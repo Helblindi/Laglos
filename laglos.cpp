@@ -26,7 +26,7 @@ static int dim;
 // Forward declarations
 double fRand(double fMin, double fMax);
 void mesh_v(const Vector &x, const double t, Vector &res);
-void move_mesh();
+void move_mesh(ParFiniteElementSpace & pfes);
 
 int main(int argc, char *argv[]) {
    // Initialize MPI.
@@ -149,49 +149,20 @@ int main(int argc, char *argv[]) {
    cout << "Num faces: " << H1FESpace.GetNF() << endl;
    cout << "dim: " << dim << endl;
 
-   ConstantCoefficient zero(0.0);
-   ParGridFunction *u = new ParGridFunction(&H1FESpace);
-   u->ProjectCoefficient(zero);
-
    // Print initialized mesh
    // Can be visualized with glvis -np # -m mesh-test-init
    {
-      ostringstream mesh_name, sol_name;
+      ostringstream mesh_name;
       mesh_name << "mesh-test-init." << setfill('0') << setw(6) << myid;
-      sol_name << "mesh-test-init-sol." << setfill('0') << setw(6) << myid;
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
-      ofstream osol(sol_name.str().c_str());
-      osol.precision(precision);
-      u->Save(osol);
    }
 
    /*
    * Move Mesh
    */
-
-   ParGridFunction *x_gf = new ParGridFunction(&H1FESpace);
-   VectorFunctionCoefficient mesh_velocity(dim, mesh_v);
-   mesh_velocity.SetTime(0);
-   ParGridFunction *v_gf = new ParGridFunction(&H1FESpace);
-   v_gf->ProjectCoefficient(mesh_velocity);
-
-   // Initialize x_gf using the starting mesh coordinates.
-   pmesh->SetNodalGridFunction(x_gf);
-
-   // Logic to change x_gf based on velocities in v_gf
-   cout << "Pre add\n";
-   x_gf->Print(cout);
-   // V = v0 + 0.5 * dt * dv_dt;
-   // cout << "printing values in v_gf\n";
-   // v_gf->Print(cout);
-   add(*x_gf, 1, *v_gf, *x_gf);
-   cout << "Post add\n";
-   x_gf->Print(cout);
-
-   // Make sure that the mesh corresponds to the new solution state.
-   H1FESpace.GetParMesh()->NewNodes(*x_gf, false);
+   move_mesh(H1FESpace);
 
    // Print moved mesh
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -203,9 +174,7 @@ int main(int argc, char *argv[]) {
       pmesh->Print(omesh);
    }
    
-
    // FaceGeometricFactors FaceGFs = *pmesh->GetFaceGeometricFactors();
-
 
 }
 
@@ -223,7 +192,7 @@ double fRand(double fMin, double fMax)
 
 void mesh_v(const Vector &x, const double t, Vector &res)
 {
-   int mesh_opt = 3; // Change this param to get different movement
+   int mesh_opt = 1; // Change this param to get different movement
 
    switch (dim)
    {
@@ -285,7 +254,21 @@ void mesh_v(const Vector &x, const double t, Vector &res)
    }
 }
 
-void move_mesh()
+void move_mesh(ParFiniteElementSpace & pfes)
 {
-   
+   ParGridFunction *x_gf = new ParGridFunction(&pfes);
+   VectorFunctionCoefficient mesh_velocity(dim, mesh_v);
+   mesh_velocity.SetTime(0);
+   ParGridFunction *v_gf = new ParGridFunction(&pfes);
+   v_gf->ProjectCoefficient(mesh_velocity);
+
+   // Initialize x_gf using the starting mesh coordinates.
+   pfes.GetParMesh()->SetNodalGridFunction(x_gf);
+
+   // Logic to change x_gf based on velocities in v_gf
+   // V = v0 + 0.5 * dt * dv_dt;
+   add(*x_gf, 1, *v_gf, *x_gf);
+
+   // Update mesh gridfunction
+   pfes.GetParMesh()->NewNodes(*x_gf, false);
 }

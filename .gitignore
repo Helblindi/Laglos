@@ -1,0 +1,11 @@
+# Object and library files
+*.o
+
+# vscode directory
+.vscode
+
+# Executable
+Laglos
+
+# Meshes
+mesh-test-*

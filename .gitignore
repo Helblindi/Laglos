@@ -9,3 +9,20 @@ Laglos
 
 # Meshes
 mesh-test-*
+
+# Cmake generated files
+.DS_Store
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+libcomp_lambda.a
+makefile
+
+# Save old files (may be of use in the future, I am a file hoarder)
+saved/
+
+# Fortran
+Fortran/main.f90
+Fortran/makefile
+Fortran/output_ref
+Fortran/data

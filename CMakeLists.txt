@@ -60,7 +60,7 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 
 
 # add the executable
-add_executable(Laglos laglos.cpp)
+add_executable(Laglos laglos.cpp laglos_solver.cpp)
 
 # Add fortran
 set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Fortran")

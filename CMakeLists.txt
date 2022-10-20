@@ -58,16 +58,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MFEM_CXX_FLAGS}")
 list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_INCLUDE_DIRS}")
 list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 
+# Add Fortran library
+add_library(comp_lambda STATIC "${PROJECT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
 
-# add the executable
-add_executable(Laglos laglos.cpp laglos_solver.cpp)
+# Include Directories
+INCLUDE_DIRECTORIES(include)
 
-# Add fortran
-set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Fortran")
-add_library(comp_lambda STATIC "${CMAKE_CURRENT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
+add_subdirectory(src)
 
-# Link MFEM and Fortran libraries
-target_link_libraries(Laglos "${MFEM_LIBRARIES}" comp_lambda)
+# Enable testing
+# https://cmake.org/cmake/help/latest/command/add_test.html
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  include(CTest)
+endif()
 
-# Specify Include directories for target
-target_include_directories(Laglos PUBLIC ${MFEM_DIR} "${MFEM_INCLUDE_DIRS}")
+# Add test folder
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

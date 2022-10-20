@@ -4,7 +4,6 @@ MODULE arbitrary_eos_Lagrangian_lambda_module
   IMPLICIT NONE
   PUBLIC               :: Lagrangian_lambda_arbitrary_eos !===Main function
   PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
-  REAL(KIND=8), PUBLIC :: b_covolume = 0.0d0   !===Covolume constant, if known
   PRIVATE
   INTEGER, PARAMETER:: NUMBER = KIND(1.d0)
   REAL(KIND=NUMBER), PARAMETER :: zero = 0
@@ -28,11 +27,12 @@ CONTAINS
   !===use no_iter=.true. if one does not want iterative line search. Then the parameter ``in_tol'' is useless.
   !===use no_iter=.false. to enable the line search with ``in_tol'' tolerance. Then ``k'' is the numer of iterations used.
   SUBROUTINE Lagrangian_lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
-       lambda_maxl_out,lambda_maxr_out,pstar,k)
+       lambda_maxl_out,lambda_maxr_out,pstar,k, b_covolume)
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
     REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
     LOGICAL,      INTENT(IN) :: no_iter
+    REAL(KIND=8), INTENT(IN) :: b_covolume
     REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
     INTEGER,      INTENT(OUT):: k
     REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
@@ -47,8 +47,8 @@ CONTAINS
     pr = in_pr
     er = in_er
     k = 0
-    CALL init(rhol,el,pl,gammal,al,alphal,capAl,capBl,capCl,expol)
-    CALL init(rhor,er,pr,gammar,ar,alphar,capAr,capBr,capCr,expor)
+    CALL init(rhol,el,pl,b_covolume,gammal,al,alphal,capAl,capBl,capCl,expol)
+    CALL init(rhor,er,pr,b_covolume,gammar,ar,alphar,capAr,capBr,capCr,expor)
     IF (pl.LE.pr) THEN
        p_min     = pl
        rho_min   = rhol
@@ -130,13 +130,22 @@ CONTAINS
   END SUBROUTINE Lagrangian_lambda_arbitrary_eos
 
 
-  SUBROUTINE init(rho,e,p,gamma,a,alpha,capA,capB,capC,expo)
+  SUBROUTINE init(rho,e,p,b_covolume,gamma,a,alpha,capA,capB,capC,expo)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN)  :: rho, e, p
+    REAL(KIND=NUMBER), INTENT(IN)  :: rho, e, p, b_covolume
     REAL(KIND=NUMBER), INTENT(OUT) :: gamma, a, alpha, capA, capB, capC, expo
     REAL(KIND=NUMBER) :: x
+
     x = 1-b_covolume*rho
     gamma = 1 + p*x/(rho*e)
+    
+   !  WRITE(*,*) "b_covolume: ", b_covolume
+   !  WRITE(*,*) "p: ", p
+   !  WRITE(*,*) "x: ", x
+   !  WRITE(*,*) "rho: ", rho
+   !  WRITE(*,*) "e: ", e
+   !  write(*,*) "gamma: ", gamma
+
     a = SQRT(gamma*p/(rho*x))
     capC = 2*a*x/(gamma-1)
     alpha = cc(gamma)*capC
@@ -150,6 +159,7 @@ CONTAINS
       REAL(KIND=NUMBER)             :: vv
       IF (gamma.LE.1) THEN
          WRITE(*,*) "BUG: gamma .LE. 1"
+         WRITE(*,*) "Gamma = ", gamma
          STOP
       ELSE IF (gamma .LE. five_third) THEN
          vv = one 
@@ -286,9 +296,9 @@ CONTAINS
     vv = half*(ul+f(pstar,pl,capAl,capBl,capCl,expol)+ur+f(pstar,pr,capAr,capBr,capCr,expor))
   END FUNCTION ustar
 
-  FUNCTION rhostar(pstar,rhoz,pz,gammaz) RESULT(vv)
+  FUNCTION rhostar(pstar,rhoz,pz,gammaz,b_covolume) RESULT(vv)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN) :: pstar, rhoz, pz, gammaz
+    REAL(KIND=NUMBER), INTENT(IN) :: pstar, rhoz, pz, gammaz, b_covolume
     REAL(KIND=NUMBER)             :: vv
     IF (pstar.LE.pz) THEN
        vv = rhoz /(b_covolume*rhoz+(1-b_covolume*rhoz)*(pz/pstar)**(1/gammaz))

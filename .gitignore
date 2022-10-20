@@ -29,6 +29,7 @@ Testing/
 saved/
 
 # Fortran
+Fortran/arbitrary_eos_lagrangian_lambda_module.mod
 Fortran/main.f90
 Fortran/makefile
 Fortran/output_ref

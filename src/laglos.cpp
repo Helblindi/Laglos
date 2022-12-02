@@ -15,16 +15,38 @@
 // Lagrangian frame using unstructured low-order finite element spatial
 // discretization and forward euler time-stepping.
 
+/*
+* Example run time parameters:  [Remember to change the problem in compile-time-vals.h]
+*
+* ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
+* ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
+* 
+*/
+
+
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
-#include "initial_vals.hpp"
-#include "compile_time_vals.h"
+// #include "compile_time_vals.h"
+#include <iostream>
+#include <fstream>
+#include <chrono>
+
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include "matplotlibcpp.h"
+
+#ifdef DMALLOC  // Memory allocation checks
+#include "dmalloc.h"
+#endif
 
 using namespace mfem;
 using namespace hydrodynamics;
 using namespace std;
+namespace plt = matplotlibcpp;
 
 // Forward declarations
+double free_steam_conditions(const Vector &x);
+void free_steam_conditions_v(const Vector &x, Vector &v);
 void orthogonal(Vector &v);
 void build_C(ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt);
 void calc_outward_normal_int(int cell, int face, ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt, Vector & res);
@@ -39,8 +61,10 @@ void mesh_v(const Vector &x, const double t, Vector &res); // Initial mesh veloc
 
 int main(int argc, char *argv[]) {
    // Initialize MPI.
-   MPI_Session mpi(argc, argv);
-   const int myid = mpi.WorldRank();
+   Mpi::Init();
+   const int num_procs = Mpi::WorldSize();
+   const int myid = Mpi::WorldRank();
+   // Hypre::Init();
 
    const int dim = CompileTimeVals::dim;
    const int problem = CompileTimeVals::problem;
@@ -51,13 +75,19 @@ int main(int argc, char *argv[]) {
    const char *mesh_file = "default";
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 2;  // Order of mesh movement approximation space
+   int order_mv = 1;  // Order of mesh movement approximation space
    int order_u = 0;
    double t_final = 0.6;
    int max_tsteps = -1;
+   double dt = 0.001;
    bool visualization = false;
    int vis_steps = 5;
    int precision = 12;
+   bool use_viscosity = true;
+   bool mm = false;
+   bool optimize_timestep = false;
+   bool convergence_testing = false;
+   double CFL = 0.5;
 
    OptionsParser args(argc, argv);
    // args.AddOption(&problem, "-p", "--problem", "Problem setup to use.");
@@ -76,14 +106,35 @@ int main(int argc, char *argv[]) {
                   "Enable or disable GLVis visualization.");
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
+   args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
+                  "--no-viscosity",
+                  "Enable or disable the use of artificial viscosity.");
+   args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
+                  "Enable or disable mesh movement.");
+   args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
+                  "--no-optimize-timestep",
+                  "Enable or disable timestep optimization using CFL.");
+   args.AddOption(&CFL, "-cfl", "--time-step-restriction",
+                  "CFL value to use.");
+   args.AddOption(&convergence_testing, "-ct", "--set-dt-to-h", "-no-ct", 
+                  "--no-set-dt-to-h", 
+                  "Enable or disable convergence testing timestep.");
+   args.AddOption(&dt, "-dt", "--timestep", "Timestep to use.");
 
    args.Parse();
    if (!args.Good())
    {
-      if (mpi.Root()) { args.PrintUsage(cout); }
+      if (Mpi::Root()) { args.PrintUsage(cout); }
       return 1;
    }
-   if (mpi.Root()) { args.PrintOptions(cout); }
+   if (Mpi::Root()) { args.PrintOptions(cout); }
+
+   // Check that convergence testing and optimizing the timestep are not both set to true
+   if (optimize_timestep && convergence_testing)
+   {
+      cout << "Cannot both optimize the timestep and set the timestep for convergence testing.\n";
+      return -1;
+   }
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
@@ -135,20 +186,25 @@ int main(int argc, char *argv[]) {
    //    mesh->SetCurvature(max(mesh_order, 1));
    // }
 
+   cout << "done with serial refinement\n";
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
    // parallel mesh is defined, the serial mesh can be deleted.
-   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
    delete mesh;
    for (int lev = 0; lev < rp_levels; lev++)
    {
       pmesh->UniformRefinement();
    }
+   cout << "done with parallel refinement\n";
+
+   cout << "dim: " << pmesh->Dimension() << ", spacedim: " << pmesh->SpaceDimension() << endl;
 
    int NE = pmesh->GetNE(), ne_min, ne_max;
    MPI_Reduce(&NE, &ne_min, 1, MPI_INT, MPI_MIN, 0, pmesh->GetComm());
    MPI_Reduce(&NE, &ne_max, 1, MPI_INT, MPI_MAX, 0, pmesh->GetComm());
-
+   double hmin, hmax, kmin, kmax;
+   pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
    if (myid == 0)
    { cout << "Zones min/max: " << ne_min << " " << ne_max << endl; }
 
@@ -162,6 +218,8 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
 
+   HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
+   cout << "global_vSize: " << global_vSize << endl;
    cout << "N dofs: " << H1FESpace.GetNDofs() << endl;
    cout << "Num Scalar Vertex DoFs: " << H1FESpace.GetNVDofs() << endl;
    cout << "Num Scalar edge-interior DoFs: " << H1FESpace.GetNEDofs() << endl;
@@ -169,20 +227,10 @@ int main(int argc, char *argv[]) {
    cout << "Num faces: " << H1FESpace.GetNF() << endl;
    cout << "dim: " << dim << endl;
 
-   // Print initialized mesh
-   // Can be visualized with glvis -np # -m ./results/mesh-test-init
-   {
-      ostringstream mesh_name;
-      mesh_name << "./results/mesh-test-init." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
-   }
-
    // Print # DoFs
    const HYPRE_Int glob_size_l2 = L2FESpace.GlobalTrueVSize();
    const HYPRE_Int glob_size_h1 = H1FESpace.GlobalTrueVSize();
-   if (mpi.Root())
+   if (Mpi::Root())
    {
       cout << "Number of kinematic (position, mesh velocity) dofs: "
            << glob_size_h1 << endl
@@ -217,7 +265,6 @@ int main(int argc, char *argv[]) {
    cout << "num interior faces: " << pmesh->GetNFbyType(FaceType::Interior) << endl;
    cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
    cout << "num total faces: " << pmesh->GetNumFaces() << endl;
-   
 
    /* The monolithic BlockVector stores unknown fields as:
    *   - 0 -> position
@@ -253,80 +300,202 @@ int main(int argc, char *argv[]) {
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
 
+   /* Distort Mesh for Saltzman Problem */
+   if (CompileTimeVals::distort_mesh)
+   {
+      switch (problem)
+      {
+         case 7: // Saltzman problem
+         {
+            Array<double> coords(dim);
+            for (int vertex = 0; vertex < pmesh->GetNV(); vertex++)
+            {
+               for (int i = 0; i < dim; i++)
+               {
+                  int index = vertex + i * H1FESpace.GetNDofs();
+                  coords[i] = x_gf[index];
+               }
+               // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
+               double x_new = coords[0] + (0.1 - coords[1]) * sin(M_PI * coords[0]); // 
+
+               x_gf[vertex] = x_new;
+            }
+         }
+         default: // do nothing for all other problems
+         {
+         }
+      }
+   }
+
+   // Print initialized mesh
+   // Can be visualized with glvis -np # -m ./results/mesh-test-init
+   {
+      ostringstream mesh_name;
+      mesh_name << "./results/mesh-test-init." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
    // Initialize mesh velocity
-   VectorFunctionCoefficient mesh_velocity(dim, mesh_v);
-   mesh_velocity.SetTime(0);
-   mv_gf.ProjectCoefficient(mesh_velocity);
+   ConstantCoefficient zero(0.0);
+   mv_gf.ProjectCoefficient(zero);
    // Sync the data location of mv_gf with its base, S
    mv_gf.SyncAliasMemory(S);
 
    // Initialize specific volume, velocity, and specific total energy
    FunctionCoefficient sv_coeff(InitialValues<problem, dim>::sv0);
+   sv_coeff.SetTime(0.);
    sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
    VectorFunctionCoefficient v_coeff(dim, InitialValues<problem, dim>::v0);
+   v_coeff.SetTime(0.);
    v_gf.ProjectCoefficient(v_coeff);
-   // for (int i = 0; i < ess_vdofs.Size(); i++)
-   // {
-   //    v_gf(ess_vdofs[i]) = 0.0;
-   // }
    // Sync the data location of v_gf with its base, S
    v_gf.SyncAliasMemory(S);
 
-   FunctionCoefficient ste_coeff(InitialValues<problem, dim>::sie0);
+   FunctionCoefficient ste_coeff(InitialValues<problem, dim>::ste0);
+   ste_coeff.SetTime(0.);
    ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
-   FunctionCoefficient rho0_coeff(InitialValues<problem, dim>::rho0); // To build mass vector
+   FunctionCoefficient rho_coeff(InitialValues<problem, dim>::rho0); 
+   rho_coeff.SetTime(0.);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, m);
+   LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, mm, CFL);
 
-   socketstream vis_sv, vis_v, vis_ste;
+   /* Set up visualiztion object */
+   socketstream vis_rho, vis_v, vis_ste, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
    char vishost[] = "localhost";
    int  visport   = 19916;
 
+   ParGridFunction rho_gf(&L2FESpace);
+
    if (visualization)
    {
+      // Compute Density
+      for (int i = 0; i < sv_gf.Size(); i++)
+      {
+         rho_gf[i] = 1./sv_gf[i];
+      } 
+
       // Make sure all MPI ranks have sent their 'v' solution before initiating
       // another set of GLVis connections (one from each rank):
       MPI_Barrier(pmesh->GetComm());
-      vis_sv.precision(8);
+
+      vis_rho.precision(8);
       vis_v.precision(8);
       vis_ste.precision(8);
+
+      vis_rho_ex.precision(8);
+      vis_v_ex.precision(8);
+      vis_ste_ex.precision(8);
+
+      vis_rho_err.precision(8);
+      vis_v_err.precision(8);
+      vis_ste_err.precision(8);
+
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
-      int offx = Ww+10; // window offsets
-      if (problem != 0 && problem != 4) // TODO: Remove??
-      {
-         VisualizeField(vis_sv, vishost, visport, sv_gf,
-                                       "Specific Volume", Wx, Wy, Ww, Wh);
-      }
+      int offx = Ww+10, offy = Wh+45;; // window offsets
+
+      VisualizeField(vis_rho, vishost, visport, rho_gf,
+                     "Density", Wx, Wy, Ww, Wh);
       Wx += offx;
       VisualizeField(vis_v, vishost, visport, v_gf,
-                                    "Velocity", Wx, Wy, Ww, Wh);
+                     "Velocity", Wx, Wy, Ww, Wh);
       Wx += offx;
       VisualizeField(vis_ste, vishost, visport, ste_gf,
-                                    "Specific Total Energy", Wx, Wy, Ww, Wh);
+                     "Specific Total Energy", Wx, Wy, Ww, Wh);
+      Wx = 0;
+      Wy += offy;
+
+      switch(problem)
+      {
+         case 7:
+         case 6:
+         case 4: // Noh Problem
+         case 3:
+         case 2:
+         {
+            // Compute errors
+            ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+            ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+            ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+
+            rho_ex->ProjectCoefficient(rho_coeff);
+            vel_ex->ProjectCoefficient(v_coeff);
+            ste_ex->ProjectCoefficient(ste_coeff);
+
+            ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+            rho_err -= *rho_ex;
+            vel_err -= *vel_ex;
+            ste_err -= *ste_ex;
+
+            // Visualize difference between exact and approx
+            VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+                           "Exact: Density", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+                           "Exact: Velocity", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+            Wx = 0;
+            Wy += offy;
+
+            // Visualize difference between exact and approx
+            VisualizeField(vis_rho_err, vishost, visport, rho_err,
+                           "Error: Density", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_v_err, vishost, visport, vel_err,
+                           "Error: Velocity", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_ste_err, vishost, visport, ste_err,
+                           "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
+
+            delete rho_ex, vel_ex, ste_ex;
+         }
+      }
    }
 
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
-   double t = 0.0, dt = 0.0001, t_old;
+   double t = 0.0, t_old;
+   if (convergence_testing)
+   {
+      dt = hmin; // Set timestep to smalled h val for convergence testing
+   }
+
    bool last_step = false;
    int steps = 0;
    BlockVector S_old(S);
 
    for (int ti = 1; !last_step; ti++)
    {
-      hydro.CalculateTimestep(S);
-      dt = hydro.GetTimestep();
+      /* Check if we need to change CFL */
+      if (CompileTimeVals::change_CFL && problem == 7 && t > CompileTimeVals::CFL_time_change && hydro.GetCFL() != CompileTimeVals::CFL_second)
+      {
+         cout << "Changing CFL for Saltzman at time = " << t << endl;
+         hydro.SetCFL(CompileTimeVals::CFL_second);
+      }
+
+      if (optimize_timestep)
+      {
+         hydro.CalculateTimestep(S);
+         dt = hydro.GetTimestep();
+      }
 
       if (t + dt >= t_final)
       {
@@ -340,8 +509,7 @@ int main(int argc, char *argv[]) {
 
       hydro.MakeTimeStep(S, t, dt); // testing
       steps++;
-      if (S_old == S) { cout << "\t ########## We have a problem!\n"; }
-      // TODO: Adaptive time step control?
+      if (S_old == S) { cout << "\t State has not changed with step.\n"; return -1; }
 
       // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
       // data in S. This operation simply updates the Memory validity flags of
@@ -361,15 +529,8 @@ int main(int argc, char *argv[]) {
       {
          double lnorm = ste_gf * ste_gf, norm;
          MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
-         // if (mem_usage)
-         // {
-         //    mem = GetMaxRssMB();
-         //    MPI_Reduce(&mem, &mmax, 1, MPI_LONG, MPI_MAX, 0, pmesh->GetComm());
-         //    MPI_Reduce(&mem, &msum, 1, MPI_LONG, MPI_SUM, 0, pmesh->GetComm());
-         // }
-         // const double internal_energy = hydro.InternalEnergy(e_gf);
-         // const double kinetic_energy = hydro.KineticEnergy(v_gf);
-         if (mpi.Root())
+ 
+         if (Mpi::Root())
          {
             const double sqrt_norm = sqrt(norm);
 
@@ -379,46 +540,165 @@ int main(int argc, char *argv[]) {
                  << ",\tdt = " << std::setw(5) << std::setprecision(6) << dt
                  << ",\t|e| = " << std::setprecision(10) << std::scientific
                  << sqrt_norm;
-            //  << ",\t|IE| = " << std::setprecision(10) << std::scientific
-            //  << internal_energy
-            //   << ",\t|KE| = " << std::setprecision(10) << std::scientific
-            //  << kinetic_energy
-            //   << ",\t|E| = " << std::setprecision(10) << std::scientific
-            //  << kinetic_energy+internal_energy;
-            // cout << std::fixed;
-            // if (mem_usage)
-            // {
-            //    cout << ", mem: " << mmax << "/" << msum << " MB";
-            // }
             cout << endl;
          }
 
          if (visualization)
          {
+            // Compute Density
+            for (int i = 0; i < sv_gf.Size(); i++)
+            {
+               rho_gf[i] = 1./sv_gf[i];
+            } 
+            
             int Wx = 0, Wy = 0; // window position
             int Ww = 350, Wh = 350; // window size
-            int offx = Ww+10; // window offsets
-            if (problem != 0 && problem != 4)
-            {
-               VisualizeField(vis_sv, vishost, visport, sv_gf,
-                              "Specific Volume", Wx, Wy, Ww, Wh);
-            }
+            int offx = Ww+10, offy = Wh + 45; // window offsets
+
+            VisualizeField(vis_rho, vishost, visport, rho_gf,
+                           "Density", Wx, Wy, Ww,Wh); 
             Wx += offx;
+
             VisualizeField(vis_v, vishost, visport,
                            v_gf, "Velocity", Wx, Wy, Ww, Wh);
             Wx += offx;
+
             VisualizeField(vis_ste, vishost, visport, ste_gf,
                            "Specific Total Energy",
                            Wx, Wy, Ww,Wh);
-            Wx += offx;
+            
+            Wx = 0;
+            Wy += offy;
+            
+            switch(problem)
+            {
+               case 7:
+               case 6:
+               case 4: // Noh Problem
+               case 3:
+               case 2:
+               {
+                  // Compute errors
+                  ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+                  ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+                  ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+
+                  rho_coeff.SetTime(t);
+                  v_coeff.SetTime(t);
+                  ste_coeff.SetTime(t);
+
+                  rho_ex->ProjectCoefficient(rho_coeff);
+                  vel_ex->ProjectCoefficient(v_coeff);
+                  ste_ex->ProjectCoefficient(ste_coeff);
+
+                  ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+                  rho_err -= *rho_ex;
+                  vel_err -= *vel_ex;
+                  ste_err -= *ste_ex;
+
+                  // Visualize difference between exact and approx
+                  VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+                                 "Exact: Density", Wx, Wy, Ww, Wh);
+                  
+                  Wx += offx;
+                  VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+                                 "Exact: Velocity", Wx, Wy, Ww, Wh);
+                  
+                  Wx += offx;
+                  VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+                                 "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+                  Wx = 0;
+                  Wy += offy;
+
+
+                  // Visualize difference between exact and approx
+                  VisualizeField(vis_rho_err, vishost, visport, rho_err,
+                                 "Error: Density", Wx, Wy, Ww, Wh);
+                  
+                  Wx += offx;
+                  VisualizeField(vis_v_err, vishost, visport, vel_err,
+                                 "Error: Velocity", Wx, Wy, Ww, Wh);
+                  
+                  Wx += offx;
+
+                  VisualizeField(vis_ste_err, vishost, visport, ste_err,
+                                 "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
+
+                  delete rho_ex, vel_ex, ste_ex;
+               }
+            }
          }
       }
    } // End time step iteration
 
-   /*
-   * Move Mesh
-   */
-   // move_mesh(H1FESpace, &mv_gf);
+   /* Plots end y velocity in the case of the Saltzman problem */
+   switch (problem)
+   {
+      case 7:
+      {
+         /* Prepare data */
+         // Velocity plot
+         int nv_py = pmesh->GetNV();
+         std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
+         // for(int i = 0; i < n_py; i++) {
+         //    x.at(i) = i*i;
+         //    y.at(i) = sin(2*M_PI*i/360.0);
+         //    z.at(i) = log(i);
+         // }
+         for(int i = 0; i < nv_py; i++) {
+            xgf_py[i] = x_gf[i];
+            // mv_y_py[i] = mv_gf[i];
+            mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
+         }
+
+         // Density plot 
+         int nc_py = L2FESpace.GetNE();
+         cout << "nc_py: " << nc_py << endl;
+         Vector center(dim);
+         std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
+         for (int ci = 0; ci < nc_py; ci++) // cell iterator
+         {
+            pmesh->GetElementCenter(ci, center);
+            rho_x_py[ci] = center[0];
+            rho_py[ci] = rho_gf[ci];
+         }
+         
+         // Set the size of output image = 1200x780 pixels
+         plt::figure_size(1200, 780);
+
+         // Plot line from given x and y data. Color is selected automatically.
+         // plt::scatter(xgf_py, mv_y_py);
+         // plt::scatter(rho_x_py, rho_py);
+
+         const long nrows=1, ncols=2;
+         long row = 0, col = 0;
+
+         plt::subplot2grid(nrows, ncols, row, col);
+         plt::scatter(rho_x_py, rho_py);
+         plt::title("Density");
+
+         col = 1;
+         plt::subplot2grid(nrows, ncols, row, col);
+         plt::scatter(xgf_py, mv_y_py);
+         plt::title("Y Velocity");
+
+         // Plot a red dashed line from given x and y data.
+         // plt::plot(x, w,"r--");
+
+         // Plot a line whose name will show up as "log(x)" in the legend.
+         // plt::named_plot("log(x)", x, z);
+
+         // Enable legend.
+         plt::show();
+
+         // save figure
+         // const char* filename = "./basic.png";
+         // std::cout << "Saving result to " << filename << std::endl;;
+         // plt::save(filename);
+         break;
+      }
+      default: {}
+   }
 
    // Print moved mesh
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -430,109 +710,103 @@ int main(int argc, char *argv[]) {
       pmesh->Print(omesh);
    }
 
-   delete pmesh;
+   // Last time recomputing density
+   for (int i = 0; i < sv_gf.Size(); i++)
+   {
+      rho_gf[i] = 1./sv_gf[i];
+   } 
+
+   /* When the exact solution is known, print out an error file */
+   switch(problem)
+   {
+      case 7:
+      case 6:
+      case 4: // Noh problem
+      case 3:
+      case 2:
+      {
+         // Compute errors
+         ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+         ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+         ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+
+         rho_coeff.SetTime(t);
+         v_coeff.SetTime(t);
+         ste_coeff.SetTime(t);
+
+         rho_ex->ProjectCoefficient(rho_coeff);
+         vel_ex->ProjectCoefficient(v_coeff);
+         ste_ex->ProjectCoefficient(ste_coeff);
+
+         /* Compute denoms */
+         double rho_ex_L1_norm = rho_ex->ComputeL1Error(zero);
+         double rho_ex_L2_norm = rho_ex->ComputeL2Error(zero);
+         double rho_ex_max_norm = rho_ex->ComputeMaxError(zero);
+
+         double vel_ex_L1_norm = vel_ex->ComputeL1Error(zero);
+         double vel_ex_L2_norm = vel_ex->ComputeL2Error(zero);
+         double vel_ex_max_norm = vel_ex->ComputeMaxError(zero);
+
+         double ste_ex_L1_norm = ste_ex->ComputeL1Error(zero);
+         double ste_ex_L2_norm = ste_ex->ComputeL2Error(zero);
+         double ste_ex_max_norm = ste_ex->ComputeMaxError(zero);
+         
+         /* Compute relative errors */
+         double rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff) / rho_ex_L1_norm;
+         double vel_L1_error_n = v_gf.ComputeL1Error(v_coeff) / vel_ex_L1_norm;
+         double ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff) / ste_ex_L1_norm;
+         const double L1_error = rho_L1_error_n + vel_L1_error_n + ste_L1_error_n;
+ 
+         double rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff) / rho_ex_L2_norm;
+         double vel_L2_error_n = v_gf.ComputeL2Error(v_coeff) / vel_ex_L2_norm;
+         double ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff) / ste_ex_L2_norm;
+         const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;
+
+         double rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex_max_norm;
+         double vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex_max_norm;
+         double ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex_max_norm;
+         const double Max_error = rho_Max_error_n + vel_Max_error_n + ste_Max_error_n;
+
+         if (Mpi::Root())
+         {
+            ostringstream convergence_filename;
+            convergence_filename << "/Users/madisonsheridan/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
+            if (rs_levels != 0) {
+               convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
+            }
+            if (rp_levels != 0) {
+               convergence_filename << "_p" << setfill('0') << setw(2) << rp_levels;
+            }
+            convergence_filename << "_refinement_"
+                                 << setfill('0') << setw(2)
+                                 << to_string(rp_levels + rs_levels)
+                                 << ".out";
+            ofstream convergence_file(convergence_filename.str().c_str());
+            convergence_file.precision(precision);
+            convergence_file << "Processor_Runtime " << "1." << "\n"
+                             << "n_processes " << num_procs << "\n"
+                             << "n_refinements "
+                             << to_string(rp_levels + rs_levels) << "\n"
+                             << "n_Dofs " << global_vSize << "\n"
+                             << "h " << hmin << "\n"
+                             << "L1_Error " << L1_error << "\n"
+                             << "L2_Error " << L2_error << "\n"
+                             << "Linf_Error " << Max_error << "\n"
+                             << "mass_loss " << hydro.CheckMassLoss(S) << "\n"
+                             << "dt " << dt << "\n"
+                             << "Endtime " << t << "\n";
+                        
+            convergence_file.close();
+
+            delete rho_ex, vel_ex, ste_ex;
+         }
+      }
+   }
+
+   /* Finally, check for mass conservation */
+   hydro.CheckMassLoss(S);
+   
+   delete pmesh, m;
 
    return 0;
 }
-
-/* 
-*
-* Mesh Movement
-*
-*/
-double fRand(double fMin, double fMax)
-{
-    double f = (double)rand() / RAND_MAX;
-    return fMin + f * (fMax - fMin);
-}
-
-void move_mesh(ParFiniteElementSpace & pfes, const ParGridFunction * velocities)
-{
-   ParGridFunction *x_gf = new ParGridFunction(&pfes);
-
-   // Initialize x_gf using the starting mesh coordinates.
-   pfes.GetParMesh()->SetNodalGridFunction(x_gf);
-
-   // Logic to change x_gf based on velocities in v_gf
-   // V = v0 + 0.5 * dt * dv_dt;
-   add(*x_gf, 1, *velocities, *x_gf);
-
-   // Update mesh gridfunction
-   pfes.GetParMesh()->NewNodes(*x_gf, false);
-}
-
-/*
-*
-* Initial Conditions
-*
-*/
-void mesh_v(const Vector &x, const double t, Vector &res)
-{
-   res.SetSize(x.Size());
-   res = 0.;
-}
-// void mesh_v(const Vector &x, const double t, Vector &res)
-// {
-//    int mesh_opt = 0; // Change this param to get different movement
-
-//    switch (dim)
-//    {
-//       case 1:
-//       {
-//          res[0] = .1;
-//          return;
-//       }
-//       case 3:
-//       case 2:
-//       {
-//          switch (mesh_opt)
-//          {
-//             case 0: // constant velocity
-//             {
-//                for (int i = 0; i < dim; i++)
-//                {
-//                   res[i] = 0.2;
-//                }
-//                return;
-//             }
-//             case 1: // Move non corners
-//             {
-//                // Set v[1]
-//                if (x[0] != 0 && x[0] != 1)
-//                {
-//                   res[1] = 0.1;
-//                }
-//                else
-//                {
-//                   res[1] = 0.;
-//                }
-
-//                // Set v[0]
-//                if (x[1] != 0 && x[1] != 1)
-//                {
-//                   res[0] = .2;
-//                }
-//                else
-//                { 
-//                   res[0] = 0.;
-//                }
-//                return;
-//             }
-//             case 2: // rotation about origin with angle theta
-//             {
-//                const double theta = M_PI/4;
-//                res[0] = x[0]*(cos(theta) - 1) - x[1]*sin(theta);
-//                res[1] = x[0]*sin(theta) + x[1]*(cos(theta) - 1);
-//                return;
-//             }
-//             case 3: // random
-//             {
-//                const double r_max = .02;
-//                res[0] = fRand(0, r_max);
-//                res[1] = fRand(0, r_max);
-//                return;
-//             }
-//          } // mesh_opt switch
-//       } // 2D velocity end
-//    }
-// }

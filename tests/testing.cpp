@@ -7,6 +7,7 @@
 using namespace std;
 
 const int dim = 1;
+const int problem = 1;
 static double b_covolume = 0;
 
 void test_lambda_max_computation();
@@ -79,7 +80,7 @@ void test_lambda_max_computation()
 
          
          // Call case
-         lambda_max = mfem::hydrodynamics::LagrangianLOOperator<dim>::compute_lambda_max(Ul_v, Ur_v, n, "testing");
+         lambda_max = mfem::hydrodynamics::LagrangianLOOperator<dim, problem>::compute_lambda_max(Ul_v, Ur_v, n, "testing");
          cout << "case: " << _case << ", lambda max: " << lambda_max << endl;
 
          next_step = "read_tol";
@@ -109,7 +110,7 @@ void test_lambda_max_computation()
 
 double gamma_law_internal(double rho, double p, double b_covolume)
 {
-   double vv = (p*(1-b_covolume*rho)) / ((mfem::hydrodynamics::LagrangianLOOperator<dim>::gamma - 1.) * rho); 
+   double vv = (p*(1-b_covolume*rho)) / ((mfem::hydrodynamics::InitialValues<problem, dim>::gamma_func() - 1.) * rho); 
 
    // cout << "b_covolume: "
    //      << b_covolume

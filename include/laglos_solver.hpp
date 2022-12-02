@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "laglos_assembly.hpp"
+#include "initial_vals.hpp"
 #include <iostream>
 #include <cassert>
 #include <string>
@@ -24,7 +25,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
                     bool vec = false);
 
 //
-template <int dim>
+template <int dim, int problem>
 class LagrangianLOOperator
 {
 protected:
@@ -49,24 +50,40 @@ protected:
    const int NDofs_L2V;
 
    Array<int> block_offsets;
-   // Reference to the current mesh configuration.
-   mutable ParGridFunction x_gf;
+   Array<int> BdrElementIndexingArray;
+   mutable Vector v_face_intermediate; // (5.7b)
    // const Array<int> &ess_tdofs;
    const int NE, l2dofs_cnt, h1dofs_cnt, l2vdofs_cnt;
 
+   const int num_faces, num_vertices;
+
+   double CFL;
    double timestep = 0.001;
 
+   bool use_viscosity;
+   bool mm;
+
 public:
-   static constexpr double gamma = 7./5.;
    LagrangianLOOperator(ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
-                        ParLinearForm *m);
+                        ParLinearForm *m,
+                        bool use_viscosity,
+                        bool mm,
+                        double CFL);
    ~LagrangianLOOperator();
+
+   double GetCFL();
+   
+   void SetCFL(const double &_CFL); // STOPPED HERE.
+
+   void IterateOverCells(); // TODO: Delete
+
+   void CreateBdrElementIndexingArray();
 
    void MakeTimeStep(Vector &S, double & t, double dt);
 
-   double GetTimeStepEstimate(const Vector &S) const;
+   double GetTimeStepEstimate(const Vector &S);
 
    void CalculateTimestep(const Vector &S);
 
@@ -77,13 +94,30 @@ public:
    void SetCellStateVector(Vector &S_new, const int cell, const Vector &U);
 
    /* cij comp */
-   void build_C(const Vector &S, double dt);
-
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
 
    void Orthogonal(Vector &v);
 
    Vector GetIntDerRefShapeFunctions();
+
+   /* Mesh movement */
+   // void form_intermediate_velocity(const Vector &S, const double dt);
+
+   void get_intermediate_face_velocity(const int & face, Vector & vel);
+
+   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
+
+   void compute_face_velocity(Vector &S, const double & dt);
+
+   void update_node_velocity(Vector &S, const int & node, const Vector & vel);
+
+   void EnforceBoundaryConditions(Vector &S);
+
+   void MoveMesh(Vector &S, GridFunction & x_gf, GridFunction & mv_gf_new, const double & t, const double & dt);
+
+   void CheckMassConservation(const Vector &S);
+
+   double CheckMassLoss(const Vector &S);
 
    /* Problem Description Functions */
    static double internal_energy(const Vector &U);

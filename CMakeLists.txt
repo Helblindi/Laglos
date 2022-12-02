@@ -1,11 +1,41 @@
 cmake_minimum_required(VERSION 3.10)
 
+set(HOMEBREW_PREFIX "/opt/homebrew"
+  CACHE PATH "Path to Homebrew installation")
+
+set(CMAKE_C_COMPILER "${HOMEBREW_PREFIX}/bin/gcc-12")
+set(CMAKE_CXX_COMPILER "${HOMEBREW_PREFIX}/bin/g++-12")
+
 # set the project name
 project(Laglos LANGUAGES C CXX Fortran)
 
 # Verify C++ and Fortran can communicate
 include(FortranCInterface)
 FortranCInterface_VERIFY(CXX)
+
+# find python libraries
+# SET(PYTHON_LIBRARIES "/opt/homebrew/Frameworks/Python.framework/Versions/3.10/lib/libpython3.10.dylib")
+# SET(PYTHON_INCLUDE_DIR "/opt/homebrew/Frameworks/Python.framework/Versions/3.10/include/python3.10")
+# find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+# find_package(PythonLibs 3.0 REQUIRED)
+
+if(APPLE)
+  find_package(Python 3 COMPONENTS Interpreter Development NumPy REQUIRED)
+  set(PYTHON_MAJOR $ENV{Python_VERSION_MAJOR})
+  set(PYTHON_MINOR $ENV{Python_VERSION_MINOR})
+  set(PYTHONLIBS_VERSION_STRING ${Python_VERSION})
+  set(PYTHON_INCLUDE_DIR ${Python_INCLUDE_DIRS})
+  set(PYTHON_LIBRARIES ${Python_LIBRARIES})
+  message("Apple - Using Python:${Python_VERSION_MAJOR} - Libraries:${PYTHON_LIBRARIES} - IncludeDirs: ${PYTHON_INCLUDE_DIR}")
+elseif(UNIX)
+  find_package(PythonLibs 3 REQUIRED)
+else()
+  set(PYTHONLIBS_VERSION_STRING $ENV{PY_VERSION})
+endif()
+
+include_directories(${PYTHON_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIR})
+# link numpy
+link_libraries(Python::NumPy ${Python_LIBRARIES})
 
 # Load user settings before the defaults - this way the defaults will not
 # overwrite the user set options. If the user has not set all options, we still
@@ -61,8 +91,21 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 # Add Fortran library
 add_library(comp_lambda STATIC "${PROJECT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
 
-# Include Directories
+### Include Directories
 INCLUDE_DIRECTORIES(include)
+
+# populate matplotlib repository
+include(FetchContent)
+FetchContent_Declare(
+    matplotlib
+    GIT_REPOSITORY https://github.com/lava/matplotlib-cpp.git
+    GIT_TAG        f23347fca25219d1c42cbb91608b5556814bf572
+)
+FetchContent_GetProperties(matplotlib)
+if(NOT matplotlib_POPULATED)
+    FetchContent_Populate(matplotlib)
+endif()
+include_directories(SYSTEM ${matplotlib_SOURCE_DIR})
 
 add_subdirectory(src)
 

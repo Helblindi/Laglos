@@ -1,0 +1,96 @@
+"""
+This python script file performs a convergence rates analsyis by running
+a reading output files and composing a table from those values.
+
+Example:
+> python create_convergence_table.py "/Users/madisonsheridan/Workspace/Laglos/saved/convergence/temp_output/"
+"""
+
+import numpy as np
+import re
+import os
+import sys
+from tabulate import tabulate
+
+
+# check command line inputs
+assert len(sys.argv) == 2, "This file needs 1 input argument: directory, but " + str(len(sys.argv)) + " were given."
+directory = str(sys.argv[1])
+rate_precision = 6
+# iterations = int(sys.argv[2])
+# increment = int(sys.argv[3])
+# plot_organization = False
+
+# now we define the main function to be called at the end
+def main():
+    # comment out "run_simuations" if you only want to compute the errors
+    vals = gather_vals()
+    compute_rates(vals)
+
+
+def gather_vals():
+    vals = {'Processor_Runtime': [],
+            'n_processes': [],
+            'n_refinements': [],
+            'n_Dofs': [],
+            'h': [],
+            'L1_Error': [],
+            'L1_Rates': [],
+            'L2_Error': [],
+            'L2_Rates': [],
+            'Linf_Error': [],
+            'Linf_Rates': [],
+            'mass_loss': [],
+            'mass_loss_rates': [],
+            'dt': [],
+            'Endtime': []}
+    for filename in sorted(os.listdir(directory)):
+        f = os.path.join(directory, filename)
+        with open(f) as fp:
+            for cnt, ln in enumerate(fp):
+                l = ln.strip().split()
+                vals[l[0]].append(float(l[1]))
+
+    return vals
+
+def compute_rates(vals):
+
+    # Use tabulate to create a formatted table
+    table = []
+    for i in range(len(vals['h'])):
+        if i == 0:
+            table.append([vals['n_Dofs'][i], vals['L1_Error'][i], "{---}", vals['L2_Error'][i], "{---}",
+                          vals['Linf_Error'][i], "{---}", vals['mass_loss'][i], "{---}"])
+        else:
+            L1_rate = np.around(np.log(vals['L1_Error'][i]/vals['L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            L2_rate = np.around(np.log(vals['L2_Error'][i]/vals['L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            Linf_rate = np.around(np.log(vals['Linf_Error'][i]/vals['Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if vals['mass_loss'][i-1] > pow(10,-14):
+                mass_loss_rate = np.around(np.log(vals['mass_loss'][i]/vals['mass_loss'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+                table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
+                          vals['L2_Error'][i], L2_rate,
+                          vals['Linf_Error'][i], Linf_rate,
+                          vals['mass_loss'][i], mass_loss_rate])
+            else:
+                table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
+                          vals['L2_Error'][i], L2_rate,
+                          vals['Linf_Error'][i], Linf_rate,
+                          vals['mass_loss'][i], "{---}"])
+            
+
+    s_table = tabulate(table,
+                       headers=["# dof", "L1 Error", "Rate", "L2 Error",
+                                "Rate", "L-Inf Error", "Rate", "Mass Loss", "Rate"],
+                       tablefmt="latex")
+
+    # Output table to console
+    print("             ")
+    print(s_table)
+
+    # Output table to txt file
+    f = open("../saved/convergence/convergence_rates.txt", "w+")
+    f.write(s_table)
+    f.close()
+
+# then we put main at the bottom to run everything
+main()

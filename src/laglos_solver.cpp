@@ -330,13 +330,9 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
    for (ci; ci < L2.GetNE(); ci++) // Cell iterator
    {
-      // cout << "working on cell: " << ci << endl;
       GetCellStateVector(S, ci, U_i);
-      // cout << "U_i: \n";
-      // U_i.Print(cout);
       val = U_i;
 
-      // cout << "get element faces\n";
       switch (dim)
       {
          case 1: 
@@ -382,7 +378,7 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
             // flux contribution
             DenseMatrix dm = flux(U_j);
-            dm += F_i; // TODO/FIX: subtraction breaks mass conservation
+            dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
             sums -= y;
@@ -412,18 +408,11 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
                case 7: // Saltzman 
                {
                   // Check bdry flag
-                  // cout << "getting boundary face of cell: " << ci << endl;
-                  // cout << "getting boundary face for face: " << fids[j] << endl;
-                  // cout << "total nbe: " << pmesh->GetNBE() << endl;
-                  // cout << "total num faces: " << pmesh->GetNumFaces() << endl;
                   int BdrElIndex = BdrElementIndexingArray[fids[j]];
-                  // cout << "Face: " << fids[j] << " corresponds to BdrElIndex: " << BdrElIndex << endl;
-
                   int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-                  // cout << "Boundary face: " << BdrElIndex << " has attribute: " << bdr_attribute << endl;
+
                   if (bdr_attribute == 1) // Dirichlet (star states "ghost")
                   {
-                     // cout << "dirichlet\n";
                      double _rho = 3.9992502342988532;
                      double _p = 1.3334833281256551;
                      Vector _v(dim);
@@ -446,7 +435,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
                   else if (bdr_attribute == 2) // slip
                   {
-                     // cout << "slip\n";
                      // Negate velocity
                      for (int _it = 0; _it < dim; _it++)
                      {
@@ -472,167 +460,31 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
                   y_temp *= 2;
                   break;
                }
-            }
+            } // End switch case
 
             // Add in boundary contribution
-            // cout << "y_temp: \n";
-            // y_temp.Print(cout);
             sums -= y_temp;
-         }         
+         } // End boundary face        
 
       } // End Face iterator
 
       sums *= dt;
       sums /= m_hpv->Elem(ci);
       val += sums;
-      // cout << "setting cell state vector for cell: " << ci << "\n";
-      // cout << "val: \n";
-      // val.Print(cout);
+
       SetCellStateVector(S_new, ci, val);
       
    } // End cell iterator
-   // cout << "end cell iterator\n";
 
    if (mm)
    {
       MoveMesh(S, x_gf, mv_gf_new, t, dt);
    }
-   // cout << "Moved mesh\n";
 
    S = S_new;
    t += dt;
-   // cout << "end time step\n";
-   // CheckMassConservation(S);
 }
 
-/* This version of MakeTimeStep implements (4.3) */
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, double dt)
-// {
-//    Vector S_new = S; // We need a place to store updated cell values.
-
-//    // Retrieve data from Monolithic block vector S
-//    Vector* sptr = const_cast<Vector*>(&S_new);
-
-//    ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
-//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-//    sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
-//    v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
-//    ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
-   
-//    // Variables needed for iteration
-//    Vector val(dim+2), c(dim), n(dim), U_i(dim+2), U_j(dim+2), sums(dim+2);
-//    Array<int> fids, oris;
-
-//    // centered numerical flux variables
-//    Vector vF(dim), vpF(dim), y_tmp(dim+2);
-//    double pF;
-
-//    int ci = 0, cj = 0;
-//    double d, c_norm;
-
-//    mfem::Mesh::FaceInformation FI;
-
-//    for (ci; ci < L2.GetNE(); ci++) // Cell iterator
-//    {
-//       H1.ExchangeFaceNbrData();
-//       GetCellStateVector(S, ci, U_i);
-
-//       val = U_i;
-
-//       pmesh->GetElementEdges(ci, fids, oris); // 3DTODO: GetElementFaces()
-//       sums = 0.;
-
-//       for (int j=0; j < fids.Size(); j++) // Face iterator
-//       {
-//          // reset face values
-//          y_tmp = 0.;
-//          vF = 0.;
-//          vpF = 0.;
-//          pF = 0.;
-
-//          CalcOutwardNormalInt(S, ci, fids[j], c);
-
-//          FI = pmesh->GetFaceInformation(fids[j]);
-
-//          if (FI.IsInterior())
-//          {
-//             // Get index information/state vector for second cell
-//             if (ci == FI.element[0].index) { 
-//                cj = FI.element[1].index; 
-//             }
-//             else { 
-//                cj = FI.element[0].index; 
-//             }
-
-//             GetCellStateVector(S, cj, U_j); // issue here
-//             vF = velocity(U_i);
-//             vF += velocity(U_j);
-//             y_tmp[0] = vF * c;
-
-//             pF = pressure(U_i) + pressure(U_j);
-//             Array<int> dofs;
-//             dofs.Append(1);
-//             dofs.Append(2);
-//             Vector yyy(dim);
-//             yyy = c;
-//             yyy *= pF;
-//             yyy *= -1.;
-//             y_tmp.SetSubVector(dofs, yyy);
-
-//             vpF = velocity(U_i);
-//             vpF *= pressure(U_i);
-//             yyy = 0.;
-//             yyy = velocity(U_j);
-//             yyy *= pressure(U_j);
-//             vpF += yyy;
-//             vpF *= -1.;
-//             y_tmp[dim + 1] = vpF * c;
-//             /* no viscosity */
-//          }
-//          else
-//          {
-//             assert(FI.IsBoundary());
-
-//             vF = velocity(U_i);
-//             vF *= 2.;
-//             y_tmp[0] = vF * c;
-
-//             pF = pressure(U_i);
-//             pF *= 2.;
-//             Array<int> dofs;
-//             dofs.Append(1);
-//             dofs.Append(2);
-//             Vector yyy(dim);
-//             yyy = c;
-//             yyy *= pF;
-//             yyy *= -1.;
-//             y_tmp.SetSubVector(dofs, yyy);
-
-//             vpF = velocity(U_i);
-//             vpF *= pressure(U_i);
-//             vpF *= -2.;
-//             y_tmp[dim + 1] = vpF * c;
-//          }         
-//          sums += y_tmp;
-
-//       } // End Face iterator
-
-//       sums *= dt;
-//       sums /= m_hpv->Elem(ci);
-//       val += sums;
-//       SetCellStateVector(S_new, ci, val);
-//    } // End cell iterator
-
-//    if (mm)
-//    {
-//       MoveMesh(S, x_gf, t, dt);
-//    }
-
-//    S = S_new;
-//    t += dt;
-//    CheckMassConservation(S);
-// }
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::GetCellStateVector(const Vector &S, 
@@ -1012,6 +864,44 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
             {
                assert(FI.IsBoundary());
                Vf = velocity(Uc);
+
+               // Optionally, enforce boundary conditions
+               // switch (problem)
+               // {
+               //    case 7: // Saltzman
+               //    {
+               //       int BdrElIndex = BdrElementIndexingArray[face];
+               //       int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+               //       if (bdr_attribute == 1) // Dirichlet bdry
+               //       {
+               //          Vf = 0.;
+               //          Vf[0] = 1.;
+               //       }
+               //       else // Slip, remove normal component
+               //       {
+               //          assert (bdr_attribute == 2);
+               //          CalcOutwardNormalInt(S, c, face, c_vec);
+               //          double c_norm = c_vec.Norml2();
+               //          c_vec *= 2.; // Needed to accomodate for the 1/2 in 4.7 that isn't present in 5.7a
+               //          F = c_vec.Norml2();
+               //          n_vec = c_vec;
+               //          n_vec /= F;
+
+               //          Vector Vf_normal_component(dim);
+               //          Vf_normal_component = n_vec;
+               //          double _scale = Vf * n_vec;
+               //          Vf_normal_component *= _scale;
+               //          Vf -= Vf_normal_component;  
+               //       }
+
+               //       break;
+               //    }
+               //    default:
+               //    {
+
+               //    }
+               // }               
             }
 
             // Put face velocity into object
@@ -1061,6 +951,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
                // cout << "Adjacent face: " << face << endl;
                get_intermediate_face_velocity(face, Vf);
                FI = pmesh->GetFaceInformation(face);
+               if (FI.IsBoundary()) { is_boundary_node = true; }
 
                // cout << "Face elements: 1: " << FI.element[0].index << ", 2: " << FI.element[1].index << endl;
 
@@ -1078,11 +969,55 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
             LHS.Invert();
             LHS.Mult(RHS, Vi);
 
-            // cout << "Computed velocity at vertex: " << vertex << " is: \n";
-            // Vi.Print(cout);
+            /* If we have a boundary node, adjust the velocity accordingly */
+            if (is_boundary_node)
+            {
+               // cout << "Working on boundary node: " << vertex << endl;
+               is_boundary_node = false;
+               for (int face_it = 0; face_it < row_length; face_it++)
+               {
+                  int face = row[face_it];
+                  FI = pmesh->GetFaceInformation(face);
+                  if (FI.IsBoundary())
+                  {
+                     int BdrElIndex = BdrElementIndexingArray[face];
+                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+                     if (bdr_attribute == 1)
+                     {
+                        Vi = 0.;
+                        
+                        if (timestep_first == 0.)
+                        {
+                           timestep_first = timestep;
+                        }
+                        double _xi = t / (2*timestep_first);
+
+                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+
+                        Vi[0] = 1. * _psi;
+
+                        break;
+                     }
+                     else 
+                     {
+                        assert (bdr_attribute == 2);
+                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+                        n_vec /= n_vec.Norml2();
+
+                        Vector Vi_normal_component(dim);
+                        Vi_normal_component = n_vec;
+                        double _scale = Vi * n_vec;
+                        Vi_normal_component *= _scale;
+
+                        Vi -= Vi_normal_component;
+                     }
+                  } // End boundary face
+               } // End: Face iterator
+            } // End: Boundary node
 
             update_node_velocity(S, vertex, Vi);
-         }
+         } // end: vertex iterator 
 
          // TODO: Compute velocities on faces now
          // compute_face_velocity(S, dt);         
@@ -1175,7 +1110,7 @@ void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_face_velocity(Vector &S, const double & dt)
 {
-   double c0, c1, D, b;
+   double c0, c1, D;
    // Iterate over faces
    for (int face = 0; face < num_faces; face++) // face iterator
    {

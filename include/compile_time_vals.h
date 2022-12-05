@@ -31,7 +31,7 @@ public:
    /* Saltzman Problem parameters */
    const static bool change_CFL = true;
    constexpr static double CFL_first = 0.01;
-   constexpr static double CFL_second = 0.1;
+   constexpr static double CFL_second = 0.25;
    constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
    const static bool distort_mesh = true;
 };

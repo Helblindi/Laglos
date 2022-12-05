@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE) # Look into this when have time.
 
 set(HOMEBREW_PREFIX "/opt/homebrew"
   CACHE PATH "Path to Homebrew installation")

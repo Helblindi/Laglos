@@ -59,6 +59,7 @@ protected:
 
    double CFL;
    double timestep = 0.001;
+   double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
 
    bool use_viscosity;
    bool mm;
@@ -74,7 +75,7 @@ public:
    ~LagrangianLOOperator();
 
    double GetCFL();
-   
+
    void SetCFL(const double &_CFL); // STOPPED HERE.
 
    void IterateOverCells(); // TODO: Delete

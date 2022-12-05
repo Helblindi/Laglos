@@ -632,72 +632,90 @@ int main(int argc, char *argv[]) {
    } // End time step iteration
 
    /* Plots end y velocity in the case of the Saltzman problem */
-   switch (problem)
+   if (visualization)
    {
-      case 7:
+      switch (problem)
       {
-         /* Prepare data */
-         // Velocity plot
-         int nv_py = pmesh->GetNV();
-         std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
-         // for(int i = 0; i < n_py; i++) {
-         //    x.at(i) = i*i;
-         //    y.at(i) = sin(2*M_PI*i/360.0);
-         //    z.at(i) = log(i);
-         // }
-         for(int i = 0; i < nv_py; i++) {
-            xgf_py[i] = x_gf[i];
-            // mv_y_py[i] = mv_gf[i];
-            mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
-         }
-
-         // Density plot 
-         int nc_py = L2FESpace.GetNE();
-         cout << "nc_py: " << nc_py << endl;
-         Vector center(dim);
-         std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
-         for (int ci = 0; ci < nc_py; ci++) // cell iterator
+         case 7:
          {
-            pmesh->GetElementCenter(ci, center);
-            rho_x_py[ci] = center[0];
-            rho_py[ci] = rho_gf[ci];
+            /* Prepare data */
+            // Velocity plot
+            int nv_py = pmesh->GetNV();
+            std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
+            // for(int i = 0; i < n_py; i++) {
+            //    x.at(i) = i*i;
+            //    y.at(i) = sin(2*M_PI*i/360.0);
+            //    z.at(i) = log(i);
+            // }
+            for(int i = 0; i < nv_py; i++) {
+               xgf_py[i] = x_gf[i];
+               // mv_y_py[i] = mv_gf[i];
+               mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
+            }
+
+            // Density plot 
+            int nc_py = L2FESpace.GetNE();
+            cout << "nc_py: " << nc_py << endl;
+            Vector center(dim);
+            std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
+            double _min = 0.6, _max = 1.;
+            for (int ci = 0; ci < nc_py; ci++) // cell iterator
+            {
+               pmesh->GetElementCenter(ci, center);
+               rho_x_py[ci] = center[0];
+               rho_py[ci] = rho_gf[ci];
+            }
+
+            std::vector<double> rho_x_exact_py(200), rho_exact_py(200);
+            double _h = (_max - _min) / 200.;
+            for (int i = 0; i < 200; i++)
+            {
+               rho_x_exact_py[i] = _min + i*_h;
+               Vector _x(dim);
+               _x = 0.;
+               _x[0] = rho_x_exact_py[i];
+               rho_exact_py[i] = InitialValues<problem, dim>::rho0(_x, t);
+            }
+
+            
+            // Set the size of output image = 1200x780 pixels
+            plt::figure_size(1200, 780);
+
+            // Plot line from given x and y data. Color is selected automatically.
+            // plt::scatter(xgf_py, mv_y_py);
+            // plt::scatter(rho_x_py, rho_py);
+
+            const long nrows=1, ncols=2;
+            long row = 0, col = 0;
+
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(rho_x_py, rho_py);
+            plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
+            plt::legend();
+            plt::title("Density");
+
+            col = 1;
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(xgf_py, mv_y_py);
+            plt::title("Y Velocity");
+
+            // Plot a red dashed line from given x and y data.
+            // plt::plot(x, w,"r--");
+
+            // Plot a line whose name will show up as "log(x)" in the legend.
+            // plt::named_plot("log(x)", x, z);
+
+            // Enable legend.
+            plt::show();
+
+            // save figure
+            // const char* filename = "./basic.png";
+            // std::cout << "Saving result to " << filename << std::endl;;
+            // plt::save(filename);
+            break;
          }
-         
-         // Set the size of output image = 1200x780 pixels
-         plt::figure_size(1200, 780);
-
-         // Plot line from given x and y data. Color is selected automatically.
-         // plt::scatter(xgf_py, mv_y_py);
-         // plt::scatter(rho_x_py, rho_py);
-
-         const long nrows=1, ncols=2;
-         long row = 0, col = 0;
-
-         plt::subplot2grid(nrows, ncols, row, col);
-         plt::scatter(rho_x_py, rho_py);
-         plt::title("Density");
-
-         col = 1;
-         plt::subplot2grid(nrows, ncols, row, col);
-         plt::scatter(xgf_py, mv_y_py);
-         plt::title("Y Velocity");
-
-         // Plot a red dashed line from given x and y data.
-         // plt::plot(x, w,"r--");
-
-         // Plot a line whose name will show up as "log(x)" in the legend.
-         // plt::named_plot("log(x)", x, z);
-
-         // Enable legend.
-         plt::show();
-
-         // save figure
-         // const char* filename = "./basic.png";
-         // std::cout << "Saving result to " << filename << std::endl;;
-         // plt::save(filename);
-         break;
+         default: {}
       }
-      default: {}
    }
 
    // Print moved mesh

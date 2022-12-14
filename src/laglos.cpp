@@ -20,6 +20,7 @@
 *
 * ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
+* ./Laglos -m ../data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2]
 * 
 */
 
@@ -44,19 +45,19 @@ using namespace hydrodynamics;
 using namespace std;
 namespace plt = matplotlibcpp;
 
-// Forward declarations
-double free_steam_conditions(const Vector &x);
-void free_steam_conditions_v(const Vector &x, Vector &v);
-void orthogonal(Vector &v);
-void build_C(ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt);
-void calc_outward_normal_int(int cell, int face, ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt, Vector & res);
-Vector Get_Int_Der_Ref_Shap_Functions();
+// // Forward declarations
+// double free_steam_conditions(const Vector &x);
+// void free_steam_conditions_v(const Vector &x, Vector &v);
+// void orthogonal(Vector &v);
+// void build_C(ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt);
+// void calc_outward_normal_int(int cell, int face, ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt, Vector & res);
+// Vector Get_Int_Der_Ref_Shap_Functions();
 
-// double compute_viscosity();
-void move_mesh(ParFiniteElementSpace & pfes, const ParGridFunction * velocities);
+// // double compute_viscosity();
+// void move_mesh(ParFiniteElementSpace & pfes, const ParGridFunction * velocities);
 
-double fRand(double fMin, double fMax);
-void mesh_v(const Vector &x, const double t, Vector &res); // Initial mesh velocity
+// double fRand(double fMin, double fMax);
+// void mesh_v(const Vector &x, const double t, Vector &res); // Initial mesh velocity
 
 
 int main(int argc, char *argv[]) {
@@ -75,7 +76,7 @@ int main(int argc, char *argv[]) {
    const char *mesh_file = "default";
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 1;  // Order of mesh movement approximation space
+   int order_mv = 2;  // Order of mesh movement approximation space
    int order_u = 0;
    double t_final = 0.6;
    int max_tsteps = -1;
@@ -212,6 +213,7 @@ int main(int argc, char *argv[]) {
    // - H1 (Q2, continuous) for mesh movement.
    // - L2 (Q0, discontinuous) for state variables
    H1_FECollection H1FEC(order_mv, dim);
+   // H1Ser_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
@@ -285,6 +287,8 @@ int main(int argc, char *argv[]) {
    offset[5] = offset[4] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
+   cout << "Block Vector constructed\n";
+
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
@@ -295,11 +299,17 @@ int main(int argc, char *argv[]) {
    v_gf.MakeRef(&L2VFESpace, S, offset[3]);
    ste_gf.MakeRef(&L2FESpace, S, offset[4]);
 
+   cout << "grid functions associated\n";
+
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
 
+   cout << "Printing initial x_gf positions\n";
+   x_gf.Print(cout);
+
+   cout << "distorting mesh\n";
    /* Distort Mesh for Saltzman Problem */
    if (CompileTimeVals::distort_mesh)
    {
@@ -308,7 +318,7 @@ int main(int argc, char *argv[]) {
          case 7: // Saltzman problem
          {
             Array<double> coords(dim);
-            for (int vertex = 0; vertex < pmesh->GetNV(); vertex++)
+            for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
             {
                for (int i = 0; i < dim; i++)
                {
@@ -326,6 +336,9 @@ int main(int argc, char *argv[]) {
          }
       }
    }
+   cout << "Mesh distorted\n";
+   cout << "Printing initial x_gf positions\n";
+   x_gf.Print(cout);
 
    // Print initialized mesh
    // Can be visualized with glvis -np # -m ./results/mesh-test-init

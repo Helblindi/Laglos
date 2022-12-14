@@ -23,7 +23,7 @@ public:
 *     Case 7: Saltzman problem. See https://people.tamu.edu/~guermond/PUBLICATIONS/guermond_popov_Saavedra_JCP_2020.pdf.
 *             Requires Neumann BC on right face and Dirichlet elsewhere.
 */
-   const static int problem = 7;
+   const static int problem = 3;
    const static int dim = 2;
    const static int shocktube = 1; // 1 - Sod, 2 - Lax, 3 - Leblanc
    constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity

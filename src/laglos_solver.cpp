@@ -88,6 +88,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    TVSize_H1(H1.TrueVSize()),
    GTVSize_H1(H1.GlobalTrueVSize()),
    NDofs_H1(H1.GetNDofs()),
+   NVDofs_H1(H1.GetNVDofs()),
    Vsize_L2(L2.GetVSize()),
    TVSize_L2(L2.TrueVSize()),
    GTVSize_L2(L2.GlobalTrueVSize()),
@@ -483,6 +484,8 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
    S = S_new;
    t += dt;
+
+   CheckMassConservation(S);
 }
 
 
@@ -636,7 +639,7 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
 
    // Output normal
    // {
-   //    cout << "inside cell: " << cell << endl;
+   //    cout << "n_vecide cell: " << cell << endl;
    //    cout << "face: " << face << endl;
    //    cout << "Face node coords: ";
    //    face_node.Print(cout);
@@ -814,8 +817,6 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
    switch (problem)
    {
       case 4: // Noh problem
-      case 3:
-      // case 2: // Isentropic Vortex
       {
          VectorFunctionCoefficient velocity_coeff(dim, InitialValues<problem, dim>::v0);
          // VectorFunctionCoefficient velocity(dim, random_mesh_v);
@@ -863,45 +864,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
             else 
             {
                assert(FI.IsBoundary());
-               Vf = velocity(Uc);
-
-               // Optionally, enforce boundary conditions
-               // switch (problem)
-               // {
-               //    case 7: // Saltzman
-               //    {
-               //       int BdrElIndex = BdrElementIndexingArray[face];
-               //       int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-
-               //       if (bdr_attribute == 1) // Dirichlet bdry
-               //       {
-               //          Vf = 0.;
-               //          Vf[0] = 1.;
-               //       }
-               //       else // Slip, remove normal component
-               //       {
-               //          assert (bdr_attribute == 2);
-               //          CalcOutwardNormalInt(S, c, face, c_vec);
-               //          double c_norm = c_vec.Norml2();
-               //          c_vec *= 2.; // Needed to accomodate for the 1/2 in 4.7 that isn't present in 5.7a
-               //          F = c_vec.Norml2();
-               //          n_vec = c_vec;
-               //          n_vec /= F;
-
-               //          Vector Vf_normal_component(dim);
-               //          Vf_normal_component = n_vec;
-               //          double _scale = Vf * n_vec;
-               //          Vf_normal_component *= _scale;
-               //          Vf -= Vf_normal_component;  
-               //       }
-
-               //       break;
-               //    }
-               //    default:
-               //    {
-
-               //    }
-               // }               
+               Vf = velocity(Uc);             
             }
 
             // Put face velocity into object
@@ -912,7 +875,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
                v_face_intermediate[index] = Vf[i];
             }
 
-         }
+         } // End face iterator
 
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
@@ -941,7 +904,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
             // cout << "vertex: " << vertex << endl;
             vertex_edge.GetRow(vertex, row);
             row_length = row.Size();
-            // 3DTODO: Will need to modify this for faces instead of edges in 3D
+            // 3DTODO: Will need to modify this for faces n_vectead of edges in 3D
             for (int face_it = 0; face_it < row_length; face_it++) // Adjacent face iterator
             {
                Vf = 0.;
@@ -972,55 +935,235 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
             /* If we have a boundary node, adjust the velocity accordingly */
             if (is_boundary_node)
             {
-               // cout << "Working on boundary node: " << vertex << endl;
-               is_boundary_node = false;
-               for (int face_it = 0; face_it < row_length; face_it++)
+               switch (problem)
                {
-                  int face = row[face_it];
-                  FI = pmesh->GetFaceInformation(face);
-                  if (FI.IsBoundary())
+                  case 7: // Saltzman
                   {
-                     int BdrElIndex = BdrElementIndexingArray[face];
-                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-
-                     if (bdr_attribute == 1)
+                     // cout << "Working on boundary node: " << vertex << endl;
+                     is_boundary_node = false;
+                     for (int face_it = 0; face_it < row_length; face_it++)
                      {
-                        Vi = 0.;
-                        
-                        if (timestep_first == 0.)
+                        int face = row[face_it];
+                        FI = pmesh->GetFaceInformation(face);
+                        if (FI.IsBoundary())
                         {
-                           timestep_first = timestep;
-                        }
-                        double _xi = t / (2*timestep_first);
+                           int BdrElIndex = BdrElementIndexingArray[face];
+                           int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
 
-                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+                           if (bdr_attribute == 1)
+                           {
+                              Vi = 0.;
+                              
+                              if (timestep_first == 0.)
+                              {
+                                 timestep_first = timestep;
+                              }
+                              double _xi = t / (2*timestep_first);
 
-                        Vi[0] = 1. * _psi;
+                              double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
 
-                        break;
-                     }
-                     else 
-                     {
-                        assert (bdr_attribute == 2);
-                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-                        n_vec /= n_vec.Norml2();
+                              Vi[0] = 1. * _psi;
 
-                        Vector Vi_normal_component(dim);
-                        Vi_normal_component = n_vec;
-                        double _scale = Vi * n_vec;
-                        Vi_normal_component *= _scale;
+                              break;
+                           }
+                           else 
+                           {
+                              assert (bdr_attribute == 2);
+                              CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+                              n_vec /= n_vec.Norml2();
 
-                        Vi -= Vi_normal_component;
-                     }
-                  } // End boundary face
-               } // End: Face iterator
+                              Vector Vi_normal_component(dim);
+                              Vi_normal_component = n_vec;
+                              double _scale = Vi * n_vec;
+                              Vi_normal_component *= _scale;
+
+                              Vi -= Vi_normal_component;
+                           }
+                        } // End boundary face
+                     } // End: Face iterator
+                  } // End: Saltzman
+                  default:
+                  {
+                     // No change
+                  }
+               } // Switch case end
+               
             } // End: Boundary node
 
             update_node_velocity(S, vertex, Vi);
          } // end: vertex iterator 
 
          // TODO: Compute velocities on faces now
-         // compute_face_velocity(S, dt);         
+         for (int face = 0; face < num_faces; face++) // face iterator
+         {  
+            // Get intermediate face velocity, face information, and face normal
+            Vector face_velocity(2);
+            Vector n_vec_temp(2);
+            Vf = 0.;
+            get_intermediate_face_velocity(face, Vf);
+            FI = pmesh->GetFaceInformation(face);
+
+            /* adjacent corner indices */
+            H1.GetFaceDofs(face, row);
+            int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
+
+            // retrieve old face and corner locations
+            Vector face_x(2), vdof1_x(2), vdof2_x(2), vdof1_v(2), vdof2_v(2);
+            get_node_position(S, face_dof, face_x);
+            get_node_position(S, face_vdof1, vdof1_x);
+            get_node_position(S, face_vdof2, vdof2_x);
+
+            // retrieve corner velocities
+            get_node_velocity(S, face_vdof1, vdof1_v);
+            get_node_velocity(S, face_vdof2, vdof2_v);
+
+            if (FI.IsInterior())
+            {
+               c = FI.element[0].index;
+               CalcOutwardNormalInt(S, c, face, c_vec);
+
+               // Face area
+               // https://github.com/mfem/mfem/issues/951
+               Vector nor(dim);
+               ElementTransformation *T = pmesh->GetFaceTransformation(face);
+               T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
+               CalcOrtho(T->Jacobian(), nor);
+               double face_length = nor.Norml2();
+
+               n_vec = c_vec;
+               n_vec /= n_vec.Norml2();
+
+               // Calculate new corner locations and half  step locations
+               Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
+               vdof1_x_new = vdof1_x;
+               vdof1_x_new.Add(dt, vdof1_v);
+               vdof1_x_half = vdof1_x;
+               vdof1_x_half.Add(dt/2, vdof1_v);
+
+               vdof2_x_new = vdof2_x;
+               vdof2_x_new.Add(dt, vdof1_v);
+               vdof2_x_half = vdof2_x;
+               vdof2_x_half.Add(dt/2, vdof2_v);
+
+               // calculate a_{12}^{n+1} (new tangent midpoint)
+               Vector vdof12_x_new(2);
+               vdof12_x_new = vdof1_x_new;
+               vdof12_x_new += vdof2_x_new;
+               vdof12_x_new /= 2.;
+
+               // Compute D (A.4c)
+               Vector n_vec_R(dim), n_vec_perp(dim), temp_vec(dim), temp_vec_2(dim);
+               n_vec_R = n_vec;
+               Orthogonal(n_vec_R);
+
+               n_vec_perp = n_vec_R;
+               n_vec_perp.Neg();
+
+               subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
+
+               subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
+
+               Orthogonal(temp_vec_2);
+
+               double D = dt * (temp_vec * n_vec_R) + 2 * (n_vec * temp_vec_2);
+
+
+               // Compute c1 (A.4a)
+               subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+               double c1 = ( dt * (temp_vec * n_vec) - 2 * (temp_vec_2 * n_vec_perp) ) / D;
+
+               // Compute c0 (A.4b)
+               double bmn = Vf * n_vec; // calculate flux across face (5.8)
+               bmn *= face_length;
+               temp_vec = vdof1_x_half;
+               Orthogonal(temp_vec);
+               temp_vec_2 = vdof2_x_half;
+               Orthogonal(temp_vec_2);
+               double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
+               double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
+               temp_vec = face_x;
+               Orthogonal(temp_vec);
+               subtract(vdof2_v, vdof1_v, temp_vec_2);
+               double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3n
+               double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
+               
+               // Compute V3n_perp
+               subtract(vdof2_x_new, vdof1_x_new, temp_vec);
+               subtract(face_x, vdof12_x_new, temp_vec_2);
+               temp_vec_2.Add(c0*dt, n_vec);
+               const1 = temp_vec * temp_vec_2; // numerator
+               temp_vec_2 = n_vec_perp;
+               temp_vec_2.Add(c1, n_vec);
+               const2 = temp_vec * temp_vec_2;
+               const2 *= dt; // denominator
+               double V3nperp = -1. * const1 / const2;
+
+               // Compute V3n (5.11)
+               double V3n = c1 * V3nperp + c0;
+
+               // Compute face velocity (5.11)
+               // const1 = Vf * n_vec;
+               // temp_vec = n_vec;
+               // temp_vec *= const1;
+               // subtract(Vf, temp_vec, face_velocity);
+               // face_velocity.Add(V3n, n_vec);
+
+               // Compute face velocity (Appendix A)
+               face_velocity = 0.;
+               face_velocity.Add(V3n, n_vec);
+               face_velocity.Add(V3nperp, n_vec_perp);
+
+               Vector face_x_new(2);
+               face_x_new = face_x;
+               face_x_new.Add(dt, face_velocity);
+
+               // Check perpendicular
+               subtract(face_x_new, vdof12_x_new, temp_vec);
+               subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
+               if (abs(temp_vec * temp_vec_2) > pow(10, -12))
+               {
+                  cout << "temp_vec:\n";
+                  temp_vec.Print(cout);
+                  cout << "temp_vec_2:\n";
+                  temp_vec_2.Print(cout);
+                  cout << "\n\n\n\n\n\n ################## Vectors are not orthogonal! \n\n\n\n\n\n\n\n";
+                  MFEM_ABORT("vectors are not orthogonal!\n");
+               }
+            }
+            else
+            {
+               assert(FI.IsBoundary());
+               // TODO: Add in boundary conditions similar to corner vertex bcs
+               for (int j = 0; j < dim; j++)
+               {
+                  face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+               }
+            }
+
+            // Lastly, put face velocity into gridfunction object
+            update_node_velocity(S, face_dof, face_velocity);
+         }
+
+         // Since we cannot use Serendipity elements, we must update cell center velocities
+         Vector Vc(dim);
+         Vector node_v(dim);
+         Array<int> verts;
+         for (int ci = 0; ci < L2.GetNE(); ci++)
+         {
+            GetCellStateVector(S, ci, Uc);
+            Vc = velocity(Uc);
+            // Vc = 0.;
+            // pmesh->GetElementVertices(ci, verts);
+            // for (int j = 0; j < verts.Size(); j++)
+            // {
+            //    get_node_velocity(S, verts[j], node_v);
+            //    Vc += node_v;
+            // }
+            // Vc /= 4.;
+            int cell_vdof = NVDofs_H1 + num_faces + ci;
+            update_node_velocity(S, cell_vdof, Vc);
+         }
+
       }
       break;
    }
@@ -1029,6 +1172,8 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
    add(x_gf, dt, mv_gf_old, x_gf);
    mv_gf_new = mv_gf_old;
    pmesh->NewNodes(x_gf, false);
+   // cout << "Printing MV_gf at time " << t << endl;
+   // mv_gf_new.Print(cout);
 }
 
 template<int dim, int problem>
@@ -1129,6 +1274,34 @@ void LagrangianLOOperator<dim, problem>::update_node_velocity(Vector &S, const i
    {
       int index = node + i * NDofs_H1;
       mv_gf[index] = vel[i];
+   }
+}
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::get_node_velocity(const Vector &S, const int & node, Vector & vel)
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction mv_gf;
+   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NDofs_H1;
+      vel[i] = mv_gf[index];
+   }
+}  
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::get_node_position(const Vector &S, const int & node, Vector & x)
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf;
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NDofs_H1;
+      x[i] = x_gf[index];
    }
 }
 
@@ -1262,7 +1435,7 @@ DenseMatrix LagrangianLOOperator<dim, problem>::flux(const Vector &U)
    return result;
 }
 
-/* Explicit Instantiation */
+/* Explicit n_vectantiation */
 template class LagrangianLOOperator<1, 2>;
 template class LagrangianLOOperator<2, 2>;
 template class LagrangianLOOperator<3, 2>;

@@ -38,6 +38,7 @@ protected:
    const int TVSize_H1;
    const HYPRE_Int GTVSize_H1;
    const int NDofs_H1;
+   const int NVDofs_H1;
 
    const int Vsize_L2;
    const int TVSize_L2;
@@ -111,6 +112,10 @@ public:
    void compute_face_velocity(Vector &S, const double & dt);
 
    void update_node_velocity(Vector &S, const int & node, const Vector & vel);
+
+   void get_node_velocity(const Vector &S, const int & node, Vector & vel);
+
+   void get_node_position(const Vector &S, const int & node, Vector & x);
 
    void EnforceBoundaryConditions(Vector &S);
 

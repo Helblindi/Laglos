@@ -33,6 +33,7 @@ protected:
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
+
    // FE spaces local and global sizes
    const int Vsize_H1;
    const int TVSize_H1;
@@ -52,6 +53,8 @@ protected:
 
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
+   Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
+   Array<double> vstar_arr;  // Array to store vstar for each face
    mutable Vector v_face_intermediate; // (5.7b)
    // const Array<int> &ess_tdofs;
    const int NE, l2dofs_cnt, h1dofs_cnt, l2vdofs_cnt;
@@ -83,6 +86,10 @@ public:
 
    void CreateBdrElementIndexingArray();
 
+   void CreateBdrVertexIndexingArray();
+
+   void CreateVStarArr(const Vector &S);
+
    void MakeTimeStep(Vector &S, double & t, double dt);
 
    double GetTimeStepEstimate(const Vector &S);
@@ -102,6 +109,9 @@ public:
 
    Vector GetIntDerRefShapeFunctions();
 
+   /* RP Functions */
+   double cosineSimilarity(const Vector &v1, const Vector &v2);
+
    /* Mesh movement */
    // void form_intermediate_velocity(const Vector &S, const double dt);
 
@@ -109,6 +119,14 @@ public:
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
+   // tests from 2023-01-05
+   void compute_node_velocity_cwa(Vector &S, const double & t, const double & dt);
+   void compute_node_velocity_mawa(Vector &S, const double & t, const double & dt);
+   void compute_node_velocity_mtwa(Vector &S, const double & t, const double & dt);
+   void compute_node_velocity_RP(Vector &S, const double & t, const double & dt);
+   
+   void compute_node_velocity(Vector &S, const double & t, const double & dt);
+   
    void compute_face_velocity(Vector &S, const double & dt);
 
    void update_node_velocity(Vector &S, const int & node, const Vector & vel);

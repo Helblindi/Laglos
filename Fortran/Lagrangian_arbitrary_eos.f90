@@ -23,17 +23,18 @@ MODULE arbitrary_eos_Lagrangian_lambda_module
 
 CONTAINS
   !===Inputs: in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter
-  !===Outputs: lambda_maxl_out,lambda_maxr_out,pstar,k
+  !===Outputs: lambda_maxl_out,lambda_maxr_out,pstar,vstar,k
   !===use no_iter=.true. if one does not want iterative line search. Then the parameter ``in_tol'' is useless.
   !===use no_iter=.false. to enable the line search with ``in_tol'' tolerance. Then ``k'' is the numer of iterations used.
   SUBROUTINE Lagrangian_lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
-       lambda_maxl_out,lambda_maxr_out,pstar,k, b_covolume)
+       lambda_maxl_out,lambda_maxr_out,pstar,vstar,k, b_covolume)
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
     REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
     LOGICAL,      INTENT(IN) :: no_iter
     REAL(KIND=8), INTENT(IN) :: b_covolume
     REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
+    REAL(KIND=8), INTENT(INOUT):: vstar
     INTEGER,      INTENT(OUT):: k
     REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
     LOGICAL                  :: check
@@ -107,7 +108,7 @@ CONTAINS
           CALL update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p1,p2,in_tol,&
                lambda_maxl_out,lambda_maxr_out,check)
           pstar = p2
-          IF (check) RETURN
+          IF (check) EXIT !RETURN
           phi1 =  phi(p1)
           phi11 = phi_prime(p1)
           phi2 =  phi(p2)
@@ -116,9 +117,10 @@ CONTAINS
              lambda_maxl_out = lambdaz(rhol,pl,al,gammal,p1,-1)
              lambda_maxr_out = lambdaz(rhor,pr,ar,gammar,p1, 1)
              pstar = p1
-             RETURN
+             EXIT
+            !  RETURN
           END IF
-          IF (phi2<zero) RETURN
+          IF (phi2<zero) EXIT!RETURN
           phi12 = (phi2-phi1)/(p2-p1) 
           phi112 = (phi12-phi11)/(p2-p1)
           phi221 = (phi22-phi12)/(p2-p1)
@@ -127,6 +129,9 @@ CONTAINS
           k = k+1
        END DO
     END IF
+    ! Madison's contribution to compute vstar
+    vstar = ustar(pstar)
+   !  WRITE(*,*) "In Fortran, vstar is: ", vstar
   END SUBROUTINE Lagrangian_lambda_arbitrary_eos
 
 
@@ -293,7 +298,7 @@ CONTAINS
     IMPLICIT NONE
     REAL(KIND=NUMBER), INTENT(IN) :: pstar
     REAL(KIND=NUMBER)             :: vv
-    vv = half*(ul+f(pstar,pl,capAl,capBl,capCl,expol)+ur+f(pstar,pr,capAr,capBr,capCr,expor))
+    vv = half*(ul-f(pstar,pl,capAl,capBl,capCl,expol)+ur+f(pstar,pr,capAr,capBr,capCr,expor))
   END FUNCTION ustar
 
   FUNCTION rhostar(pstar,rhoz,pz,gammaz,b_covolume) RESULT(vv)

@@ -138,16 +138,16 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    v_face_intermediate = 0.;
 
    // Print some Dimension information
-   cout << "Vsize_H1: " << Vsize_H1 << endl;
-   cout << "TVSize_H1: " << TVSize_H1 << endl;
-   cout << "GTVSize_H1: " << GTVSize_H1 << endl;
-   cout << "NDofs_H1: " << NDofs_H1 << endl;
+   // cout << "Vsize_H1: " << Vsize_H1 << endl;
+   // cout << "TVSize_H1: " << TVSize_H1 << endl;
+   // cout << "GTVSize_H1: " << GTVSize_H1 << endl;
+   // cout << "NDofs_H1: " << NDofs_H1 << endl;
 }
 
 template<int dim, int problem>
 LagrangianLOOperator<dim, problem>::~LagrangianLOOperator()
 {
-
+   // delete pmesh, m_lf, m_hpv;
 }
 
 template<int dim, int problem>
@@ -238,10 +238,8 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
       
       t_temp = CFL / temp_sum;
 
-      // cout << "t_temp: " << t_temp << endl;
-
       if (t_temp < t_min && t_temp > 1e-12) { t_min = t_temp; }
-   }
+   } // End cell iterator
 
    this->timestep = t_min;
 }
@@ -330,10 +328,12 @@ void LagrangianLOOperator<dim, problem>::CreateBdrVertexIndexingArray()
       // iterate over boundary faces
       for (int j = 0; j < fids.Size(); j++)
       {
+         // cout << "face: " << fids[j] << endl;
          pmesh->GetEdgeVertices(fids[j], verts);
          for (int k = 0; k < verts.Size(); k++)
          {
             int index = verts[k];
+            // cout << "vert index: " << index << endl;
             switch (problem)
             {  
                case 7:
@@ -355,6 +355,16 @@ void LagrangianLOOperator<dim, problem>::CreateBdrVertexIndexingArray()
          } // end vertex iterator
       } // end boundary faces
    } // end boundary elements
+}
+
+template<int dim, int problem>
+bool LagrangianLOOperator<dim, problem>::IsBdrVertex(const int & node)
+{
+   if (BdrVertexIndexingArray[node] == -1)
+   {
+      return false;
+   }
+   return true;
 }
 
 
@@ -401,7 +411,7 @@ void LagrangianLOOperator<dim, problem>::CreateVStarArr(const Vector &S)
                   lambda_maxr_out = 0.,
                   pstar = 0.,
                   vstar = 0.;
-         bool no_iter = false; 
+         bool no_iter = true; 
          int k = 0; // Tells you how many iterations were needed for convergence
 
          __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
@@ -462,7 +472,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
       DenseMatrix F_i = flux(U_i);
       sums = 0.;
-      // cout << "iterate over faces\n";
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
          CalcOutwardNormalInt(S, ci, fids[j], c);
@@ -474,7 +483,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
 
          if (FI.IsInterior())
          {
-            // cout << "Interior face\n";
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -482,7 +490,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
             else { 
                cj = FI.element[0].index; 
             }
-
             GetCellStateVector(S, cj, U_j); 
 
             // flux contribution
@@ -510,7 +517,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
             U_i_bdry = U_i;
             y_temp_bdry = 0.;
 
-            // cout << "enforcing bcs\n";
             /* Enforce Boundary Conditions */
             switch (problem)
             {
@@ -593,8 +599,8 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
    S = S_new;
    t += dt;
 
-   // CheckMassConservation(S);
-}
+   CheckMassConservation(S);
+} 
 
 
 template<int dim, int problem>
@@ -934,6 +940,7 @@ Vector LagrangianLOOperator<dim, problem>::GetIntDerRefShapeFunctions()
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf, GridFunction & mv_gf_new,const double & t, const double & dt)
 {
+   cout << "Moving mesh\n";
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf_old;
    mv_gf_old.MakeRef(&H1, *sptr, block_offsets[1]);
@@ -1004,10 +1011,11 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
-         compute_node_velocity_RP(S,t,dt);
 
-         // compute_node_velocity(S, t, dt);
+         compute_node_velocity_LS(S, t, dt);
          Array<int> row;
+
+         cout << "Computing velocity on faces now\n";
 
          // TODO: Compute velocities on faces now
          for (int face = 0; face < num_faces; face++) // face iterator
@@ -1083,7 +1091,6 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
 
                double D = dt * (temp_vec * n_vec_R) + 2 * (n_vec * temp_vec_2);
 
-
                // Compute c1 (A.4a)
                subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
                double c1 = ( dt * (temp_vec * n_vec) - 2 * (temp_vec_2 * n_vec_perp) ) / D;
@@ -1142,7 +1149,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
                   temp_vec.Print(cout);
                   cout << "temp_vec_2:\n";
                   temp_vec_2.Print(cout);
-                  cout << "\n\n\n\n\n\n ################## Vectors are not orthogonal! \n\n\n\n\n\n\n\n";
+                  cout << "################## Vectors are not orthogonal!";
                   MFEM_ABORT("vectors are not orthogonal!\n");
                }
             }
@@ -1184,18 +1191,19 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
       break;
    }
 
+   cout << "Finally, move x_gf according to mv_gf.\n";
    // Finally, move x_gf according to mv_gf
    add(x_gf, dt, mv_gf_old, x_gf);
    mv_gf_new = mv_gf_old;
    pmesh->NewNodes(x_gf, false);
    // cout << "Printing MV_gf at time " << t << endl;
    // mv_gf_new.Print(cout);
+   cout << "Done moving mesh\n";
 }
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
 {
-   // cout << "Checking Mass Conservation\n";
    Vector U_i(dim + 2);
    
    for (int ci = 0; ci < L2.GetNE(); ci++)
@@ -1386,20 +1394,6 @@ void LagrangianLOOperator<dim, problem>::compute_node_velocity_cwa(Vector &S, co
    
 }
 
-// midpoint angle weighted average
-template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_node_velocity_mawa(Vector &S, const double & t, const double & dt)
-{
-
-}
-
-// midpoint triangle weighted average
-template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_node_velocity_mtwa(Vector &S, const double & t, const double & dt)
-{
-
-}
-
 // Riemann Problem node movement
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_node_velocity_RP(Vector &S, const double & t, const double & dt)
@@ -1584,6 +1578,179 @@ void LagrangianLOOperator<dim, problem>::compute_node_velocity_RP(Vector &S, con
       update_node_velocity(S, vertex, Vi);  
    } // End vertex iteration
 }
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::
+   compute_node_velocity_LS(Vector &S, const double & t, 
+                            const double & dt, 
+                            const string flag, // Default NA
+                            void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
+{
+   mfem::Mesh::FaceInformation FI;
+   Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
+   Table vertex_edge;
+   // Ref: https://mfem.org/howto/nav-mesh-connectivity/
+   Transpose(*edge_vertex, vertex_edge);
+   Array<int> row;
+   int row_length;
+
+   Vector Vf(dim); // Intermediate Face Velocity or exact velocity if testing
+   Vector n_vec(dim); // For enforcing BCs
+
+   bool is_boundary_node = false;
+
+   // Iterate over vertices
+   for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
+   {
+      // Reset flag indicating boundary node
+      is_boundary_node = false;
+
+      // Construct A, B_x, B_y
+      vertex_edge.GetRow(vertex, row);
+      row_length = row.Size();
+
+      // Instantiate A
+      DenseMatrix A(row_length, dim + 1), At(dim+1, row_length), LHS(dim+1, dim+1);
+      Vector Bx(row_length), By(row_length), vertex_x(dim), vertex_v(dim);
+      Vector Bx_mod(dim+1), By_mod(dim+1); // To solve LS problem
+      get_node_position(S, vertex, vertex_x);
+      
+      // 3DTODO: Will need to modify this for faces instead of edges in 3D
+      for (int face_it = 0; face_it < row_length; face_it++) // Adjacent face iterator
+      {
+         // Reset face velocity object
+         Vf = 0.;
+
+         int face = row[face_it];
+         FI = pmesh->GetFaceInformation(face);
+         if (FI.IsBoundary()) { is_boundary_node = true; }
+
+         // Retrieve coordinates for face node
+         Array<int> face_dof_row;
+         H1.GetFaceDofs(face, face_dof_row);
+         int face_dof = face_dof_row[2]; // Dof corresponding to the center of the face
+         Vector face_x(dim);
+         get_node_position(S, face_dof, face_x);
+
+         // Fill corresponding row of A, Bx, By
+         for (int i = 0; i < dim; i++)
+         {
+            A(face_it, i) = face_x(i) - vertex_x(i); // Fill with nodal locations
+         }
+         A(face_it, dim) = 1.;
+
+         if (flag == "testing")
+         {
+            // Used for make test
+            test_vel(face_x, t, Vf);
+         }
+         else
+         {
+            get_intermediate_face_velocity(face, Vf);
+         }
+
+         // In either case, we set the corresponding row to the face velocity,
+         // whether that is given by the intermediate face velocity or the exact
+         Bx(face_it) = Vf(0);
+         By(face_it) = Vf(1);
+      } // End face iterator
+
+      // We should have an overdetermined system 
+      // assert(row_length > dim + 1);
+      At.Transpose(A);
+      Mult(At, A, LHS);
+      At.Mult(Bx, Bx_mod);
+      At.Mult(By, By_mod);
+
+      // Solve linear systems A x_A = B_x, A x_B = B_y
+      Vector res_x(dim+1), res_y(dim+1);
+
+      if (is_boundary_node)
+      {
+         CGSolver cg;
+         cg.SetOperator(LHS);
+         cg.SetRelTol(1e-12);
+         cg.SetAbsTol(1e-12);
+         cg.SetMaxIter(1000);
+         cg.SetPrintLevel(-1);
+         cg.Mult(Bx_mod, res_x);
+         cg.Mult(By_mod, res_y);
+      } // End Boundary Node
+      else
+      {
+         // Solve directly
+         LHS.Invert();
+         LHS.Mult(Bx_mod, res_x);
+         LHS.Mult(By_mod, res_y);
+      }
+      
+      // Solve for nodal velocity
+      vertex_v(0) = res_x(dim); // Set to cx
+      vertex_v(1) = res_y(dim); // Set to cy
+
+      // Enforce boundary conditions
+      if (is_boundary_node)
+      {
+         /* Enforce BCs (Copy/Paste from previous nodal computation) */
+         switch (problem)
+         {
+            case 7: // Saltzman
+            {
+               // cout << "Working on boundary node: " << vertex << endl;
+               is_boundary_node = false;
+               for (int face_it = 0; face_it < row_length; face_it++)
+               {
+                  int face = row[face_it];
+                  FI = pmesh->GetFaceInformation(face);
+                  if (FI.IsBoundary())
+                  {
+                     int BdrElIndex = BdrElementIndexingArray[face];
+                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+                     if (bdr_attribute == 1)
+                     {
+                        vertex_v = 0.;
+                        
+                        if (timestep_first == 0.)
+                        {
+                           timestep_first = timestep;
+                        }
+                        double _xi = t / (2*timestep_first);
+
+                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+
+                        vertex_v[0] = 1. * _psi;
+
+                        break;
+                     }
+                     else 
+                     {
+                        assert (bdr_attribute == 2);
+                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+                        n_vec /= n_vec.Norml2();
+
+                        Vector vertex_v_normal_component(dim);
+                        vertex_v_normal_component = n_vec;
+                        double _scale = vertex_v * n_vec;
+                        vertex_v_normal_component *= _scale;
+
+                        vertex_v -= vertex_v_normal_component;
+                     }
+                  } // End boundary face
+               } // End: Face iterator
+            } // End: Saltzman
+            default:
+            {
+               // No change
+            }
+         } // Switch case end
+      }
+
+      
+      update_node_velocity(S, vertex, vertex_v);
+   } // End Vertex iterator
+}
+
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, const double & dt)
@@ -1838,11 +2005,10 @@ double LagrangianLOOperator<dim, problem>::compute_lambda_max(const Vector & U_i
    bool no_iter = false;
    int k = 0; // Tells you how many iterations were needed for convergence
 
+   // cout << "CLM pre fortran function.\n";
    __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
       &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
       &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&vstar,&k,&b_covolume);
-
-   // TODO: vstar
 
    return std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
    // return 1.;
@@ -1920,6 +2086,10 @@ template class LagrangianLOOperator<3, 6>;
 template class LagrangianLOOperator<1, 7>;
 template class LagrangianLOOperator<2, 7>;
 template class LagrangianLOOperator<3, 7>;
+
+template class LagrangianLOOperator<1, 8>;
+template class LagrangianLOOperator<2, 8>;
+template class LagrangianLOOperator<3, 8>;
 
 } // end ns hydrodynamics
 

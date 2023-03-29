@@ -22,9 +22,13 @@ public:
 *     Case 6: Shocktubes 1 - Sod, 2 - Lax, 3 - Leblanc
 *     Case 7: Saltzman problem. See https://people.tamu.edu/~guermond/PUBLICATIONS/guermond_popov_Saavedra_JCP_2020.pdf.
 *             Requires Neumann BC on right face and Dirichlet elsewhere.
+*     Case 8: Linear velocity field to validate Least Squares method
 */
    const static int problem = 7;
    const static int dim = 2;
+   
+   /* Various parameters */
+   const static bool distort_mesh = false; // Relevant in problems 7
    const static int shocktube = 1; // 1 - Sod, 2 - Lax, 3 - Leblanc
    constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity
 
@@ -33,7 +37,6 @@ public:
    constexpr static double CFL_first = 0.01;
    constexpr static double CFL_second = 0.25;
    constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
-   const static bool distort_mesh = false;
 };
 }
 }

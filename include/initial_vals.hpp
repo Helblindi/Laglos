@@ -153,7 +153,7 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
             else { return _rhoR; }
          }
       }
-      case 7:{ // Saltzman TODO???
+      case 7:{
          if (t == 0) { return 1.; }
          else 
          {
@@ -187,6 +187,10 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
             }
          }
          return 0.;
+      }
+      case 8:
+      {
+         return 1.;
       }
       default: 
       {
@@ -357,6 +361,17 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, const double & t, V
          }
          return;
       }
+      case 8: // Linear velocity field constant in time
+      {
+         if (t == 0) {
+            for (int i = 0; i < dim; i++)
+            {
+               v[i] = 1.0 * x[i] + 1.0;
+            } 
+            // v[0] = 1.;
+         }
+         return;
+      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!");
@@ -380,6 +395,7 @@ inline double InitialValues<problem, dim>::sie0(const Vector &x, const double & 
    {
       case 2: // Isentropic vortex
       case 3: 
+      case 8:
       {
          // Use pressure law to get specific internal energy
          const double gamma = gamma_func();
@@ -444,6 +460,7 @@ inline double InitialValues<problem, dim>::ste0(const Vector &x, const double & 
       case 5:
       case 6:
       case 7:
+      case 8:
       default:
       {
          Vector v(2);
@@ -465,6 +482,7 @@ inline double InitialValues<problem, dim>::gamma_func(const int shocktube)
       case 2:
       case 3:
       case 5:
+      case 8:
       {
          return 7./5.;
       }

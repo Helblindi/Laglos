@@ -22,6 +22,7 @@
 * ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
 * ./Laglos -m ../data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
+* ./Laglos -m ../data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 * 
 */
 
@@ -307,13 +308,13 @@ int main(int argc, char *argv[]) {
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
 
-   cout << "Printing initial x_gf positions\n";
-   x_gf.Print(cout);
+   // cout << "Printing initial x_gf positions\n";
+   // x_gf.Print(cout);
 
-   cout << "distorting mesh\n";
    /* Distort Mesh for Saltzman Problem */
    if (CompileTimeVals::distort_mesh)
    {
+      cout << "distorting mesh\n";
       switch (problem)
       {
          case 7: // Saltzman problem
@@ -332,14 +333,62 @@ int main(int argc, char *argv[]) {
                x_gf[vertex] = x_new;
             }
          }
+         // case 8: // Linear node movement
+         // {
+         //    Array<double> coords(dim), coords_new(dim);
+         //    cout << "pmesh call: " << pmesh->GetNV() << endl;
+         //    cout << "H1 call: " << H1FESpace.GetNDofs() << endl;
+         //    cout << "pmesh num faces: " << pmesh->GetNumFaces() << endl;
+         
+         //    // Distort all corner nodes
+         //    // pmesh->GetNV will give # corner nodes 
+         //    for (int vertex = 0; vertex < pmesh->GetNV(); vertex++)
+         //    {
+         //       cout << "vertex: " << vertex << endl;
+         //       for (int i = 0; i < dim; i++)
+         //       {
+         //          int index = vertex + i * H1FESpace.GetNDofs();
+         //          cout << "index: " << index << endl;
+
+         //          coords_new[i] = coords[i]; //*pow(coords[i], 2);
+         //          x_gf[index] = coords_new[i];
+         //       }
+         //    }
+
+         //    // Adjust all face nodes to be averages of their adjacent corners
+         //    mfem::Mesh::FaceInformation FI;
+         //    for (int face = 0; face < pmesh->GetNumFaces(); face++)
+         //    {
+         //       cout << "Iterating on face: " << face << endl;
+         //       FI = pmesh->GetFaceInformation(face);
+         //       Array<int> face_dof_row;
+         //       H1FESpace.GetFaceDofs(face, face_dof_row);
+
+         //       cout << "Face dof row for face: " << face << ":\n";
+         //       face_dof_row.Print(cout);
+
+         //       int face_dof = face_dof_row[2];
+         //       int index0 = face_dof_row[0];
+         //       int index1 = face_dof_row[1];
+         //       for (int i = 0; i < dim; i++)
+         //       {
+         //          int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
+         //          int node0_index = index0 + i * H1FESpace.GetNDofs();
+         //          int node1_index = index1 + i * H1FESpace.GetNDofs();
+         //          x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
+         //       }
+               
+         //    }
+         // }
          default: // do nothing for all other problems
          {
          }
       }
+      cout << "Mesh distorted\n";
    }
-   cout << "Mesh distorted\n";
-   cout << "Printing initial x_gf positions\n";
-   x_gf.Print(cout);
+   
+   // cout << "Printing initial x_gf positions\n";
+   // x_gf.Print(cout);
 
    // Print initialized mesh
    // Can be visualized with glvis -np # -m ./results/mesh-test-init
@@ -383,6 +432,7 @@ int main(int argc, char *argv[]) {
 
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, mm, CFL);
+   cout << "Solver created.\n";
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
@@ -432,6 +482,7 @@ int main(int argc, char *argv[]) {
 
       switch(problem)
       {
+         case 8:
          case 7:
          case 6:
          case 4: // Noh Problem
@@ -496,6 +547,8 @@ int main(int argc, char *argv[]) {
    int steps = 0;
    BlockVector S_old(S);
 
+   cout << "Entering time loop\n";
+
    for (int ti = 1; !last_step; ti++)
    {
       /* Check if we need to change CFL */
@@ -541,6 +594,7 @@ int main(int argc, char *argv[]) {
 
       if (last_step || (ti % vis_steps) == 0)
       {
+         cout << "Current time: " << t << endl;
          double lnorm = ste_gf * ste_gf, norm;
          MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
  
@@ -586,6 +640,7 @@ int main(int argc, char *argv[]) {
             
             switch(problem)
             {
+               case 8:
                case 7:
                case 6:
                case 4: // Noh Problem
@@ -751,6 +806,7 @@ int main(int argc, char *argv[]) {
    /* When the exact solution is known, print out an error file */
    switch(problem)
    {
+      // case 8: // 8TODO
       case 7:
       case 6:
       case 4: // Noh problem

@@ -88,6 +88,8 @@ public:
 
    void CreateBdrVertexIndexingArray();
 
+   bool IsBdrVertex(const int & node);
+
    void CreateVStarArr(const Vector &S);
 
    void MakeTimeStep(Vector &S, double & t, double dt);
@@ -121,9 +123,8 @@ public:
 
    // tests from 2023-01-05
    void compute_node_velocity_cwa(Vector &S, const double & t, const double & dt);
-   void compute_node_velocity_mawa(Vector &S, const double & t, const double & dt);
-   void compute_node_velocity_mtwa(Vector &S, const double & t, const double & dt);
    void compute_node_velocity_RP(Vector &S, const double & t, const double & dt);
+   void compute_node_velocity_LS(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
    void compute_node_velocity(Vector &S, const double & t, const double & dt);
    

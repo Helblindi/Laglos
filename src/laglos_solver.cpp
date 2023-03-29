@@ -1018,154 +1018,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
          cout << "Computing velocity on faces now\n";
 
          // TODO: Compute velocities on faces now
-         for (int face = 0; face < num_faces; face++) // face iterator
-         {  
-            // Get intermediate face velocity, face information, and face normal
-            Vector face_velocity(2);
-            Vector n_vec_temp(2);
-            Vf = 0.;
-            get_intermediate_face_velocity(face, Vf);
-            FI = pmesh->GetFaceInformation(face);
-
-            /* adjacent corner indices */
-            H1.GetFaceDofs(face, row);
-            int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
-
-            // retrieve old face and corner locations
-            Vector face_x(2), vdof1_x(2), vdof2_x(2), vdof1_v(2), vdof2_v(2);
-            get_node_position(S, face_dof, face_x);
-            get_node_position(S, face_vdof1, vdof1_x);
-            get_node_position(S, face_vdof2, vdof2_x);
-
-            // retrieve corner velocities
-            get_node_velocity(S, face_vdof1, vdof1_v);
-            get_node_velocity(S, face_vdof2, vdof2_v);
-
-            if (FI.IsInterior())
-            {
-               c = FI.element[0].index;
-               CalcOutwardNormalInt(S, c, face, c_vec);
-
-               // Face area
-               // https://github.com/mfem/mfem/issues/951
-               Vector nor(dim);
-               ElementTransformation *T = pmesh->GetFaceTransformation(face);
-               T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
-               CalcOrtho(T->Jacobian(), nor);
-               double face_length = nor.Norml2();
-
-               n_vec = c_vec;
-               n_vec /= n_vec.Norml2();
-
-               // Calculate new corner locations and half  step locations
-               Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
-               vdof1_x_new = vdof1_x;
-               vdof1_x_new.Add(dt, vdof1_v);
-               vdof1_x_half = vdof1_x;
-               vdof1_x_half.Add(dt/2, vdof1_v);
-
-               vdof2_x_new = vdof2_x;
-               vdof2_x_new.Add(dt, vdof1_v);
-               vdof2_x_half = vdof2_x;
-               vdof2_x_half.Add(dt/2, vdof2_v);
-
-               // calculate a_{12}^{n+1} (new tangent midpoint)
-               Vector vdof12_x_new(2);
-               vdof12_x_new = vdof1_x_new;
-               vdof12_x_new += vdof2_x_new;
-               vdof12_x_new /= 2.;
-
-               // Compute D (A.4c)
-               Vector n_vec_R(dim), n_vec_perp(dim), temp_vec(dim), temp_vec_2(dim);
-               n_vec_R = n_vec;
-               Orthogonal(n_vec_R);
-
-               n_vec_perp = n_vec_R;
-               n_vec_perp.Neg();
-
-               subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-
-               subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-
-               Orthogonal(temp_vec_2);
-
-               double D = dt * (temp_vec * n_vec_R) + 2 * (n_vec * temp_vec_2);
-
-               // Compute c1 (A.4a)
-               subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-               double c1 = ( dt * (temp_vec * n_vec) - 2 * (temp_vec_2 * n_vec_perp) ) / D;
-
-               // Compute c0 (A.4b)
-               double bmn = Vf * n_vec; // calculate flux across face (5.8)
-               bmn *= face_length;
-               temp_vec = vdof1_x_half;
-               Orthogonal(temp_vec);
-               temp_vec_2 = vdof2_x_half;
-               Orthogonal(temp_vec_2);
-               double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
-               double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
-               temp_vec = face_x;
-               Orthogonal(temp_vec);
-               subtract(vdof2_v, vdof1_v, temp_vec_2);
-               double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3n
-               double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
-               
-               // Compute V3n_perp
-               subtract(vdof2_x_new, vdof1_x_new, temp_vec);
-               subtract(face_x, vdof12_x_new, temp_vec_2);
-               temp_vec_2.Add(c0*dt, n_vec);
-               const1 = temp_vec * temp_vec_2; // numerator
-               temp_vec_2 = n_vec_perp;
-               temp_vec_2.Add(c1, n_vec);
-               const2 = temp_vec * temp_vec_2;
-               const2 *= dt; // denominator
-               double V3nperp = -1. * const1 / const2;
-
-               // Compute V3n (5.11)
-               double V3n = c1 * V3nperp + c0;
-
-               // Compute face velocity (5.11)
-               // const1 = Vf * n_vec;
-               // temp_vec = n_vec;
-               // temp_vec *= const1;
-               // subtract(Vf, temp_vec, face_velocity);
-               // face_velocity.Add(V3n, n_vec);
-
-               // Compute face velocity (Appendix A)
-               face_velocity = 0.;
-               face_velocity.Add(V3n, n_vec);
-               face_velocity.Add(V3nperp, n_vec_perp);
-
-               Vector face_x_new(2);
-               face_x_new = face_x;
-               face_x_new.Add(dt, face_velocity);
-
-               // Check perpendicular
-               subtract(face_x_new, vdof12_x_new, temp_vec);
-               subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
-               if (abs(temp_vec * temp_vec_2) > pow(10, -12))
-               {
-                  cout << "temp_vec:\n";
-                  temp_vec.Print(cout);
-                  cout << "temp_vec_2:\n";
-                  temp_vec_2.Print(cout);
-                  cout << "################## Vectors are not orthogonal!";
-                  MFEM_ABORT("vectors are not orthogonal!\n");
-               }
-            }
-            else
-            {
-               assert(FI.IsBoundary());
-               // TODO: Add in boundary conditions similar to corner vertex bcs
-               for (int j = 0; j < dim; j++)
-               {
-                  face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
-               }
-            }
-
-            // Lastly, put face velocity into gridfunction object
-            update_node_velocity(S, face_dof, face_velocity);
-         }
+         compute_face_velocity(S, dt);
 
          // Since we cannot use Serendipity elements, we must update cell center velocities
          Vector Vc(dim);
@@ -1872,11 +1725,160 @@ void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_face_velocity(Vector &S, const double & dt)
 {
-   double c0, c1, D;
+   /* Parameters needed for face velocity calculations */
+   mfem::Mesh::FaceInformation FI;
+   Vector Vf(dim), c_vec(dim), n_vec(dim);
+   Array<int> row;
+   int face_dof = 0, face_vdof2 = 0, c = 0;
+
    // Iterate over faces
    for (int face = 0; face < num_faces; face++) // face iterator
-   {
+   {  
+      // Get intermediate face velocity, face information, and face normal
+      Vector face_velocity(2);
+      Vector n_vec_temp(2);
+      Vf = 0.;
+      get_intermediate_face_velocity(face, Vf);
+      FI = pmesh->GetFaceInformation(face);
 
+      /* adjacent corner indices */
+      H1.GetFaceDofs(face, row);
+      int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
+
+      // retrieve old face and corner locations
+      Vector face_x(2), vdof1_x(2), vdof2_x(2), vdof1_v(2), vdof2_v(2);
+      get_node_position(S, face_dof, face_x);
+      get_node_position(S, face_vdof1, vdof1_x);
+      get_node_position(S, face_vdof2, vdof2_x);
+
+      // retrieve corner velocities
+      get_node_velocity(S, face_vdof1, vdof1_v);
+      get_node_velocity(S, face_vdof2, vdof2_v);
+
+      if (FI.IsInterior())
+      {
+         c = FI.element[0].index;
+         CalcOutwardNormalInt(S, c, face, c_vec);
+
+         // Face area
+         // https://github.com/mfem/mfem/issues/951
+         Vector nor(dim);
+         ElementTransformation *T = pmesh->GetFaceTransformation(face);
+         T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
+         CalcOrtho(T->Jacobian(), nor);
+         double face_length = nor.Norml2();
+
+         n_vec = c_vec;
+         n_vec /= n_vec.Norml2();
+
+         // Calculate new corner locations and half  step locations
+         Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
+         vdof1_x_new = vdof1_x;
+         vdof1_x_new.Add(dt, vdof1_v);
+         vdof1_x_half = vdof1_x;
+         vdof1_x_half.Add(dt/2, vdof1_v);
+
+         vdof2_x_new = vdof2_x;
+         vdof2_x_new.Add(dt, vdof1_v);
+         vdof2_x_half = vdof2_x;
+         vdof2_x_half.Add(dt/2, vdof2_v);
+
+         // calculate a_{12}^{n+1} (new tangent midpoint)
+         Vector vdof12_x_new(2);
+         vdof12_x_new = vdof1_x_new;
+         vdof12_x_new += vdof2_x_new;
+         vdof12_x_new /= 2.;
+
+         // Compute D (A.4c)
+         Vector n_vec_R(dim), n_vec_perp(dim), temp_vec(dim), temp_vec_2(dim);
+         n_vec_R = n_vec;
+         Orthogonal(n_vec_R);
+
+         n_vec_perp = n_vec_R;
+         n_vec_perp.Neg();
+
+         subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
+
+         subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
+
+         Orthogonal(temp_vec_2);
+
+         double D = dt * (temp_vec * n_vec_R) + 2 * (n_vec * temp_vec_2);
+
+         // Compute c1 (A.4a)
+         subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+         double c1 = ( dt * (temp_vec * n_vec) - 2 * (temp_vec_2 * n_vec_perp) ) / D;
+
+         // Compute c0 (A.4b)
+         double bmn = Vf * n_vec; // calculate flux across face (5.8)
+         bmn *= face_length;
+         temp_vec = vdof1_x_half;
+         Orthogonal(temp_vec);
+         temp_vec_2 = vdof2_x_half;
+         Orthogonal(temp_vec_2);
+         double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
+         double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
+         temp_vec = face_x;
+         Orthogonal(temp_vec);
+         subtract(vdof2_v, vdof1_v, temp_vec_2);
+         double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3n
+         double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
+         
+         // Compute V3n_perp
+         subtract(vdof2_x_new, vdof1_x_new, temp_vec);
+         subtract(face_x, vdof12_x_new, temp_vec_2);
+         temp_vec_2.Add(c0*dt, n_vec);
+         const1 = temp_vec * temp_vec_2; // numerator
+         temp_vec_2 = n_vec_perp;
+         temp_vec_2.Add(c1, n_vec);
+         const2 = temp_vec * temp_vec_2;
+         const2 *= dt; // denominator
+         double V3nperp = -1. * const1 / const2;
+
+         // Compute V3n (5.11)
+         double V3n = c1 * V3nperp + c0;
+
+         // Compute face velocity (5.11)
+         // const1 = Vf * n_vec;
+         // temp_vec = n_vec;
+         // temp_vec *= const1;
+         // subtract(Vf, temp_vec, face_velocity);
+         // face_velocity.Add(V3n, n_vec);
+
+         // Compute face velocity (Appendix A)
+         face_velocity = 0.;
+         face_velocity.Add(V3n, n_vec);
+         face_velocity.Add(V3nperp, n_vec_perp);
+
+         Vector face_x_new(2);
+         face_x_new = face_x;
+         face_x_new.Add(dt, face_velocity);
+
+         // Check perpendicular
+         subtract(face_x_new, vdof12_x_new, temp_vec);
+         subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
+         if (abs(temp_vec * temp_vec_2) > pow(10, -12))
+         {
+            cout << "temp_vec:\n";
+            temp_vec.Print(cout);
+            cout << "temp_vec_2:\n";
+            temp_vec_2.Print(cout);
+            cout << "################## Vectors are not orthogonal!";
+            MFEM_ABORT("vectors are not orthogonal!\n");
+         }
+      }
+      else
+      {
+         assert(FI.IsBoundary());
+         // TODO: Add in boundary conditions similar to corner vertex bcs
+         for (int j = 0; j < dim; j++)
+         {
+            face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+         }
+      }
+
+      // Lastly, put face velocity into gridfunction object
+      update_node_velocity(S, face_dof, face_velocity);
    }
 }
 

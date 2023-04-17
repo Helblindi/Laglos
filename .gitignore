@@ -40,7 +40,7 @@ Fortran/a.exe
 arbitrary_eos_lagrangian_lambda_module.mod
 
 # Results
-results/
+results/*
 
 
 #Unknown

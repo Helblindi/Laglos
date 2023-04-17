@@ -128,7 +128,9 @@ public:
    
    void compute_node_velocity(Vector &S, const double & t, const double & dt);
    
-   void compute_face_velocity(Vector &S, const double & dt);
+   void compute_interior_face_velocities(Vector &S, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+
+   void fill_center_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void update_node_velocity(Vector &S, const int & node, const Vector & vel);
 

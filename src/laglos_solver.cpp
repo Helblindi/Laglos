@@ -785,7 +785,7 @@ void LagrangianLOOperator<dim, problem>::Orthogonal(Vector &v)
    if (dim == 2)
    {
       double x = v(0), y = v(1);
-      v(0) = -1 * y;
+      v(0) = -1. * y;
       v(1) = x;
    }
 }
@@ -1018,28 +1018,9 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
          cout << "Computing velocity on faces now\n";
 
          // TODO: Compute velocities on faces now
-         compute_face_velocity(S, dt);
+         compute_interior_face_velocities(S, dt);
 
-         // Since we cannot use Serendipity elements, we must update cell center velocities
-         Vector Vc(dim);
-         Vector node_v(dim);
-         Array<int> verts;
-         for (int ci = 0; ci < L2.GetNE(); ci++)
-         {
-            GetCellStateVector(S, ci, Uc);
-            Vc = velocity(Uc);
-            // Vc = 0.;
-            // pmesh->GetElementVertices(ci, verts);
-            // for (int j = 0; j < verts.Size(); j++)
-            // {
-            //    get_node_velocity(S, verts[j], node_v);
-            //    Vc += node_v;
-            // }
-            // Vc /= 4.;
-            int cell_vdof = NVDofs_H1 + num_faces + ci;
-            update_node_velocity(S, cell_vdof, Vc);
-         }
-
+         fill_center_velocities_with_average(S);
       }
       break;
    }
@@ -1518,87 +1499,110 @@ void LagrangianLOOperator<dim, problem>::
       // Solve linear systems A x_A = B_x, A x_B = B_y
       Vector res_x(dim+1), res_y(dim+1);
 
-      if (is_boundary_node)
+      if (flag=="testing")
       {
-         CGSolver cg;
-         cg.SetOperator(LHS);
-         cg.SetRelTol(1e-12);
-         cg.SetAbsTol(1e-12);
-         cg.SetMaxIter(1000);
-         cg.SetPrintLevel(-1);
-         cg.Mult(Bx_mod, res_x);
-         cg.Mult(By_mod, res_y);
-      } // End Boundary Node
+         if (is_boundary_node)
+         {
+            // Prescribe exact solution on boundary nodes
+            test_vel(vertex_x, t, vertex_v);
+         }
+         else
+         {
+            // Interior node
+            // Solve directly
+            LHS.Invert();
+            LHS.Mult(Bx_mod, res_x);
+            LHS.Mult(By_mod, res_y);
+
+            // Solve for nodal velocity
+            vertex_v(0) = res_x(dim); // Set to cx
+            vertex_v(1) = res_y(dim); // Set to cy
+         }
+      }
       else
       {
-         // Solve directly
-         LHS.Invert();
-         LHS.Mult(Bx_mod, res_x);
-         LHS.Mult(By_mod, res_y);
-      }
-      
-      // Solve for nodal velocity
-      vertex_v(0) = res_x(dim); // Set to cx
-      vertex_v(1) = res_y(dim); // Set to cy
-
-      // Enforce boundary conditions
-      if (is_boundary_node)
-      {
-         /* Enforce BCs (Copy/Paste from previous nodal computation) */
-         switch (problem)
+         assert(flag=="NA");
+         if (is_boundary_node)
          {
-            case 7: // Saltzman
+            CGSolver cg;
+            cg.SetOperator(LHS);
+            cg.SetRelTol(1e-12);
+            cg.SetAbsTol(1e-12);
+            cg.SetMaxIter(1000);
+            cg.SetPrintLevel(-1);
+            cg.Mult(Bx_mod, res_x);
+            cg.Mult(By_mod, res_y);
+         } // End Boundary Node
+         else
+         {
+            // Solve directly
+            LHS.Invert();
+            LHS.Mult(Bx_mod, res_x);
+            LHS.Mult(By_mod, res_y);
+         }
+         
+         // Solve for nodal velocity
+         vertex_v(0) = res_x(dim); // Set to cx
+         vertex_v(1) = res_y(dim); // Set to cy
+
+         // Enforce boundary conditions
+         if (is_boundary_node)
+         {
+            /* Enforce BCs (Copy/Paste from previous nodal computation) */
+            switch (problem)
             {
-               // cout << "Working on boundary node: " << vertex << endl;
-               is_boundary_node = false;
-               for (int face_it = 0; face_it < row_length; face_it++)
+               case 7: // Saltzman
                {
-                  int face = row[face_it];
-                  FI = pmesh->GetFaceInformation(face);
-                  if (FI.IsBoundary())
+                  // cout << "Working on boundary node: " << vertex << endl;
+                  is_boundary_node = false;
+                  for (int face_it = 0; face_it < row_length; face_it++)
                   {
-                     int BdrElIndex = BdrElementIndexingArray[face];
-                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-
-                     if (bdr_attribute == 1)
+                     int face = row[face_it];
+                     FI = pmesh->GetFaceInformation(face);
+                     if (FI.IsBoundary())
                      {
-                        vertex_v = 0.;
-                        
-                        if (timestep_first == 0.)
+                        int BdrElIndex = BdrElementIndexingArray[face];
+                        int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+                        if (bdr_attribute == 1)
                         {
-                           timestep_first = timestep;
+                           vertex_v = 0.;
+                           
+                           if (timestep_first == 0.)
+                           {
+                              timestep_first = timestep;
+                           }
+                           double _xi = t / (2*timestep_first);
+
+                           double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+
+                           vertex_v[0] = 1. * _psi;
+
+                           break;
                         }
-                        double _xi = t / (2*timestep_first);
+                        else 
+                        {
+                           assert (bdr_attribute == 2);
+                           CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+                           n_vec /= n_vec.Norml2();
 
-                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+                           Vector vertex_v_normal_component(dim);
+                           vertex_v_normal_component = n_vec;
+                           double _scale = vertex_v * n_vec;
+                           vertex_v_normal_component *= _scale;
 
-                        vertex_v[0] = 1. * _psi;
-
-                        break;
-                     }
-                     else 
-                     {
-                        assert (bdr_attribute == 2);
-                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-                        n_vec /= n_vec.Norml2();
-
-                        Vector vertex_v_normal_component(dim);
-                        vertex_v_normal_component = n_vec;
-                        double _scale = vertex_v * n_vec;
-                        vertex_v_normal_component *= _scale;
-
-                        vertex_v -= vertex_v_normal_component;
-                     }
-                  } // End boundary face
-               } // End: Face iterator
-            } // End: Saltzman
-            default:
-            {
-               // No change
-            }
-         } // Switch case end
-      }
-
+                           vertex_v -= vertex_v_normal_component;
+                        }
+                     } // End boundary face
+                  } // End: Face iterator
+               } // End: Saltzman
+               default:
+               {
+                  // No change
+               }
+            } // Switch case end
+         }
+      } // End not testing
       
       update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
@@ -1723,20 +1727,25 @@ void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const 
 }
 
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_face_velocity(Vector &S, const double & dt)
+void LagrangianLOOperator<dim, problem>::
+   compute_interior_face_velocities(Vector &S, const double & dt,
+                                    const string flag, // Default NA
+                                    void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), c_vec(dim), n_vec(dim);
+   Vector Uc(dim+2), Ucp(dim+2);
+   Vector cell_c_v(dim), cell_cp_v(dim), cell_center_v(dim); // For computation of bmn
    Array<int> row;
-   int face_dof = 0, face_vdof2 = 0, c = 0;
+   int face_dof = 0, face_vdof2 = 0, c = 0, cp = 0;
 
    // Iterate over faces
    for (int face = 0; face < num_faces; face++) // face iterator
    {  
       // Get intermediate face velocity, face information, and face normal
-      Vector face_velocity(2);
-      Vector n_vec_temp(2);
+      Vector face_velocity(dim);
+      face_velocity = 0.;
       Vf = 0.;
       get_intermediate_face_velocity(face, Vf);
       FI = pmesh->GetFaceInformation(face);
@@ -1746,139 +1755,337 @@ void LagrangianLOOperator<dim, problem>::compute_face_velocity(Vector &S, const 
       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
       // retrieve old face and corner locations
-      Vector face_x(2), vdof1_x(2), vdof2_x(2), vdof1_v(2), vdof2_v(2);
+      Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
       get_node_position(S, face_dof, face_x);
       get_node_position(S, face_vdof1, vdof1_x);
       get_node_position(S, face_vdof2, vdof2_x);
 
+      cout << "------------------------------------\n";
+      cout << "We are iterating on face: " << face << endl;
+      cout << "This face is located at: \n";
+      face_x.Print(cout);
+      cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
+      vdof1_x.Print(cout);
+      cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
+      vdof2_x.Print(cout);
+
       // retrieve corner velocities
       get_node_velocity(S, face_vdof1, vdof1_v);
       get_node_velocity(S, face_vdof2, vdof2_v);
+      
+      cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
+      vdof1_v.Print(cout);
+      cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
+      vdof2_v.Print(cout);
 
-      if (FI.IsInterior())
+      // if (FI.IsInterior())
+      // {
+      cout << "========================================\n";
+      cout << "We have an interior face: " << face << endl;
+      cout << "dt: " << dt << endl;
+      c = FI.element[0].index;
+      cp = FI.element[1].index;
+      GetCellStateVector(S, c, Uc);
+      GetCellStateVector(S, cp, Ucp);
+      cell_c_v = velocity(Uc);
+      cell_cp_v = velocity(Ucp);
+      cell_center_v = cell_c_v;
+      cell_center_v *= 0.5;
+      cell_center_v.Add(0.5, cell_cp_v);
+
+      cout << "Cell c: " << c << ", cell cp: " << cp << endl;
+      cout << "Velocity on cell c:\n";
+      cell_c_v.Print(cout);
+      cout << "Velocity on cell cp:\n";
+      cell_cp_v.Print(cout);
+      cout << "cell centered flux on face:\n";
+      cell_center_v.Print(cout);
+      CalcOutwardNormalInt(S, c, face, c_vec);
+
+      // Face area/length
+      // https://github.com/mfem/mfem/issues/951
+      // Vector nor(dim);
+      // ElementTransformation *T = pmesh->GetFaceTransformation(face);
+      // T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
+      // CalcOrtho(T->Jacobian(), nor);
+      // double face_length = nor.Norml2();
+      // cout << "Vector 'nor' calculated using Jacobian: \n";
+      // nor.Print(cout);
+      Vector _secant(dim);
+      subtract(vdof2_x, vdof1_x, _secant);
+      double face_length = _secant.Norml2();
+      _secant /= face_length;
+
+      cout << "_secant (vdof2 - vdof1): \n";
+      _secant.Print(cout);
+
+      n_vec = c_vec;
+      n_vec /= n_vec.Norml2();
+
+      cout << "The outward normal vector is: \n";
+      n_vec.Print(cout);
+      cout << "\n\n\n trying to change how the normal is computed\n";
+      n_vec = _secant;
+      Orthogonal(n_vec);
+
+      cout << "The outward normal vector is: \n";
+      n_vec.Print(cout);
+
+      // Calculate new corner locations and half  step locations
+      Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
+      vdof1_x_new = vdof1_x;
+      vdof1_x_new.Add(dt, vdof1_v);
+      vdof1_x_half = vdof1_x;
+      vdof1_x_half.Add(dt/2., vdof1_v);
+
+      cout << "New locations for vdof1. full:\n";
+      vdof1_x_new.Print(cout);
+      cout << "half: \n";
+      vdof1_x_half.Print(cout);
+
+      vdof2_x_new = vdof2_x;
+      vdof2_x_new.Add(dt, vdof2_v);
+      vdof2_x_half = vdof2_x;
+      vdof2_x_half.Add(dt/2., vdof2_v);
+
+      cout << "New locations for vdof2. full:\n";
+      vdof2_x_new.Print(cout);
+      cout << "half: \n";
+      vdof2_x_half.Print(cout);
+
+      // calculate a_{12}^{n+1} (new tangent midpoint)
+      Vector vdof12_x_new(2);
+      vdof12_x_new = vdof1_x_new;
+      vdof12_x_new += vdof2_x_new;
+      vdof12_x_new /= 2.;
+      cout << "new tangent midpoint, vdof12_x_new: \n";
+      vdof12_x_new.Print(cout);
+
+      // Compute D (A.4c)
+      Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
+      n_vec_R = n_vec;
+      Orthogonal(n_vec_R);
+      cout << "n_vec_R: \n";
+      n_vec_R.Print(cout);
+
+      subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
+      cout << "V1-V2:\n";
+      temp_vec.Print(cout);
+
+      subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
+      cout << "A2-A1:\n";
+      temp_vec_2.Print(cout);
+
+      Orthogonal(temp_vec_2);
+      cout << "(A2-A1)^R:\n";
+      temp_vec_2.Print(cout);
+
+      double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+      cout << "D: " << D << endl;
+
+      // Compute c1 (A.4a)
+      subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+      cout << "V2-V1:\n";
+      temp_vec.Print(cout);
+      cout << "c1 computation n_vec:\n";
+      n_vec.Print(cout);
+      double c1 = ( dt * (temp_vec * n_vec) + 2 * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
+      cout << "c1 computation n_vec_R:\n";
+      n_vec_R.Print(cout);
+      cout << "c1: " << c1 << endl;
+
+      // Compute c0 (A.4b)
+      cout << "!!!Computing c0\n";
+
+      cout << "\n === First we compute bmn ===\n";
+      // cout << "cell_center_v:\n";
+      // cell_center_v.Print(cout);
+      Vector n_vec_half(dim);
+      subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
+      Orthogonal(n_vec_half);
+      cout << "n_vec_half:\n";
+      n_vec_half.Print(cout);
+      Vector v_exact_at_face(dim);
+      test_vel(face_x, 0., v_exact_at_face);
+      // double bmn = v_exact_at_face * n_vec_half;
+      double bmn = v_exact_at_face * n_vec;
+      // cout << "face length: " << face_length << endl;
+      // bmn *= face_length;
+      cout << "bmn: " << bmn << endl;
+
+      temp_vec = vdof1_x_half;
+      Orthogonal(temp_vec); // A1R
+      // cout << "A1^R:\n";
+      // temp_vec.Print(cout);
+      temp_vec_2 = vdof2_x_half;
+      Orthogonal(temp_vec_2); // A2R
+      // cout << "A2^R:\n";
+      // temp_vec_2.Print(cout);
+      double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
+      double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
+      
+      temp_vec = face_x;
+      Orthogonal(temp_vec);
+      // cout << "a3^R:\n";
+      // temp_vec.Print(cout);
+      subtract(vdof2_v, vdof1_v, temp_vec_2);
+      // cout << "V2 - V1:\n";
+      // temp_vec_2.Print(cout);
+      double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
+      // cout << "const 1: " << const1 << ", const 2: " << const2 << ", const3: " << const3 << endl;
+      double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
+      cout << "c0: " << c0 << endl;
+      
+      // Compute V3n_perp
+      // cout << "Computing V3n_perp\n";
+      subtract(vdof2_x_new, vdof1_x_new, temp_vec);
+      // cout << "a2n+1 - a1n+1:\n";
+      // temp_vec.Print(cout);
+      subtract(face_x, vdof12_x_new, temp_vec_2);
+      temp_vec_2.Add(c0*dt, n_vec);
+      // cout << "a3n - a12n+1 + c0dtn_vec:\n";
+      // temp_vec_2.Print(cout);
+      const1 = temp_vec * temp_vec_2; // numerator
+      temp_vec_2 = n_vec_R;
+      temp_vec_2 *= -1.;
+      temp_vec_2.Add(c1, n_vec);
+      // cout << "c1n_vec + nperp:\n";
+      // temp_vec_2.Print(cout);
+      const2 = temp_vec * temp_vec_2;
+      const2 *= dt; // denominator
+      double V3nperp = -1. * const1 / const2;
+      cout << "V3nperp: " << V3nperp << endl;
+
+      // Compute V3n (5.11)
+      double V3n = c1 * V3nperp + c0;
+      cout << "V3n: " << V3n << endl;
+
+      // Compute face velocity (5.11)
+      // const1 = Vf * n_vec;
+      // temp_vec = n_vec;
+      // temp_vec *= const1;
+      // subtract(Vf, temp_vec, face_velocity);
+      // face_velocity.Add(V3n, n_vec);
+
+      // Compute face velocity (Appendix A)
+      face_velocity = 0.;
+      face_velocity.Add(V3n, n_vec);
+      Vector n_vec_perp(dim);
+      n_vec_perp = n_vec_R;
+      n_vec_perp *= -1.;
+      cout << "n_vec_perp:\n";
+      n_vec_perp.Print(cout);
+      cout << "n_vec_R:\n";
+      n_vec_R.Print(cout);
+      face_velocity.Add(V3nperp, n_vec_perp);
+
+      Vector face_x_new(2);
+      face_x_new = face_x;
+      face_x_new.Add(dt, face_velocity);
+
+      // Check perpendicular
+      subtract(face_x_new, vdof12_x_new, temp_vec);
+      subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
+      if (abs(temp_vec * temp_vec_2) > pow(10, -12))
       {
-         c = FI.element[0].index;
-         CalcOutwardNormalInt(S, c, face, c_vec);
-
-         // Face area
-         // https://github.com/mfem/mfem/issues/951
-         Vector nor(dim);
-         ElementTransformation *T = pmesh->GetFaceTransformation(face);
-         T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
-         CalcOrtho(T->Jacobian(), nor);
-         double face_length = nor.Norml2();
-
-         n_vec = c_vec;
-         n_vec /= n_vec.Norml2();
-
-         // Calculate new corner locations and half  step locations
-         Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
-         vdof1_x_new = vdof1_x;
-         vdof1_x_new.Add(dt, vdof1_v);
-         vdof1_x_half = vdof1_x;
-         vdof1_x_half.Add(dt/2, vdof1_v);
-
-         vdof2_x_new = vdof2_x;
-         vdof2_x_new.Add(dt, vdof1_v);
-         vdof2_x_half = vdof2_x;
-         vdof2_x_half.Add(dt/2, vdof2_v);
-
-         // calculate a_{12}^{n+1} (new tangent midpoint)
-         Vector vdof12_x_new(2);
-         vdof12_x_new = vdof1_x_new;
-         vdof12_x_new += vdof2_x_new;
-         vdof12_x_new /= 2.;
-
-         // Compute D (A.4c)
-         Vector n_vec_R(dim), n_vec_perp(dim), temp_vec(dim), temp_vec_2(dim);
-         n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
-
-         n_vec_perp = n_vec_R;
-         n_vec_perp.Neg();
-
-         subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-
-         subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-
-         Orthogonal(temp_vec_2);
-
-         double D = dt * (temp_vec * n_vec_R) + 2 * (n_vec * temp_vec_2);
-
-         // Compute c1 (A.4a)
-         subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-         double c1 = ( dt * (temp_vec * n_vec) - 2 * (temp_vec_2 * n_vec_perp) ) / D;
-
-         // Compute c0 (A.4b)
-         double bmn = Vf * n_vec; // calculate flux across face (5.8)
-         bmn *= face_length;
-         temp_vec = vdof1_x_half;
-         Orthogonal(temp_vec);
-         temp_vec_2 = vdof2_x_half;
-         Orthogonal(temp_vec_2);
-         double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
-         double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
-         temp_vec = face_x;
-         Orthogonal(temp_vec);
-         subtract(vdof2_v, vdof1_v, temp_vec_2);
-         double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3n
-         double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
-         
-         // Compute V3n_perp
-         subtract(vdof2_x_new, vdof1_x_new, temp_vec);
-         subtract(face_x, vdof12_x_new, temp_vec_2);
-         temp_vec_2.Add(c0*dt, n_vec);
-         const1 = temp_vec * temp_vec_2; // numerator
-         temp_vec_2 = n_vec_perp;
-         temp_vec_2.Add(c1, n_vec);
-         const2 = temp_vec * temp_vec_2;
-         const2 *= dt; // denominator
-         double V3nperp = -1. * const1 / const2;
-
-         // Compute V3n (5.11)
-         double V3n = c1 * V3nperp + c0;
-
-         // Compute face velocity (5.11)
-         // const1 = Vf * n_vec;
-         // temp_vec = n_vec;
-         // temp_vec *= const1;
-         // subtract(Vf, temp_vec, face_velocity);
-         // face_velocity.Add(V3n, n_vec);
-
-         // Compute face velocity (Appendix A)
-         face_velocity = 0.;
-         face_velocity.Add(V3n, n_vec);
-         face_velocity.Add(V3nperp, n_vec_perp);
-
-         Vector face_x_new(2);
-         face_x_new = face_x;
-         face_x_new.Add(dt, face_velocity);
-
-         // Check perpendicular
-         subtract(face_x_new, vdof12_x_new, temp_vec);
-         subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
-         if (abs(temp_vec * temp_vec_2) > pow(10, -12))
-         {
-            cout << "temp_vec:\n";
-            temp_vec.Print(cout);
-            cout << "temp_vec_2:\n";
-            temp_vec_2.Print(cout);
-            cout << "################## Vectors are not orthogonal!";
-            MFEM_ABORT("vectors are not orthogonal!\n");
-         }
+         cout << "temp_vec:\n";
+         temp_vec.Print(cout);
+         cout << "temp_vec_2:\n";
+         temp_vec_2.Print(cout);
+         cout << "################## Vectors are not orthogonal!";
+         MFEM_ABORT("vectors are not orthogonal!\n");
       }
-      else
+
+      if (flag == "testing")
       {
-         assert(FI.IsBoundary());
-         // TODO: Add in boundary conditions similar to corner vertex bcs
-         for (int j = 0; j < dim; j++)
-         {
-            face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
-         }
+         cout << "The coordinate location of this face is: \n";
+         face_x.Print(cout);
+         cout << "The computed velocity on this face is: \n";
+         face_velocity.Print(cout);
+         cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
+         Vector face_v_exact(dim);
+         test_vel(face_x, 0., face_v_exact);
+         face_v_exact.Print(cout);
+         Vector temp_vel(dim);
+         subtract(face_v_exact, face_velocity, temp_vel);
+         // if (temp_vel.Norml2() > 10e-6)
+         // {
+         //    MFEM_ABORT("Incorrect face velocity.\n");
+         // }
       }
+
+
+      // }
+      // else
+      // {
+      //    assert(FI.IsBoundary());
+      //    // TODO: Add in boundary conditions similar to corner vertex bcs
+      //    // TODO: Add testing validation step here
+      //    if (flag == "testing")
+      //    {
+      //       // Set exact velocity on boundary face.
+      //       cout << "We have a boundary face: " << face << endl;
+      //       double t = 0.;
+      //       test_vel(face_x, t, face_velocity);
+      //       cout << "The computed velocity on this face is: \n";
+      //       face_velocity.Print(cout);
+      //    }
+      //    else
+      //    {
+      //       // Average nodal velocities when not testing
+      //       assert(flag == "NA");
+      //       for (int j = 0; j < dim; j++)
+      //       {
+      //          face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+      //       }
+      //    }
+        
+      // }
 
       // Lastly, put face velocity into gridfunction object
       update_node_velocity(S, face_dof, face_velocity);
+   }
+}
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::
+   fill_center_velocities_with_average(Vector &S,
+                                       const string flag, 
+                                       void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   // Since we cannot use Serendipity elements, we must update cell center velocities
+   Vector Vc(dim), Uc(dim+2);
+   // Vector node_v(dim);
+   Array<int> verts;
+   Vector face_x(dim);
+   for (int ci = 0; ci < L2.GetNE(); ci++)
+   {
+      // Get center node dof
+      int cell_vdof = NVDofs_H1 + num_faces + ci;
+      get_node_position(S, cell_vdof, face_x);
+      if (flag == "testing")
+      {
+         test_vel(face_x, 0., Vc);
+         cout << "node " << ci << " is located at: \n";
+         face_x.Print(cout);
+         cout << "It has velocity:\n";
+         Vc.Print(cout);
+      }
+      else
+      {
+         GetCellStateVector(S, ci, Uc);
+         Vc = velocity(Uc);
+         // Vc = 0.;
+         // pmesh->GetElementVertices(ci, verts);
+         // for (int j = 0; j < verts.Size(); j++)
+         // {
+         //    get_node_velocity(S, verts[j], node_v);
+         //    Vc += node_v;
+         // }
+         // Vc /= 4.;
+      }
+      // Update the velocity for the center node
+      update_node_velocity(S, cell_vdof, Vc);
    }
 }
 

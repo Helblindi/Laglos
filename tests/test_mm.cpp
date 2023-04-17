@@ -8,13 +8,13 @@
 using namespace std;
 using namespace mfem;
 
-/* ---------------- Parameters to be used for test ---------------- */
+/* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
 const double a = 1.,
              b = 1.,
-             c = 1.,
+             c = 1,
              d = 1.,
-             e = 1.,
+             e = -1.,
              f = 1.;
 
 // Problem
@@ -25,7 +25,7 @@ int order_u = 0;
 const string flag = "testing";
 double tol = 1e-12;
 const char *mesh_file = "../data/ref-square.mesh";
-int mesh_refinements = 6;
+int mesh_refinements = 1;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = true;           // Doesn't matter
 double CFL = 0.5;          // Doesn't matter
@@ -41,6 +41,7 @@ int upper_refinement = 6;
 static double _error_def = 0.;
 static int _num_cells_def = 0;
 int test_mesh_movement(double & _error = _error_def, int & _num_cells = _num_cells_def);
+int test_mass_conservation(double & _error = _error_def);
 void create_error_convergence_table();
 
 int main(int argc, char *argv[])
@@ -78,7 +79,8 @@ int main(int argc, char *argv[])
    else
    {
       // This is the call for the CMake test
-      return test_mesh_movement();
+      // return test_mesh_movement();
+      return test_mass_conservation();
    }
 }
 
@@ -163,7 +165,7 @@ int test_mesh_movement(double & _error, int & _num_cells)
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
 
    const double t = 0;
-   const double dt = 0.1;
+   const double dt = 1.;
    
    hydro.compute_node_velocity_LS(S, t, dt, flag, &velocity_exact);
    if (!suppress_test_output)
@@ -288,20 +290,168 @@ void create_error_convergence_table()
    
 }
 
-// \begin{tabular}{
-//   l
-//   S[round-mode=places, round-precision=3, table-format=2.3]
-//   S[round-mode=places, round-precision=2, table-format=2.2]
-//   S[round-mode=places, round-precision=3, table-format=2.3]
-//   S[round-mode=places, round-precision=2, table-format=2.2]}
-// \hline
-//    {\# dof} & {L1 Error} & {Rate}     &   {L2 Error} & {Rate} \\
-// \hline
-//       16 &   1.43065  & {---}      &   1.34817  & {---}  \\
-//       64 &   1.1216   & 0.351112 &   0.968713 & 0.476861\\
-//      256 &   0.826564 & 0.440358 &   0.732866 & 0.402521  \\
-//     1024 &   0.491592 & 0.749666 &   0.495077 & 0.565896   \\
-//     4096 &   0.318258 & 0.627263 &   0.367941 & 0.428179  \\
-//    16384 &   0.192916 & 0.722223 &   0.274031 & 0.425134 \\
-// \hline
-// \end{tabular}
+
+int test_mass_conservation(double & _error)
+{
+   int total_iterations = 1;
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+   if (!suppress_test_output)
+   {
+      cout << "num cells: " << pmesh->GetNE() << endl;
+      cout << "num interior faces: " << pmesh->GetNFbyType(FaceType::Interior) << endl;
+      cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
+      cout << "num total faces: " << pmesh->GetNumFaces() << endl;
+   }
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-TestMM." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+   mv_gf.SyncAliasMemory(S);   
+
+   // zero coefficient for sv and ste
+   ConstantCoefficient zero(0.0);
+   sv_gf.ProjectCoefficient(zero);
+   sv_gf.SyncAliasMemory(S);
+   ste_gf.ProjectCoefficient(zero);
+   ste_gf.SyncAliasMemory(S);
+
+   // Prescribe initial velocity profile on cells
+   VectorFunctionCoefficient v_coeff(dim, velocity_exact);
+   v_gf.ProjectCoefficient(v_coeff);
+   v_gf.SyncAliasMemory(S);
+   cout << "Printing v_gf\n";
+   v_gf.Print(cout);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   
+   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
+
+   double t = 0;
+   const double dt = .03;
+   Array<double> cell_areas(L2FESpace.GetNE());
+
+   // Store initial area of cells
+   double error_denom = 0.;
+   for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
+   {
+      double k = pmesh->GetElementVolume(ci);
+      cell_areas[ci] = k;
+      assert(k >= 0.);
+      error_denom += k;
+   }
+   
+   for (int _it = 0; _it < total_iterations; _it++)
+   {
+      hydro.compute_node_velocity_LS(S, t, dt, flag, &velocity_exact);
+      if (!suppress_test_output)
+      {
+         cout << "Done computing node velocity.\n";
+      }
+
+      hydro.compute_interior_face_velocities(S,dt, flag, &velocity_exact);
+      if (!suppress_test_output)
+      {
+         cout << "Done computing face velocities.\n";
+      }
+
+      hydro.fill_center_velocities_with_average(S, flag, &velocity_exact);
+
+      add(x_gf, dt, mv_gf, x_gf);
+      pmesh->NewNodes(x_gf, false);
+      if (!suppress_test_output)
+      {
+         cout << "Done moving mesh.\n";
+      }
+   }
+
+   // Compute error
+   double num = 0.;
+   _error = 0.;
+   for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
+   {
+      double k = pmesh->GetElementVolume(ci);
+      cout << "Volume of cell " << ci << " is: " << k << endl;
+      cout << "Starting volume was: " << cell_areas[ci] << endl;
+      double val = abs(k - cell_areas[ci]);
+      num += val;
+   }
+   _error = num / error_denom;
+
+   cout << "Total area error is: " << _error << endl;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-TestMM-post-move." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   if (_error < tol)
+   {
+      return 0; // Test passed
+   }
+   else 
+   {
+      return 1; // Test failed
+   }
+}

@@ -38,6 +38,9 @@ Fortran/data_c
 Fortran/a.exe
 arbitrary_eos_lagrangian_lambda_module.mod
 
+# Results
+results/
+
 
 #Unknown
 DartConfiguration.tcl

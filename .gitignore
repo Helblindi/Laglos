@@ -23,6 +23,7 @@ CTestTestfile.cmake
 
 # Tests
 tests/TestInstantiator
+tests/TestMM
 Testing/
 
 # Save old files (may be of use in the future, I am a file hoarder)

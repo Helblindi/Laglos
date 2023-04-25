@@ -428,6 +428,7 @@ void LagrangianLOOperator<dim, problem>::CreateVStarArr(const Vector &S)
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, double dt)
 {
+   cout << "Making timestep\n";
    Vector S_new = S; // We need a place to store updated cell values.
 
    // Retrieve data from Monolithic block vector S
@@ -436,7 +437,27 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
    ParGridFunction x_gf, mv_gf_new;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf_new.MakeRef(&H1, *sptr, block_offsets[1]);
-   
+
+   ComputeStateUpdate(S, t, dt, S_new);
+
+   if (mm)
+   {
+      MoveMesh(S, x_gf, mv_gf_new, t, dt);
+   }
+
+   S = S_new;
+   t += dt;
+
+   CheckMassConservation(S);
+} 
+
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(const Vector &S, const double &t, const double dt, Vector &S_new)
+{
+   cout << "========================================\n";
+   cout << "Computing State Update\n";
+   cout << "========================================\n";
    // Variables needed for iteration
    Vector val(dim+2), c(dim), n(dim), U_i(dim+2), U_j(dim+2), sums(dim+2);
    Array<int> fids, fids2, oris, oris2, verts; // TODO: Remove fids2, oris2, These are for testing.
@@ -590,17 +611,7 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
       SetCellStateVector(S_new, ci, val);
       
    } // End cell iterator
-
-   if (mm)
-   {
-      MoveMesh(S, x_gf, mv_gf_new, t, dt);
-   }
-
-   S = S_new;
-   t += dt;
-
-   CheckMassConservation(S);
-} 
+}
 
 
 template<int dim, int problem>
@@ -1417,24 +1428,87 @@ void LagrangianLOOperator<dim, problem>::compute_node_velocity_RP(Vector &S, con
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A)
 {
+   // cout << "--- Computing matrix A --- \n";
+   // cout << "Matrix C: \n";
+   // C.Print(cout);
+   // cout << "dt: " << dt << ", d: " << d << endl;
+   DenseMatrix _mat(C);
+   _mat *= -dt;
+   // cout << "-dt * C:\n";
+   // _mat.Print(cout);
 
+   _mat(0,0) += d;
+   _mat(1,1) += d;
+   // cout << "dI - dt C:\n";
+   // _mat.Print(cout);
+   _mat.Invert();
+   // cout << "Inverse:\n";
+   // _mat.Print(cout);
+   Mult(C, _mat, A);
+   // cout << "A:\n";
+   // A.Print(cout);
 }
 
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_B(const Vector & D, const double d, const double &dt, Vector &B)
+void LagrangianLOOperator<dim, problem>::compute_B(const DenseMatrix &A, const Vector & D, const double d, const double &dt, Vector &B)
 {
+   // cout << "--- Computing B ---\n";
+   // cout << "Matrix A:\n";
+   // A.Print(cout);
+   // cout << "dt: " << dt << ", d: " << d << endl;
 
+   DenseMatrix _mat(A);
+   _mat *= dt;
+   // cout << "dt * A:\n";
+   // _mat.Print(cout);
+
+   _mat(0,0) += 1.;
+   _mat(1,1) += 1.;
+   // cout << "I + dt * A:\n";
+   // _mat.Print(cout);
+
+   _mat *= (1. / d);
+   // cout << "(I + dt * A)/d:\n";
+   // _mat.Print(cout);
+
+   // cout << "D: \n";
+   // D.Print(cout);
+   
+   _mat.Mult(D, B);
 }
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
 {
+   // cout << "--- Computing determinant ---\n";
+
    double trace = C.Trace();
    double det = C.Det();
 
-   // TODO: Compute d
+   // cout << "trace(C): " << trace << ", det(C): " << det << endl;
+   double num = 0., denom = 0., pm = 0.;
+   double d1 = 0., d2 = 0.;
+
+   num = dt * trace + 1.;
+   denom = 2.;
+   pm = sqrt(pow(dt, 2) * pow(trace, 2) + 2. * dt * trace + 1. - 4. * pow(dt,2) * det);
+   d1 = (num + pm) / denom;
+   d2 = (num - pm) / denom;
+
+   // cout << "num: " << num << ", denom: " << denom << ", pm: " << pm << endl;
+   // cout << "d1: " << d1 << ", d2: " << d2 << endl;
+   // Will need to change
    // How to pick which d?
    // Check invertability of (d I - dt C)?
+   // One of the values is 0. Hmmm.
+   if (d1 != 0.)
+   {
+      d = d1;
+   }
+   else
+   {
+      d = d2;
+   }
 }
 
 template<int dim, int problem>
@@ -1447,6 +1521,9 @@ void LagrangianLOOperator<dim, problem>::
                                    const string flag, 
                                    void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
+   // cout << "========================================\n";
+   // cout << "Computing corrected node_velocity\n";
+   // cout << "========================================\n";
    // V_exact = Cx + D
    // Will need access to what C and D are from the computed velocity from LS
    double d = 0.;
@@ -1460,7 +1537,20 @@ void LagrangianLOOperator<dim, problem>::
    compute_A(C, d, dt, A);
 
    // Third, compute B
-   compute_B(D, d, dt, B);
+   compute_B(A, D, d, dt, B);
+
+   /* Print values */
+   // cout << "- LS Velocity -\n";
+   // cout << "C:\n";
+   // C.Print(cout);
+   // cout << "D:\n";
+   // D.Print(cout);
+
+   // cout << "- Corrected Velocity -\n";
+   // cout << "A:\n";
+   // A.Print(cout);
+   // cout << "B:\n";
+   // B.Print(cout);
 
    // Finally, evaluate velocity at vertex_x and put resulting value into vertex_v
    A.Mult(vertex_x, vertex_v);
@@ -1474,6 +1564,9 @@ void LagrangianLOOperator<dim, problem>::
                             const string flag, // Default NA
                             void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
+   // cout << "========================================\n";
+   // cout << "Computing corner velocities using Least Squares.\n";
+   // cout << "========================================\n";
    mfem::Mesh::FaceInformation FI;
    Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
    Table vertex_edge;
@@ -1573,6 +1666,25 @@ void LagrangianLOOperator<dim, problem>::
             vertex_v(1) = res_y(dim); // Set to cy
 
             /* Just going to modify testing part of function to take into account corrected velocity */
+            // TODO: We will need to ensure the timestep restriction
+            // Form C, D
+            DenseMatrix C(dim, dim);
+            Vector D(dim);
+            C(0, 0) = res_x(0);
+            C(0, 1) = res_x(1);
+            C(1, 0) = res_y(0);
+            C(1, 1) = res_y(1);
+
+            D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
+            D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
+
+            Vector vertex_v_uncorrected(dim);
+            vertex_v_uncorrected = vertex_v;
+            compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+            // cout << "Precorrected velocity: \n";
+            // vertex_v_uncorrected.Print(cout);
+            // cout << "Postcorrected velocity: \n";
+            // vertex_v.Print(cout);
          }
       }
       else
@@ -1788,6 +1900,9 @@ void LagrangianLOOperator<dim, problem>::
                                     const string flag, // Default NA
                                     void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
+   // cout << "========================================\n";
+   // cout << "Computing corrective interior face velocities.\n";
+   // cout << "========================================\n";
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), c_vec(dim), n_vec(dim);
@@ -1803,7 +1918,8 @@ void LagrangianLOOperator<dim, problem>::
       Vector face_velocity(dim);
       face_velocity = 0.;
       Vf = 0.;
-      get_intermediate_face_velocity(face, Vf);
+      // get_intermediate_face_velocity(face, Vf);
+      // test_vel(face_x, t, Vf);
       FI = pmesh->GetFaceInformation(face);
 
       /* adjacent corner indices */
@@ -1816,29 +1932,29 @@ void LagrangianLOOperator<dim, problem>::
       get_node_position(S, face_vdof1, vdof1_x);
       get_node_position(S, face_vdof2, vdof2_x);
 
-      cout << "------------------------------------\n";
-      cout << "We are iterating on face: " << face << endl;
-      cout << "This face is located at: \n";
-      face_x.Print(cout);
-      cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
-      vdof1_x.Print(cout);
-      cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
-      vdof2_x.Print(cout);
+      // cout << "------------------------------------\n";
+      // cout << "We are iterating on face: " << face << endl;
+      // cout << "This face is located at: \n";
+      // face_x.Print(cout);
+      // cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
+      // vdof1_x.Print(cout);
+      // cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
+      // vdof2_x.Print(cout);
 
       // retrieve corner velocities
       get_node_velocity(S, face_vdof1, vdof1_v);
       get_node_velocity(S, face_vdof2, vdof2_v);
       
-      cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
-      vdof1_v.Print(cout);
-      cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
-      vdof2_v.Print(cout);
+      // cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
+      // vdof1_v.Print(cout);
+      // cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
+      // vdof2_v.Print(cout);
 
       if (FI.IsInterior())
       {
-         cout << "========================================\n";
-         cout << "We have an interior face: " << face << endl;
-         cout << "dt: " << dt << endl;
+         // cout << "========================================\n";
+         // cout << "We have an interior face: " << face << endl;
+         // cout << "dt: " << dt << endl;
          c = FI.element[0].index;
          cp = FI.element[1].index;
          GetCellStateVector(S, c, Uc);
@@ -1849,13 +1965,13 @@ void LagrangianLOOperator<dim, problem>::
          cell_center_v *= 0.5;
          cell_center_v.Add(0.5, cell_cp_v);
 
-         cout << "Cell c: " << c << ", cell cp: " << cp << endl;
-         cout << "Velocity on cell c:\n";
-         cell_c_v.Print(cout);
-         cout << "Velocity on cell cp:\n";
-         cell_cp_v.Print(cout);
-         cout << "cell centered flux on face:\n";
-         cell_center_v.Print(cout);
+         // cout << "Cell c: " << c << ", cell cp: " << cp << endl;
+         // cout << "Velocity on cell c:\n";
+         // cell_c_v.Print(cout);
+         // cout << "Velocity on cell cp:\n";
+         // cell_cp_v.Print(cout);
+         // cout << "cell centered flux on face:\n";
+         // cell_center_v.Print(cout);
          CalcOutwardNormalInt(S, c, face, c_vec);
 
          // Face area/length
@@ -1872,20 +1988,20 @@ void LagrangianLOOperator<dim, problem>::
          double face_length = _secant.Norml2();
          _secant /= face_length;
 
-         cout << "_secant (vdof2 - vdof1): \n";
-         _secant.Print(cout);
+         // cout << "_secant (vdof2 - vdof1): \n";
+         // _secant.Print(cout);
 
          n_vec = c_vec;
          n_vec /= n_vec.Norml2();
 
-         cout << "The outward normal vector is: \n";
-         n_vec.Print(cout);
-         cout << "\n\n\n trying to change how the normal is computed\n";
-         n_vec = _secant;
-         Orthogonal(n_vec);
+         // cout << "The outward normal vector is: \n";
+         // n_vec.Print(cout);
+         // cout << "\n\n\n trying to change how the normal is computed\n";
+         // n_vec = _secant;
+         // Orthogonal(n_vec);
 
-         cout << "The outward normal vector is: \n";
-         n_vec.Print(cout);
+         // cout << "The outward normal vector is: \n";
+         // n_vec.Print(cout);
 
          // Calculate new corner locations and half  step locations
          Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
@@ -1894,80 +2010,80 @@ void LagrangianLOOperator<dim, problem>::
          vdof1_x_half = vdof1_x;
          vdof1_x_half.Add(dt/2., vdof1_v);
 
-         cout << "New locations for vdof1. full:\n";
-         vdof1_x_new.Print(cout);
-         cout << "half: \n";
-         vdof1_x_half.Print(cout);
+         // cout << "New locations for vdof1. full:\n";
+         // vdof1_x_new.Print(cout);
+         // cout << "half: \n";
+         // vdof1_x_half.Print(cout);
 
          vdof2_x_new = vdof2_x;
          vdof2_x_new.Add(dt, vdof2_v);
          vdof2_x_half = vdof2_x;
          vdof2_x_half.Add(dt/2., vdof2_v);
 
-         cout << "New locations for vdof2. full:\n";
-         vdof2_x_new.Print(cout);
-         cout << "half: \n";
-         vdof2_x_half.Print(cout);
+         // cout << "New locations for vdof2. full:\n";
+         // vdof2_x_new.Print(cout);
+         // cout << "half: \n";
+         // vdof2_x_half.Print(cout);
 
          // calculate a_{12}^{n+1} (new tangent midpoint)
          Vector vdof12_x_new(2);
          vdof12_x_new = vdof1_x_new;
          vdof12_x_new += vdof2_x_new;
          vdof12_x_new /= 2.;
-         cout << "new tangent midpoint, vdof12_x_new: \n";
-         vdof12_x_new.Print(cout);
+         // cout << "new tangent midpoint, vdof12_x_new: \n";
+         // vdof12_x_new.Print(cout);
 
          // Compute D (A.4c)
          Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
          n_vec_R = n_vec;
          Orthogonal(n_vec_R);
-         cout << "n_vec_R: \n";
-         n_vec_R.Print(cout);
+         // cout << "n_vec_R: \n";
+         // n_vec_R.Print(cout);
 
          subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-         cout << "V1-V2:\n";
-         temp_vec.Print(cout);
+         // cout << "V1-V2:\n";
+         // temp_vec.Print(cout);
 
          subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         cout << "A2-A1:\n";
-         temp_vec_2.Print(cout);
+         // cout << "A2-A1:\n";
+         // temp_vec_2.Print(cout);
 
          Orthogonal(temp_vec_2);
-         cout << "(A2-A1)^R:\n";
-         temp_vec_2.Print(cout);
+         // cout << "(A2-A1)^R:\n";
+         // temp_vec_2.Print(cout);
 
          double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
-         cout << "D: " << D << endl;
+         // cout << "D: " << D << endl;
 
          // Compute c1 (A.4a)
          subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-         cout << "V2-V1:\n";
-         temp_vec.Print(cout);
-         cout << "c1 computation n_vec:\n";
-         n_vec.Print(cout);
+         // cout << "V2-V1:\n";
+         // temp_vec.Print(cout);
+         // cout << "c1 computation n_vec:\n";
+         // n_vec.Print(cout);
          double c1 = ( dt * (temp_vec * n_vec) + 2 * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
-         cout << "c1 computation n_vec_R:\n";
-         n_vec_R.Print(cout);
-         cout << "c1: " << c1 << endl;
+         // cout << "c1 computation n_vec_R:\n";
+         // n_vec_R.Print(cout);
+         // cout << "c1: " << c1 << endl;
 
          // Compute c0 (A.4b)
-         cout << "!!!Computing c0\n";
+         // cout << "!!!Computing c0\n";
 
-         cout << "\n === First we compute bmn ===\n";
+         // cout << "\n === First we compute bmn ===\n";
          // cout << "cell_center_v:\n";
          // cell_center_v.Print(cout);
          Vector n_vec_half(dim);
          subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
          Orthogonal(n_vec_half);
-         cout << "n_vec_half:\n";
-         n_vec_half.Print(cout);
+         // cout << "n_vec_half:\n";
+         // n_vec_half.Print(cout);
          Vector v_exact_at_face(dim);
          test_vel(face_x, 0., v_exact_at_face);
          // double bmn = v_exact_at_face * n_vec_half;
          double bmn = v_exact_at_face * n_vec;
          // cout << "face length: " << face_length << endl;
          // bmn *= face_length;
-         cout << "bmn: " << bmn << endl;
+         // cout << "bmn: " << bmn << endl;
 
          temp_vec = vdof1_x_half;
          Orthogonal(temp_vec); // A1R
@@ -1990,7 +2106,7 @@ void LagrangianLOOperator<dim, problem>::
          double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
          // cout << "const 1: " << const1 << ", const 2: " << const2 << ", const3: " << const3 << endl;
          double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
-         cout << "c0: " << c0 << endl;
+         // cout << "c0: " << c0 << endl;
          
          // Compute V3n_perp
          // cout << "Computing V3n_perp\n";
@@ -2010,11 +2126,11 @@ void LagrangianLOOperator<dim, problem>::
          const2 = temp_vec * temp_vec_2;
          const2 *= dt; // denominator
          double V3nperp = -1. * const1 / const2;
-         cout << "V3nperp: " << V3nperp << endl;
+         // cout << "V3nperp: " << V3nperp << endl;
 
          // Compute V3n (5.11)
          double V3n = c1 * V3nperp + c0;
-         cout << "V3n: " << V3n << endl;
+         // cout << "V3n: " << V3n << endl;
 
          // Compute face velocity (5.11)
          // const1 = Vf * n_vec;
@@ -2029,10 +2145,10 @@ void LagrangianLOOperator<dim, problem>::
          Vector n_vec_perp(dim);
          n_vec_perp = n_vec_R;
          n_vec_perp *= -1.;
-         cout << "n_vec_perp:\n";
-         n_vec_perp.Print(cout);
-         cout << "n_vec_R:\n";
-         n_vec_R.Print(cout);
+         // cout << "n_vec_perp:\n";
+         // n_vec_perp.Print(cout);
+         // cout << "n_vec_R:\n";
+         // n_vec_R.Print(cout);
          face_velocity.Add(V3nperp, n_vec_perp);
 
          Vector face_x_new(2);
@@ -2044,21 +2160,21 @@ void LagrangianLOOperator<dim, problem>::
          subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
          if (abs(temp_vec * temp_vec_2) > pow(10, -12))
          {
-            cout << "temp_vec:\n";
-            temp_vec.Print(cout);
-            cout << "temp_vec_2:\n";
-            temp_vec_2.Print(cout);
-            cout << "################## Vectors are not orthogonal!";
+            // cout << "temp_vec:\n";
+            // temp_vec.Print(cout);
+            // cout << "temp_vec_2:\n";
+            // temp_vec_2.Print(cout);
+            // cout << "################## Vectors are not orthogonal!";
             MFEM_ABORT("vectors are not orthogonal!\n");
          }
 
          if (flag == "testing")
          {
-            cout << "The coordinate location of this face is: \n";
-            face_x.Print(cout);
-            cout << "The computed velocity on this face is: \n";
-            face_velocity.Print(cout);
-            cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
+            // cout << "The coordinate location of this face is: \n";
+            // face_x.Print(cout);
+            // cout << "The computed velocity on this face is: \n";
+            // face_velocity.Print(cout);
+            // cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
             Vector face_v_exact(dim);
             test_vel(face_x, 0., face_v_exact);
             face_v_exact.Print(cout);
@@ -2079,11 +2195,11 @@ void LagrangianLOOperator<dim, problem>::
          if (flag == "testing")
          {
             // Set exact velocity on boundary face.
-            cout << "We have a boundary face: " << face << endl;
+            // cout << "We have a boundary face: " << face << endl;
             double t = 0.;
             test_vel(face_x, t, face_velocity);
-            cout << "The computed velocity on this face is: \n";
-            face_velocity.Print(cout);
+            // cout << "The computed velocity on this face is: \n";
+            // face_velocity.Print(cout);
          }
          else
          {
@@ -2102,6 +2218,7 @@ void LagrangianLOOperator<dim, problem>::
    }
 }
 
+
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
    fill_center_velocities_with_average(Vector &S,
@@ -2109,8 +2226,8 @@ void LagrangianLOOperator<dim, problem>::
                                        void (*test_vel)(const Vector&, const double&, Vector&))
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
-   Vector Vc(dim), Uc(dim+2);
-   // Vector node_v(dim);
+   Vector Vc(dim), Uc(dim+2), node_v(dim);
+
    Array<int> verts;
    Vector face_x(dim);
    for (int ci = 0; ci < L2.GetNE(); ci++)
@@ -2118,29 +2235,67 @@ void LagrangianLOOperator<dim, problem>::
       // Get center node dof
       int cell_vdof = NVDofs_H1 + num_faces + ci;
       get_node_position(S, cell_vdof, face_x);
-      if (flag == "testing")
+      
+      GetCellStateVector(S, ci, Uc);
+      Vc = velocity(Uc);
+      Vc = 0.;
+      pmesh->GetElementVertices(ci, verts);
+      for (int j = 0; j < verts.Size(); j++)
       {
-         test_vel(face_x, 0., Vc);
-         cout << "node " << ci << " is located at: \n";
-         face_x.Print(cout);
-         cout << "It has velocity:\n";
-         Vc.Print(cout);
+         get_node_velocity(S, verts[j], node_v);
+         Vc += node_v;
       }
-      else
-      {
-         GetCellStateVector(S, ci, Uc);
-         Vc = velocity(Uc);
-         // Vc = 0.;
-         // pmesh->GetElementVertices(ci, verts);
-         // for (int j = 0; j < verts.Size(); j++)
-         // {
-         //    get_node_velocity(S, verts[j], node_v);
-         //    Vc += node_v;
-         // }
-         // Vc /= 4.;
-      }
+      Vc /= 4.;
+
       // Update the velocity for the center node
       update_node_velocity(S, cell_vdof, Vc);
+   }
+}
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::fill_face_velocities_with_average(Vector &S, const string flag, void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   /* Parameters needed for face velocity calculations */
+   mfem::Mesh::FaceInformation FI;
+   Vector Uc(dim+2), Ucp(dim+2);
+   Vector cell_c_v(dim), cell_cp_v(dim), cell_center_v(dim); // For computation of bmn
+   Array<int> row;
+   int face_dof = 0, face_vdof1 = 0, face_vdof2 = 0;
+
+   // Iterate over faces
+   for (int face = 0; face < num_faces; face++) // face iterator
+   {  
+      // Get face information
+      Vector face_velocity(dim);
+      face_velocity = 0.;
+
+      FI = pmesh->GetFaceInformation(face);
+
+      /* adjacent corner indices */
+      H1.GetFaceDofs(face, row);
+      int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
+
+      // retrieve old face and corner locations
+      Vector face_x(dim), vdof1_v(dim), vdof2_v(dim);
+
+      // Get face location
+      get_node_position(S, face_dof, face_x);
+
+      // retrieve corner velocities
+      get_node_velocity(S, face_vdof1, vdof1_v);
+      get_node_velocity(S, face_vdof2, vdof2_v);
+      
+
+      // Average nodal velocities
+      for (int j = 0; j < dim; j++)
+      {
+         face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+      }
+
+      // test_vel(face_x, 0, face_velocity);
+
+      // Lastly, put face velocity into gridfunction object
+      update_node_velocity(S, face_dof, face_velocity);
    }
 }
 
@@ -2266,7 +2421,7 @@ double LagrangianLOOperator<dim, problem>::compute_lambda_max(const Vector & U_i
           lambda_maxr_out = 0.,
           pstar = 0.,
           vstar = 0.;
-   bool no_iter = false;
+   bool no_iter = true; // Had to change for test case to run
    int k = 0; // Tells you how many iterations were needed for convergence
 
    // cout << "CLM pre fortran function.\n";

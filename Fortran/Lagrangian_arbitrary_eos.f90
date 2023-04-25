@@ -39,6 +39,7 @@ CONTAINS
     REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
     LOGICAL                  :: check
     !===Initialization
+   !  WRITE(*,*) "Computing lambda max in fortran"
     rhol= in_rhol
     ul = in_ul
     pl = in_pl
@@ -95,14 +96,17 @@ CONTAINS
     phi_pmax = (p_max-p_min)*SQRT(capA_min/(p_max+capB_min))+ur-ul
 
     !===Initialize p1 and p2
+   !  WRITE(*,*) "F: Initializing p1 and p2"
     CALL initialize_p1_p2(p1,p2)
 
     IF (no_iter) THEN
        pstar = p2
+      !  WRITE(*,*) "F: No iter"
        CALL no_iter_update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p2,lambda_maxl_out,lambda_maxr_out)
        RETURN
     ELSE
        !===Iterations
+      ! WRITE(*,*) "F: iter"
        p1 = MAX(p1,p2-phi(p2)/phi_prime(p2))
        DO WHILE(.TRUE.)
           CALL update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p1,p2,in_tol,&

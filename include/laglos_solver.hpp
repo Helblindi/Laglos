@@ -94,6 +94,8 @@ public:
 
    void MakeTimeStep(Vector &S, double & t, double dt);
 
+   void ComputeStateUpdate(const Vector &S, const double &t, const double dt, Vector &S_new);
+
    double GetTimeStepEstimate(const Vector &S);
 
    void CalculateTimestep(const Vector &S);
@@ -126,9 +128,9 @@ public:
    void compute_node_velocity_RP(Vector &S, const double & t, const double & dt);
    void compute_node_velocity_LS(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
-   // Function representing development on April 2023
+   // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);
-   void compute_B(const Vector & D, const double d, const double &dt, Vector &B);
+   void compute_B(const DenseMatrix &A, const Vector & D, const double d, const double &dt, Vector &B);
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
    void compute_corrected_node_velocity(const DenseMatrix &C, const Vector &D, const double & dt, const Vector &vertex_x, Vector &vertex_v, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
@@ -137,6 +139,7 @@ public:
    void compute_interior_face_velocities(Vector &S, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void fill_center_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void fill_face_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void update_node_velocity(Vector &S, const int & node, const Vector & vel);
 

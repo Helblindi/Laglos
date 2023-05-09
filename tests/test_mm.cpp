@@ -12,11 +12,11 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 2.,
+const double a = 1.,
              b = 1.,
              c = 1,
              d = 1.,
-             e = -1.,
+             e = -2.,
              f = 1.;
 
 // Problem
@@ -27,7 +27,7 @@ int order_u = 0;
 const string flag = "testing";
 double tol = 1e-12;
 const char *mesh_file = "../data/ref-square.mesh";
-int mesh_refinements = 2;
+int mesh_refinements = 1;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = false;          // Doesn't matter
 double CFL = 0.5;          // Doesn't matter
@@ -174,7 +174,7 @@ int test_mesh_movement(double & _error, int & _num_cells)
    const double t = 0;
    const double dt = 1.;
    
-   hydro.compute_node_velocity_LS(S, t, dt, flag, &velocity_exact);
+   hydro.compute_node_velocity(S, t, dt, flag, &velocity_exact);
    if (!suppress_test_output)
    {
       cout << "Done computing node velocity.\n";
@@ -388,8 +388,9 @@ int test_area_conservation(double & _error, int & _num_cells)
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
 
    double t = 0;
-   const double dt = 0.01;
+   const double dt = .01;
    Array<double> cell_areas(L2FESpace.GetNE());
+   Array<double> bmn_sum_cells(L2FESpace.GetNE());
 
    // Store initial mass of cells
    for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
@@ -403,7 +404,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    /* Move the Mesh */
    // hydro.compute_node_velocity_LS(S, t, dt, flag, &velocity_exact);
    /* --- Start of node computation --- */
-   Vector vertex_x(dim), vertex_v(dim), v_pre_update(dim), v_post_update(dim);
+   Vector vertex_x(dim), vertex_v(dim), v_pre_update(dim), v_post_update(dim), res(dim);
    DenseMatrix C(dim);
    Vector D(dim);
    for (int vertex = 0; vertex < pmesh->GetNV(); vertex++)
@@ -414,13 +415,16 @@ int test_area_conservation(double & _error, int & _num_cells)
       C(1,0) = d;
       C(1,1) = e;
 
+      // C.Mult(vertex_x, res);
+
+      // D(0) = c - res[0];
+      // D(1) = f - res[1];
+
       D(0) = c;
       D(1) = f;
 
       hydro.compute_corrected_node_velocity(C,D,dt,vertex_x, vertex_v, flag, velocity_exact);
-      hydro.get_node_velocity(S, vertex, v_pre_update);
       hydro.update_node_velocity(S, vertex, vertex_v);
-      hydro.get_node_velocity(S, vertex, v_post_update);
 
       if (!suppress_test_output)
       {
@@ -439,17 +443,12 @@ int test_area_conservation(double & _error, int & _num_cells)
 
    /* Fill faces with average velocities */
    hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
+   // hydro.compute_interior_face_velocities(S, dt, flag, &velocity_exact);
    hydro.fill_center_velocities_with_average(S, flag, &velocity_exact);
 
-   add(x_gf, dt, mv_gf, x_gf);
-   pmesh->NewNodes(x_gf, false);
-   t += dt;
-   if (!suppress_test_output)
-   {
-      cout << "Done moving mesh.\n";
-   }
-
-   // Compute error
+   /* ************************
+   Compute cell bmn sum (RHS)
+   *************************** */ 
    double num = 0.;
    _error = 0.;
    double error_denom = 0.;
@@ -459,6 +458,8 @@ int test_area_conservation(double & _error, int & _num_cells)
    mfem::Mesh::FaceInformation FI;
    Vector secant(dim), n_vec(dim), vdof1_x(dim), vdof2_x(dim), face_x(dim), face_v(dim);
    int face_vdof1, face_vdof2, face_dof;
+   int c, cp;
+   Vector Uc(dim+2), Ucp(dim+2), c_vec(dim), Vf(dim);
 
    // vector for plotting the error of each cell
    std::vector<double> cells_py(L2FESpace.GetNE());
@@ -466,68 +467,133 @@ int test_area_conservation(double & _error, int & _num_cells)
 
    for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
    {
-      if (!suppress_test_output)
-      {
-         cout << "Computing error for cell: " << ci << endl;
-      }
-      // Compute cell area side
-      double k = pmesh->GetElementVolume(ci);
-      double _bmn_approx = (k - cell_areas[ci]) / dt;
-
+      cout << "===== Computing cell bmn sum for cell: " << ci << " =====\n";
       // Compute sum of bmn on cell
       pmesh->GetElementEdges(ci, fids, oris);
+
       // iterate over faces
       bmn_sum = 0.;
       for (int j = 0; j < fids.Size(); j++)
       {
-         FI = pmesh->GetFaceInformation(fids[j]);
+         Vf = 0.;
+         int face = fids[j];
+         FI = pmesh->GetFaceInformation(face);
+         cout << "face: " << face << endl;
+
+         // Compute intermediate face velocity on fly
+         c = FI.element[0].index;
+         cp = FI.element[1].index;
+         cout << "cell c: " << c << ", cell cp: " << cp << endl;
+         hydro.GetCellStateVector(S, c, Uc);
+
          H1FESpace.GetFaceDofs(fids[j], row);
          int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
          hydro.get_node_position(S, face_vdof1, vdof1_x);
          hydro.get_node_position(S, face_vdof2, vdof2_x);
          hydro.get_node_position(S, face_dof, face_x);
 
-         if (!suppress_test_output)
-         {
-            cout << "face: " << fids[j] << ", face x: " << endl;
-            face_x.Print(cout);
-         }
+         // if (FI.IsInterior())
+         // {
+         //    // this vector is only needed for interior faces
+         //    hydro.GetCellStateVector(S, cp, Ucp);
+         //    // Get normal, d, and |F|
+         //    hydro.CalcOutwardNormalInt(S, c, face, c_vec);
+         //    double c_norm = c_vec.Norml2();
+         //    c_vec *= 2.; // Needed to accomodate for the 1/2 in 4.7 that isn't present in 5.7a
+         //    double F = c_vec.Norml2();
+         //    n_vec = c_vec;
+         //    n_vec /= F;
 
-         subtract(vdof2_x, vdof1_x, secant);
-         double face_length = secant.Norml2();
+         //    double _d = hydro.compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
+
+         //    Vf = hydro.velocity(Uc);
+         //    Vf += hydro.velocity(Ucp);
+         //    Vf *= 0.5;
+         //    double coeff = _d * (Ucp[0] - Uc[0]) / F;
+         //    Vf.Add(coeff, n_vec);
+         // }
+         // else
+         // {
+         //    assert(FI.IsBoundary());
+         //    Vf = hydro.velocity(Uc);
+         // }
+         
+         velocity_exact(face_x, t, Vf);
+
+         // if (!suppress_test_output)
+         // {
+         //    cout << "face: " << fids[j] << ", face x: " << endl;
+         //    face_x.Print(cout);
+         // }
+
+         // subtract(vdof2_x, vdof1_x, secant);
+         // double face_length = secant.Norml2();
          // secant /= face_length;
+         // Vector sec_norm(dim);
+         // sec_norm = secant;
+         // hydro.Orthogonal(sec_norm);
          // n_vec = secant;
          // hydro.Orthogonal(n_vec);
-         hydro.CalcOutwardNormalInt(S, FI.element[0].index, fids[j], n_vec);
-         hydro.get_node_velocity(S, face_dof, face_v);
+         hydro.CalcOutwardNormalInt(S, ci, face, n_vec);
+         n_vec *= 2.;
+         // hydro.get_node_velocity(S, face_dof, face_v);
+         // hydro.get_intermediate_face_velocity(fids[j], Vf);
+         cout << "face_x:\n";
+         face_x.Print(cout);
+         cout << "Vf:\n";
+         Vf.Print(cout);
+         cout << "outward normal vector:\n";
+         n_vec.Print(cout);
+         // cout << "outward normal vector secant:\n";
+         // sec_norm.Print(cout);
 
-         double bmn = face_v * n_vec;
-         bmn *= face_length;
-         
+         // double bmn = face_v * n_vec;
+         double bmn = Vf * n_vec;
+         // bmn *= n_vec.Norml2();
+         cout << "bmn: " << bmn << endl << endl;
          bmn_sum += bmn;
 
-         if (!suppress_test_output)
-         {
-            cout << "Face velocity:\n";
-            face_v.Print(cout);
-            cout << "n_vec:\n";
-            n_vec.Print(cout);
-            cout << "face length: " << face_length << endl;
-            cout << "bmn: " << bmn << endl;
-         }
+         // if (!suppress_test_output)
+         // {
+         //    cout << "Face velocity:\n";
+         //    face_v.Print(cout);
+         //    cout << "n_vec:\n";
+         //    n_vec.Print(cout);
+         //    cout << "face length: " << face_length << endl;
+         //    cout << "bmn: " << bmn << endl;
+         // }
          
-      }
+      } // End face iterator
+      bmn_sum_cells[ci] = bmn_sum;
+   }
 
+   add(x_gf, dt, mv_gf, x_gf);
+   pmesh->NewNodes(x_gf, false);
+   t += dt;
+   if (!suppress_test_output)
+   {
+      cout << "Done moving mesh.\n";
+   }
+
+   /* ************************
+   Compute cell area error
+   *************************** */ 
+   for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
+   {
       if (!suppress_test_output)
       {
-         cout << "bmn approx: " << _bmn_approx << ", bmn sum: " << bmn_sum << endl;
-         cout << "Area of cell " << ci << " is: " << k << endl;
-         cout << "Starting area was: " << cell_areas[ci] << endl;
+         cout << "Computing cell area error for cell: " << ci << endl;
       }
-   
-      double val = _bmn_approx - bmn_sum;
+      // Compute cell area side
+      double k = pmesh->GetElementVolume(ci);
+      double _bmn_approx = (k - cell_areas[ci]) / dt;
+
+      cout << "Cell wise comparison:\n";
+      cout << "cell area difference: " << _bmn_approx << ", bmn_sum: " << bmn_sum_cells[ci] << endl;
+
+      double val = abs(_bmn_approx - bmn_sum_cells[ci]);
       num += val;
-      error_denom += abs(_bmn_approx);
+      error_denom += abs(bmn_sum_cells[ci]);
       cells_py[ci] = ci;
       cell_errors_py[ci] = val;
    }

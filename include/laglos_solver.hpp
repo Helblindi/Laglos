@@ -130,11 +130,11 @@ public:
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);
-   void compute_B(const DenseMatrix &A, const Vector & D, const double d, const double &dt, Vector &B);
+   void compute_B(const DenseMatrix &C, const Vector & D, const double d, const double &dt, Vector &B);
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
    void compute_corrected_node_velocity(const DenseMatrix &C, const Vector &D, const double & dt, const Vector &vertex_x, Vector &vertex_v, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void compute_node_velocity(Vector &S, const double & t, const double & dt);
+   void compute_node_velocity(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
    void compute_interior_face_velocities(Vector &S, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 

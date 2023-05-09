@@ -1444,36 +1444,31 @@ void LagrangianLOOperator<dim, problem>::compute_A(const DenseMatrix & C, const 
    _mat.Invert();
    // cout << "Inverse:\n";
    // _mat.Print(cout);
-   Mult(C, _mat, A);
+   Mult(_mat, C, A);
    // cout << "A:\n";
    // A.Print(cout);
 }
 
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_B(const DenseMatrix &A, const Vector & D, const double d, const double &dt, Vector &B)
+void LagrangianLOOperator<dim, problem>::compute_B(const DenseMatrix &C, const Vector & D, const double d, const double &dt, Vector &B)
 {
    // cout << "--- Computing B ---\n";
    // cout << "Matrix A:\n";
    // A.Print(cout);
    // cout << "dt: " << dt << ", d: " << d << endl;
 
-   DenseMatrix _mat(A);
-   _mat *= dt;
-   // cout << "dt * A:\n";
-   // _mat.Print(cout);
+   // DenseMatrix _mat(A);
+   // _mat *= dt;
+   // _mat(0,0) += 1.;
+   // _mat(1,1) += 1.;
+   // _mat *= (1. / d);
+   // _mat.Mult(D, B);
 
-   _mat(0,0) += 1.;
-   _mat(1,1) += 1.;
-   // cout << "I + dt * A:\n";
-   // _mat.Print(cout);
-
-   _mat *= (1. / d);
-   // cout << "(I + dt * A)/d:\n";
-   // _mat.Print(cout);
-
-   // cout << "D: \n";
-   // D.Print(cout);
-   
+   DenseMatrix _mat(C);
+   _mat *= -dt;
+   _mat(0,0) += d;
+   _mat(1,1) += d;
+   _mat.Invert();
    _mat.Mult(D, B);
 }
 
@@ -1501,12 +1496,13 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
    // How to pick which d?
    // Check invertability of (d I - dt C)?
    // One of the values is 0. Hmmm.
-   if (d1 != 0.)
+   if (d1 > 0.)
    {
       d = d1;
    }
    else
    {
+      assert(d2 > 0.);
       d = d2;
    }
 }
@@ -1531,13 +1527,18 @@ void LagrangianLOOperator<dim, problem>::
    Vector B(dim);
 
    // First, compute d
-   compute_determinant(C, dt, d);
+   compute_determinant(C, dt/2., d);
+   // cout << "d: " << d << endl;
 
    // Second, compute A
-   compute_A(C, d, dt, A);
+   compute_A(C, d, dt/2., A);
+   // cout << "A:\n";
+   // A.Print(cout);
 
    // Third, compute B
-   compute_B(A, D, d, dt, B);
+   compute_B(C, D, d, dt/2., B);
+   // cout << "B:\n";
+   // B.Print(cout);
 
    /* Print values */
    // cout << "- LS Velocity -\n";
@@ -1778,120 +1779,47 @@ void LagrangianLOOperator<dim, problem>::
 
 
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, const double & dt)
+void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, 
+                            const double & dt, 
+                            const string flag, // Default NA
+                            void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
-   // Compute node velocities according to (5.10)
-   mfem::Mesh::FaceInformation FI;
-   Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
-   Table vertex_edge;
-   // Ref: https://mfem.org/howto/nav-mesh-connectivity/
-   Transpose(*edge_vertex, vertex_edge);
-   // cout << "Printing transpose table (vertex to edge)\n";
-   // vertex_edge.Print(cout);
-   Array<int> row;
-   int row_length;
-   DenseMatrix LHS(dim), dm_tmp(dim);
-   Vector RHS(dim), y(dim), Vi(dim), Vf(dim), n_vec(dim);
-   bool is_boundary_node = false;
-   double c_norm = 0.;
+   cout << "Computing corrected node velocities.\n";
 
-   // Vector Vf(dim);
+   bool is_boundary_node = false;
+
+   DenseMatrix C(dim, dim);
+   Vector D(dim), vertex_x(dim), vertex_v(dim);
+
+   // Iterate over vertices
    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
    {
-      // cout << "Computing vertex velocity at vertex: " << vertex << endl;
-      LHS = 0.;
-      RHS = 0.;
-      // cout << "vertex: " << vertex << endl;
-      vertex_edge.GetRow(vertex, row);
-      row_length = row.Size();
-      // 3DTODO: Will need to modify this for faces instead of edges in 3D
-      for (int face_it = 0; face_it < row_length; face_it++) // Adjacent face iterator
-      {
-         Vf = 0.;
-         y = 0.;
-         int face = row[face_it];
-         // cout << "Using face: " << face << endl;
-         // cout << "Adjacent face: " << face << endl;
-         get_intermediate_face_velocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
-         if (FI.IsBoundary()) { is_boundary_node = true; }
+      // Reset flag indicating boundary node
+      is_boundary_node = false;
 
-         // cout << "Face elements: 1: " << FI.element[0].index << ", 2: " << FI.element[1].index << endl;
+      get_node_position(S, vertex, vertex_x);
+      test_vel(vertex_x, t, vertex_v);
 
-         // Retrieve corresponding normal (orientation doesn't matter)
-         CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-         c_norm = n_vec.Norml2();
-         n_vec /= c_norm;
+      C(0,0) = -1.;
+      C(0,1) = 0.;
+      C(1,0) = 0.;
+      C(1,1) = 1.;
 
-         tensor(n_vec, n_vec, dm_tmp);
-         LHS += dm_tmp;
-         dm_tmp.Mult(Vf, y);
-         RHS += y;
-      }
+      Vector res(dim);
+      C.Mult(vertex_x, res);
+      D[0] = 1. - res[0];
+      D[1] = 1. - res[1];
 
-      LHS.Invert();
-      LHS.Mult(RHS, Vi);
+      Vector vertex_v_uncorrected(dim);
+      vertex_v_uncorrected = vertex_v;
+      compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+      cout << "Precorrected velocity: \n";
+      vertex_v_uncorrected.Print(cout);
+      cout << "Postcorrected velocity: \n";
+      vertex_v.Print(cout);
 
-      /* If we have a boundary node, adjust the velocity accordingly */
-      if (is_boundary_node)
-      {
-         switch (problem)
-         {
-            case 7: // Saltzman
-            {
-               // cout << "Working on boundary node: " << vertex << endl;
-               is_boundary_node = false;
-               for (int face_it = 0; face_it < row_length; face_it++)
-               {
-                  int face = row[face_it];
-                  FI = pmesh->GetFaceInformation(face);
-                  if (FI.IsBoundary())
-                  {
-                     int BdrElIndex = BdrElementIndexingArray[face];
-                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-
-                     if (bdr_attribute == 1)
-                     {
-                        Vi = 0.;
-                        
-                        if (timestep_first == 0.)
-                        {
-                           timestep_first = timestep;
-                        }
-                        double _xi = t / (2*timestep_first);
-
-                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-
-                        Vi[0] = 1. * _psi;
-
-                        break;
-                     }
-                     else 
-                     {
-                        assert (bdr_attribute == 2);
-                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-                        n_vec /= n_vec.Norml2();
-
-                        Vector Vi_normal_component(dim);
-                        Vi_normal_component = n_vec;
-                        double _scale = Vi * n_vec;
-                        Vi_normal_component *= _scale;
-
-                        Vi -= Vi_normal_component;
-                     }
-                  } // End boundary face
-               } // End: Face iterator
-            } // End: Saltzman
-            default:
-            {
-               // No change
-            }
-         } // Switch case end
-         
-      } // End: Boundary node
-
-      update_node_velocity(S, vertex, Vi);
-   } // end: vertex iterator 
+      update_node_velocity(S, vertex, vertex_v);
+   } // End Vertex iterator
 }
 
 template<int dim, int problem>

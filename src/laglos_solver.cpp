@@ -1878,268 +1878,268 @@ void LagrangianLOOperator<dim, problem>::
       // cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
       // vdof2_v.Print(cout);
 
-      if (FI.IsInterior())
+      // if (FI.IsInterior())
+      // {
+      // cout << "========================================\n";
+      // cout << "We have an interior face: " << face << endl;
+      // cout << "dt: " << dt << endl;
+      c = FI.element[0].index;
+      cp = FI.element[1].index;
+      GetCellStateVector(S, c, Uc);
+      GetCellStateVector(S, cp, Ucp);
+      cell_c_v = velocity(Uc);
+      cell_cp_v = velocity(Ucp);
+      cell_center_v = cell_c_v;
+      cell_center_v *= 0.5;
+      cell_center_v.Add(0.5, cell_cp_v);
+
+      // cout << "Cell c: " << c << ", cell cp: " << cp << endl;
+      // cout << "Velocity on cell c:\n";
+      // cell_c_v.Print(cout);
+      // cout << "Velocity on cell cp:\n";
+      // cell_cp_v.Print(cout);
+      // cout << "cell centered flux on face:\n";
+      // cell_center_v.Print(cout);
+      CalcOutwardNormalInt(S, c, face, c_vec);
+
+      // Face area/length
+      // https://github.com/mfem/mfem/issues/951
+      // Vector nor(dim);
+      // ElementTransformation *T = pmesh->GetFaceTransformation(face);
+      // T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
+      // CalcOrtho(T->Jacobian(), nor);
+      // double face_length = nor.Norml2();
+      // cout << "Vector 'nor' calculated using Jacobian: \n";
+      // nor.Print(cout);
+      Vector _secant(dim);
+      subtract(vdof2_x, vdof1_x, _secant);
+      double face_length = _secant.Norml2();
+      // _secant /= face_length;
+
+      // cout << "_secant (vdof2 - vdof1): \n";
+      // _secant.Print(cout);
+
+      n_vec = c_vec;
+      n_vec /= n_vec.Norml2();
+
+      // cout << "The outward normal vector is: \n";
+      // n_vec.Print(cout);
+      // cout << "\n\n\n trying to change how the normal is computed\n";
+      // n_vec = _secant;
+      // Orthogonal(n_vec);
+
+      // cout << "The outward normal vector is: \n";
+      // n_vec.Print(cout);
+
+      // Calculate new corner locations and half  step locations
+      Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
+      vdof1_x_new = vdof1_x;
+      vdof1_x_new.Add(dt, vdof1_v);
+      vdof1_x_half = vdof1_x;
+      vdof1_x_half.Add(dt/2., vdof1_v);
+
+      // cout << "New locations for vdof1. full:\n";
+      // vdof1_x_new.Print(cout);
+      // cout << "half: \n";
+      // vdof1_x_half.Print(cout);
+
+      vdof2_x_new = vdof2_x;
+      vdof2_x_new.Add(dt, vdof2_v);
+      vdof2_x_half = vdof2_x;
+      vdof2_x_half.Add(dt/2., vdof2_v);
+
+      // cout << "New locations for vdof2. full:\n";
+      // vdof2_x_new.Print(cout);
+      // cout << "half: \n";
+      // vdof2_x_half.Print(cout);
+
+      // calculate a_{12}^{n+1} (new tangent midpoint)
+      Vector vdof12_x_new(2);
+      vdof12_x_new = vdof1_x_new;
+      vdof12_x_new += vdof2_x_new;
+      vdof12_x_new /= 2.;
+      // cout << "new tangent midpoint, vdof12_x_new: \n";
+      // vdof12_x_new.Print(cout);
+
+      // Compute D (A.4c)
+      Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
+      n_vec_R = n_vec;
+      Orthogonal(n_vec_R);
+      // cout << "n_vec_R: \n";
+      // n_vec_R.Print(cout);
+
+      subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
+      // cout << "V1-V2:\n";
+      // temp_vec.Print(cout);
+
+      subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
+      // cout << "A2-A1:\n";
+      // temp_vec_2.Print(cout);
+
+      Orthogonal(temp_vec_2);
+      // cout << "(A2-A1)^R:\n";
+      // temp_vec_2.Print(cout);
+
+      double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+      // cout << "D: " << D << endl;
+
+      // Compute c1 (A.4a)
+      subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+      // cout << "V2-V1:\n";
+      // temp_vec.Print(cout);
+      // cout << "c1 computation n_vec:\n";
+      // n_vec.Print(cout);
+      double c1 = ( dt * (temp_vec * n_vec) + 2 * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
+      // cout << "c1 computation n_vec_R:\n";
+      // n_vec_R.Print(cout);
+      // cout << "c1: " << c1 << endl;
+
+      // Compute c0 (A.4b)
+      // cout << "!!!Computing c0\n";
+
+      // cout << "\n === First we compute bmn ===\n";
+      // cout << "cell_center_v:\n";
+      // cell_center_v.Print(cout);
+      Vector n_vec_half(dim);
+      subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
+      Orthogonal(n_vec_half);
+      // cout << "n_vec_half:\n";
+      // n_vec_half.Print(cout);
+      Vector v_exact_at_face(dim);
+      test_vel(face_x, 0., v_exact_at_face);
+      // double bmn = v_exact_at_face * n_vec_half;
+      double bmn = v_exact_at_face * n_vec;
+      // cout << "face length: " << face_length << endl;
+      bmn *= face_length;
+      // cout << "bmn: " << bmn << endl;
+
+      temp_vec = vdof1_x_half;
+      Orthogonal(temp_vec); // A1R
+      // cout << "A1^R:\n";
+      // temp_vec.Print(cout);
+      temp_vec_2 = vdof2_x_half;
+      Orthogonal(temp_vec_2); // A2R
+      // cout << "A2^R:\n";
+      // temp_vec_2.Print(cout);
+      double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
+      double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
+      
+      temp_vec = face_x;
+      Orthogonal(temp_vec);
+      // cout << "a3^R:\n";
+      // temp_vec.Print(cout);
+      subtract(vdof2_v, vdof1_v, temp_vec_2);
+      // cout << "V2 - V1:\n";
+      // temp_vec_2.Print(cout);
+      double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
+      // cout << "const 1: " << const1 << ", const 2: " << const2 << ", const3: " << const3 << endl;
+      double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
+      // cout << "c0: " << c0 << endl;
+      
+      // Compute V3n_perp
+      // cout << "Computing V3n_perp\n";
+      subtract(vdof2_x_new, vdof1_x_new, temp_vec);
+      // cout << "a2n+1 - a1n+1:\n";
+      // temp_vec.Print(cout);
+      subtract(face_x, vdof12_x_new, temp_vec_2);
+      temp_vec_2.Add(c0*dt, n_vec);
+      // cout << "a3n - a12n+1 + c0dtn_vec:\n";
+      // temp_vec_2.Print(cout);
+      const1 = temp_vec * temp_vec_2; // numerator
+      temp_vec_2 = n_vec_R;
+      temp_vec_2 *= -1.;
+      temp_vec_2.Add(c1, n_vec);
+      // cout << "c1n_vec + nperp:\n";
+      // temp_vec_2.Print(cout);
+      const2 = temp_vec * temp_vec_2;
+      const2 *= dt; // denominator
+      double V3nperp = -1. * const1 / const2;
+      // cout << "V3nperp: " << V3nperp << endl;
+
+      // Compute V3n (5.11)
+      double V3n = c1 * V3nperp + c0;
+      // cout << "V3n: " << V3n << endl;
+
+      // Compute face velocity (5.11)
+      // const1 = Vf * n_vec;
+      // temp_vec = n_vec;
+      // temp_vec *= const1;
+      // subtract(Vf, temp_vec, face_velocity);
+      // face_velocity.Add(V3n, n_vec);
+
+      // Compute face velocity (Appendix A)
+      face_velocity = 0.;
+      face_velocity.Add(V3n, n_vec);
+      Vector n_vec_perp(dim);
+      n_vec_perp = n_vec_R;
+      n_vec_perp *= -1.;
+      // cout << "n_vec_perp:\n";
+      // n_vec_perp.Print(cout);
+      // cout << "n_vec_R:\n";
+      // n_vec_R.Print(cout);
+      face_velocity.Add(V3nperp, n_vec_perp);
+
+      Vector face_x_new(2);
+      face_x_new = face_x;
+      face_x_new.Add(dt, face_velocity);
+
+      // Check perpendicular
+      subtract(face_x_new, vdof12_x_new, temp_vec);
+      subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
+      if (abs(temp_vec * temp_vec_2) > pow(10, -12))
       {
-         // cout << "========================================\n";
-         // cout << "We have an interior face: " << face << endl;
-         // cout << "dt: " << dt << endl;
-         c = FI.element[0].index;
-         cp = FI.element[1].index;
-         GetCellStateVector(S, c, Uc);
-         GetCellStateVector(S, cp, Ucp);
-         cell_c_v = velocity(Uc);
-         cell_cp_v = velocity(Ucp);
-         cell_center_v = cell_c_v;
-         cell_center_v *= 0.5;
-         cell_center_v.Add(0.5, cell_cp_v);
-
-         // cout << "Cell c: " << c << ", cell cp: " << cp << endl;
-         // cout << "Velocity on cell c:\n";
-         // cell_c_v.Print(cout);
-         // cout << "Velocity on cell cp:\n";
-         // cell_cp_v.Print(cout);
-         // cout << "cell centered flux on face:\n";
-         // cell_center_v.Print(cout);
-         CalcOutwardNormalInt(S, c, face, c_vec);
-
-         // Face area/length
-         // https://github.com/mfem/mfem/issues/951
-         // Vector nor(dim);
-         // ElementTransformation *T = pmesh->GetFaceTransformation(face);
-         // T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(face)));
-         // CalcOrtho(T->Jacobian(), nor);
-         // double face_length = nor.Norml2();
-         // cout << "Vector 'nor' calculated using Jacobian: \n";
-         // nor.Print(cout);
-         Vector _secant(dim);
-         subtract(vdof2_x, vdof1_x, _secant);
-         double face_length = _secant.Norml2();
-         _secant /= face_length;
-
-         // cout << "_secant (vdof2 - vdof1): \n";
-         // _secant.Print(cout);
-
-         n_vec = c_vec;
-         n_vec /= n_vec.Norml2();
-
-         // cout << "The outward normal vector is: \n";
-         // n_vec.Print(cout);
-         // cout << "\n\n\n trying to change how the normal is computed\n";
-         // n_vec = _secant;
-         // Orthogonal(n_vec);
-
-         // cout << "The outward normal vector is: \n";
-         // n_vec.Print(cout);
-
-         // Calculate new corner locations and half  step locations
-         Vector vdof1_x_new(2), vdof2_x_new(2), vdof1_x_half(2), vdof2_x_half(2);
-         vdof1_x_new = vdof1_x;
-         vdof1_x_new.Add(dt, vdof1_v);
-         vdof1_x_half = vdof1_x;
-         vdof1_x_half.Add(dt/2., vdof1_v);
-
-         // cout << "New locations for vdof1. full:\n";
-         // vdof1_x_new.Print(cout);
-         // cout << "half: \n";
-         // vdof1_x_half.Print(cout);
-
-         vdof2_x_new = vdof2_x;
-         vdof2_x_new.Add(dt, vdof2_v);
-         vdof2_x_half = vdof2_x;
-         vdof2_x_half.Add(dt/2., vdof2_v);
-
-         // cout << "New locations for vdof2. full:\n";
-         // vdof2_x_new.Print(cout);
-         // cout << "half: \n";
-         // vdof2_x_half.Print(cout);
-
-         // calculate a_{12}^{n+1} (new tangent midpoint)
-         Vector vdof12_x_new(2);
-         vdof12_x_new = vdof1_x_new;
-         vdof12_x_new += vdof2_x_new;
-         vdof12_x_new /= 2.;
-         // cout << "new tangent midpoint, vdof12_x_new: \n";
-         // vdof12_x_new.Print(cout);
-
-         // Compute D (A.4c)
-         Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
-         n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
-         // cout << "n_vec_R: \n";
-         // n_vec_R.Print(cout);
-
-         subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-         // cout << "V1-V2:\n";
+         // cout << "temp_vec:\n";
          // temp_vec.Print(cout);
-
-         subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         // cout << "A2-A1:\n";
+         // cout << "temp_vec_2:\n";
          // temp_vec_2.Print(cout);
+         // cout << "################## Vectors are not orthogonal!";
+         MFEM_ABORT("vectors are not orthogonal!\n");
+      }
 
-         Orthogonal(temp_vec_2);
-         // cout << "(A2-A1)^R:\n";
-         // temp_vec_2.Print(cout);
+      // if (flag == "testing")
+      // {
+      //    // cout << "The coordinate location of this face is: \n";
+      //    // face_x.Print(cout);
+      //    // cout << "The computed velocity on this face is: \n";
+      //    // face_velocity.Print(cout);
+      //    // cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
+      //    Vector face_v_exact(dim);
+      //    test_vel(face_x, 0., face_v_exact);
+      //    face_v_exact.Print(cout);
+      //    Vector temp_vel(dim);
+      //    subtract(face_v_exact, face_velocity, temp_vel);
+      //    if (temp_vel.Norml2() > 10e-6)
+      //    {
+      //       MFEM_ABORT("Incorrect face velocity.\n");
+      //    }
+      // }
+      // } // End interior face
 
-         double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
-         // cout << "D: " << D << endl;
-
-         // Compute c1 (A.4a)
-         subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-         // cout << "V2-V1:\n";
-         // temp_vec.Print(cout);
-         // cout << "c1 computation n_vec:\n";
-         // n_vec.Print(cout);
-         double c1 = ( dt * (temp_vec * n_vec) + 2 * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
-         // cout << "c1 computation n_vec_R:\n";
-         // n_vec_R.Print(cout);
-         // cout << "c1: " << c1 << endl;
-
-         // Compute c0 (A.4b)
-         // cout << "!!!Computing c0\n";
-
-         // cout << "\n === First we compute bmn ===\n";
-         // cout << "cell_center_v:\n";
-         // cell_center_v.Print(cout);
-         Vector n_vec_half(dim);
-         subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
-         Orthogonal(n_vec_half);
-         // cout << "n_vec_half:\n";
-         // n_vec_half.Print(cout);
-         Vector v_exact_at_face(dim);
-         test_vel(face_x, 0., v_exact_at_face);
-         // double bmn = v_exact_at_face * n_vec_half;
-         double bmn = v_exact_at_face * n_vec;
-         // cout << "face length: " << face_length << endl;
-         // bmn *= face_length;
-         // cout << "bmn: " << bmn << endl;
-
-         temp_vec = vdof1_x_half;
-         Orthogonal(temp_vec); // A1R
-         // cout << "A1^R:\n";
-         // temp_vec.Print(cout);
-         temp_vec_2 = vdof2_x_half;
-         Orthogonal(temp_vec_2); // A2R
-         // cout << "A2^R:\n";
-         // temp_vec_2.Print(cout);
-         double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
-         double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
-         
-         temp_vec = face_x;
-         Orthogonal(temp_vec);
-         // cout << "a3^R:\n";
-         // temp_vec.Print(cout);
-         subtract(vdof2_v, vdof1_v, temp_vec_2);
-         // cout << "V2 - V1:\n";
-         // temp_vec_2.Print(cout);
-         double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
-         // cout << "const 1: " << const1 << ", const 2: " << const2 << ", const3: " << const3 << endl;
-         double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
-         // cout << "c0: " << c0 << endl;
-         
-         // Compute V3n_perp
-         // cout << "Computing V3n_perp\n";
-         subtract(vdof2_x_new, vdof1_x_new, temp_vec);
-         // cout << "a2n+1 - a1n+1:\n";
-         // temp_vec.Print(cout);
-         subtract(face_x, vdof12_x_new, temp_vec_2);
-         temp_vec_2.Add(c0*dt, n_vec);
-         // cout << "a3n - a12n+1 + c0dtn_vec:\n";
-         // temp_vec_2.Print(cout);
-         const1 = temp_vec * temp_vec_2; // numerator
-         temp_vec_2 = n_vec_R;
-         temp_vec_2 *= -1.;
-         temp_vec_2.Add(c1, n_vec);
-         // cout << "c1n_vec + nperp:\n";
-         // temp_vec_2.Print(cout);
-         const2 = temp_vec * temp_vec_2;
-         const2 *= dt; // denominator
-         double V3nperp = -1. * const1 / const2;
-         // cout << "V3nperp: " << V3nperp << endl;
-
-         // Compute V3n (5.11)
-         double V3n = c1 * V3nperp + c0;
-         // cout << "V3n: " << V3n << endl;
-
-         // Compute face velocity (5.11)
-         // const1 = Vf * n_vec;
-         // temp_vec = n_vec;
-         // temp_vec *= const1;
-         // subtract(Vf, temp_vec, face_velocity);
-         // face_velocity.Add(V3n, n_vec);
-
-         // Compute face velocity (Appendix A)
-         face_velocity = 0.;
-         face_velocity.Add(V3n, n_vec);
-         Vector n_vec_perp(dim);
-         n_vec_perp = n_vec_R;
-         n_vec_perp *= -1.;
-         // cout << "n_vec_perp:\n";
-         // n_vec_perp.Print(cout);
-         // cout << "n_vec_R:\n";
-         // n_vec_R.Print(cout);
-         face_velocity.Add(V3nperp, n_vec_perp);
-
-         Vector face_x_new(2);
-         face_x_new = face_x;
-         face_x_new.Add(dt, face_velocity);
-
-         // Check perpendicular
-         subtract(face_x_new, vdof12_x_new, temp_vec);
-         subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
-         if (abs(temp_vec * temp_vec_2) > pow(10, -12))
-         {
-            // cout << "temp_vec:\n";
-            // temp_vec.Print(cout);
-            // cout << "temp_vec_2:\n";
-            // temp_vec_2.Print(cout);
-            // cout << "################## Vectors are not orthogonal!";
-            MFEM_ABORT("vectors are not orthogonal!\n");
-         }
-
-         if (flag == "testing")
-         {
-            // cout << "The coordinate location of this face is: \n";
-            // face_x.Print(cout);
-            // cout << "The computed velocity on this face is: \n";
-            // face_velocity.Print(cout);
-            // cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
-            Vector face_v_exact(dim);
-            test_vel(face_x, 0., face_v_exact);
-            face_v_exact.Print(cout);
-            Vector temp_vel(dim);
-            subtract(face_v_exact, face_velocity, temp_vel);
-            // if (temp_vel.Norml2() > 10e-6)
-            // {
-            //    MFEM_ABORT("Incorrect face velocity.\n");
-            // }
-         }
-      } // End interior face
-
-      else
-      {
-         assert(FI.IsBoundary());
-         // TODO: Add in boundary conditions similar to corner vertex bcs
-         // TODO: Add testing validation step here
-         if (flag == "testing")
-         {
-            // Set exact velocity on boundary face.
-            // cout << "We have a boundary face: " << face << endl;
-            double t = 0.;
-            test_vel(face_x, t, face_velocity);
-            // cout << "The computed velocity on this face is: \n";
-            // face_velocity.Print(cout);
-         }
-         else
-         {
-            // Average nodal velocities when not testing
-            assert(flag == "NA");
-            for (int j = 0; j < dim; j++)
-            {
-               face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
-            }
-         }
+      // else
+      // {
+      //    assert(FI.IsBoundary());
+      //    // TODO: Add in boundary conditions similar to corner vertex bcs
+      //    // TODO: Add testing validation step here
+      //    if (flag == "testing")
+      //    {
+      //       // Set exact velocity on boundary face.
+      //       // cout << "We have a boundary face: " << face << endl;
+      //       double t = 0.;
+      //       test_vel(face_x, t, face_velocity);
+      //       // cout << "The computed velocity on this face is: \n";
+      //       // face_velocity.Print(cout);
+      //    }
+      //    else
+      //    {
+      //       // Average nodal velocities when not testing
+      //       assert(flag == "NA");
+      //       for (int j = 0; j < dim; j++)
+      //       {
+      //          face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+      //       }
+      //    }
         
-      } // End boundary face
+      // } // End boundary face
 
       // Lastly, put face velocity into gridfunction object
       update_node_velocity(S, face_dof, face_velocity);

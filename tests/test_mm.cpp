@@ -16,7 +16,7 @@ const double a = 1.,
              b = 1.,
              c = 1,
              d = 1.,
-             e = -2.,
+             e = -1.,
              f = 1.;
 
 // Problem
@@ -388,7 +388,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
 
    double t = 0;
-   const double dt = .01;
+   const double dt = .5;
    Array<double> cell_areas(L2FESpace.GetNE());
    Array<double> bmn_sum_cells(L2FESpace.GetNE());
 

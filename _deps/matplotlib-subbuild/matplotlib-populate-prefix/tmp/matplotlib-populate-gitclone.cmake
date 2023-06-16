@@ -3,21 +3,21 @@
 
 cmake_minimum_required(VERSION 3.5)
 
-if(EXISTS "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt" AND EXISTS "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt" AND
-  "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt" IS_NEWER_THAN "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt")
+if(EXISTS "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt" AND EXISTS "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt" AND
+  "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt" IS_NEWER_THAN "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt")
   message(STATUS
     "Avoiding repeated git clone, stamp file is up to date: "
-    "'/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt'"
+    "'/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt'"
   )
   return()
 endif()
 
 execute_process(
-  COMMAND ${CMAKE_COMMAND} -E rm -rf "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-src"
+  COMMAND ${CMAKE_COMMAND} -E rm -rf "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-src"
   RESULT_VARIABLE error_code
 )
 if(error_code)
-  message(FATAL_ERROR "Failed to remove directory: '/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-src'")
+  message(FATAL_ERROR "Failed to remove directory: '/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-src'")
 endif()
 
 # try the clone 3 times in case there is an odd git clone issue
@@ -25,9 +25,9 @@ set(error_code 1)
 set(number_of_tries 0)
 while(error_code AND number_of_tries LESS 3)
   execute_process(
-    COMMAND "/usr/bin/git" 
+    COMMAND "/Users/sheridan7/local/bin/git" 
             clone --no-checkout --config "advice.detachedHead=false" "https://github.com/lava/matplotlib-cpp.git" "matplotlib-src"
-    WORKING_DIRECTORY "/Users/madisonsheridan/Workspace/Laglos/_deps"
+    WORKING_DIRECTORY "/Users/sheridan7/Workspace/Laglos/_deps"
     RESULT_VARIABLE error_code
   )
   math(EXPR number_of_tries "${number_of_tries} + 1")
@@ -40,9 +40,9 @@ if(error_code)
 endif()
 
 execute_process(
-  COMMAND "/usr/bin/git" 
+  COMMAND "/Users/sheridan7/local/bin/git" 
           checkout "f23347fca25219d1c42cbb91608b5556814bf572" --
-  WORKING_DIRECTORY "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-src"
+  WORKING_DIRECTORY "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-src"
   RESULT_VARIABLE error_code
 )
 if(error_code)
@@ -52,22 +52,22 @@ endif()
 set(init_submodules TRUE)
 if(init_submodules)
   execute_process(
-    COMMAND "/usr/bin/git" 
+    COMMAND "/Users/sheridan7/local/bin/git" 
             submodule update --recursive --init 
-    WORKING_DIRECTORY "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-src"
+    WORKING_DIRECTORY "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-src"
     RESULT_VARIABLE error_code
   )
 endif()
 if(error_code)
-  message(FATAL_ERROR "Failed to update submodules in: '/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-src'")
+  message(FATAL_ERROR "Failed to update submodules in: '/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-src'")
 endif()
 
 # Complete success, update the script-last-run stamp file:
 #
 execute_process(
-  COMMAND ${CMAKE_COMMAND} -E copy "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt" "/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt"
+  COMMAND ${CMAKE_COMMAND} -E copy "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitinfo.txt" "/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt"
   RESULT_VARIABLE error_code
 )
 if(error_code)
-  message(FATAL_ERROR "Failed to copy script-last-run stamp file: '/Users/madisonsheridan/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt'")
+  message(FATAL_ERROR "Failed to copy script-last-run stamp file: '/Users/sheridan7/Workspace/Laglos/_deps/matplotlib-subbuild/matplotlib-populate-prefix/src/matplotlib-populate-stamp/matplotlib-populate-gitclone-lastrun.txt'")
 endif()

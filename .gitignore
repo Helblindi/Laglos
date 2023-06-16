@@ -5,6 +5,7 @@
 .vscode
 Laglos.code-workspace
 build/ 
+compile_commands.json
 
 # Executable
 Laglos

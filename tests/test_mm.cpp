@@ -403,7 +403,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    }
 
    /* Move the Mesh */
-   // hydro.compute_node_velocity_LS(S, t, dt, flag, &velocity_exact);
+   
    /* --- Start of node computation --- */
    Vector vertex_x(dim), vertex_v(dim), v_pre_update(dim), v_post_update(dim), res(dim);
    DenseMatrix C(dim);
@@ -415,11 +415,6 @@ int test_area_conservation(double & _error, int & _num_cells)
       C(0,1) = b;
       C(1,0) = d;
       C(1,1) = e;
-
-      // C.Mult(vertex_x, res);
-
-      // D(0) = c - res[0];
-      // D(1) = f - res[1];
 
       D(0) = c;
       D(1) = f;
@@ -443,8 +438,8 @@ int test_area_conservation(double & _error, int & _num_cells)
    }
 
    /* Fill faces with average velocities */
-   hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
-   // hydro.compute_interior_face_velocities(S, dt, flag, &velocity_exact);
+   // hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
+   hydro.compute_interior_face_velocities(S, dt, flag, &velocity_exact);
    hydro.fill_center_velocities_with_average(S, flag, &velocity_exact);
 
    /* ************************

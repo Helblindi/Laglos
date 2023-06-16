@@ -179,7 +179,7 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
 
    mfem::Mesh::FaceInformation FI;
 
-   for (ci; ci < L2.GetNE(); ci++) // Cell iterator
+   for (; ci < L2.GetNE(); ci++) // Cell iterator
    {
       temp_sum = 0.;
       mi = m_hpv->Elem(ci);
@@ -275,7 +275,7 @@ void LagrangianLOOperator<dim, problem>::IterateOverCells()
    cout << "GetNEdges: " << pmesh->GetNEdges() << endl;
    cout << "GetNumFaces: " << pmesh->GetNumFaces() << endl;
    
-   for (ci; ci < L2.GetNE(); ci++) // cell iterator
+   for (; ci < L2.GetNE(); ci++) // cell iterator
    {
       cout << "We are on cell: " << ci << endl;
 
@@ -468,7 +468,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(const Vector &S, con
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
 
-   for (ci; ci < L2.GetNE(); ci++) // Cell iterator
+   for (; ci < L2.GetNE(); ci++) // Cell iterator
    {
       GetCellStateVector(S, ci, U_i);
       val = U_i;

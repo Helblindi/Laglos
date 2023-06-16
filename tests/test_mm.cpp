@@ -234,7 +234,8 @@ int test_mesh_movement(double & _error, int & _num_cells)
    }
 
    // Delete remaining pointers
-   delete pmesh, m;
+   delete pmesh;
+   delete m;
 
    // Point dangling pointers to NULL
    pmesh = NULL;

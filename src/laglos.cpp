@@ -27,9 +27,9 @@
 */
 
 
+#include "compile_time_vals.h"
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
-// #include "compile_time_vals.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -529,7 +529,9 @@ int main(int argc, char *argv[]) {
             VisualizeField(vis_ste_err, vishost, visport, ste_err,
                            "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
 
-            delete rho_ex, vel_ex, ste_ex;
+            delete rho_ex;
+            delete vel_ex;
+            delete ste_ex;
          }
       }
    }
@@ -555,7 +557,8 @@ int main(int argc, char *argv[]) {
       if (CompileTimeVals::change_CFL && problem == 7 && t > CompileTimeVals::CFL_time_change && hydro.GetCFL() != CompileTimeVals::CFL_second)
       {
          cout << "Changing CFL for Saltzman at time = " << t << endl;
-         hydro.SetCFL(CompileTimeVals::CFL_second);
+         double CFL_new = CompileTimeVals::CFL_second;
+         hydro.SetCFL(CFL_new);
       }
 
       if (optimize_timestep)
@@ -576,7 +579,7 @@ int main(int argc, char *argv[]) {
 
       hydro.MakeTimeStep(S, t, dt); // testing
       steps++;
-      if (S_old == S) { cout << "\t State has not changed with step.\n"; return -1; }
+      if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
 
       // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
       // data in S. This operation simply updates the Memory validity flags of
@@ -693,7 +696,9 @@ int main(int argc, char *argv[]) {
                   VisualizeField(vis_ste_err, vishost, visport, ste_err,
                                  "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
 
-                  delete rho_ex, vel_ex, ste_ex;
+                  delete rho_ex;
+                  delete vel_ex;
+                  delete ste_ex;
                }
             }
          }
@@ -886,7 +891,9 @@ int main(int argc, char *argv[]) {
                         
             convergence_file.close();
 
-            delete rho_ex, vel_ex, ste_ex;
+            delete rho_ex;
+            delete vel_ex;
+            delete ste_ex;
          }
       }
    }
@@ -894,7 +901,8 @@ int main(int argc, char *argv[]) {
    /* Finally, check for mass conservation */
    hydro.CheckMassLoss(S);
    
-   delete pmesh, m;
+   delete pmesh;
+   delete m;
 
    return 0;
 }

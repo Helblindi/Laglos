@@ -21,6 +21,7 @@ cmake_install.cmake
 libcomp_lambda.a
 makefile 
 CTestTestfile.cmake
+_deps/
 
 # Tests
 tests/TestInstantiator

@@ -1,11 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE) # Look into this when have time.
 
+# Require C++11 and disable compiler-specific extensions
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(HOMEBREW_PREFIX "/opt/homebrew"
   CACHE PATH "Path to Homebrew installation")
 
-set(CMAKE_C_COMPILER "${HOMEBREW_PREFIX}/bin/gcc-12")
-set(CMAKE_CXX_COMPILER "${HOMEBREW_PREFIX}/bin/g++-12")
+# set(CMAKE_C_COMPILER "${HOMEBREW_PREFIX}/bin/gcc-12")
+# set(CMAKE_CXX_COMPILER "${HOMEBREW_PREFIX}/bin/g++-12")
+
+# edits
+if (NOT CMAKE_CXX_COMPILER)
+  if (CXX)
+    set(CMAKE_CXX_COMPILER ${CXX})
+    # Avoid some issues when CXX is defined
+    unset(CXX)
+    unset(CXX CACHE)
+  endif()
+endif()
 
 # set the project name
 project(Laglos LANGUAGES C CXX Fortran)
@@ -71,9 +86,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 message(STATUS "Looking for mfem ...")
 set(MFEM_DIR "" CACHE PATH "Path to the MFEM build or install prefix.")
 if (MFEM_DIR)
-   # find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
-   #              "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
-   find_package(mfem REQUIRED)
+   find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
+                "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
+  #  message(STATUS "Here is the currect value of mfem_DIR: ${MFEM_DIR}")
+  #  find_package(mfem REQUIRED)
 else()
    find_package(mfem REQUIRED NAMES MFEM)
 endif()

@@ -1023,7 +1023,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction & x_gf
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
 
-         compute_node_velocity_LS(S, t, dt);
+         compute_node_velocities(S, t, dt);
          Array<int> row;
 
          cout << "Computing velocity on faces now\n";
@@ -1507,6 +1507,21 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
    }
 }
 
+/*
+Function: compute_corrected_node_velocity
+Parameters:
+   C, D     - Matrix and vector representing linear velocity field at node
+   dt       - timestep
+   vertex_x - Vector coordinates for node
+   vertex_v - Computed velocity
+   flag     - flag used to indicate testing
+   test_vel - velocity used for testing
+Purpose:
+   This function takes in the velocity field that is computed at a node 
+   using Least Squares or the Rannacher-Turek FE, and returns the corrected
+   velocity that preserves linear motion (i.e. face nodes don't have to correct
+   when the velocity is linear).
+*/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
    compute_corrected_node_velocity(const DenseMatrix &C, 
@@ -1558,269 +1573,301 @@ void LagrangianLOOperator<dim, problem>::
    vertex_v += B;
 }
 
+/*
+Function: compute_node_velocity_LS
+Parameters:
+   S        - BlockVector representing FiniteElement information
+   t        - Current time
+   dt       - Timestep
+   flag     - Flag used to indicate testing
+   test_vel - Velocity used for testing
+Purpose:
+   This function computes the nodal velocity of all nodes in the mesh.  It does
+   this using the intermediate face velocities from the adjacent faces, forming 
+   an overdetermined system for the local velocity field under the assumption that
+   it is a linear field, and solves the overdetermined system using Least Squares.
+*/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
-   compute_node_velocity_LS(Vector &S, const double & t, 
-                            const double & dt, 
+   compute_node_velocity_LS(const Vector &S,
+                            const Table &vertex_edge, 
+                            const int & vertex,
+                            const double &t,
+                            const double &dt,
+                            Vector &vertex_v,
+                            DenseMatrix &C,
+                            Vector &D,
                             const string flag, // Default NA
                             void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    // cout << "========================================\n";
-   // cout << "Computing corner velocities using Least Squares.\n";
+   // cout << "Computing corner velocity using Least Squares.\n";
    // cout << "========================================\n";
+
+   /* Code from previous LS */
+   bool is_boundary_node = false;
    mfem::Mesh::FaceInformation FI;
+   Array<int> row;
+   Array<int> face_dof_row;
+   int row_length, face, face_dof;
+   DenseMatrix A(row_length, dim + 1), At(dim+1, row_length), LHS(dim+1, dim+1);
+   Vector Bx(row_length), By(row_length), vertex_x(dim);
+   Vector Bx_mod(dim+1), By_mod(dim+1); // To solve LS problem 
+   Vector Vf(dim); // Intermediate Face Velocity or exact velocity if testing
+   Vector n_vec(dim); // For enforcing BCs 
+   Vector face_x(dim);
+
+   // Construct A, B_x, B_y
+   vertex_edge.GetRow(vertex, row);
+   row_length = row.Size();
+   
+   // Get position of node
+   get_node_position(S, vertex, vertex_x);
+   
+   // 3DTODO: Will need to modify this for faces instead of edges in 3D
+   for (int face_it = 0; face_it < row_length; face_it++) // Adjacent face iterator
+   {
+      // Reset face velocity object
+      Vf = 0.;
+
+      face = row[face_it];
+      FI = pmesh->GetFaceInformation(face);
+      if (FI.IsBoundary()) { is_boundary_node = true; }
+
+      // Retrieve coordinates for face node
+      H1.GetFaceDofs(face, face_dof_row);
+      face_dof = face_dof_row[2]; // Dof corresponding to the center of the face
+      get_node_position(S, face_dof, face_x);
+
+      // Fill corresponding row of A, Bx, By
+      for (int i = 0; i < dim; i++)
+      {
+         A(face_it, i) = face_x(i) - vertex_x(i); // Fill with nodal locations
+      }
+      A(face_it, dim) = 1.;
+
+      if (flag == "testing")
+      {
+         // Use exact velocity when testing 
+         test_vel(face_x, t, Vf);
+      }
+      else
+      {
+         get_intermediate_face_velocity(face, Vf);
+      }
+
+      // In either case, we set the corresponding row to the face velocity,
+      // whether that is given by the intermediate face velocity or the exact
+      Bx(face_it) = Vf(0);
+      By(face_it) = Vf(1);
+   } // End face iterator
+
+   // We should have an overdetermined system 
+   // assert(row_length > dim + 1);
+   At.Transpose(A);
+   Mult(At, A, LHS);
+   At.Mult(Bx, Bx_mod);
+   At.Mult(By, By_mod);
+
+   // Solve linear systems A x_A = B_x, A x_B = B_y
+   Vector res_x(dim+1), res_y(dim+1);
+
+   if (flag=="testing")
+   {
+      if (is_boundary_node)
+      {
+         // Prescribe exact solution on boundary nodes
+         test_vel(vertex_x, t, vertex_v);
+      }
+      else
+      {
+         // Interior node
+         // Solve directly
+         LHS.Invert();
+         LHS.Mult(Bx_mod, res_x);
+         LHS.Mult(By_mod, res_y);
+
+         // Solve for nodal velocity
+         vertex_v(0) = res_x(dim); // Set to cx
+         vertex_v(1) = res_y(dim); // Set to cy
+
+         /* Just going to modify testing part of function to take into account corrected velocity */
+         // TODO: We will need to ensure the timestep restriction
+         // Form C, D
+         C(0, 0) = res_x(0);
+         C(0, 1) = res_x(1);
+         C(1, 0) = res_y(0);
+         C(1, 1) = res_y(1);
+
+         D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
+         D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
+
+         Vector vertex_v_uncorrected(dim);
+         vertex_v_uncorrected = vertex_v;
+         // cout << "Precorrected velocity: \n";
+         // vertex_v_uncorrected.Print(cout);
+         // cout << "Postcorrected velocity: \n";
+         // vertex_v.Print(cout);
+      }
+   }
+   else
+   {
+      assert(flag=="NA");
+      if (is_boundary_node)
+      {
+         CGSolver cg;
+         cg.SetOperator(LHS);
+         cg.SetRelTol(1e-12);
+         cg.SetAbsTol(1e-12);
+         cg.SetMaxIter(1000);
+         cg.SetPrintLevel(-1);
+         cg.Mult(Bx_mod, res_x);
+         cg.Mult(By_mod, res_y);
+      } // End Boundary Node
+      else
+      {
+         // Solve directly
+         LHS.Invert();
+         LHS.Mult(Bx_mod, res_x);
+         LHS.Mult(By_mod, res_y);
+      }
+      
+      // Solve for nodal velocity 
+      vertex_v(0) = res_x(dim); // Set to cx
+      vertex_v(1) = res_y(dim); // Set to cy
+
+      // Enforce boundary conditions
+      if (is_boundary_node)
+      {
+         /* Enforce BCs (Copy/Paste from previous nodal computation) */
+         switch (problem)
+         {
+            case 7: // Saltzman
+            {
+               // cout << "Working on boundary node: " << vertex << endl;
+               is_boundary_node = false;
+               for (int face_it = 0; face_it < row_length; face_it++)
+               {
+                  int face = row[face_it];
+                  FI = pmesh->GetFaceInformation(face);
+                  if (FI.IsBoundary())
+                  {
+                     int BdrElIndex = BdrElementIndexingArray[face];
+                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+                     if (bdr_attribute == 1)
+                     {
+                        vertex_v = 0.;
+                        
+                        if (timestep_first == 0.)
+                        {
+                           timestep_first = timestep;
+                        }
+                        double _xi = t / (2*timestep_first);
+
+                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+
+                        vertex_v[0] = 1. * _psi;
+
+                        break;
+                     }
+                     else 
+                     {
+                        assert (bdr_attribute == 2);
+                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+                        n_vec /= n_vec.Norml2();
+
+                        Vector vertex_v_normal_component(dim);
+                        vertex_v_normal_component = n_vec;
+                        double _scale = vertex_v * n_vec;
+                        vertex_v_normal_component *= _scale;
+
+                        vertex_v -= vertex_v_normal_component;
+                     }
+                  } // End boundary face
+               } // End: Face iterator
+            } // End: Saltzman
+            default:
+            {
+               // No change
+            }
+         } // Switch case end
+      }
+   } // End not testing
+   
+   /* End ode from previous LS */
+}
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::
+   compute_node_velocities(Vector &S, 
+                           const double & t, 
+                           const double & dt, 
+                           const string flag, // Default NA
+                           void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
+{
    Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
    Table vertex_edge;
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
    Transpose(*edge_vertex, vertex_edge);
-   Array<int> row;
-   int row_length;
-
-   Vector Vf(dim); // Intermediate Face Velocity or exact velocity if testing
-   Vector n_vec(dim); // For enforcing BCs
-
-   bool is_boundary_node = false;
-
-   // Iterate over vertices
-   for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
-   {
-      // Reset flag indicating boundary node
-      is_boundary_node = false;
-
-      // Construct A, B_x, B_y
-      vertex_edge.GetRow(vertex, row);
-      row_length = row.Size();
-
-      // Instantiate A
-      DenseMatrix A(row_length, dim + 1), At(dim+1, row_length), LHS(dim+1, dim+1);
-      Vector Bx(row_length), By(row_length), vertex_x(dim), vertex_v(dim);
-      Vector Bx_mod(dim+1), By_mod(dim+1); // To solve LS problem
-      get_node_position(S, vertex, vertex_x);
-      
-      // 3DTODO: Will need to modify this for faces instead of edges in 3D
-      for (int face_it = 0; face_it < row_length; face_it++) // Adjacent face iterator
-      {
-         // Reset face velocity object
-         Vf = 0.;
-
-         int face = row[face_it];
-         FI = pmesh->GetFaceInformation(face);
-         if (FI.IsBoundary()) { is_boundary_node = true; }
-
-         // Retrieve coordinates for face node
-         Array<int> face_dof_row;
-         H1.GetFaceDofs(face, face_dof_row);
-         int face_dof = face_dof_row[2]; // Dof corresponding to the center of the face
-         Vector face_x(dim);
-         get_node_position(S, face_dof, face_x);
-
-         // Fill corresponding row of A, Bx, By
-         for (int i = 0; i < dim; i++)
-         {
-            A(face_it, i) = face_x(i) - vertex_x(i); // Fill with nodal locations
-         }
-         A(face_it, dim) = 1.;
-
-         if (flag == "testing")
-         {
-            // Used for make test
-            test_vel(face_x, t, Vf);
-         }
-         else
-         {
-            get_intermediate_face_velocity(face, Vf);
-         }
-
-         // In either case, we set the corresponding row to the face velocity,
-         // whether that is given by the intermediate face velocity or the exact
-         Bx(face_it) = Vf(0);
-         By(face_it) = Vf(1);
-      } // End face iterator
-
-      // We should have an overdetermined system 
-      // assert(row_length > dim + 1);
-      At.Transpose(A);
-      Mult(At, A, LHS);
-      At.Mult(Bx, Bx_mod);
-      At.Mult(By, By_mod);
-
-      // Solve linear systems A x_A = B_x, A x_B = B_y
-      Vector res_x(dim+1), res_y(dim+1);
-
-      if (flag=="testing")
-      {
-         if (is_boundary_node)
-         {
-            // Prescribe exact solution on boundary nodes
-            test_vel(vertex_x, t, vertex_v);
-         }
-         else
-         {
-            // Interior node
-            // Solve directly
-            LHS.Invert();
-            LHS.Mult(Bx_mod, res_x);
-            LHS.Mult(By_mod, res_y);
-
-            // Solve for nodal velocity
-            vertex_v(0) = res_x(dim); // Set to cx
-            vertex_v(1) = res_y(dim); // Set to cy
-
-            /* Just going to modify testing part of function to take into account corrected velocity */
-            // TODO: We will need to ensure the timestep restriction
-            // Form C, D
-            DenseMatrix C(dim, dim);
-            Vector D(dim);
-            C(0, 0) = res_x(0);
-            C(0, 1) = res_x(1);
-            C(1, 0) = res_y(0);
-            C(1, 1) = res_y(1);
-
-            D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
-            D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
-
-            Vector vertex_v_uncorrected(dim);
-            vertex_v_uncorrected = vertex_v;
-            compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
-            // cout << "Precorrected velocity: \n";
-            // vertex_v_uncorrected.Print(cout);
-            // cout << "Postcorrected velocity: \n";
-            // vertex_v.Print(cout);
-         }
-      }
-      else
-      {
-         assert(flag=="NA");
-         if (is_boundary_node)
-         {
-            CGSolver cg;
-            cg.SetOperator(LHS);
-            cg.SetRelTol(1e-12);
-            cg.SetAbsTol(1e-12);
-            cg.SetMaxIter(1000);
-            cg.SetPrintLevel(-1);
-            cg.Mult(Bx_mod, res_x);
-            cg.Mult(By_mod, res_y);
-         } // End Boundary Node
-         else
-         {
-            // Solve directly
-            LHS.Invert();
-            LHS.Mult(Bx_mod, res_x);
-            LHS.Mult(By_mod, res_y);
-         }
-         
-         // Solve for nodal velocity 
-         vertex_v(0) = res_x(dim); // Set to cx
-         vertex_v(1) = res_y(dim); // Set to cy
-
-         // Enforce boundary conditions
-         if (is_boundary_node)
-         {
-            /* Enforce BCs (Copy/Paste from previous nodal computation) */
-            switch (problem)
-            {
-               case 7: // Saltzman
-               {
-                  // cout << "Working on boundary node: " << vertex << endl;
-                  is_boundary_node = false;
-                  for (int face_it = 0; face_it < row_length; face_it++)
-                  {
-                     int face = row[face_it];
-                     FI = pmesh->GetFaceInformation(face);
-                     if (FI.IsBoundary())
-                     {
-                        int BdrElIndex = BdrElementIndexingArray[face];
-                        int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
-
-                        if (bdr_attribute == 1)
-                        {
-                           vertex_v = 0.;
-                           
-                           if (timestep_first == 0.)
-                           {
-                              timestep_first = timestep;
-                           }
-                           double _xi = t / (2*timestep_first);
-
-                           double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-
-                           vertex_v[0] = 1. * _psi;
-
-                           break;
-                        }
-                        else 
-                        {
-                           assert (bdr_attribute == 2);
-                           CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-                           n_vec /= n_vec.Norml2();
-
-                           Vector vertex_v_normal_component(dim);
-                           vertex_v_normal_component = n_vec;
-                           double _scale = vertex_v * n_vec;
-                           vertex_v_normal_component *= _scale;
-
-                           vertex_v -= vertex_v_normal_component;
-                        }
-                     } // End boundary face
-                  } // End: Face iterator
-               } // End: Saltzman
-               default:
-               {
-                  // No change
-               }
-            } // Switch case end
-         }
-      } // End not testing
-      
-      update_node_velocity(S, vertex, vertex_v);
-   } // End Vertex iterator
-}
-
-
-template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, 
-                            const double & dt, 
-                            const string flag, // Default NA
-                            void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
-{
-   cout << "Computing corrected node velocities.\n";
-
-   bool is_boundary_node = false;
-
    DenseMatrix C(dim, dim);
-   Vector D(dim), vertex_x(dim), vertex_v(dim);
+   Vector D(dim), vertex_v(dim);
 
    // Iterate over vertices
    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
    {
-      // Reset flag indicating boundary node
-      is_boundary_node = false;
-
-      get_node_position(S, vertex, vertex_x);
-      test_vel(vertex_x, t, vertex_v);
-
-      C(0,0) = -1.;
-      C(0,1) = 0.;
-      C(1,0) = 0.;
-      C(1,1) = 1.;
-
-      Vector res(dim);
-      C.Mult(vertex_x, res);
-      D[0] = 1. - res[0];
-      D[1] = 1. - res[1];
-
-      Vector vertex_v_uncorrected(dim);
-      vertex_v_uncorrected = vertex_v;
-      compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
-      cout << "Precorrected velocity: \n";
-      vertex_v_uncorrected.Print(cout);
-      cout << "Postcorrected velocity: \n";
-      vertex_v.Print(cout);
-
-      update_node_velocity(S, vertex, vertex_v);
+      C = 0.;
+      D = 0.;
+      compute_node_velocity_LS(S, vertex_edge, vertex, t, dt, vertex_v, C, D, flag, test_vel);
+      // TODO Compute corrected velocity -> Get C and D
+      // compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+      // Stuff this into S
+      // update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
 }
+// template<int dim, int problem>
+// void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, 
+//                             const double & dt, 
+//                             const string flag, // Default NA
+//                             void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
+// {
+//    cout << "Computing corrected node velocities.\n";
+
+//    bool is_boundary_node = false;
+
+//    DenseMatrix C(dim, dim);
+//    Vector D(dim), vertex_x(dim), vertex_v(dim);
+
+//    // Iterate over vertices
+//    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
+//    {
+//       // Reset flag indicating boundary node
+//       is_boundary_node = false;
+
+//       get_node_position(S, vertex, vertex_x);
+//       test_vel(vertex_x, t, vertex_v);
+
+//       C(0,0) = -1.;
+//       C(0,1) = 0.;
+//       C(1,0) = 0.;
+//       C(1,1) = 1.;
+
+//       Vector res(dim);
+//       C.Mult(vertex_x, res);
+//       D[0] = 1. - res[0];
+//       D[1] = 1. - res[1];
+
+//       Vector vertex_v_uncorrected(dim);
+//       vertex_v_uncorrected = vertex_v;
+//       compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+//       cout << "Precorrected velocity: \n";
+//       vertex_v_uncorrected.Print(cout);
+//       cout << "Postcorrected velocity: \n";
+//       vertex_v.Print(cout);
+
+//       update_node_velocity(S, vertex, vertex_v);
+//    } // End Vertex iterator
+// }
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::

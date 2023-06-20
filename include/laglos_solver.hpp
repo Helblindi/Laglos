@@ -126,7 +126,16 @@ public:
    // tests from 2023-01-05
    void compute_node_velocity_cwa(Vector &S, const double & t, const double & dt);
    void compute_node_velocity_RP(Vector &S, const double & t, const double & dt);
-   void compute_node_velocity_LS(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void compute_node_velocity_LS(const Vector &S, 
+                                 const Table &vertex_edge,  
+                                 const int &vertex,
+                                 const double & t, 
+                                 const double & dt, 
+                                 Vector &vertex_v,
+                                 DenseMatrix &C,
+                                 Vector &D,
+                                 const string flag="NA", 
+                                 void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);
@@ -134,7 +143,7 @@ public:
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
    void compute_corrected_node_velocity(const DenseMatrix &C, const Vector &D, const double & dt, const Vector &vertex_x, Vector &vertex_v, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void compute_node_velocity(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void compute_node_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
    void compute_interior_face_velocities(Vector &S, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 

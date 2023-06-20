@@ -174,7 +174,7 @@ int test_mesh_movement(double & _error, int & _num_cells)
    const double t = 0;
    const double dt = 1.;
    
-   hydro.compute_node_velocity(S, t, dt, flag, &velocity_exact);
+   hydro.compute_node_velocities(S, t, dt, flag, &velocity_exact);
    if (!suppress_test_output)
    {
       cout << "Done computing node velocity.\n";
@@ -463,7 +463,7 @@ int test_area_conservation(double & _error, int & _num_cells)
 
    for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
    {
-      cout << "===== Computing cell bmn sum for cell: " << ci << " =====\n";
+      // cout << "===== Computing cell bmn sum for cell: " << ci << " =====\n";
       // Compute sum of bmn on cell
       pmesh->GetElementEdges(ci, fids, oris);
 
@@ -474,12 +474,12 @@ int test_area_conservation(double & _error, int & _num_cells)
          Vf = 0.;
          int face = fids[j];
          FI = pmesh->GetFaceInformation(face);
-         cout << "face: " << face << endl;
+         // cout << "face: " << face << endl;
 
          // Compute intermediate face velocity on fly
          c = FI.element[0].index;
          cp = FI.element[1].index;
-         cout << "cell c: " << c << ", cell cp: " << cp << endl;
+         // cout << "cell c: " << c << ", cell cp: " << cp << endl;
          hydro.GetCellStateVector(S, c, Uc);
 
          H1FESpace.GetFaceDofs(fids[j], row);
@@ -534,19 +534,19 @@ int test_area_conservation(double & _error, int & _num_cells)
          n_vec *= 2.;
          // hydro.get_node_velocity(S, face_dof, face_v);
          // hydro.get_intermediate_face_velocity(fids[j], Vf);
-         cout << "face_x:\n";
-         face_x.Print(cout);
-         cout << "Vf:\n";
-         Vf.Print(cout);
-         cout << "outward normal vector:\n";
-         n_vec.Print(cout);
+         // cout << "face_x:\n";
+         // face_x.Print(cout);
+         // cout << "Vf:\n";
+         // Vf.Print(cout);
+         // cout << "outward normal vector:\n";
+         // n_vec.Print(cout);
          // cout << "outward normal vector secant:\n";
          // sec_norm.Print(cout);
 
          // double bmn = face_v * n_vec;
          double bmn = Vf * n_vec;
          // bmn *= n_vec.Norml2();
-         cout << "bmn: " << bmn << endl << endl;
+         // cout << "bmn: " << bmn << endl << endl;
          bmn_sum += bmn;
 
          // if (!suppress_test_output)

@@ -1601,7 +1601,7 @@ void LagrangianLOOperator<dim, problem>::
                             void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    // cout << "========================================\n";
-   // cout << "Computing corner velocity using Least Squares.\n";
+   // cout << "Computing node velocity using Least Squares.\n";
    // cout << "========================================\n";
 
    /* Code from previous LS */
@@ -1610,16 +1610,17 @@ void LagrangianLOOperator<dim, problem>::
    Array<int> row;
    Array<int> face_dof_row;
    int row_length, face, face_dof;
+
+   /* Get row information */
+   vertex_edge.GetRow(vertex, row);
+   row_length = row.Size();
+
    DenseMatrix A(row_length, dim + 1), At(dim+1, row_length), LHS(dim+1, dim+1);
    Vector Bx(row_length), By(row_length), vertex_x(dim);
    Vector Bx_mod(dim+1), By_mod(dim+1); // To solve LS problem 
    Vector Vf(dim); // Intermediate Face Velocity or exact velocity if testing
    Vector n_vec(dim); // For enforcing BCs 
    Vector face_x(dim);
-
-   // Construct A, B_x, B_y
-   vertex_edge.GetRow(vertex, row);
-   row_length = row.Size();
    
    // Get position of node
    get_node_position(S, vertex, vertex_x);
@@ -1662,8 +1663,7 @@ void LagrangianLOOperator<dim, problem>::
       By(face_it) = Vf(1);
    } // End face iterator
 
-   // We should have an overdetermined system 
-   // assert(row_length > dim + 1);
+   // Form system
    At.Transpose(A);
    Mult(At, A, LHS);
    At.Mult(Bx, Bx_mod);
@@ -1671,49 +1671,36 @@ void LagrangianLOOperator<dim, problem>::
 
    // Solve linear systems A x_A = B_x, A x_B = B_y
    Vector res_x(dim+1), res_y(dim+1);
+   
+   /*
+   ** New stuff
+   **
+   ** */
 
-   if (flag=="testing")
+   // Must handle underdetermined system
+   if (row_length < dim + 1)
    {
-      if (is_boundary_node)
-      {
-         // Prescribe exact solution on boundary nodes
-         test_vel(vertex_x, t, vertex_v);
+      if (flag=="testing") { 
+         test_vel(vertex_x, t, vertex_v); 
+
+         // Get C and D from the test_vel function
+         Vector temp_vec(dim), temp_res(dim);
+         temp_vec = 0.;
+         test_vel(temp_vec, t, temp_res);
+         D(0) = temp_res(0);
+         D(1) = temp_res(1);
+         temp_vec(0) = 1.;
+         test_vel(temp_vec, t, temp_res);
+         C(0,0) = temp_res(0) - D(0); // a
+         C(1,0) = temp_res(1) - D(1); // d
+
+         temp_vec = 0.;
+         temp_vec(1) = 1.;
+         test_vel(temp_vec, t, temp_res);
+         C(0,1) = temp_res(0) - D(0); // a
+         C(1,1) = temp_res(1) - D(1); // d
       }
-      else
-      {
-         // Interior node
-         // Solve directly
-         LHS.Invert();
-         LHS.Mult(Bx_mod, res_x);
-         LHS.Mult(By_mod, res_y);
-
-         // Solve for nodal velocity
-         vertex_v(0) = res_x(dim); // Set to cx
-         vertex_v(1) = res_y(dim); // Set to cy
-
-         /* Just going to modify testing part of function to take into account corrected velocity */
-         // TODO: We will need to ensure the timestep restriction
-         // Form C, D
-         C(0, 0) = res_x(0);
-         C(0, 1) = res_x(1);
-         C(1, 0) = res_y(0);
-         C(1, 1) = res_y(1);
-
-         D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
-         D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
-
-         Vector vertex_v_uncorrected(dim);
-         vertex_v_uncorrected = vertex_v;
-         // cout << "Precorrected velocity: \n";
-         // vertex_v_uncorrected.Print(cout);
-         // cout << "Postcorrected velocity: \n";
-         // vertex_v.Print(cout);
-      }
-   }
-   else
-   {
-      assert(flag=="NA");
-      if (is_boundary_node)
+      else 
       {
          CGSolver cg;
          cg.SetOperator(LHS);
@@ -1723,77 +1710,95 @@ void LagrangianLOOperator<dim, problem>::
          cg.SetPrintLevel(-1);
          cg.Mult(Bx_mod, res_x);
          cg.Mult(By_mod, res_y);
-      } // End Boundary Node
-      else
-      {
-         // Solve directly
-         LHS.Invert();
-         LHS.Mult(Bx_mod, res_x);
-         LHS.Mult(By_mod, res_y);
-      }
-      
-      // Solve for nodal velocity 
+
+         // Form C, D
+         C(0, 0) = res_x(0);
+         C(0, 1) = res_x(1);
+         C(1, 0) = res_y(0);
+         C(1, 1) = res_y(1);
+
+         D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
+         D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
+      } 
+   }
+   else // determined or overdetermined system
+   { 
+      LHS.Invert();
+      LHS.Mult(Bx_mod, res_x);
+      LHS.Mult(By_mod, res_y);
+
+      // Solve for nodal velocity
       vertex_v(0) = res_x(dim); // Set to cx
       vertex_v(1) = res_y(dim); // Set to cy
 
-      // Enforce boundary conditions
-      if (is_boundary_node)
-      {
-         /* Enforce BCs (Copy/Paste from previous nodal computation) */
-         switch (problem)
-         {
-            case 7: // Saltzman
-            {
-               // cout << "Working on boundary node: " << vertex << endl;
-               is_boundary_node = false;
-               for (int face_it = 0; face_it < row_length; face_it++)
-               {
-                  int face = row[face_it];
-                  FI = pmesh->GetFaceInformation(face);
-                  if (FI.IsBoundary())
-                  {
-                     int BdrElIndex = BdrElementIndexingArray[face];
-                     int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+      // TODO: We will need to ensure the timestep restriction
+      // Form C, D
+      C(0, 0) = res_x(0);
+      C(0, 1) = res_x(1);
+      C(1, 0) = res_y(0);
+      C(1, 1) = res_y(1);
 
-                     if (bdr_attribute == 1)
-                     {
-                        vertex_v = 0.;
+      D(0) = res_x(dim) - (res_x(0) * vertex_x(0) + res_x(1) * vertex_x(1));
+      D(1) = res_y(dim) - (res_y(0) * vertex_x(0) + res_y(1) * vertex_x(1));
+   }
+   
+   //    // Enforce boundary conditions
+   //    if (is_boundary_node)
+   //    {
+   //       /* Enforce BCs (Copy/Paste from previous nodal computation) */
+   //       switch (problem)
+   //       {
+   //          case 7: // Saltzman
+   //          {
+   //             // cout << "Working on boundary node: " << vertex << endl;
+   //             is_boundary_node = false;
+   //             for (int face_it = 0; face_it < row_length; face_it++)
+   //             {
+   //                int face = row[face_it];
+   //                FI = pmesh->GetFaceInformation(face);
+   //                if (FI.IsBoundary())
+   //                {
+   //                   int BdrElIndex = BdrElementIndexingArray[face];
+   //                   int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+
+   //                   if (bdr_attribute == 1)
+   //                   {
+   //                      vertex_v = 0.;
                         
-                        if (timestep_first == 0.)
-                        {
-                           timestep_first = timestep;
-                        }
-                        double _xi = t / (2*timestep_first);
+   //                      if (timestep_first == 0.)
+   //                      {
+   //                         timestep_first = timestep;
+   //                      }
+   //                      double _xi = t / (2*timestep_first);
 
-                        double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+   //                      double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
 
-                        vertex_v[0] = 1. * _psi;
+   //                      vertex_v[0] = 1. * _psi;
 
-                        break;
-                     }
-                     else 
-                     {
-                        assert (bdr_attribute == 2);
-                        CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-                        n_vec /= n_vec.Norml2();
+   //                      break;
+   //                   }
+   //                   else 
+   //                   {
+   //                      assert (bdr_attribute == 2);
+   //                      CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+   //                      n_vec /= n_vec.Norml2();
 
-                        Vector vertex_v_normal_component(dim);
-                        vertex_v_normal_component = n_vec;
-                        double _scale = vertex_v * n_vec;
-                        vertex_v_normal_component *= _scale;
+   //                      Vector vertex_v_normal_component(dim);
+   //                      vertex_v_normal_component = n_vec;
+   //                      double _scale = vertex_v * n_vec;
+   //                      vertex_v_normal_component *= _scale;
 
-                        vertex_v -= vertex_v_normal_component;
-                     }
-                  } // End boundary face
-               } // End: Face iterator
-            } // End: Saltzman
-            default:
-            {
-               // No change
-            }
-         } // Switch case end
-      }
-   } // End not testing
+   //                      vertex_v -= vertex_v_normal_component;
+   //                   }
+   //                } // End boundary face
+   //             } // End: Face iterator
+   //          } // End: Saltzman
+   //          default:
+   //          {
+   //             // No change
+   //          }
+   //       } // Switch case end
+   //    }
    
    /* End ode from previous LS */
 }
@@ -1811,7 +1816,7 @@ void LagrangianLOOperator<dim, problem>::
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
    Transpose(*edge_vertex, vertex_edge);
    DenseMatrix C(dim, dim);
-   Vector D(dim), vertex_v(dim);
+   Vector D(dim), vertex_v(dim), vertex_x(dim);
 
    // Iterate over vertices
    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
@@ -1819,55 +1824,16 @@ void LagrangianLOOperator<dim, problem>::
       C = 0.;
       D = 0.;
       compute_node_velocity_LS(S, vertex_edge, vertex, t, dt, vertex_v, C, D, flag, test_vel);
+
       // TODO Compute corrected velocity -> Get C and D
-      // compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+      get_node_position(S, vertex, vertex_x);
+      compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
+
       // Stuff this into S
-      // update_node_velocity(S, vertex, vertex_v);
+      update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
 }
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::compute_node_velocity(Vector &S, const double & t, 
-//                             const double & dt, 
-//                             const string flag, // Default NA
-//                             void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
-// {
-//    cout << "Computing corrected node velocities.\n";
 
-//    bool is_boundary_node = false;
-
-//    DenseMatrix C(dim, dim);
-//    Vector D(dim), vertex_x(dim), vertex_v(dim);
-
-//    // Iterate over vertices
-//    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
-//    {
-//       // Reset flag indicating boundary node
-//       is_boundary_node = false;
-
-//       get_node_position(S, vertex, vertex_x);
-//       test_vel(vertex_x, t, vertex_v);
-
-//       C(0,0) = -1.;
-//       C(0,1) = 0.;
-//       C(1,0) = 0.;
-//       C(1,1) = 1.;
-
-//       Vector res(dim);
-//       C.Mult(vertex_x, res);
-//       D[0] = 1. - res[0];
-//       D[1] = 1. - res[1];
-
-//       Vector vertex_v_uncorrected(dim);
-//       vertex_v_uncorrected = vertex_v;
-//       compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
-//       cout << "Precorrected velocity: \n";
-//       vertex_v_uncorrected.Print(cout);
-//       cout << "Postcorrected velocity: \n";
-//       vertex_v.Print(cout);
-
-//       update_node_velocity(S, vertex, vertex_v);
-//    } // End Vertex iterator
-// }
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::

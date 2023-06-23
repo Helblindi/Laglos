@@ -24,7 +24,7 @@ public:
 *             Requires Neumann BC on right face and Dirichlet elsewhere.
 *     Case 8: Linear velocity field to validate Least Squares method
 */
-   const static int problem = 6;
+   const static int problem = 0;
    const static int dim = 2;
    
    /* Various parameters */

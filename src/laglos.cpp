@@ -18,6 +18,7 @@
 /*
 * Example run time parameters:  [Remember to change the problem in compile-time-vals.h]
 *
+* ./Laglos -m data/ref_square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
 * ./Laglos -m ../data/ref-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 1] // Sod
 * ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
@@ -488,6 +489,8 @@ int main(int argc, char *argv[]) {
          case 4: // Noh Problem
          case 3:
          case 2:
+         case 1:
+         case 0:
          {
             // Compute errors
             ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
@@ -579,6 +582,7 @@ int main(int argc, char *argv[]) {
 
       hydro.MakeTimeStep(S, t, dt); // testing
       steps++;
+      
       if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
 
       // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
@@ -649,6 +653,8 @@ int main(int argc, char *argv[]) {
                case 4: // Noh Problem
                case 3:
                case 2:
+               case 1:
+               case 0:
                {
                   // Compute errors
                   ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
@@ -788,7 +794,9 @@ int main(int argc, char *argv[]) {
             // plt::save(filename);
             break;
          }
-         default: {}
+         default: // do nothing for all other problems
+         {
+         }
       }
    }
 
@@ -895,6 +903,9 @@ int main(int argc, char *argv[]) {
             delete vel_ex;
             delete ste_ex;
          }
+      }
+      default: // do nothing for all other problems
+      {
       }
    }
 

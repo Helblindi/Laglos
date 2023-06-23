@@ -393,6 +393,8 @@ inline double InitialValues<problem, dim>::sie0(const Vector &x, const double & 
 {
    switch (problem)
    {
+      case 0:
+      case 1:
       case 2: // Isentropic vortex
       case 3: 
       case 8:

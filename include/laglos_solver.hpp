@@ -94,7 +94,7 @@ public:
 
    void MakeTimeStep(Vector &S, double & t, double dt);
 
-   void ComputeStateUpdate(const Vector &S, const double &t, const double dt, Vector &S_new);
+   void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
    double GetTimeStepEstimate(const Vector &S);
 
@@ -145,7 +145,7 @@ public:
 
    void compute_node_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
-   void compute_interior_face_velocities(Vector &S, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void compute_corrective_face_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void fill_center_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void fill_face_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);

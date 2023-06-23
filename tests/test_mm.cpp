@@ -12,12 +12,12 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 1.,
-             b = 1.,
-             c = 1.,
+const double a = 0.,
+             b = -1.,
+             c = 0.,
              d = 1.,
-             e = 1.,
-             f = 1.;
+             e = 0.,
+             f = 0.;
 
 // Problem
 const int dim = 2;
@@ -413,7 +413,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    hydro.compute_node_velocities(S, t, dt, flag, &velocity_exact);
    /* Fill faces with average velocities */
    // hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
-   hydro.compute_interior_face_velocities(S, dt, flag, &velocity_exact);
+   hydro.compute_corrective_face_velocities(S, t, dt, flag, &velocity_exact);
    hydro.fill_center_velocities_with_average(S, flag, &velocity_exact);
 
    /* ************************

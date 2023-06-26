@@ -12,12 +12,12 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 0.,
-             b = -1.,
-             c = 0.,
+const double a = 1.,
+             b = 1.,
+             c = 1.,
              d = 1.,
-             e = 0.,
-             f = 0.;
+             e = -1.,
+             f = 1.;
 
 // Problem
 const int dim = 2;
@@ -390,7 +390,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
 
    double t = 0;
-   const double dt = .5;
+   const double dt = .1;
    Array<double> cell_areas(L2FESpace.GetNE());
    Array<double> bmn_sum_cells(L2FESpace.GetNE());
 
@@ -412,7 +412,7 @@ int test_area_conservation(double & _error, int & _num_cells)
 
    hydro.compute_node_velocities(S, t, dt, flag, &velocity_exact);
    /* Fill faces with average velocities */
-   // hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
+   hydro.fill_face_velocities_with_average(S, flag, &velocity_exact);
    hydro.compute_corrective_face_velocities(S, t, dt, flag, &velocity_exact);
    hydro.fill_center_velocities_with_average(S, flag, &velocity_exact);
 
@@ -426,7 +426,7 @@ int test_area_conservation(double & _error, int & _num_cells)
 
    Array<int> fids, oris, row;
    mfem::Mesh::FaceInformation FI;
-   Vector secant(dim), n_vec(dim), vdof1_x(dim), vdof2_x(dim), face_x(dim), face_v(dim);
+   Vector secant(dim), n_vec(dim), n_int(dim), vdof1_x(dim), vdof2_x(dim), face_x(dim), face_v(dim);
    int face_vdof1, face_vdof2, face_dof;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), c_vec(dim), Vf(dim);
@@ -504,8 +504,11 @@ int test_area_conservation(double & _error, int & _num_cells)
          // hydro.Orthogonal(sec_norm);
          // n_vec = secant;
          // hydro.Orthogonal(n_vec);
-         hydro.CalcOutwardNormalInt(S, ci, face, n_vec);
-         n_vec *= 2.;
+         hydro.CalcOutwardNormalInt(S, ci, face, n_int);
+         n_vec = n_int;
+         double F = n_vec.Norml2();
+         n_vec /= F;
+
          // hydro.get_node_velocity(S, face_dof, face_v);
          // hydro.get_intermediate_face_velocity(fids[j], Vf);
          // cout << "face_x:\n";
@@ -519,6 +522,7 @@ int test_area_conservation(double & _error, int & _num_cells)
 
          // double bmn = face_v * n_vec;
          double bmn = Vf * n_vec;
+         bmn *= F;
          // bmn *= n_vec.Norml2();
          // cout << "bmn: " << bmn << endl << endl;
          bmn_sum += bmn;

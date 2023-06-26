@@ -397,6 +397,7 @@ inline double InitialValues<problem, dim>::sie0(const Vector &x, const double & 
       case 1:
       case 2: // Isentropic vortex
       case 3: 
+      case 5: // 1D horizontal motion
       case 8:
       {
          // Use pressure law to get specific internal energy
@@ -419,10 +420,6 @@ inline double InitialValues<problem, dim>::sie0(const Vector &x, const double & 
             double p = 0.00001, gamma = gamma_func();
             return p / ((gamma - 1) * rho0(x,t));
          }
-      }
-      case 5: // 1D horizontal motion
-      {
-         return 0.;
       }
       case 6: // Sod tube, pressure is given
       {

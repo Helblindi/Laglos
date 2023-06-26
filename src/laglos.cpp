@@ -18,10 +18,11 @@
 /*
 * Example run time parameters:  [Remember to change the problem in compile-time-vals.h]
 *
-* ./Laglos -m data/ref_square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
+* ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
+* ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
+* ./Laglos -m ../data/ref-square.mesh -tf 1. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
 * ./Laglos -m ../data/ref-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 1] // Sod
 * ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
-* ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
 * ./Laglos -m ../data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 * ./Laglos -m ../data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 * 
@@ -486,6 +487,7 @@ int main(int argc, char *argv[]) {
          case 8:
          case 7:
          case 6:
+         case 5:
          case 4: // Noh Problem
          case 3:
          case 2:
@@ -650,6 +652,7 @@ int main(int argc, char *argv[]) {
                case 8:
                case 7:
                case 6:
+               case 5:
                case 4: // Noh Problem
                case 3:
                case 2:

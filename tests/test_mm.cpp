@@ -12,12 +12,12 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 1.,
-             b = 1.,
-             c = 1.,
+const double a = 0.,
+             b = -1.,
+             c = 0.,
              d = 1.,
-             e = 1.,
-             f = 1.;
+             e = 0.,
+             f = 0.;
 
 // Problem
 const int dim = 2;
@@ -390,7 +390,7 @@ int test_area_conservation(double & _error, int & _num_cells)
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
 
    double t = 0;
-   const double dt = .1;
+   const double dt = .9;
    Array<double> cell_areas(L2FESpace.GetNE());
    Array<double> bmn_sum_cells(L2FESpace.GetNE());
 
@@ -554,6 +554,8 @@ int test_area_conservation(double & _error, int & _num_cells)
       cout << "Done moving mesh.\n";
    }
 
+   cout << "S:\n";
+   S.Print(cout);
    /* ************************
    Compute cell area error
    *************************** */ 
@@ -566,6 +568,9 @@ int test_area_conservation(double & _error, int & _num_cells)
       // Compute cell area side
       double k = pmesh->GetElementVolume(ci);
       double _bmn_approx = (k - cell_areas[ci]) / dt;
+      cout << "k: " << k << endl;
+      cout << "cell area: " << cell_areas[ci] << endl;
+      cout << "dt: " << dt << endl;
 
       cout << "Cell wise comparison:\n";
       cout << "cell area difference: " << _bmn_approx << ", bmn_sum: " << bmn_sum_cells[ci] << endl;

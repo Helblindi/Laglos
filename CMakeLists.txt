@@ -86,8 +86,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 message(STATUS "Looking for mfem ...")
 set(MFEM_DIR "" CACHE PATH "Path to the MFEM build or install prefix.")
 if (MFEM_DIR)
-   find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
-                "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
+  find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
+                "${MFEM_DIR}/build" NO_DEFAULT_PATH)
+  #  find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
+  #               "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
   #  message(STATUS "Here is the currect value of mfem_DIR: ${MFEM_DIR}")
   #  find_package(mfem REQUIRED)
 else()

@@ -1591,8 +1591,8 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
 {
    double trace = C.Trace();
    double det = C.Det();
-   cout << "C:\n";
-   C.Print(cout);
+   // cout << "C:\n";
+   // C.Print(cout);
    cout << "trace: " << trace << ", det: " << det << ", dt: " << dt << endl;
 
    double num = 0., denom = 0., pm = 0.;
@@ -2288,29 +2288,21 @@ void LagrangianLOOperator<dim, problem>::
          }
       } // End interior face
 
+      // On the boundary, we just need the average of the adjacent 
+      // vertices to account for the corrective corner velocities
+      // NOTE that even in the test case, the corner velocities will
+      // be modified and so prescribing the exact velocities on the
+      // boundary faces will not preserve mass.
       else
       {
-         // cout << "Boundary face~~\n";
-         // assert(FI.IsBoundary());
-         // // TODO: Add in boundary conditions similar to corner vertex bcs
-         // // TODO: Add testing validation step here
-         // if (flag == "testing")
-         // {
-         //    // Set exact velocity on boundary face.
-         //    // cout << "We have a boundary face: " << face << endl;
-         //    test_vel(face_x, t, face_velocity);
-         //    // cout << "The computed velocity on this face is: \n";
-         //    // face_velocity.Print(cout);
-         // }
-         // else
-         // {
-         //    // Average nodal velocities when not testing
-         //    assert(flag == "NA");
-            for (int j = 0; j < dim; j++)
-            {
-               face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
-            }
-         // }
+         cout << "Boundary face~~\n";
+         assert(FI.IsBoundary());
+         // TODO: Add in boundary conditions similar to corner vertex bcs
+         // TODO: Add testing validation step here
+         for (int j = 0; j < dim; j++)
+         {
+            face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2;
+         }
         
       } // End boundary face
 

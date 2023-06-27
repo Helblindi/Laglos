@@ -1003,7 +1003,11 @@ Vector LagrangianLOOperator<dim, problem>::GetIntDerRefShapeFunctions()
 // }
 
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::compute_intermediate_face_velocities(const Vector &S)
+void LagrangianLOOperator<dim, problem>::
+   compute_intermediate_face_velocities(const Vector &S,
+                                        const double t,
+                                        const string flag, // Default NA
+                                        void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    /***
     * Compute intermediate face velocities according to (5.7) 
@@ -1022,41 +1026,58 @@ void LagrangianLOOperator<dim, problem>::compute_intermediate_face_velocities(co
 
       GetCellStateVector(S, c, Uc);
 
-      if (FI.IsInterior())
+      if (flag == "NA")
       {
-         // this vector is only needed for interior faces
-         GetCellStateVector(S, cp, Ucp);
+         if (FI.IsInterior())
+         {        
+            // this vector is only needed for interior faces
+            GetCellStateVector(S, cp, Ucp);
 
-         // Get normal, d, and |F|
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
-         double F = n_vec.Norml2();
-         n_vec /= F;
-         c_vec = n_int;
-         c_vec /= 2.;
-         double c_norm = c_vec.Norml2();
+            // Get normal, d, and |F|
+            CalcOutwardNormalInt(S, c, face, n_int);
+            n_vec = n_int;
+            double F = n_vec.Norml2();
+            n_vec /= F;
+            c_vec = n_int;
+            c_vec /= 2.;
+            double c_norm = c_vec.Norml2();
 
-         // cout << "(mm)\tn:\n";
-         // n_vec.Print(cout);
-         d = compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
+            // cout << "(mm)\tn:\n";
+            // n_vec.Print(cout);
+            d = compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
 
-         Vf = velocity(Uc);
-         Vf += velocity(Ucp);
-         Vf *= 0.5;
-         double coeff = d * (Ucp[0] - Uc[0]) / F;
-         Vf.Add(coeff, n_vec);
+            Vf = velocity(Uc);
+            Vf += velocity(Ucp);
+            Vf *= 0.5;
+            double coeff = d * (Ucp[0] - Uc[0]) / F;
+            Vf.Add(coeff, n_vec);
 
-         // cout << "\n\n==========================\n";
-         // cout << "mm\nface: " << face << endl;
-         // Vf.Print(cout);
-         // cout << "n_vec:\n";
-         // n_vec.Print(cout);
-         // cout << "=========================\n";
+            // cout << "\n\n==========================\n";
+            // cout << "mm\nface: " << face << endl;
+            // Vf.Print(cout);
+            // cout << "n_vec:\n";
+            // n_vec.Print(cout);
+            // cout << "=========================\n";
+
+         }
+         else 
+         {
+            assert(FI.IsBoundary());
+            Vf = velocity(Uc);             
+         }
       }
       else 
       {
-         assert(FI.IsBoundary());
-         Vf = velocity(Uc);             
+         assert(flag=="testing");
+
+         Array<int> row;
+         Vector face_x(dim);
+         H1.GetFaceDofs(face, row);
+
+         int face_dof = row[2];
+         get_node_position(S, face_dof, face_x);
+
+         test_vel(face_x, t, Vf);
       }
 
       // Put face velocity into object
@@ -1122,7 +1143,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
       }
       default: // Move mesh according to paper
       {
-         compute_intermediate_face_velocities(S);
+         compute_intermediate_face_velocities(S, t);
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
@@ -1544,15 +1565,7 @@ void LagrangianLOOperator<dim, problem>::
       }
       A(face_it, dim) = 1.;
 
-      if (flag == "testing")
-      {
-         // Use exact velocity when testing 
-         test_vel(face_x, t, Vf);
-      }
-      else
-      {
-         get_intermediate_face_velocity(face, Vf);
-      }
+      get_intermediate_face_velocity(face, Vf);
 
       // In either case, we set the corresponding row to the face velocity,
       // whether that is given by the intermediate face velocity or the exact
@@ -1930,23 +1943,11 @@ void LagrangianLOOperator<dim, problem>::
          // test_vel(face_x, 0., v_exact_at_face);
          // double bmn = v_exact_at_face * n_vec_half;
          
-         if (flag == "testing")
-         {
-            test_vel(face_x, t, Vf);
-         }
-         else
-         {
-            get_intermediate_face_velocity(face, Vf);
-         }
+         get_intermediate_face_velocity(face, Vf);
          
          double bmn = Vf * n_vec;
          bmn *= F;
 
-         // if (ifv_bmn != bmn)
-         // {
-         //    cout << "ifv_bmn: " << ifv_bmn << ", bmn: " << bmn << endl;
-         //    MFEM_ABORT("bmn issue.")
-         // }
          // cout << "face length: " << face_length << endl;
          // bmn *= face_length;
          // cout << "bmn: " << bmn << endl;

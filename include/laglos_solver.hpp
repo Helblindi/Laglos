@@ -112,7 +112,10 @@ public:
    double cosineSimilarity(const Vector &v1, const Vector &v2);
 
    /* Mesh movement */
-   void compute_intermediate_face_velocities(const Vector &S);
+   void compute_intermediate_face_velocities(const Vector &S, 
+                                             const double t,
+                                             const string flag="NA", 
+                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void get_intermediate_face_velocity(const int & face, Vector & vel);
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);

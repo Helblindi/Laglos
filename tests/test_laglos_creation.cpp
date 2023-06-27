@@ -12,12 +12,12 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 0.,
-             b = -1.,
-             c = 0.,
+const double a = 1.,
+             b = 1.,
+             c = 1.,
              d = 1.,
-             e = 0.,
-             f = 0.;
+             e = -1.,
+             f = 1.;
 
 // Problem
 const int dim = 2;
@@ -166,8 +166,8 @@ int test_mesh_initiation()
    Vector v0(dim);
    v0[0] = -1.1;
    v0[1] = -1.2;
-   VectorConstantCoefficient v0_coeff(v0);
-   v_gf.ProjectCoefficient(v0_coeff);
+   VectorFunctionCoefficient v_coeff(dim, velocity_exact);
+   v_gf.ProjectCoefficient(v_coeff);
    v_gf.SyncAliasMemory(S);
 
    ConstantCoefficient n_two(-2.0);
@@ -208,7 +208,7 @@ int test_mesh_initiation()
 
    cout << "\n-------------------------\n";
    cout << "Testing retrieval of intermediate face velocities.\n";
-   hydro.compute_intermediate_face_velocities(S);
+   hydro.compute_intermediate_face_velocities(S, t, flag, &velocity_exact);
    int face = 1;
    Vector face_vel(dim);
    hydro.get_intermediate_face_velocity(face, face_vel);

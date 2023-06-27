@@ -54,10 +54,7 @@ protected:
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
-   Array<double> vstar_arr;  // Array to store vstar for each face
    mutable Vector v_face_intermediate; // (5.7b)
-   // const Array<int> &ess_tdofs;
-   const int NE, l2dofs_cnt, h1dofs_cnt, l2vdofs_cnt;
 
    const int num_faces, num_vertices;
 
@@ -90,8 +87,6 @@ public:
 
    bool IsBdrVertex(const int & node);
 
-   void CreateVStarArr(const Vector &S);
-
    void MakeTimeStep(Vector &S, double & t, double dt);
 
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
@@ -117,15 +112,13 @@ public:
    double cosineSimilarity(const Vector &v1, const Vector &v2);
 
    /* Mesh movement */
-   // void form_intermediate_velocity(const Vector &S, const double dt);
-
+   void compute_intermediate_face_velocities(const Vector &S);
    void get_intermediate_face_velocity(const int & face, Vector & vel);
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
    // tests from 2023-01-05
    void compute_node_velocity_cwa(Vector &S, const double & t, const double & dt);
-   void compute_node_velocity_RP(Vector &S, const double & t, const double & dt);
    void compute_node_velocity_LS(const Vector &S, 
                                  const Table &vertex_edge,  
                                  const int &vertex,

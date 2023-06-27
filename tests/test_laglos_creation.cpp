@@ -174,6 +174,10 @@ int test_mesh_initiation()
    ste_gf.ProjectCoefficient(n_two);
    ste_gf.SyncAliasMemory(S);
 
+   // BlockVector instantiated
+   cout << "S: \n";
+   S.Print(cout);
+
    // Just leave templated for hydro construction
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    
@@ -183,7 +187,35 @@ int test_mesh_initiation()
    const double dt = 1.;
 
    // TODO: Test Getter and Setter of state variables
+   Vector U(dim+2), new_vals(dim+2);
+   int index = 1;
+
+   cout << "\n-------------------------\n";
+   cout << "U before changing values:\n";
+   hydro.GetCellStateVector(S, index, U);
+   U.Print(cout);
+
+   new_vals = 10.;
+   hydro.SetCellStateVector(S, index, new_vals);
    
+   cout << "U after changing values:\n";
+   hydro.GetCellStateVector(S, index, U);
+   U.Print(cout);
+   cout << "-------------------------\n\n";
+
+   cout << "S: \n";
+   S.Print(cout);
+
+   cout << "\n-------------------------\n";
+   cout << "Testing retrieval of intermediate face velocities.\n";
+   hydro.compute_intermediate_face_velocities(S);
+   int face = 1;
+   Vector face_vel(dim);
+   hydro.get_intermediate_face_velocity(face, face_vel);
+   cout << "face vel for face: " << face << endl;
+   face_vel.Print(cout);
+   cout << "-------------------------\n\n";
+
    // Delete remaining pointers
    delete pmesh;
    delete m;
@@ -192,15 +224,5 @@ int test_mesh_initiation()
    pmesh = NULL;
    m = NULL;
 
-   // if (_error < tol)
-   // {
-   //    return 0; // Test passed
-   // }
-   // else 
-   // {
-   //    return 1; // Test failed
-   // }
-   cout << "S: \n";
-   S.Print(cout);
    return 0;
 }

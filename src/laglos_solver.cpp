@@ -100,19 +100,12 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    block_offsets(6),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
-   vstar_arr(pmesh->GetNumFaces()),
-   // ess_tdofs(ess_tdofs),
-   NE(pmesh->GetNE()),
-   l2dofs_cnt(L2.GetFE(0)->GetDof()),
-   h1dofs_cnt(H1.GetFE(0)->GetDof()),
-   l2vdofs_cnt(L2V.GetFE(0)->GetDof()),
    num_faces(L2.GetNF()),
    num_vertices(pmesh->GetNV()),
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
    CFL(CFL)
-
 {
    block_offsets[0] = 0;
    block_offsets[1] = block_offsets[0] + Vsize_H1;
@@ -146,6 +139,8 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    cout << "NDofs_L2: " << NDofs_L2 << endl;
    cout << "NDofs_L2V: " << NDofs_L2V << endl;
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
+   cout << "num_faces: " << num_faces << endl;
+   cout << "num_vertices: " << num_vertices << endl;
 }
 
 template<int dim, int problem>
@@ -183,7 +178,7 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
 
    mfem::Mesh::FaceInformation FI;
 
-   for (; ci < L2.GetNE(); ci++) // Cell iterator
+   for (; ci < NDofs_L2; ci++) // Cell iterator
    {
       temp_sum = 0.;
       mi = m_hpv->Elem(ci);
@@ -285,7 +280,7 @@ void LagrangianLOOperator<dim, problem>::IterateOverCells()
    cout << "GetNEdges: " << pmesh->GetNEdges() << endl;
    cout << "GetNumFaces: " << pmesh->GetNumFaces() << endl;
    
-   for (; ci < L2.GetNE(); ci++) // cell iterator
+   for (; ci < NDofs_L2; ci++) // cell iterator
    {
       cout << "We are on cell: " << ci << endl;
 
@@ -378,63 +373,6 @@ bool LagrangianLOOperator<dim, problem>::IsBdrVertex(const int & node)
 }
 
 
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::CreateVStarArr(const Vector &S)
-// {
-//    // Function is called at the beginning of compute_node_velocity_RP
-//    mfem::Mesh::FaceInformation FI;
-//    int c, cp;
-//    Vector Uc(dim+2), Ucp(dim+2), c_vec(dim), n_vec(dim);
-//    double in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr;
-
-//    for (int face = 0; face < pmesh->GetNumFaces(); face++)
-//    {
-//       FI = pmesh->GetFaceInformation(face);
-
-//       if (FI.IsInterior())
-//       {
-//          c = FI.element[0].index;
-//          cp = FI.element[1].index;  
-//          GetCellStateVector(S,c,Uc);
-//          GetCellStateVector(S,cp,Ucp);
-//          CalcOutwardNormalInt(S, c, face, c_vec);
-//          // c_vec *= 2.; // Need to accomodate for the 1/2 in 4.7 that isn't present in 5.7a
-//          n_vec = c_vec;
-//          n_vec /= c_vec.Norml2();
-
-//          /* Compute vstar here. */
-//          in_rhol = 1. / Uc[0];
-//          in_ul = velocity(Uc) * n_vec; 
-//          in_el = specific_internal_energy(Uc);
-//          in_pl = pressure(Uc);
-
-//          in_rhor = 1. / Ucp[0]; 
-//          in_ur = velocity(Ucp) * n_vec; 
-//          in_er = specific_internal_energy(Ucp);
-//          in_pr = pressure(Ucp);
-
-//          // double b_covolume = 0.1/max(in_rhol,in_rhor);
-//          double b_covolume = 0.;
-
-//          double in_tol = 0.0000000000001,
-//                   lambda_maxl_out = 0.,
-//                   lambda_maxr_out = 0.,
-//                   pstar = 0.,
-//                   vstar = 0.;
-//          bool no_iter = true; 
-//          int k = 0; // Tells you how many iterations were needed for convergence
-
-//          __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-//             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-//             &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&vstar,&k,&b_covolume);
-         
-//          vstar_arr[face] = vstar;
-//       }
-
-//    } // End face loop
-// }
-
-
 /****************************************************************************************************
 * Function: MakeTimeStep
 * Parameters:
@@ -506,7 +444,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
 
-   for (; ci < L2.GetNE(); ci++) // Cell iterator
+   for (; ci < NDofs_L2; ci++) // Cell iterator
    {
       GetCellStateVector(S_new, ci, U_i);
       
@@ -1064,6 +1002,86 @@ Vector LagrangianLOOperator<dim, problem>::GetIntDerRefShapeFunctions()
 //    }
 // }
 
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::compute_intermediate_face_velocities(const Vector &S)
+{
+   /***
+    * Compute intermediate face velocities according to (5.7) 
+    ***/
+   mfem::Mesh::FaceInformation FI;
+   int c, cp;
+   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim), Vf(dim); 
+   double d, c_norm, F;
+
+   for (int face = 0; face < num_faces; face++) // face iterator
+   {
+      Vf = 0.;
+      FI = pmesh->GetFaceInformation(face);
+      c = FI.element[0].index;
+      cp = FI.element[1].index;
+
+      GetCellStateVector(S, c, Uc);
+
+      if (FI.IsInterior())
+      {
+         // this vector is only needed for interior faces
+         GetCellStateVector(S, cp, Ucp);
+
+         // Get normal, d, and |F|
+         CalcOutwardNormalInt(S, c, face, n_int);
+         n_vec = n_int;
+         double F = n_vec.Norml2();
+         n_vec /= F;
+         c_vec = n_int;
+         c_vec /= 2.;
+         double c_norm = c_vec.Norml2();
+
+         // cout << "(mm)\tn:\n";
+         // n_vec.Print(cout);
+         d = compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
+
+         Vf = velocity(Uc);
+         Vf += velocity(Ucp);
+         Vf *= 0.5;
+         double coeff = d * (Ucp[0] - Uc[0]) / F;
+         Vf.Add(coeff, n_vec);
+
+         // cout << "\n\n==========================\n";
+         // cout << "mm\nface: " << face << endl;
+         // Vf.Print(cout);
+         // cout << "n_vec:\n";
+         // n_vec.Print(cout);
+         // cout << "=========================\n";
+      }
+      else 
+      {
+         assert(FI.IsBoundary());
+         Vf = velocity(Uc);             
+      }
+
+      // Put face velocity into object
+      for (int i = 0; i < dim; i++)
+      {
+         int index = face + i * num_faces;
+         v_face_intermediate[index] = Vf[i];
+      }
+
+   } // End face iterator
+
+}
+
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const int & face, Vector & vel)
+{
+      // Retrieve face velocity from object
+      for (int i = 0; i < dim; i++)
+      {
+         int index = face + i * num_faces;
+         vel[i] = v_face_intermediate[index];
+      }
+}
+
 /****************************************************************************************************
 * Function: MoveMesh
 * Parameters:
@@ -1104,69 +1122,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
       }
       default: // Move mesh according to paper
       {
-         /***
-          * Compute intermediate face velocities according to (5.7) 
-          ***/
-         mfem::Mesh::FaceInformation FI;
-         int c, cp;
-         Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim), Vf(dim); 
-         double d, c_norm, F;
-
-         for (int face = 0; face < num_faces; face++) // face iterator
-         {
-            Vf = 0.;
-            FI = pmesh->GetFaceInformation(face);
-            c = FI.element[0].index;
-            cp = FI.element[1].index;
-
-            GetCellStateVector(S, c, Uc);
-
-            if (FI.IsInterior())
-            {
-               // this vector is only needed for interior faces
-               GetCellStateVector(S, cp, Ucp);
-
-               // Get normal, d, and |F|
-               CalcOutwardNormalInt(S, c, face, n_int);
-               n_vec = n_int;
-               double F = n_vec.Norml2();
-               n_vec /= F;
-               c_vec = n_int;
-               c_vec /= 2.;
-               double c_norm = c_vec.Norml2();
-
-               // cout << "(mm)\tn:\n";
-               // n_vec.Print(cout);
-               d = compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
-
-               Vf = velocity(Uc);
-               Vf += velocity(Ucp);
-               Vf *= 0.5;
-               double coeff = d * (Ucp[0] - Uc[0]) / F;
-               Vf.Add(coeff, n_vec);
-
-               // cout << "\n\n==========================\n";
-               // cout << "mm\nface: " << face << endl;
-               // Vf.Print(cout);
-               // cout << "n_vec:\n";
-               // n_vec.Print(cout);
-               // cout << "=========================\n";
-            }
-            else 
-            {
-               assert(FI.IsBoundary());
-               Vf = velocity(Uc);             
-            }
-
-            // Put face velocity into object
-            for (int i = 0; i < dim; i++)
-            {
-               int index = face + i * num_faces;
-               v_face_intermediate[index] = Vf[i];
-            }
-
-         } // End face iterator
-
+         compute_intermediate_face_velocities(S);
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
@@ -1193,7 +1149,7 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
    Vector U_i(dim + 2);
    int counter = 0;
    
-   for (int ci = 0; ci < L2.GetNE(); ci++)
+   for (int ci = 0; ci < NDofs_L2; ci++)
    {
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
@@ -1212,7 +1168,7 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
          // cout << endl;
       }
    }
-   cout << "Percentage of cells where mass conservation was broken: " << counter / L2.GetNE() << endl;
+   cout << "Percentage of cells where mass conservation was broken: " << counter / NDofs_L2 << endl;
 }
 
 template<int dim, int problem>
@@ -1223,7 +1179,7 @@ double LagrangianLOOperator<dim, problem>::CheckMassLoss(const Vector &S)
 
    double num = 0., denom = 0.;
    
-   for (int ci = 0; ci < L2.GetNE(); ci++)
+   for (int ci = 0; ci < NDofs_L2; ci++)
    {
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
@@ -1235,16 +1191,6 @@ double LagrangianLOOperator<dim, problem>::CheckMassLoss(const Vector &S)
    return num / denom;
 }
 
-template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const int & face, Vector & vel)
-{
-      // Retrieve face velocity from object
-      for (int i = 0; i < dim; i++)
-      {
-         int index = face + i * num_faces;
-         vel[i] = v_face_intermediate[index];
-      }
-}
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)
@@ -1377,190 +1323,6 @@ void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector 
    
 // }
 
-// Riemann Problem node movement
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::compute_node_velocity_RP(Vector &S, const double & t, const double & dt)
-// {
-//    // Values needed
-//    mfem::Mesh::FaceInformation FI;
-//    Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
-//    Table vertex_edge;
-//    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
-//    Transpose(*edge_vertex, vertex_edge);
-//    Array<int> vertex_edge_row;
-//    int vertex_edge_row_length;
-//    Vector n_vec(dim);
-
-//    Table * vertex_element = pmesh->GetVertexToElementTable();
-
-//    Array<int> row;
-//    int row_length;
-
-//    double mi = 0., Ti = 0.;
-//    Vector Uc(dim+2), Vi(dim), Vi_perp(dim);
-//    int vertex_bdr_attribute = 0;
-
-//    // This method uses vstar_arr which have been formed using CreateVStarArr
-//    CreateVStarArr(S);
-
-//    // Iterate over nodes
-//    for (int vertex = 0; vertex < num_vertices; vertex++)
-//    {
-//       // Reset values and grab adjacent elements
-//       Vi = 0.; // Reset vertex velocity 
-//       vertex_bdr_attribute = 0; // reset boundary attribute
-
-//       vertex_element->GetRow(vertex, row);
-//       row_length = row.Size();
-//       Vector vertex_coords(2);
-//       get_node_position(S, vertex, vertex_coords);
-
-//       // Average velocity of adjacent cells and normalize to get a direction
-//       for (int element_it = 0; element_it < row_length; element_it++)
-//       {
-//          int el_index = row[element_it];
-
-//          // Get cell state vector
-//          GetCellStateVector(S, el_index, Uc);
-
-//          Vi += velocity(Uc);
-//       } // End cell iterator
-
-//       Vi /= row_length; 
-
-//       // If Vi is zero, no more computation is needed since the node will not move.
-//       // Hence, only compute something if the directional vector is nonzero
-//       if (Vi.Norml2() != 0)
-//       {
-//          Vi /= Vi.Norml2();
-
-//          // Compute orthogonal vector to normal direction
-//          Vi_perp = Vi;
-//          Orthogonal(Vi_perp);
-         
-//          double tempCosineSimilarity = 0.;
-//          int closest_face1 = -1, closest_face2 = -1;
-//          double closest_face1_cs = -1., closest_face2_cs = -1.; // value to temporary store cosineSimilarity
-
-//          // Iterate over adjacent faces
-//          vertex_edge.GetRow(vertex, vertex_edge_row);
-//          vertex_edge_row_length = vertex_edge_row.Size();
-//          for (int face_it = 0; face_it < vertex_edge_row_length; face_it++)
-//          {
-//             // Get Face information
-//             int face = vertex_edge_row[face_it];
-//             FI = pmesh->GetFaceInformation(face);
-
-//             // Compute coordinates for face node
-//             Array<int> face_dof_row;
-//             H1.GetFaceDofs(face, face_dof_row);
-//             int face_dof = face_dof_row[2];
-//             Vector face_x(2);
-//             get_node_position(S, face_dof, face_x);
-
-//             // Compute the secant vector to each of the adjact face midpoint
-//             Vector secant(2);
-//             subtract(face_x, vertex_coords, secant);
-
-//             // Compute the cosine similarity from the reference line
-//             tempCosineSimilarity = abs(cosineSimilarity(secant, Vi_perp));
-
-//             // Determine if this face is one of the closest two
-//             // by maximizing cosine similarity
-//             if (tempCosineSimilarity >= closest_face2_cs)
-//             {
-//                if (tempCosineSimilarity >= closest_face1_cs)
-//                {
-//                   // We have the new closest face
-//                   closest_face2_cs = closest_face1_cs;
-//                   closest_face2 = closest_face1;
-
-//                   closest_face1_cs = tempCosineSimilarity;
-//                   closest_face1 = face;
-//                }
-//                else {
-//                   // We have the new second closest face
-//                   closest_face2_cs = tempCosineSimilarity;
-//                   closest_face2 = face;
-//                }
-//             }
-//          } // End face iterator
-
-//          // Average the magnitude of those vstar values  
-//          double calc_vel = (abs(vstar_arr[closest_face1]) + abs(vstar_arr[closest_face2])) / 2.;
-
-//          Vi *= calc_vel;
-
-//          /* If we have a boundary node, adjust the velocity accordingly */
-//          // Check if the node is a boundary node
-//          vertex_bdr_attribute = BdrVertexIndexingArray[vertex];
-//          switch (problem)
-//          {
-//             case 7: // Saltzman
-//             {
-//                switch (vertex_bdr_attribute)
-//                {
-//                   case 1: // Dirichlet BCs (for piston)
-//                   {
-//                      Vi = 0.;
-
-//                      if (timestep_first == 0.)
-//                      {
-//                         timestep_first = timestep;
-//                      }
-//                      double _xi = t / (2*timestep_first);
-
-//                      double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-
-//                      Vi[0] = 1. * _psi;
-
-//                      break;
-//                   }
-//                   case 2: // Slip BCs
-//                   {
-//                      Vi *= 2.;
-//                      vertex_edge.GetRow(vertex, vertex_edge_row);
-//                      vertex_edge_row_length = vertex_edge_row.Size();
-//                      for (int face_it = 0; face_it < vertex_edge_row_length; face_it++)
-//                      {
-//                         // Vi *= 2.;
-//                         int face = vertex_edge_row[face_it];
-//                         FI = pmesh->GetFaceInformation(face);
-//                         if (FI.IsBoundary())
-//                         {
-//                            CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-//                            n_vec /= n_vec.Norml2();
-
-//                            Vector Vi_normal_component = n_vec;
-//                            double _scale = Vi * n_vec;
-//                            Vi_normal_component *= _scale;
-
-//                            Vi -= Vi_normal_component;
-//                         }
-//                      }
-
-//                      break;
-//                   }
-//                   default:
-//                   {
-//                      // do nothing
-//                   }
-//                } // End Vertex attribute
-
-//                break;
-//             } // End case Saltzman
-//             default:
-//             {
-//                // no change
-//             }
-//          } // End: boundary node enforcement
-
-//       } // End if Vi.Norml2() != 0
-
-//       // Update the vertex velocity
-//       update_node_velocity(S, vertex, Vi);  
-//    } // End vertex iteration
-// }
 
 /* * * * * Corrected Node velocity calculations * * * * */
 template<int dim, int problem>
@@ -2338,7 +2100,7 @@ void LagrangianLOOperator<dim, problem>::
 
    Array<int> verts;
    Vector face_x(dim);
-   for (int ci = 0; ci < L2.GetNE(); ci++)
+   for (int ci = 0; ci < NDofs_L2; ci++)
    {
       // Get center node dof
       int cell_vdof = NVDofs_H1 + num_faces + ci;

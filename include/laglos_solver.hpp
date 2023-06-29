@@ -174,9 +174,6 @@ public:
    static Vector velocity(const Vector & U);
 
    DenseMatrix flux(const Vector &U);
-
-   // double ComputeViscosity(const Vector & UL, const Vector & UR);
-
 };
 
 } // end ns hydrodynamics

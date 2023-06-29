@@ -2170,6 +2170,17 @@ void LagrangianLOOperator<dim, problem>::fill_face_velocities_with_average(Vecto
    }
 }
 
+/*
+Function: update_node_velocity
+Parameters:
+   S        - BlockVector representing FiniteElement information
+   node     - 
+   test_vel - Velocity used for testing
+Purpose:
+   This function computes the node velocities on the faces which
+   are designed to bubble in the direction of the normal vector 
+   to conserve mass locally.
+*/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::update_node_velocity(Vector &S, const int & node, const Vector & vel)
 {

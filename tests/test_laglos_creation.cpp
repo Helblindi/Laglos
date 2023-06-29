@@ -216,6 +216,30 @@ int test_mesh_initiation()
    face_vel.Print(cout);
    cout << "-------------------------\n\n";
 
+   cout << "\n-------------------------\n";
+   cout << "Testing update_node_velocity function\n";
+   Vector node_vel(dim), node_pos(dim), zeros(dim);
+   zeros = 0.;
+
+   for (int node = 0; node < H1FESpace.GetNDofs(); node++)
+   {
+      hydro.get_node_position(S, node, node_pos);
+      hydro.update_node_velocity(S, node, zeros);
+      hydro.get_node_velocity(S, node, node_vel);
+      cout << "node: " << node << endl;
+      cout << "position:\n";
+      node_pos.Print(cout);
+      cout << "velocity:\n";
+      node_vel.Print(cout); 
+      cout << "---\n";
+   }
+
+   cout << "S: \n";
+   S.Print(cout);
+   // hydro.update_node_velocity(S, ,);
+   // cout << "S: \n";
+   // S.Print(cout);
+
    // Delete remaining pointers
    delete pmesh;
    delete m;

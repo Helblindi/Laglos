@@ -1192,26 +1192,6 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
    cout << "Percentage of cells where mass conservation was broken: " << counter / NDofs_L2 << endl;
 }
 
-template<int dim, int problem>
-double LagrangianLOOperator<dim, problem>::CheckMassLoss(const Vector &S)
-{
-   // cout << "Checking Mass Conservation\n";
-   Vector U_i(dim + 2);
-
-   double num = 0., denom = 0.;
-   
-   for (int ci = 0; ci < NDofs_L2; ci++)
-   {
-      const double m = m_hpv->Elem(ci);
-      const double k = pmesh->GetElementVolume(ci);
-      GetCellStateVector(S, ci, U_i);
-      num += abs(k / U_i[0] - m);
-      denom += abs(m);
-   }
-   // cout << "Total relative mass loss: " << num / denom << endl;
-   return num / denom;
-}
-
 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)

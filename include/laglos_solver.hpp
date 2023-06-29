@@ -158,8 +158,6 @@ public:
 
    void CheckMassConservation(const Vector &S);
 
-   double CheckMassLoss(const Vector &S);
-
    /* Problem Description Functions */
    static double internal_energy(const Vector &U);
 

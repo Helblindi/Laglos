@@ -896,7 +896,7 @@ int main(int argc, char *argv[]) {
                              << "L1_Error " << L1_error << "\n"
                              << "L2_Error " << L2_error << "\n"
                              << "Linf_Error " << Max_error << "\n"
-                             << "mass_loss " << hydro.CheckMassLoss(S) << "\n"
+                             << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
                              << "dt " << dt << "\n"
                              << "Endtime " << t << "\n";
                         
@@ -911,9 +911,6 @@ int main(int argc, char *argv[]) {
       {
       }
    }
-
-   /* Finally, check for mass conservation */
-   hydro.CheckMassLoss(S);
    
    delete pmesh;
    delete m;

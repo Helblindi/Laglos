@@ -23,3 +23,8 @@ add_executable(TestInitiation test_laglos_creation.cpp "${MFEM_DIR}" "${PROJECT_
 target_link_libraries(TestInitiation PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
 target_include_directories(TestInitiation PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestInitiation COMMAND TestInitiation)
+
+add_executable(TestCR test_CR.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestCR PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_include_directories(TestCR PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME TestCR COMMAND TestCR)

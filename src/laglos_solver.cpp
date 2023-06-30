@@ -105,6 +105,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    BdrVertexIndexingArray(pmesh->GetNV()),
    num_faces(L2.GetNF()),
    num_vertices(pmesh->GetNV()),
+   num_edges(pmesh->GetNEdges()),
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
@@ -144,6 +145,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
+   cout << "num_edges: " << num_edges << endl;
 }
 
 template<int dim, int problem>
@@ -1653,10 +1655,10 @@ void LagrangianLOOperator<dim, problem>::
 
 
 /*
-Function: RT_velocity
+Function: RT_corner_velocity
 Parameters:
    cell - index corrseponding to the cell (K_c)
-   node - global index of the node to calculate the velocity on, only corner nodes are permitted (x_i)
+   node - global index of the node to calculate the velocity on (node < H1.GetNDofs)
    vel  - returned velocity v_h^v_K(x_i)
 Purpose:
    The purpose of this function is to compute the Rannacher-Turek constructed velocity of a given cell
@@ -1667,48 +1669,95 @@ Purpose:
    has already been called.  If this function has not been called, then the returned velocity will be 0.
 */
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::RT_velocity(const int & cell, const int & node, Vector &vel)
+void LagrangianLOOperator<dim, problem>::RT_corner_velocity(const int & cell, const int & node, Vector &vel)
 {
+   assert(node < NDofs_H1); // "Invalid nodal index"
+   assert(cell < NDofs_L2); // "Invalid cell index"
+
+   DofEntity entity;
+   int EDof;
+   GetEntityDof(node, entity, EDof);
+
    // Get DoFs corresponding to cell
    Array<int> cell_face_row;
    cell_face.GetRow(cell, cell_face_row);
    int row_length = cell_face_row.Size();
 
-   // Get integration point corresponding to node location
-   Array<int> verts;
-   pmesh->GetElementVertices(cell, verts);
+   // Reset velocity
+   vel = 0.;
 
-   IntegrationPoint test_ip;
-   if (node == verts[0]) {
-      test_ip.Set2(0., 0.);
-   } else if (node == verts[1]) {
-      test_ip.Set2(1., 0.);
-   } else if (node == verts[2]) {
-      test_ip.Set2(1., 1.);
-   } else if (node == verts[3]) {
-      test_ip.Set2(0., 1.);
-   } else { 
-      // Invalid if node is not contained in cell
-      MFEM_ABORT("Incorrect node provided.\n"); 
-   }
-
-   // Evaluate reference shape functions at integration point
-   Vector shapes(4);
-   const FiniteElement * fe = CR.GetFE(cell);
-   fe->CalcShape(test_ip, shapes);
-
-   // Sum over faces evaluating local velocity at vertex
-   Vector Ci(dim);
-   Ci = 0.;
-   Vector face_vel(dim);
-
-   for (int face_it = 0; face_it < row_length; face_it++)
+   switch (entity)
    {
-      int face = cell_face_row[face_it];
+      case 0: // corner
+      {
+         // Get integration point corresponding to node location
+         Array<int> verts;
+         pmesh->GetElementVertices(cell, verts);
 
-      // Get intermediate face velocities corresponding to faces
-      get_intermediate_face_velocity(face, face_vel);
-      Ci.Add(shapes[face_it], face_vel);
+         IntegrationPoint test_ip;
+         if (node == verts[0]) {
+            test_ip.Set2(0., 0.);
+         } else if (node == verts[1]) {
+            test_ip.Set2(1., 0.);
+         } else if (node == verts[2]) {
+            test_ip.Set2(1., 1.);
+         } else if (node == verts[3]) {
+            test_ip.Set2(0., 1.);
+         } else { 
+            // Invalid if node is not contained in cell
+            MFEM_ABORT("Incorrect node provided.\n"); 
+         }
+
+         // Evaluate reference shape functions at integration point
+         Vector shapes(4);
+         const FiniteElement * fe = CR.GetFE(cell);
+         fe->CalcShape(test_ip, shapes);
+
+         // Sum over faces evaluating local velocity at vertex
+         Vector Ci(dim);
+         Ci = 0.;
+         Vector face_vel(dim);
+
+         for (int face_it = 0; face_it < row_length; face_it++)
+         {
+            int face = cell_face_row[face_it];
+
+            // Get intermediate face velocities corresponding to faces
+            get_intermediate_face_velocity(face, vel);
+            vel.Add(shapes[face_it], face_vel);
+         }
+         break;
+      }
+      case 1: // face
+      {
+         bool face_is_part_of_cell = false;
+         // Check is face is part of the provided cell
+         for (int face_it = 0; face_it < row_length; face_it++)
+         {
+            if (EDof == cell_face_row[face_it])
+            {
+               face_is_part_of_cell = true;
+            }
+         }
+
+         if (!face_is_part_of_cell)
+         {
+            MFEM_ABORT("Provided face is not adjacent to cell");
+         }
+
+         // Simply return the intermediate face velocity
+         cout << "face: " << EDof << endl;
+         get_intermediate_face_velocity(EDof, vel);
+         break;
+      }
+      case 2: // cell
+      {
+         break;
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid entity value.\n");
+      }
    }
 }
 

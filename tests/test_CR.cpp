@@ -193,12 +193,12 @@ int test_mesh_initiation()
    m->Assemble();
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
-   int node = 5;
+   int node = 15;
    int cell = 1;
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.RT_velocity(cell, node, _vel);
+   hydro.RT_corner_velocity(cell, node, _vel);
 
    true_vel[0] = 2.5;
    true_vel[1] = 1.5;

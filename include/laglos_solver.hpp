@@ -58,7 +58,7 @@ protected:
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
    mutable Vector v_face_intermediate; // (5.7b)
 
-   const int num_faces, num_vertices;
+   const int num_vertices, num_faces, num_edges;
 
    double CFL;
    double timestep = 0.001;
@@ -69,7 +69,7 @@ protected:
 
 public:
    enum DofEntity {corner, face, cell};
-   
+
    LagrangianLOOperator(ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
@@ -137,7 +137,9 @@ public:
                                  Vector &D,
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void RT_velocity(const int & cell, const int & node, Vector &vel);
+   void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
+   void compute_geo_V(const int & node);
+   void compute_geo_C(const int & node);
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);

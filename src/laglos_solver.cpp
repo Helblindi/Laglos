@@ -265,6 +265,17 @@ double LagrangianLOOperator<dim, problem>::GetTimeStepEstimate(const Vector &S)
    return 0.001;
 }
 
+/****************************************************************************************************
+* Function: GetEntityDof
+* Parameters:
+*     GDof   - Global degree of freedom with a max of H1.GetNDofs()
+*     Entity - enum representing what type of node GDof corresponds to
+*     EDof   - Entity index of the GDof
+*
+* Purpose:
+*     This function is a helper function to identify which entity a node corresponds to
+*     and to convert from the global numbering to the entity's numbering.
+****************************************************************************************************/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::GetEntityDof(const int GDof, DofEntity & entity, int & EDof)
 {

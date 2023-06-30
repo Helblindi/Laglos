@@ -99,6 +99,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    TVSize_L2V(L2V.TrueVSize()),
    GTVSize_L2V(L2V.GlobalTrueVSize()),
    NDofs_L2V(L2V.GetNDofs()),
+   cell_face(CR.GetElementToDofTable()),
    block_offsets(6),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
@@ -1737,10 +1738,64 @@ void LagrangianLOOperator<dim, problem>::
 }
 
 
+/*
+Function: RT_velocity
+Parameters:
+   cell - index corrseponding to the cell (K_c)
+   node - global index of the node to calculate the velocity on, only corner nodes are permitted (x_i)
+   vel  - returned velocity v_h^v_K(x_i)
+Purpose:
+   The purpose of this function is to compute the Rannacher-Turek constructed velocity of a given cell
+   at a given node in the mesh.  If that node is not contained in the cell, this function will throw
+   an error.
+
+   NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
+   has already been called.  If this function has not been called, then the returned velocity will be 0.
+*/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::RT_velocity(const int & cell, const int & node, Vector &vel)
 {
+   // Get DoFs corresponding to cell
+   Array<int> cell_face_row;
+   cell_face.GetRow(cell, cell_face_row);
+   int row_length = cell_face_row.Size();
 
+   // Get integration point corresponding to node location
+   Array<int> verts;
+   pmesh->GetElementVertices(cell, verts);
+
+   IntegrationPoint test_ip;
+   if (node == verts[0]) {
+      test_ip.Set2(0., 0.);
+   } else if (node == verts[1]) {
+      test_ip.Set2(1., 0.);
+   } else if (node == verts[2]) {
+      test_ip.Set2(1., 1.);
+   } else if (node == verts[3]) {
+      test_ip.Set2(0., 1.);
+   } else { 
+      // Invalid if node is not contained in cell
+      MFEM_ABORT("Incorrect node provided.\n"); 
+   }
+
+   // Evaluate reference shape functions at integration point
+   Vector shapes(4);
+   const FiniteElement * fe = CR.GetFE(cell);
+   fe->CalcShape(test_ip, shapes);
+
+   // Sum over faces evaluating local velocity at vertex
+   Vector Ci(dim);
+   Ci = 0.;
+   Vector face_vel(dim);
+
+   for (int face_it = 0; face_it < row_length; face_it++)
+   {
+      int face = cell_face_row[face_it];
+
+      // Get intermediate face velocities corresponding to faces
+      get_intermediate_face_velocity(face, face_vel);
+      Ci.Add(shapes[face_it], face_vel);
+   }
 }
 
 template<int dim, int problem>

@@ -12,12 +12,12 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 0.,
-             b = -1.,
-             c = 0.,
+const double a = 1.,
+             b = 1.,
+             c = 1.,
              d = 1.,
-             e = 0.,
-             f = 0.;
+             e = -1.,
+             f = 1.;
 
 // Problem
 const int dim = 2;
@@ -88,6 +88,16 @@ void velocity_exact(const Vector &x, const double & t, Vector &v)
    v[1] = d * x[0] + e * x[1] + f;
 }
 
+/******************************************************************************************
+* This is a test case to validate the Rannacher-Turek velocity reconstruction function.
+* It assumes that the given test_velocity function is defined as:
+*        C      x  +   D
+*     | 1 1  | |x|   | 1 |
+*     |      | | | + |   |
+*     | 1 -1 | |y|   | 1 |
+* Using this velocity, a LagrangianLOOperator class is instantiated, face velocities are
+* computed exactly using this velocity, and then the velocity is computed at a given node.
+******************************************************************************************/
 int test_mesh_initiation()
 {
    // Initialize mesh
@@ -116,13 +126,6 @@ int test_mesh_initiation()
 
    // Output information
    pmesh->ExchangeFaceNbrData();
-   // if (!suppress_test_output)
-   // {
-   //    cout << "num cells: " << pmesh->GetNE() << endl;
-   //    cout << "num interior faces: " << pmesh->GetNFbyType(FaceType::Interior) << endl;
-   //    cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
-   //    cout << "num total faces: " << pmesh->GetNumFaces() << endl;
-   // }
    
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -187,53 +190,15 @@ int test_mesh_initiation()
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
-   // Output information on CRFESpace
-   cout << "Crouzeix-Raviart info:\n";
-   cout << "CRFESpace.GetVSize(): " << CRFESpace.GetVSize() << endl;
-   cout << "CRFESpace.TrueVSize(): " << CRFESpace.TrueVSize() << endl;
-   cout << "CRFESpace.GlobalTrueVSize(): " << CRFESpace.GlobalTrueVSize() << endl;
-   cout << "CRFESpace.GetNDofs(): " << CRFESpace.GetNDofs() << endl;
-   cout << "CRFESpace.GetNVDofs(): " << CRFESpace.GetNVDofs() << endl;
-   cout << "CFFESpace.GetNE(): " << CRFESpace.GetNE() << endl;
+   int node = 5;
+   int cell = 1;
+   Vector _vel(dim), true_vel(dim);
+   double t = 0.;
+   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.RT_velocity(cell, node, _vel);
 
-   IntegrationPoint test_ip;
-   test_ip.Set2(1.,0.);
-   Vector shape(4);
-   DenseMatrix dshape(4,2);
-   dshape = 0.;
-   shape = 0.;
-
-   const FiniteElement * fe = CRFESpace.GetFE(2);
-   fe->CalcShape(test_ip, shape);
-   fe->CalcDShape(test_ip, dshape);
-   IntegrationRule ir = fe->GetNodes();
-   cout << "====== ir: " << ir.GetNPoints() << endl;
-   // ir.Print(cout);
-
-   cout << "shape:\n";
-   shape.Print(cout);
-
-   cout << "dshape:\n";
-   dshape.Print(cout);
-
-   // element to node table
-   Table cell_face = CRFESpace.GetElementToDofTable();
-   Array<int> cell_face_row;
-   int row_length = 0;
-   for (int cell = 0; cell < CRFESpace.GetNE(); cell++)
-   {  
-      cell_face.GetRow(cell, cell_face_row);
-      row_length = cell_face_row.Size();
-      cout << "cell: " << cell << ", row:\n";
-      cell_face_row.Print(cout);
-   }
-
-   int node = 1;
-   Vector _vel(dim);
-   RT_vel(hydro, CRFESpace, pmesh, cell_face, 1, node, _vel);
-
-   const double t = 0;
-   const double dt = 1.;
+   true_vel[0] = 2.5;
+   true_vel[1] = 1.5;
 
    // Delete remaining pointers
    delete pmesh;
@@ -243,89 +208,10 @@ int test_mesh_initiation()
    pmesh = NULL;
    m = NULL;
 
-   return 0;
-}
-
-void RT_vel(mfem::hydrodynamics::LagrangianLOOperator<dim, problem> & hydro,
-            const ParFiniteElementSpace & CRFESpace,
-            const ParMesh * pmesh,
-            const Table & cell_face, 
-            const int & cell,
-            const int & node, 
-            Vector &vel)
-{
-   // Get DoFs corresponding to cell
-   Array<int> cell_face_row;
-   cell_face.GetRow(cell, cell_face_row);
-   int row_length = cell_face_row.Size();
-   cout << "faces on cell:\n";
-   for (int i = 0; i < row_length; i++)
-   {
-      cout << "face: " << cell_face_row[i] << endl;
+   if (true_vel[0] == _vel[0] && true_vel[1] == _vel[1]) { 
+      return 0; 
    }
-
-   // TODO: Get integration point corresponding to node location
-   Array<int> verts;
-   pmesh->GetElementVertices(cell, verts);
-   // cout << "verts for element 0: \n";
-   // for (int i = 0; i < verts.Size(); i++)
-   // {
-   //    cout << "vert: " << verts[i] << endl;
-   // }
-
-   IntegrationPoint test_ip;
-   if (node == verts[0]) {
-      test_ip.Set2(0., 0.);
-      // cout << "ip is (0,0)\n";
-   } else if (node == verts[1]) {
-      test_ip.Set2(1., 0.);
-      // cout << "ip is (1,0)\n";
-   } else if (node == verts[2]) {
-      test_ip.Set2(1., 1.);
-      // cout << "ip is (1,1)\n";
-   } else if (node == verts[3]) {
-      test_ip.Set2(0., 1.);
-      // cout << "ip is (0,1)\n";
-   } else { 
-      // Invalid if node is not contained in cell
-      MFEM_ABORT("Incorrect node provided.\n"); 
+   else { 
+      return 1; 
    }
-
-   // Evaluate reference shape functions at integration point
-   Vector shapes(4);
-   const FiniteElement * fe = CRFESpace.GetFE(cell);
-   fe->CalcShape(test_ip, shapes);
-   // cout << "shapes: \n";
-   // shapes.Print(cout);
-
-   // Sum over faces evaluating local velocity at vertex
-   Vector Ci(dim);
-   Ci = 0.;
-   Vector face_vel(dim);
-   Vector v_face_intermediate(CRFESpace.GetVSize());
-   v_face_intermediate[0] = 1.;
-   v_face_intermediate[12] = 1.;
-   v_face_intermediate[1] = 2.;
-   v_face_intermediate[13] = 2.;
-   v_face_intermediate[2] = 3.;
-   v_face_intermediate[14] = 3.;
-   v_face_intermediate[3] = 4.;
-   v_face_intermediate[15] = 4.;
-
-   for (int face_it = 0; face_it < row_length; face_it++)
-   {
-      int face = cell_face_row[face_it];
-
-      // Get intermediate face velocities corresponding to faces
-      // hydro.get_intermediate_face_velocity(face, face_vel);
-      face_vel[0] = v_face_intermediate[face];
-      face_vel[1] = v_face_intermediate[face + CRFESpace.GetNDofs()];
-
-      // cout << "face it: " << face_it << ", face: " << face << ", shape: " << shapes[face_it] << endl;
-      // cout << "face_vel:\n";
-      // face_vel.Print(cout);
-      Ci.Add(shapes[face_it], face_vel);
-   }
-
-   Ci.Print(cout);
 }

@@ -51,6 +51,8 @@ protected:
    const HYPRE_Int GTVSize_L2V;
    const int NDofs_L2V;
 
+   // Tables to relate cell to the contained faces
+   Table cell_face;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices

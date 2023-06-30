@@ -219,10 +219,12 @@ int main(int argc, char *argv[]) {
    H1_FECollection H1FEC(order_mv, dim);
    // H1Ser_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
 
    HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
    cout << "global_vSize: " << global_vSize << endl;
@@ -433,7 +435,7 @@ int main(int argc, char *argv[]) {
    m->Assemble();
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, mm, CFL);
    cout << "Solver created.\n";
 
    /* Set up visualiztion object */

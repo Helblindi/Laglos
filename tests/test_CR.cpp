@@ -185,7 +185,7 @@ int test_mesh_initiation()
 
    // Just leave templated for hydro construction
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    // Output information on CRFESpace
    cout << "Crouzeix-Raviart info:\n";

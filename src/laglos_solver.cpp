@@ -75,6 +75,7 @@ template<int dim, int problem>
 LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                          ParFiniteElementSpace &l2,
                                                          ParFiniteElementSpace &l2v,
+                                                         ParFiniteElementSpace &cr,
                                                          ParLinearForm *m,
                                                          bool use_viscosity,
                                                          bool mm, 
@@ -82,6 +83,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    H1(h1),
    L2(l2),
    L2V(l2v),
+   CR(cr),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    Vsize_H1(H1.GetVSize()),
@@ -1732,6 +1734,13 @@ void LagrangianLOOperator<dim, problem>::
          }
       } // Switch case end
    }
+}
+
+
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::RT_velocity(const int & cell, const int & node, Vector &vel)
+{
+
 }
 
 template<int dim, int problem>

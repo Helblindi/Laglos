@@ -100,10 +100,12 @@ int test_mesh_initiation()
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
 
    // Output information
    pmesh->ExchangeFaceNbrData();
@@ -181,7 +183,7 @@ int test_mesh_initiation()
    // Just leave templated for hydro construction
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, m, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    const double t = 0;
    const double dt = 1.;

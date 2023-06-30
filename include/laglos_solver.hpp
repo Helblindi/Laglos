@@ -29,7 +29,7 @@ template <int dim, int problem>
 class LagrangianLOOperator
 {
 protected:
-   ParFiniteElementSpace &H1, &L2, &L2V;
+   ParFiniteElementSpace &H1, &L2, &L2V, &CR;
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -69,6 +69,7 @@ public:
    LagrangianLOOperator(ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
+                        ParFiniteElementSpace &cr,
                         ParLinearForm *m,
                         bool use_viscosity,
                         bool mm,
@@ -132,6 +133,7 @@ public:
                                  Vector &D,
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void RT_velocity(const int & cell, const int & node, Vector &vel);
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);

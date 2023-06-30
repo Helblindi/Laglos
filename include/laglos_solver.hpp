@@ -68,6 +68,8 @@ protected:
    bool mm;
 
 public:
+   enum DofEntity {corner, face, cell};
+   
    LagrangianLOOperator(ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
@@ -79,6 +81,8 @@ public:
    ~LagrangianLOOperator();
 
    double GetCFL();
+
+   void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
    void SetCFL(const double &_CFL); // STOPPED HERE.
 
@@ -123,8 +127,6 @@ public:
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
-   // tests from 2023-01-05
-   void compute_node_velocity_cwa(Vector &S, const double & t, const double & dt);
    void compute_node_velocity_LS(const Vector &S, 
                                  const Table &vertex_edge,  
                                  const int &vertex,

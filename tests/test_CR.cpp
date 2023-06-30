@@ -187,7 +187,10 @@ int test_mesh_initiation()
    ste_gf.SyncAliasMemory(S);
 
    // Just leave templated for hydro construction
+   ConstantCoefficient one(1.0);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one));
+   m->Assemble();
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    int node = 5;

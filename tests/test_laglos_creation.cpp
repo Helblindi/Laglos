@@ -181,7 +181,10 @@ int test_mesh_initiation()
    S.Print(cout);
 
    // Just leave templated for hydro construction
+   ConstantCoefficient one(1.0);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one));
+   m->Assemble();
    
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
@@ -223,12 +226,16 @@ int test_mesh_initiation()
    Vector node_vel(dim), node_pos(dim), zeros(dim);
    zeros = 0.;
 
+   mfem::hydrodynamics::LagrangianLOOperator<dim, problem>::DofEntity entity;
+   int EDof = 0;
+
    for (int node = 0; node < H1FESpace.GetNDofs(); node++)
    {
       hydro.get_node_position(S, node, node_pos);
       hydro.update_node_velocity(S, node, zeros);
       hydro.get_node_velocity(S, node, node_vel);
-      cout << "node: " << node << endl;
+      hydro.GetEntityDof(node, entity, EDof);
+      cout << "global dof: " << node << ", entity: " << entity << ", local dof: " << EDof << endl;
       cout << "position:\n";
       node_pos.Print(cout);
       cout << "velocity:\n";

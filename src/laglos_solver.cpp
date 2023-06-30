@@ -266,6 +266,27 @@ double LagrangianLOOperator<dim, problem>::GetTimeStepEstimate(const Vector &S)
 }
 
 template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::GetEntityDof(const int GDof, DofEntity & entity, int & EDof)
+{
+   if (GDof < num_vertices)
+   {
+      entity = DofEntity::corner;
+      EDof = GDof;
+   }
+   else if (GDof < num_vertices + num_faces)
+   {
+      entity = DofEntity::face;
+      EDof = GDof - num_vertices;
+   }
+   // TODO: Add edge implementation
+   else
+   {
+      entity = DofEntity::cell;
+      EDof = GDof - num_vertices - num_faces;
+   }
+}
+
+template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::IterateOverCells()
 {
    cout << "-----Iterating over cells-----\n";
@@ -1229,124 +1250,6 @@ void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector 
       }
    }
 }
-
-// cell weighted average
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::compute_node_velocity_cwa(Vector &S, const double & t, const double & dt)
-// {
-//    // Still need face information to implement slip BCs
-//    mfem::Mesh::FaceInformation FI;
-//    Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
-//    Table vertex_edge;
-//    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
-//    Transpose(*edge_vertex, vertex_edge);
-//    Array<int> vertex_edge_row;
-//    int vertex_edge_row_length;
-//    Vector n_vec(dim);
-
-//    Table * vertex_element = pmesh->GetVertexToElementTable();
-
-//    Array<int> row;
-//    int row_length;
-//    double denom; // change var name
-
-//    double mi = 0., Ti = 0., Ki=0.;
-//    Vector Uc(dim+2), Vi(dim);
-//    int vertex_bdr_attribute = 0;
-
-//    for (int vertex = 0; vertex < num_vertices; vertex++)
-//    {
-//       Vi = 0.; // Reset vertex velocity 
-//       vertex_element->GetRow(vertex, row);
-//       row_length = row.Size();
-//       denom = 0.;
-
-//       // Iterate over cells that share this vertex and average their contribution to vertex velocity
-//       for (int element_it = 0; element_it < row_length; element_it++)
-//       {
-//          int el_index = row[element_it];
-//          // Get mass of cell
-//          mi = m_hpv->Elem(el_index);
-
-//          // Get cell state vector
-//          GetCellStateVector(S, el_index, Uc);
-//          Ti = Uc[0];
-
-//          // Get measure of cell
-//          Ki = mi * Ti;
-//          assert(Ki >= 0.);
-//          Vi.Add(Ki, velocity(Uc));
-//          denom += Ki;
-//       }
-//       Vi /= denom;
-
-//       /* If we have a boundary node, adjust the velocity accordingly */
-//       // Check if the node is a boundary node
-//       vertex_bdr_attribute = BdrVertexIndexingArray[vertex];
-//       switch (problem)
-//       {
-//          case 7: // Saltzman
-//          {
-//             switch (vertex_bdr_attribute)
-//             {
-//                case 1: // Dirichlet BCs (for piston)
-//                {
-//                   Vi = 0.;
-
-//                   if (timestep_first == 0.)
-//                   {
-//                      timestep_first = timestep;
-//                   }
-//                   double _xi = t / (2*timestep_first);
-
-//                   double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-
-//                   Vi[0] = 1. * _psi;
-
-//                   break;
-//                }
-//                case 2: // Slip BCs
-//                {
-//                   vertex_edge.GetRow(vertex, vertex_edge_row);
-//                   vertex_edge_row_length = vertex_edge_row.Size();
-//                   for (int face_it = 0; face_it < vertex_edge_row_length; face_it++)
-//                   {
-//                      int face = vertex_edge_row[face_it];
-//                      FI = pmesh->GetFaceInformation(face);
-//                      if (FI.IsBoundary())
-//                      {
-//                         CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-//                         n_vec /= n_vec.Norml2();
-
-//                         Vector Vi_normal_component = n_vec;
-//                         double _scale = Vi * n_vec;
-//                         Vi_normal_component *= _scale;
-
-//                         Vi -= Vi_normal_component;
-//                      }
-//                   }
-
-//                   break;
-//                }
-//                default:
-//                {
-//                   // do nothing
-//                }
-//             } // End Vertex attribute
-
-//             break;
-//          } // End case Saltzman
-//          default:
-//          {
-//             // no change
-//          }
-//       } // End: boundary node enforcement
-
-//       // finally, update the vertex velocity in the data structure
-//       update_node_velocity(S, vertex, Vi);
-//    } // end vertex iterator
-   
-// }
 
 
 /* * * * * Corrected Node velocity calculations * * * * */

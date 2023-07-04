@@ -28,3 +28,8 @@ add_executable(TestCR test_CR.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglo
 target_link_libraries(TestCR PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
 target_include_directories(TestCR PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestCR COMMAND TestCR)
+
+add_executable(TestVDLFGI test_VDLFGI.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestVDLFGI PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_include_directories(TestVDLFGI PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME TestVDLFGI COMMAND TestVDLFGI)

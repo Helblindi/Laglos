@@ -30,7 +30,7 @@ class LagrangianLOOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
-   ParGridFunction v_CR_gf;
+   ParGridFunction v_CR_gf; // 5.7(b)
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -57,7 +57,6 @@ protected:
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
-   mutable Vector v_face_intermediate; // (5.7b)
 
    const int num_vertices, num_faces, num_edges;
 

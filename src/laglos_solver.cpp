@@ -132,9 +132,8 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
 
-   // Set size of intermediate face velocities vector
-   v_face_intermediate.SetSize(num_faces * dim);
-   v_face_intermediate = 0.;
+   // Initialize values of intermediate face velocities
+   v_CR_gf = 0.;
 
    // Print some Dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -148,9 +147,6 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
    cout << "num_edges: " << num_edges << endl;
-
-   cout << "v_CR_gf.Size(): " << v_CR_gf.Size() << endl;
-   cout << "v_face_intermediate.Size(): " << v_face_intermediate.Size() << endl;
 }
 
 template<int dim, int problem>
@@ -1126,7 +1122,7 @@ void LagrangianLOOperator<dim, problem>::
       for (int i = 0; i < dim; i++)
       {
          int index = face + i * num_faces;
-         v_face_intermediate[index] = Vf[i];
+         v_CR_gf[index] = Vf[i];
       }
 
    } // End face iterator
@@ -1141,7 +1137,9 @@ void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const in
       for (int i = 0; i < dim; i++)
       {
          int index = face + i * num_faces;
-         vel[i] = v_face_intermediate[index];
+         vel[i] = v_CR_gf[index];
+
+         cout << "v_CR_gf[index]: " << v_CR_gf[index] << endl;
       }
 }
 

@@ -29,7 +29,8 @@ template <int dim, int problem>
 class LagrangianLOOperator
 {
 protected:
-   ParFiniteElementSpace &H1, &L2, &L2V, &CR;
+   ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
+   ParGridFunction v_CR_gf;
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -138,6 +139,7 @@ public:
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
+   void RT_int_grad(const IntegrationRule * ir, const int cell, DenseMatrix & res);
    void compute_geo_V(const int & node);
    void compute_geo_C(const int & node);
    

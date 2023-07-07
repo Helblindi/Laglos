@@ -84,6 +84,8 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    L2(l2),
    L2V(l2v),
    CR(cr),
+   CRc(CR.GetParMesh(), CR.FEColl(), 1),
+   v_CR_gf(&CR),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    Vsize_H1(H1.GetVSize()),
@@ -146,6 +148,9 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
    cout << "num_edges: " << num_edges << endl;
+
+   cout << "v_CR_gf.Size(): " << v_CR_gf.Size() << endl;
+   cout << "v_face_intermediate.Size(): " << v_face_intermediate.Size() << endl;
 }
 
 template<int dim, int problem>
@@ -1759,6 +1764,55 @@ void LagrangianLOOperator<dim, problem>::RT_corner_velocity(const int & cell, co
          MFEM_ABORT("Invalid entity value.\n");
       }
    }
+}
+
+/*
+Function: RT_corner_velocity
+Parameters:
+   ir   -
+   cell - index corrseponding to the cell (K_c)
+   res  - 
+Purpose:
+
+
+   NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
+   has already been called.  If this function has not been called, then the returned velocity will be 0.
+*/
+template<int dim, int problem>
+void LagrangianLOOperator<dim, problem>::RT_int_grad(const IntegrationRule * ir, 
+                                                     const int cell, 
+                                                     DenseMatrix & res)
+{
+   cout << "RT_int_grad funcall.\n";
+   ParGridFunction CRc_gf(&CRc);
+   const int size = CRc.GetVSize();
+
+   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+   Vector grad(dim), row(dim);
+   res = 0., row = 0.;
+   res.SetSize(dim);
+
+   // Iterate over quadrature
+   for (int i = 0; i < ir->GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      trans->SetIntPoint(&ip);
+
+      // cout << "el " << cell << " at integration point " << i << endl;
+      for (int j = 0; j < dim; j++)
+      {
+         CRc_gf.MakeRef(&CRc, v_CR_gf, j*size);
+         CRc_gf.GetGradient(*trans, grad);
+
+         // Put information into Dense Matrix
+         res.GetRow(j, row);
+         row.Add(ip.weight, grad);
+         res.SetRow(j, row);
+      }
+   }
+
+   cout << "printing resultant matrix:\n";
+   res.Print(cout);
 }
 
 template<int dim, int problem>

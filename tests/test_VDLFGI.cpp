@@ -18,9 +18,9 @@ const double a = 2.,
              e = -1.,
              f = 1.,
              aq = 1.,
-             bq = 2.,
-             dq = 3.,
-             eq = 4.;
+             bq = 1.,
+             dq = 1.,
+             eq = 1.;
 
 // Problem
 const int dim = 2;
@@ -42,6 +42,11 @@ int lower_refinement = 2;
 int upper_refinement = 7;
 /* ---------------- End Parameters ---------------- */
 
+void RT_int_grad(ParGridFunction & CR_v_gf, 
+                 ParMesh * pmesh,   
+                 const IntegrationRule * ir, 
+                 const int cell, 
+                 DenseMatrix & res);
 void velocity_exact(const Vector &x, const double & t, Vector &v);
 void test_VDLFGI();
 void test_integral();
@@ -224,7 +229,7 @@ void test_integral()
    {
       int precision = 12;
       ostringstream mesh_name;
-      mesh_name << "../results/mesh-TestIntegral." << setfill('0') << setw(6) << myid;
+      mesh_name << "../results/mesh-TestIntegral-moved." << setfill('0') << setw(6) << myid;
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
@@ -307,7 +312,7 @@ void test_integral()
    // hydro.RT_corner_velocity(cell, node, _vel);
    // Set int rule
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
-   const IntegrationRule gir = IntRules.Get(CRFESpace.GetFE(0)->GetGeomType(), 2);
+   const IntegrationRule gir = IntRules.Get(CRFESpace.GetFE(0)->GetGeomType(), 1);
 
    // Output integration rule information
    cout << "Order of integration rule: " << gir.GetOrder() << endl;
@@ -334,40 +339,83 @@ void test_integral()
    cout << "CRc.TrueVSize(): " << CRc.TrueVSize() << endl;
    cout << "CRc.GetNDofs(): " << CRc.GetNDofs() << endl;
 
+   cell = 1;
+   DenseMatrix res(dim);
+   RT_int_grad(v_cr_gf, pmesh, &gir, cell, res);
 
-   // Print element vector for each cell
-   for (int c = 0; c < dim; c++)
+   // // Print element vector for each cell
+   // for (int c = 0; c < dim; c++)
+   // {
+   //    cout << "--- Iterating on dimension: " << c << " ---\n";
+   //    // Get dimensional component of pargridfunction
+   //    CRc_gf.MakeRef(&CRc, v_cr_gf, c*size);
+   //    cout << "CRc_gf:\n";
+   //    CRc_gf.Print(cout);
+
+   //    for (int el_index = 0; el_index < pmesh->GetNE(); el_index++)
+   //    {
+   //       const FiniteElement * fe = CRFESpace.GetFE(el_index);
+   //       ElementTransformation * trans = pmesh->GetElementTransformation(el_index);
+
+   //       const int dim = fe->GetDim();
+   //       const int dof = fe->GetDof();
+   //       const int sdim = trans->GetSpaceDim();
+   //       const int order = fe->GetOrder();
+   //       cout << "el_index: " << el_index << ", dim: " << dim << ", dof: " << dof << ", sdim: " << sdim << ", order: " << order << endl;
+   //       // trans->Transform(Geometries.GetCenter(pmesh->GetElementBaseGeometry(el_index)),cent);
+
+   //       mfem::Vector grad;
+   //       for (int i = 0; i < gir.GetNPoints(); i++)
+   //       {
+   //          const IntegrationPoint &ip = gir.IntPoint(i);
+   //          trans->SetIntPoint(&ip);
+
+   //          cout << "el " << el_index << " at integration point " << i << endl;
+   //          CRc_gf.GetGradient(*trans, grad);
+   //          cout << "grad: \n";
+   //          grad.Print(cout); 
+
+   //       }
+   //    }
+   // }
+}
+
+void RT_int_grad(ParGridFunction & CR_v_gf, 
+                 ParMesh * pmesh,   
+                 const IntegrationRule * ir, 
+                 const int cell, 
+                 DenseMatrix & res)
+{
+   cout << "RT_int_grad funcall.\n";
+   ParFiniteElementSpace * CR = CR_v_gf.ParFESpace();
+   ParFiniteElementSpace CRc(CR->GetParMesh(), CR->FEColl(), 1);
+   ParGridFunction CRc_gf(&CRc); // CRc1_gf(&CRc), CRc2_gf(&CRc), CRc3_gf(&CRc);
+   const int size = CRc.GetVSize();
+
+   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+   Vector grad(dim), row(dim);
+   res = 0., row = 0.;
+   res.SetSize(2);
+
+   // Iterate over quadrature
+   for (int i = 0; i < ir->GetNPoints(); i++)
    {
-      cout << "--- Iterating on dimension: " << c << " ---\n";
-      // Get dimensional component of pargridfunction
-      CRc_gf.MakeRef(&CRc, v_cr_gf, c*size);
-      cout << "CRc_gf:\n";
-      CRc_gf.Print(cout);
+      const IntegrationPoint &ip = ir->IntPoint(i);
+      trans->SetIntPoint(&ip);
 
-      for (int el_index = 0; el_index < pmesh->GetNE(); el_index++)
+      // cout << "el " << cell << " at integration point " << i << endl;
+      for (int j = 0; j < dim; j++)
       {
-         const FiniteElement * fe = CRFESpace.GetFE(el_index);
-         ElementTransformation * trans = pmesh->GetElementTransformation(el_index);
+         CRc_gf.MakeRef(&CRc, CR_v_gf, j*size);
+         CRc_gf.GetGradient(*trans, grad);
 
-         const int dim = fe->GetDim();
-         const int dof = fe->GetDof();
-         const int sdim = trans->GetSpaceDim();
-         const int order = fe->GetOrder();
-         cout << "el_index: " << el_index << ", dim: " << dim << ", dof: " << dof << ", sdim: " << sdim << ", order: " << order << endl;
-         // trans->Transform(Geometries.GetCenter(pmesh->GetElementBaseGeometry(el_index)),cent);
-
-         mfem::Vector grad;
-         for (int i = 0; i < gir.GetNPoints(); i++)
-         {
-            const IntegrationPoint &ip = gir.IntPoint(i);
-            trans->SetIntPoint(&ip);
-
-            cout << "el " << el_index << " at integration point " << i << endl;
-            CRc_gf.GetGradient(*trans, grad);
-            cout << "grad: \n";
-            grad.Print(cout); 
-
-         }
+         // Put information into Dense Matrix
+         res.GetRow(j, row);
+         row.Add(ip.weight, grad);
+         res.SetRow(j, row);
       }
    }
+
+   cout << "printing resultant matrix:\n";
+   res.Print(cout);
 }

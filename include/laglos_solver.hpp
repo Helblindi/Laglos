@@ -52,8 +52,12 @@ protected:
    const HYPRE_Int GTVSize_L2V;
    const int NDofs_L2V;
 
+   IntegrationRule RT_ir;
+
    // Tables to relate cell to the contained faces
    Table cell_face;
+   Table * vertex_element;
+   Table * face_element;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
@@ -137,10 +141,12 @@ public:
                                  Vector &D,
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+                                 
+   void compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v);
    void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const IntegrationRule * ir, const int cell, DenseMatrix & res);
-   void compute_geo_V(const int & node);
-   void compute_geo_C(const int & node);
+   void compute_geo_V(const int & node, Vector & res);
+   void compute_geo_C(const int & node, DenseMatrix & res);
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);

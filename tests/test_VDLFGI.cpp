@@ -8,19 +8,20 @@
 
 using namespace std;
 using namespace mfem;
+namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 2.,
+const double a = 1.,
              b = 1.,
              c = 1.,
              d = 1.,
              e = -1.,
              f = 1.,
-             aq = 1.,
-             bq = 1.,
-             dq = 1.,
-             eq = 1.;
+             aq = 0.,
+             bq = 0.,
+             dq = 0.,
+             eq = 0.;
 
 // Problem
 const int dim = 2;
@@ -205,7 +206,7 @@ void test_integral()
    {
       int precision = 12;
       ostringstream mesh_name;
-      mesh_name << "../results/mesh-TestIntegral." << setfill('0') << setw(6) << myid;
+      mesh_name << "../results/mesh-TestVDLFGI." << setfill('0') << setw(6) << myid;
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
@@ -223,17 +224,6 @@ void test_integral()
 
    // Output information
    pmesh->ExchangeFaceNbrData();
-   
-   // Output mesh to be visualized
-   // Can be visualized with glvis -np # -m mesh-test-moved
-   {
-      int precision = 12;
-      ostringstream mesh_name;
-      mesh_name << "../results/mesh-TestIntegral-moved." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
-   }
 
    // Construct blockvector
    const int Vsize_l2 = L2FESpace.GetVSize();
@@ -297,11 +287,13 @@ void test_integral()
    double t = 0.;
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
 
-   cout << "Printing v_cr_gf:\n";
-   v_cr_gf.Print(cout);
-
    VectorFunctionCoefficient v_CR_coeff(dim, &velocity_exact);
    v_cr_gf.ProjectCoefficient(v_CR_coeff);
+   ParGridFunction v_exact_gf(&H1FESpace);
+   v_exact_gf.ProjectCoefficient(v_CR_coeff);
+
+   cout << "Printing v_cr_gf:\n";
+   v_cr_gf.Print(cout);
 
    // hydro.RT_corner_velocity(cell, node, _vel);
    // Set int rule
@@ -323,6 +315,7 @@ void test_integral()
    const int size = CRc.GetVSize();
    cout << "Size: " << size << endl;
    ParGridFunction CRc_gf(&CRc);
+   ParGridFunction vgeo_gf(&H1FESpace);
 
    cout << "Diagnostics:\n";
    cout << "CRFESpace.GetVSize(): " << CRFESpace.GetVSize() << endl;
@@ -333,7 +326,165 @@ void test_integral()
    cout << "CRc.TrueVSize(): " << CRc.TrueVSize() << endl;
    cout << "CRc.GetNDofs(): " << CRc.GetNDofs() << endl;
 
+   Array<double> cell_areas(L2FESpace.GetNE());
+   Array<double> bmn_sum_cells(L2FESpace.GetNE());
+
+   // Store initial mass of cells
+   for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
+   {
+      double k = pmesh->GetElementVolume(ci);
+
+      cell_areas[ci] = k;
+      assert(k >= 0.);
+   }
+
    cell = 1;
+   node = 10;
    DenseMatrix res(dim);
-   hydro.RT_int_grad(&gir, cell, res);
+   // hydro.RT_int_grad(&gir, cell, res);
+
+   Vector x(dim), vec_res(dim);
+   // hydro.get_node_position(S, node, x);
+   // cout << "node position for node: " << node << endl;
+   // x.Print(cout);
+   
+   // hydro.compute_geo_V(node, vec_res);
+   // hydro.compute_geo_C(node, res);
+   double dt = 0.5;
+   // hydro.compute_node_velocity_RT(node, dt, vec_res);
+   for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
+   {
+      // hydro.get_node_position(S, node_it, x);
+      // cout << "node position for node: " << node << endl;
+      // x.Print(cout);
+
+      hydro.compute_node_velocity_RT(node_it, dt, vec_res);
+      hydro.update_node_velocity(S, node_it, vec_res);
+      hydro.compute_geo_V(node_it, vec_res);
+      for (int i = 0; i < dim; i++)
+      {
+         int index = node_it + i*H1FESpace.GetNDofs();
+         vgeo_gf[index] = vec_res[i];
+      }
+   }
+
+   // Fill center with average over corner vertices
+   Array<int> verts;
+   Vector vel_center(dim);
+   for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
+   {
+      double vel_center_x = 0., vel_center_y = 0.;
+      pmesh->GetElementVertices(ci, verts);
+      for (int j = 0; j < verts.Size(); j++)
+      {
+         int index = verts[j];
+         vel_center_x += vgeo_gf[index];
+         index = verts[j] + H1FESpace.GetNDofs();
+         vel_center_y += vgeo_gf[index];
+      }
+      vel_center_x *= 1. / verts.Size();
+      vel_center_y *= 1. / verts.Size();
+
+      vgeo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
+      vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
+   }
+
+   // hydro.compute_corrective_face_velocities(S, t, dt);
+   hydro.fill_center_velocities_with_average(S);
+
+   /* ************************
+   Move the mesh according to previously computed nodal velocities
+   *************************** */ 
+   add(x_gf, dt, mv_gf, x_gf);
+   pmesh->NewNodes(x_gf, false);
+   t += dt;
+   if (!suppress_test_output)
+   {
+      cout << "Done moving mesh.\n";
+   }
+
+   double num = 0., error_denom = 0., _error = 0.;
+   /* ************************
+   Compute cell area error
+   *************************** */ 
+   std::vector<double> cells_py(L2FESpace.GetNE());
+   std::vector<double> cell_errors_py(L2FESpace.GetNE());
+   for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
+   {
+      if (!suppress_test_output)
+      {
+         cout << "Computing cell area error for cell: " << ci << endl;
+      }
+      // Compute cell area side
+      double k = pmesh->GetElementVolume(ci);
+      double _bmn_approx = (k - cell_areas[ci]) / dt;
+      cout << "cell area pre move: " << cell_areas[ci] << endl;
+      cout << "cell area post move: " << k << endl;
+      cout << "dt: " << dt << endl;
+
+      cout << "Cell wise comparison:\n";
+      cout << "cell area difference: " << _bmn_approx << ", bmn_sum: " << bmn_sum_cells[ci] << endl;
+
+      double val = abs(_bmn_approx - bmn_sum_cells[ci]);
+      num += val;
+      error_denom += abs(bmn_sum_cells[ci]);
+      cells_py[ci] = ci;
+      cell_errors_py[ci] = val;
+   }
+
+   if (error_denom < tol)
+   {
+      _error = 0.;
+   }
+   else
+   {
+      _error = abs(num / error_denom);
+   }
+
+   /* ************************
+   Visualization
+   *************************** */ 
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-TestVDLFGI-moved." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   socketstream vis_vh, vis_vgeo, vis_vexact;
+   char vishost[] = "localhost";
+   int visport = 19916;
+
+   MPI_Barrier(pmesh->GetComm());
+   vis_vgeo.precision(8);
+
+   int Wx = 0, Wy = 0;
+   const int Ww = 350, Wh = 350;
+   int offx = Ww+10, offy = Wh+45;
+
+   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, vgeo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+
+   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+
+   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
+
+   // Plots cell errors using Python's matplotlib library
+   if (!suppress_test_output)
+   {
+      plt::figure_size(1200, 780);
+      plt::title("Error by cell");
+      plt::plot(cells_py, cell_errors_py, "og");
+      plt::xlabel("cell");
+      plt::ylabel("error");
+      plt::show();
+   }
+   
 }

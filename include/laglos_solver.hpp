@@ -73,7 +73,7 @@ protected:
 
 public:
    enum DofEntity {corner, face, cell};
-
+   
    LagrangianLOOperator(ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
@@ -141,7 +141,7 @@ public:
                                  Vector &D,
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-                                 
+
    void compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v);
    void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const IntegrationRule * ir, const int cell, DenseMatrix & res);

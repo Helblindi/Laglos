@@ -71,6 +71,17 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
    while (connection_failed);
 }
 
+// TODO: Create basic object instantiation
+// template<int dim, int problem>
+// LagrangianLOOperator<dim, problem>::LagrangianLOOperator() :
+//    H1(new FiniteElementSpace()),
+//    use_viscosity(true),
+//    mm(true),
+//    CFL(1.)
+// {
+
+// }
+
 template<int dim, int problem>
 LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                          ParFiniteElementSpace &l2,
@@ -140,7 +151,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    // Set integration rule for Rannacher-Turek space
    // TODO: Modify this to be set by a parameter rather than hard-coded
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
-   RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), 1);
+   RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), 2);
 
    // Print some Dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -1118,7 +1129,7 @@ void LagrangianLOOperator<dim, problem>::
          Array<int> row;
          Vector face_x(dim);
          H1.GetFaceDofs(face, row);
-
+         cout << "face: " << face << ", face_dof: " << row[2] << endl;
          int face_dof = row[2];
          get_node_position(S, face_dof, face_x);
 
@@ -1140,12 +1151,13 @@ void LagrangianLOOperator<dim, problem>::
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const int & face, Vector & vel)
 {
-      // Retrieve face velocity from object
-      for (int i = 0; i < dim; i++)
-      {
-         int index = face + i * num_faces;
-         vel[i] = v_CR_gf[index];
-      }
+   assert(face < num_faces);
+   // Retrieve face velocity from object
+   for (int i = 0; i < dim; i++)
+   {
+      int index = face + i * num_faces;
+      vel[i] = v_CR_gf[index];
+   }
 }
 
 /****************************************************************************************************
@@ -1300,43 +1312,69 @@ void LagrangianLOOperator<dim, problem>::compute_B(const DenseMatrix &C, const V
    _mat.Mult(D, B);
 }
 
+// Assumes dt, not dt/2 is passed in
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
 {
-   double trace = C.Trace();
-   double det = C.Det();
-   // cout << "C:\n";
-   // C.Print(cout);
-   // cout << "trace: " << trace << ", det: " << det << ", dt: " << dt << endl;
+   double a = 1.;
+   double b = -1. * (1. + (dt / 2.) * (C(0,0) + C(1,1)));
+   double c = (pow(dt, 2) / 4.) * (C(0,1) * C(1,0) + C(0,0) * C(1,1));
 
-   double num = 0., denom = 0., pm = 0.;
-   double d1 = 0., d2 = 0.;
+   cout << "a: " << a << ", b: " << b << ", c: " << c << endl;
 
-   num = dt * trace + 1.;
-   denom = 2.;
-   pm = sqrt(pow(dt, 2) * pow(trace, 2) + 2. * dt * trace + 1. - 4. * pow(dt,2) * det);
-   d1 = (num + pm) / denom;
-   d2 = (num - pm) / denom;
+   cout << "determinant: " << pow(b,2) - 4. * a * c << endl;
+   double pm = sqrt(pow(b,2) - 4. * a * c);
+   cout << "pm: " << pm << endl;
 
-   if (isnan(d1) || isnan(d2))
-   {
-      MFEM_ABORT("NaN values returned in compute_determinant.\n");
-   }
+   double d1 = -1 * b + pm;
+   d1 /= (2. * a);
 
-   // Will need to change
-   // How to pick which d?
-   // Check invertability of (d I - dt C)?
-   // One of the values is 0. Hmmm.
-   if (d1 > 0.)
-   {
-      d = d1;
-   }
-   else
-   {
-      assert(d2 > 0.);
-      d = d2;
-   }
+   double d2 = -1 * b - pm;
+   d2 /= (2. * a);
+
+   cout << "d1: " << d1 << endl;
+   cout << "d2: " << d2 << endl;
+
+   d = std::max(d1, d2);
 }
+
+// template<int dim, int problem>
+// void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
+// {
+//    double trace = C.Trace();
+//    double det = C.Det();
+//    // cout << "C:\n";
+//    // C.Print(cout);
+//    // cout << "trace: " << trace << ", det: " << det << ", dt: " << dt << endl;
+
+//    double num = 0., denom = 0., pm = 0.;
+//    double d1 = 0., d2 = 0.;
+
+//    num = dt * trace + 1.;
+//    denom = 2.;
+//    pm = sqrt(pow(dt, 2) * pow(trace, 2) + 2. * dt * trace + 1. - 4. * pow(dt,2) * det);
+//    d1 = (num + pm) / denom;
+//    d2 = (num - pm) / denom;
+
+//    if (isnan(d1) || isnan(d2))
+//    {
+//       MFEM_ABORT("NaN values returned in compute_determinant.\n");
+//    }
+
+//    // Will need to change
+//    // How to pick which d?
+//    // Check invertability of (d I - dt C)?
+//    // One of the values is 0. Hmmm.
+//    if (d1 > 0.)
+//    {
+//       d = d1;
+//    }
+//    else
+//    {
+//       assert(d2 > 0.);
+//       d = d2;
+//    }
+// }
 
 /*
 Function: compute_corrected_node_velocity
@@ -1675,12 +1713,12 @@ void LagrangianLOOperator<dim, problem>::
    DenseMatrix Ci(dim);
    Vector Vgeo(dim);
    double d = 0.;;
-
+   
    Ci = 0., Vgeo = 0., node_v = 0.;
    compute_geo_C(node, Ci);
    compute_geo_V(node, Vgeo);
 
-   compute_determinant(Ci, dt/2., d);
+   compute_determinant(Ci, dt, d);
 
    // Compute V_i^n
    DenseMatrix _mat(Ci);
@@ -1846,17 +1884,20 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const IntegrationRule * ir,
    }
 }
 
-/*
+/***********************************************************************************************************
 Function: compute_geo_V
 Parameters:
-   node - 
-   res  - 
+   node - Index corresponding to the global node index, to include face nodes and cell center nodes.  
+          Note that we should not be computing any sort of averaged velocity at the cell centers.
+   res  - Averaged Vector resulting from the average value of the cell wise velocities of all
+          adjacent cells at the node
 Purpose:
-
+   Part of the process to reconstructing the continuous geometric velocity field from the discontinuous
+   RT representation.  The exact equation to be solved is given by equation (5.11).
 
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
-*/
+***********************************************************************************************************/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector & res)
 {
@@ -1901,17 +1942,20 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
    // res.Print(cout);
 }
 
-/*
+/***********************************************************************************************************
 Function: compute_geo_C
 Parameters:
-   node - 
-   res  - 
+   node - Index corresponding to the global node index, to include face nodes and cell center nodes.  
+          Note that we should not be computing any sort of averaged velocity at the cell centers.
+   res  - Averaged DenseMatrix resulting from the average gradient of the cell wise velocities of all
+          adjacent cells.
 Purpose:
-
+   Part of the process to reconstructing the continuous geometric velocity field from the discontinuous
+   RT representation.  The exact equation to be solved is given by equation (5.11)
 
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
-*/
+***********************************************************************************************************/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMatrix & res)
 {

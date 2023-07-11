@@ -12,16 +12,16 @@ namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
-const double a = 1.,
-             b = 0.,
-             c = 0.,
-             d = 0.,
-             e = -0.5,
-             f = 0.,
-             aq = 0.,
-             bq = 0.,
-             dq = 0.,
-             eq = 0.;
+double a = 1.,
+       b = 1.,
+       c = 1.,
+       d = 1.,
+       e = -0.5,
+       f = 1.,
+       aq = 0.,
+       bq = 0.,
+       dq = 0.,
+       eq = 0.;
 
 // Problem
 const int dim = 2;
@@ -436,6 +436,9 @@ Purpose:
 */
 int test_RT_int_grad()
 {
+   // Ensure there is no quadratic component to the velocity field
+   aq = 0., bq = 0., dq = 0., eq = 0.;
+
    // Initialize mesh
    mfem::Mesh *mesh;
    mesh = new mfem::Mesh(mesh_file, true, true);
@@ -516,18 +519,36 @@ int test_RT_int_grad()
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    // Necessary parameters
-   DenseMatrix dm(dim);
+   DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
+   true_grad(0,0) = a;
+   true_grad(0,1) = b;
+   true_grad(1,0) = d;
+   true_grad(1,1) = e;;
    double _error = 0.;
    double dt = 1., t = 0.;
 
    // Must compute the intermediate face velocities before computing geometric velocity
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   int cell = 0;
-   hydro.RT_int_grad(cell, dm);
-   cout << "Dense Matrix for cell: " << cell << endl;
-   dm.Print(cout);
 
-   return 0;
+   for (int cell_it = 0; cell_it < L2FESpace.GetNE(); cell_it++)
+   {
+      hydro.RT_int_grad(cell_it, dm);
+      cout << "Dense Matrix for cell: " << cell_it << endl;
+      dm.Print(cout);
+
+      Add(dm, true_grad, -1., grad_error);
+      _error += grad_error.FNorm();
+   }
+   
+   if (abs(_error) < tol)
+   {
+      return 0; // Test passed
+   }
+   else 
+   {
+      cout << "error: " << _error << endl;
+      return 1; // Test failed
+   }
 }
 
 void test_integral()

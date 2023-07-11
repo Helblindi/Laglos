@@ -1867,12 +1867,16 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
    {
       const IntegrationPoint &ip = RT_ir.IntPoint(i);
       trans->SetIntPoint(&ip);
+      cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << ", weight: " << ip.weight << endl;
 
       // cout << "el " << cell << " at integration point " << i << endl;
       for (int j = 0; j < dim; j++)
       {
+         cout << "dim: " << j << endl;
          CRc_gf.MakeRef(&CRc, v_CR_gf, j*size);
          CRc_gf.GetGradient(*trans, grad);
+         cout << "grad: ";
+         grad.Print(cout);
 
          // Put information into Dense Matrix
          res.GetRow(j, row);

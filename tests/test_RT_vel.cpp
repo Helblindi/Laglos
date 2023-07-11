@@ -51,6 +51,7 @@ int upper_refinement = 7;
 void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_Vi_geo();
 int test_Ci_geo();
+int test_RT_int_grad();
 void test_integral();
 
 int main(int argc, char *argv[])
@@ -73,6 +74,7 @@ int main(int argc, char *argv[])
    int d = 0;
    d += test_Vi_geo();
    d += test_Ci_geo();
+   d += test_RT_int_grad();
    return d;
    // test_integral();
 }
@@ -309,6 +311,11 @@ int test_Vi_geo()
    }
 }
 
+/*
+Purpose:
+   In a linear velocity field, Cgeo should be the same at every node.  This 
+   iterates over all nodes and validates this.
+*/
 int test_Ci_geo()
 {
    // Initialize mesh
@@ -421,6 +428,106 @@ int test_Ci_geo()
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
+}
+
+/*
+Purpose:
+   Test the integral of the gradient of the RT velocity function given an integration rule.   
+*/
+int test_RT_int_grad()
+{
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction v_cr_gf(&CRFESpace);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   Vector one(dim);
+   one = 1.;
+
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+   mv_gf.ProjectCoefficient(v_exact_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   // Initialize specific volume, velocity, and specific total energy
+   ConstantCoefficient one_const_coeff(1.0);
+   sv_gf.ProjectCoefficient(one_const_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   VectorConstantCoefficient one_coeff(one);
+   v_gf.ProjectCoefficient(one_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   ste_gf.ProjectCoefficient(one_const_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+   m->Assemble();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+
+   // Necessary parameters
+   DenseMatrix dm(dim);
+   double _error = 0.;
+   double dt = 1., t = 0.;
+
+   // Must compute the intermediate face velocities before computing geometric velocity
+   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   int cell = 0;
+   hydro.RT_int_grad(cell, dm);
+   cout << "Dense Matrix for cell: " << cell << endl;
+   dm.Print(cout);
+
+   return 0;
 }
 
 void test_integral()

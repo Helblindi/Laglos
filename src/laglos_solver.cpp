@@ -1840,19 +1840,18 @@ void LagrangianLOOperator<dim, problem>::RT_corner_velocity(const int & cell, co
 /*
 Function: RT_int_grad
 Parameters:
-   ir   -
    cell - index corrseponding to the cell (K_c)
-   res  - 
+   res  - (dim x dim) DenseMatrix representing the outer product of Vfm with 
+          the gradient of its corresponding scalar RT shape function.
 Purpose:
-
+   This function calculates the integral of the gradient of the RT velocity function
+   on a given cell.
 
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
 */
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::RT_int_grad(const IntegrationRule * ir, 
-                                                     const int cell, 
-                                                     DenseMatrix & res)
+void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix & res)
 {
    // cout << "RT_int_grad funcall.\n";
    ParGridFunction CRc_gf(&CRc);
@@ -1864,9 +1863,9 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const IntegrationRule * ir,
    res.SetSize(dim);
 
    // Iterate over quadrature
-   for (int i = 0; i < ir->GetNPoints(); i++)
+   for (int i = 0; i < RT_ir.GetNPoints(); i++)
    {
-      const IntegrationPoint &ip = ir->IntPoint(i);
+      const IntegrationPoint &ip = RT_ir.IntPoint(i);
       trans->SetIntPoint(&ip);
 
       // cout << "el " << cell << " at integration point " << i << endl;
@@ -1990,7 +1989,7 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
       denom += abs(pmesh->GetElementVolume(row_el));
 
       dm_temp = 0.;
-      RT_int_grad(&RT_ir, row_el, dm_temp);
+      RT_int_grad(row_el, dm_temp);
       res.Add(1., dm_temp);
    }
 

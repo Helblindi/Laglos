@@ -1129,7 +1129,6 @@ void LagrangianLOOperator<dim, problem>::
          Array<int> row;
          Vector face_x(dim);
          H1.GetFaceDofs(face, row);
-         cout << "face: " << face << ", face_dof: " << row[2] << endl;
          int face_dof = row[2];
          get_node_position(S, face_dof, face_x);
 
@@ -1920,7 +1919,7 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
    }
    else // cell centers 
    {
-      MFEM_ABORT("No need to compute C_i at cell centers");
+      MFEM_ABORT("No need to compute V_i at cell centers");
    }
 
    int row_length = row.Size();
@@ -1995,11 +1994,10 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
       res.Add(1., dm_temp);
    }
 
-   // cout << "denom: " << denom << endl;
+   cout << "denom: " << denom << endl;
    res *= 1./denom;
 
-
-   cout << "Ci for node: " << node << endl;;
+   cout << "Ci for node: " << node << endl;
    res.Print(cout);
 }
 

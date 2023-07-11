@@ -198,7 +198,7 @@ int test_mesh_initiation()
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.RT_corner_velocity(cell, node, _vel);
+   hydro.RT_nodal_velocity(cell, node, _vel);
 
    true_vel[0] = 2.5;
    true_vel[1] = 1.5;

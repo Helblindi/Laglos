@@ -143,7 +143,7 @@ public:
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v);
-   void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
+   void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const int cell, DenseMatrix & res);
    void compute_geo_V(const int & node, Vector & res);
    void compute_geo_C(const int & node, DenseMatrix & res);

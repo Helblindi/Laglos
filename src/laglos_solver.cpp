@@ -1732,7 +1732,7 @@ void LagrangianLOOperator<dim, problem>::
 
 
 /*
-Function: RT_corner_velocity
+Function: RT_nodal_velocity
 Parameters:
    cell - index corrseponding to the cell (K_c)
    node - global index of the node to calculate the velocity on (node < H1.GetNDofs)
@@ -1746,7 +1746,7 @@ Purpose:
    has already been called.  If this function has not been called, then the returned velocity will be 0.
 */
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::RT_corner_velocity(const int & cell, const int & node, Vector &vel)
+void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, const int & node, Vector &vel)
 {
    assert(node < NDofs_H1); // "Invalid nodal index"
    assert(cell < NDofs_L2); // "Invalid cell index"
@@ -1931,7 +1931,7 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
       int row_el = row[row_it];
 
       temp = 0.;
-      RT_corner_velocity(row_el, node, temp);
+      RT_nodal_velocity(row_el, node, temp);
       // cout << "velocity computed on cell " << row_el << " for node: " << node << endl;
       temp.Print(cout);
       res.Add(1., temp);

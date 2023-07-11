@@ -656,7 +656,7 @@ void test_integral()
    cout << "Printing v_cr_gf:\n";
    v_cr_gf.Print(cout);
 
-   // hydro.RT_corner_velocity(cell, node, _vel);
+   // hydro.RT_nodal_velocity(cell, node, _vel);
    // Set int rule
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
    const IntegrationRule gir = IntRules.Get(CRFESpace.GetFE(0)->GetGeomType(), 1);

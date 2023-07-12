@@ -29,6 +29,7 @@ tests/TestMM
 tests/TestInitiation
 tests/TestCR
 tests/TestRTvel
+tests/Test1D
 Testing/
 
 # Save old files (may be of use in the future, I am a file hoarder)

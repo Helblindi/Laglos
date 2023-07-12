@@ -41,7 +41,7 @@ int upper_refinement = 7;
 
 // Default reference values
 int test_1d_mesh();
-void test_vel_field_1();
+int test_vel_field_1();
 
 int main(int argc, char *argv[])
 {
@@ -164,7 +164,7 @@ int test_1d_mesh()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction v_cr_gf(&CRFESpace);
+
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    mv_gf.MakeRef(&H1FESpace, S, offset[1]);
    sv_gf.MakeRef(&L2FESpace, S, offset[2]);
@@ -237,7 +237,7 @@ Purpose:
    v_exact = | 1 0 | |x| + |1|
              | 0 0 | |y|   |1|
 */
-void test_vel_field_1()
+int test_vel_field_1()
 {
    a = 1., b = 0., c = 1., d = 0., e = 0., f = 1.;
 
@@ -295,8 +295,6 @@ void test_vel_field_1()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction vgeo_gf(&H1FESpace);
-   ParGridFunction v_cr_gf(&CRFESpace);
 
    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
    ParGridFunction v_exact_gf(&H1FESpace);
@@ -343,67 +341,26 @@ void test_vel_field_1()
 
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      cout << "node: " << node_it << endl;
-      hydro.compute_geo_C(node_it, dm);
-      dm.Print(cout);
       hydro.compute_node_velocity_RT(node_it, dt, vec_res);
-      cout << "RT v: ";
-      vec_res.Print(cout);
       hydro.update_node_velocity(S, node_it, vec_res);
-
-      // Also store for plotting simple the averaged geometric V
-      hydro.compute_geo_V(node_it, vec_res);
-      cout << "Vgeo: ";
-      vec_res.Print(cout);
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node_it + i*H1FESpace.GetNDofs();
-         vgeo_gf[index] = vec_res[i];
-      }
-   }
-
-   // Fill center with average over corner vertices
-   Array<int> verts;
-   Vector vel_center(dim);
-   for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
-   {
-      double vel_center_x = 0., vel_center_y = 0.;
-      pmesh->GetElementVertices(ci, verts);
-      for (int j = 0; j < verts.Size(); j++)
-      {
-         int index = verts[j];
-         vel_center_x += vgeo_gf[index];
-         index = verts[j] + H1FESpace.GetNDofs();
-         vel_center_y += vgeo_gf[index];
-      }
-      vel_center_x *= 1. / verts.Size();
-      vel_center_y *= 1. / verts.Size();
-
-      vgeo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
-      vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
    // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.fill_face_velocities_with_average(S);
    hydro.fill_center_velocities_with_average(S);
 
    /* ************************
    Displace Velocities
    *************************** */ 
-   socketstream vis_vh, vis_vgeo, vis_vexact;
+   socketstream vis_vh, vis_vexact;
    char vishost[] = "localhost";
    int visport = 19916;
 
    MPI_Barrier(pmesh->GetComm());
-   vis_vgeo.precision(8);
 
    int Wx = 0, Wy = 0;
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, vgeo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
-
-   Wx += offx;
 
    hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
 
@@ -431,6 +388,21 @@ void test_vel_field_1()
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
+   }
+
+   // Since we prescribe the exact velocity on the faces, mv_gf should be the same as v_exact
+   Vector vel_err(mv_gf.Size());
+   subtract(mv_gf, v_exact_gf, vel_err);
+   double _error = vel_err.Norml2();
+
+   if (abs(_error) < tol)
+   {
+      return 0; // Test passed
+   }
+   else 
+   {
+      cout << "error: " << _error << endl;
+      return 1; // Test failed
    }
 }
 

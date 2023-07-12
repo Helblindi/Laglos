@@ -145,8 +145,16 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
 
+   // resize v_CR_gf to correspond to the number of faces
+   if (dim == 1)
+   {
+      v_CR_gf.SetSize(num_faces);
+   }
+   
    // Initialize values of intermediate face velocities
    v_CR_gf = 0.;
+
+   assert(v_CR_gf.Size() == dim * num_faces);
 
    // Set integration rule for Rannacher-Turek space
    // TODO: Modify this to be set by a parameter rather than hard-coded
@@ -1162,13 +1170,35 @@ void LagrangianLOOperator<dim, problem>::
       else 
       {
          assert(flag=="testing");
-
-         Array<int> row;
          Vector face_x(dim);
-         H1.GetFaceDofs(face, row);
-         int face_dof = row[2];
-         get_node_position(S, face_dof, face_x);
+         int face_dof;
 
+         // dof ordering depends on dimension
+         switch (dim)
+         {
+            case 1:
+            {
+               face_dof = face;
+               break;
+            }
+            case 2:
+            {
+               Array<int> row;
+               H1.GetFaceDofs(face, row);
+               face_dof = row[2];               
+               break;
+            }
+            case 3:
+            {
+               MFEM_ABORT("3D not implemented.\n");
+            }
+            default:
+            {
+               MFEM_ABORT("Invalid dimension value.\n");
+            }
+         }
+
+         get_node_position(S, face_dof, face_x);
          test_vel(face_x, t, Vf);
       }
 
@@ -1753,27 +1783,45 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
    compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v)
 {
-   DenseMatrix Ci(dim);
-   Vector Vgeo(dim);
-   double d = 0.;
-   
-   Ci = 0., Vgeo = 0., node_v = 0.;
-   compute_geo_C(node, Ci);
-   compute_geo_V(node, Vgeo);
-
-   // cout << "geo_C: " << endl;
-   // Ci.Print(cout);
-
-   compute_determinant(Ci, dt, d);
-   // cout << "d: " << d << endl;
-
-   // Compute V_i^n
-   DenseMatrix _mat(Ci);
-   _mat *= - dt / 2.;
-   for (int i = 0; i < dim; i++)
+   switch (dim)
    {
-      _mat(i,i) += d;
+      case 1:
+      {
+         // Remark 5.3 in the paper states that since each geometric node belongs to one
+         // face only, the RT velocity is equal to the IFV previously computed.
+         assert(node < num_faces);
+         get_intermediate_face_velocity(node, node_v);
+         break;
+      }
+      default:
+      {
+         DenseMatrix Ci(dim);
+         Vector Vgeo(dim);
+         double d = 0.;
+         
+         Ci = 0., Vgeo = 0., node_v = 0.;
+         compute_geo_C(node, Ci);
+         compute_geo_V(node, Vgeo);
+
+         // cout << "geo_C: " << endl;
+         // Ci.Print(cout);
+
+         compute_determinant(Ci, dt, d);
+         // cout << "d: " << d << endl;
+
+         // Compute V_i^n
+         DenseMatrix _mat(Ci);
+         _mat *= - dt / 2.;
+         for (int i = 0; i < dim; i++)
+         {
+            _mat(i,i) += d;
+         }
+         _mat.Invert();
+         _mat.Mult(Vgeo, node_v);
+         break;
+      }
    }
+   
    // cout << "pre inverse _mat:\n";
    // _mat.Print(cout);
    // double in_tol = 0.0000000000001;
@@ -1797,8 +1845,7 @@ void LagrangianLOOperator<dim, problem>::
    // }
    // else
    // {
-   _mat.Invert();
-   _mat.Mult(Vgeo, node_v);
+   
    // }
    
    // cout << "inverted _mat:\n";
@@ -1808,7 +1855,7 @@ void LagrangianLOOperator<dim, problem>::
 }
 
 
-/*
+/***********************************************************************************************************
 Function: RT_nodal_velocity
 Parameters:
    cell - index corrseponding to the cell (K_c)
@@ -1819,9 +1866,10 @@ Purpose:
    at a given node in the mesh.  If that node is not contained in the cell, this function will throw
    an error.
 
+   NOTE: This function assumes dim > 1.
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
-*/
+***********************************************************************************************************/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, const int & node, Vector &vel)
 {
@@ -1950,7 +1998,7 @@ void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, con
    }
 }
 
-/*
+/***********************************************************************************************************
 Function: RT_int_grad
 Parameters:
    cell - index corrseponding to the cell (K_c)
@@ -1960,9 +2008,10 @@ Purpose:
    This function calculates the integral of the gradient of the RT velocity function
    on a given cell.
 
+   NOTE: This function assumes that dim > 1.
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
-*/
+***********************************************************************************************************/
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix & res)
 {
@@ -2009,6 +2058,8 @@ Parameters:
 Purpose:
    Part of the process to reconstructing the continuous geometric velocity field from the discontinuous
    RT representation.  The exact equation to be solved is given by equation (5.11).
+
+   NOTE: This function assumes dim > 1.
 
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
@@ -2079,6 +2130,7 @@ Purpose:
    Part of the process to reconstructing the continuous geometric velocity field from the discontinuous
    RT representation.  The exact equation to be solved is given by equation (5.11)
 
+   NOTE: This function assumes dim > 1.
    NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
    has already been called.  If this function has not been called, then the returned velocity will be 0.
 ***********************************************************************************************************/
@@ -2520,7 +2572,29 @@ void LagrangianLOOperator<dim, problem>::
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
       // Get center node dof
-      int cell_vdof = NVDofs_H1 + num_faces + ci;
+      int cell_vdof;
+      switch (dim)
+      {
+         case 1:
+         {
+            cell_vdof = num_faces + ci;
+            break;
+         }
+         case 2:
+         {
+            cell_vdof = NVDofs_H1 + num_faces + ci;
+            break;
+         }
+         case 3:
+         {
+            MFEM_ABORT("3D not implemented.\n");
+         }
+         default:
+         {
+            MFEM_ABORT("Incorrect dim value provided.\n");
+         }
+      }
+
       get_node_position(S, cell_vdof, face_x);
       
       GetCellStateVector(S, ci, Uc);
@@ -2532,7 +2606,7 @@ void LagrangianLOOperator<dim, problem>::
          get_node_velocity(S, verts[j], node_v);
          Vc += node_v;
       }
-      Vc /= 4.;
+      Vc /= verts.Size();
 
       // Update the velocity for the center node
       update_node_velocity(S, cell_vdof, Vc);

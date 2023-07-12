@@ -794,133 +794,79 @@ void LagrangianLOOperator<dim, problem>::SetCellStateVector(Vector &S_new,
 *        |                                  |
 *       \/ (face)                          \/ (face)
 ****************************************************************************************************/
-// template<int dim, int problem>
-// void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res)
-// {
-//    Vector* sptr = const_cast<Vector*>(&S);
-//    ParGridFunction x_gf, mv_gf;
-//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-//    // Fill nodes with mesh nodes for retrieval
-//    const int nNodes = x_gf.Size() / dim; // TODO: Implement class variables for this
-
-//    Array<int> face_dofs;
-//    Vector a(dim);
-//    Vector face_node(dim); // Temp
-//    res = 0.;
-
-//    // Get int der shape functions
-//    Vector shapes = GetIntDerRefShapeFunctions();
-//    assert (dim == 2); // "This code only works for dim==2."
-
-//    H1.GetFaceDofs(face, face_dofs);
-
-//    // Compute C_{cc'} = 1/2 \Sum_{i\in {1:3}} [a_i^n \int_0^1 \theta_i(\xi) d\xi]
-//    for (int d = 0; d < face_dofs.Size(); d++)
-//    {
-//       a = 0.;
-//       for (int _dim = 0; _dim < dim; _dim++)
-//       {
-//          int index = _dim * nNodes + face_dofs[d];
-//          a[_dim] = x_gf(index);
-//       }
-//       if (d == face_dofs.Size() - 1)
-//       {
-//          face_node = a;
-//       }
-
-//       // Now that vectors are retrieved, sum
-//       a *= shapes[d];
-//       add(res, a, res);
-//    }
-
-//    Orthogonal(res);
-//    res *= 0.5;
-
-//    /* Ensure orientation of normal */
-//    const auto FI = pmesh->GetFaceInformation(face);
-
-//    if (FI.IsInterior()) // Interior face
-//    {
-//       // Orientation of the normal vector depends on the indices of
-//       // the cells that share that face.  The normal points towards
-//       // the cell with the lower global index.  This normal must be
-//       // flipped if the cell we are working with is the one of the
-//       // lower index.
-//       if (cell == min(FI.element[0].index, FI.element[1].index))
-//       {
-//          res *= -1.;
-//       }
-//    }
-//    else // Boundary face
-//    {
-//       // By default, boundary normals point toward cell.  This always
-//       // needs to be reversed to compute outward normal.
-//       assert(FI.IsBoundary());
-//       res *= -1.;
-//    }
-
-//    // Output normal
-//    {
-//       cout << "n_vecide cell: " << cell << endl;
-//       cout << "face: " << face << endl;
-//       cout << "Face node coords: ";
-//       face_node.Print(cout);
-//       cout << "Normal vector: ";
-//       res.Print(cout);
-//       cout << endl;
-//    }
-// }
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res)
 {
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
-   Vector Vf(dim), n_vec(dim), face_velocity(dim);
-   Vector Uc(dim+2), Ucp(dim+2);
-   Vector cell_c_v(dim), cell_cp_v(dim), cell_center_v(dim); // For computation of bmn
    Array<int> row;
-
    FI = pmesh->GetFaceInformation(face);
-   H1.GetFaceDofs(face, row);
-   int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
 
-   Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
-   get_node_position(S, face_dof, face_x);
-   get_node_position(S, face_vdof1, vdof1_x);
-   get_node_position(S, face_vdof2, vdof2_x);
+   int c, cp, face_dof;
+   c = FI.element[0].index;
+   cp = FI.element[1].index;
 
-   Vector secant(dim);
-   subtract(vdof2_x, vdof1_x, secant);
-
-   res = secant;
-   Orthogonal(res);
-
-   /* Ensure orientation of normal */
-   if (FI.IsInterior()) // Interior face
+   switch(dim)
    {
-      // Orientation of the normal vector depends on the indices of
-      // the cells that share that face.  The normal points towards
-      // the cell with the lower global index.  This normal must be
-      // flipped if the cell we are working with is the one of the
-      // lower index.
-      if (cell == max(FI.element[0].index, FI.element[1].index))
+      case 1:
       {
-         // cout << "flipping normal\n";
-         res *= -1.;
+         Vector cell_center_x(dim), face_x(dim);
+         face_dof = face;
+
+         vertex_element->GetRow(face, row);
+
+         int cell_gdof = cell + num_faces;
+         get_node_position(S, cell_gdof, cell_center_x);
+         get_node_position(S, face, face_x);
+
+         subtract(face_x, cell_center_x, res);
+         res *= 1. / res.Norml2();
+         break;
+      }
+      case 2:
+      {
+         H1.GetFaceDofs(face, row);
+         int face_vdof1 = row[1], face_vdof2 = row[0];
+         face_dof = row[2];
+
+         Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
+         get_node_position(S, face_dof, face_x);
+         get_node_position(S, face_vdof1, vdof1_x);
+         get_node_position(S, face_vdof2, vdof2_x);
+
+         Vector secant(dim);
+         subtract(vdof2_x, vdof1_x, secant);
+
+         res = secant;
+         Orthogonal(res);
+
+         /* Ensure orientation of normal */
+         if (FI.IsInterior()) // Interior face
+         {
+            // Orientation of the normal vector depends on the indices of
+            // the cells that share that face.  The normal points towards
+            // the cell with the lower global index.  This normal must be
+            // flipped if the cell we are working with is the one of the
+            // lower index.
+            if (cell == max(c, cp))
+            {
+               // cout << "flipping normal\n";
+               res *= -1.;
+            }
+         }
+
+         break;
+      }
+      case 3:
+      {
+         MFEM_ABORT("3D not implemented.\n");
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid dim provided.\n");
       }
    }
-
-   // Output normal
-   // {
-      // cout << "n_vecide cell: " << cell << endl;
-      // cout << "face: " << face << endl;
-      // cout << "Face node coords: ";
-      // face_x.Print(cout);
-      // cout << "Normal vector: ";
-      // res.Print(cout);
-      // cout << endl;
-   // }
 }
 
 
@@ -1130,13 +1076,14 @@ void LagrangianLOOperator<dim, problem>::
       if (flag == "NA")
       {
          if (FI.IsInterior())
-         {        
+         {
             // this vector is only needed for interior faces
             GetCellStateVector(S, cp, Ucp);
 
             // Get normal, d, and |F|
             CalcOutwardNormalInt(S, c, face, n_int);
             n_vec = n_int;
+
             double F = n_vec.Norml2();
             n_vec /= F;
             c_vec = n_int;
@@ -1152,14 +1099,6 @@ void LagrangianLOOperator<dim, problem>::
             Vf *= 0.5;
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
-
-            // cout << "\n\n==========================\n";
-            // cout << "mm\nface: " << face << endl;
-            // Vf.Print(cout);
-            // cout << "n_vec:\n";
-            // n_vec.Print(cout);
-            // cout << "=========================\n";
-
          }
          else 
          {
@@ -1270,8 +1209,6 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
-         cout << "Printing intermediate face velocities:\n";
-         v_CR_gf.Print(cout);
 
          compute_node_velocities(S, t, dt);
          if (dim > 1)
@@ -1821,37 +1758,6 @@ void LagrangianLOOperator<dim, problem>::
          break;
       }
    }
-   
-   // cout << "pre inverse _mat:\n";
-   // _mat.Print(cout);
-   // double in_tol = 0.0000000000001;
-
-   // if (Vgeo.Norml2() < in_tol)
-   // {
-   //    MFEM_ABORT("Vgeo = 0.");
-   // }
-   // if (problem == 6 && 
-   //     dim == 2 && 
-   //     _mat(0,1) < in_tol && 
-   //     _mat(1,0) < in_tol && 
-   //     _mat(1,1) < in_tol)
-   // {
-   //    if (_mat(0,0) > in_tol)
-   //    {
-   //       _mat(0,0) = 1. / _mat(0,0);
-   //    }
-   //    node_v[0] = _mat(0,0) * Vgeo[0];
-   //    node_v[1] = 0.;
-   // }
-   // else
-   // {
-   
-   // }
-   
-   // cout << "inverted _mat:\n";
-   // _mat.Print(cout);
-   // cout << "RT vel: ";
-   // node_v.Print(cout);
 }
 
 
@@ -2207,30 +2113,13 @@ void LagrangianLOOperator<dim, problem>::
                            const string flag, // Default NA
                            void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
-   // Table * edge_vertex = pmesh->GetEdgeVertexTable(); // How to iterate over faces attached to nodes
-   // Table vertex_edge;
-   // Ref: https://mfem.org/howto/nav-mesh-connectivity/
-   // Transpose(*edge_vertex, vertex_edge);
-   // DenseMatrix C(dim, dim);
-   // Vector D(dim);
-   Vector vertex_v(dim), vertex_x(dim);
+   Vector vertex_v(dim);
 
    // Iterate over vertices
    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
    {
-      cout << "--- computing velocity for corner vertex: " << vertex << endl;
-      // C = 0.;
-      // D = 0.;
-      // compute_node_velocity_LS(S, vertex_edge, vertex, t, dt, vertex_v, C, D, flag, test_vel);
       compute_node_velocity_RT(vertex, dt, vertex_v);
 
-      // TODO Compute corrected velocity -> Get C and D
-      get_node_position(S, vertex, vertex_x);
-      // compute_corrected_node_velocity(C, D, dt, vertex_x, vertex_v, flag, test_vel);
-
-      // cout << "Velocity at vertex: " << vertex << ": \n";
-      // vertex_v.Print(cout);
-      // Stuff this into S
       update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
 }

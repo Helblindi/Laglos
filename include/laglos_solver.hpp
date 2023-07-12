@@ -55,7 +55,7 @@ protected:
    IntegrationRule RT_ir;
 
    // Tables to relate cell to the contained faces
-   Table cell_face;
+   Table element_face;
    Table * vertex_element;
    Table * face_element;
    Array<int> block_offsets;

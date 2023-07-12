@@ -33,3 +33,8 @@ add_executable(TestRTvel test_RT_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/sr
 target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
 target_include_directories(TestRTvel PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestRTvel COMMAND TestRTvel)
+
+add_executable(Test1D test_1D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_include_directories(Test1D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME Test1D COMMAND Test1D)

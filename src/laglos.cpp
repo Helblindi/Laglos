@@ -94,6 +94,7 @@ int main(int argc, char *argv[]) {
    bool mm = false;
    bool optimize_timestep = false;
    bool convergence_testing = false;
+   bool suppress_output = false;
    double CFL = 0.5;
 
    OptionsParser args(argc, argv);
@@ -127,6 +128,9 @@ int main(int argc, char *argv[]) {
                   "--no-set-dt-to-h", 
                   "Enable or disable convergence testing timestep.");
    args.AddOption(&dt, "-dt", "--timestep", "Timestep to use.");
+   args.AddOption(&suppress_output, "-so", "--suppress-output", "-no-so",
+                  "--no-suppress-output",
+                  "Enable or disable output during runtime.");
 
    args.Parse();
    if (!args.Good())
@@ -135,6 +139,16 @@ int main(int argc, char *argv[]) {
       return 1;
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
+
+   // Optionally suppress std::ios output to console
+   ofstream file("/dev/null");
+   //save cout stream buffer
+   streambuf* strm_buffer = cout.rdbuf();
+   if (suppress_output)
+   {
+      // redirect cout to /dev/null
+      cout.rdbuf(file.rdbuf());
+   }
 
    // Check that convergence testing and optimizing the timestep are not both set to true
    if (optimize_timestep && convergence_testing)
@@ -605,8 +619,16 @@ int main(int argc, char *argv[]) {
       // and the oper object might have redirected the mesh positions to those.
       pmesh->NewNodes(x_gf, false);
 
+      
+
       if (last_step || (ti % vis_steps) == 0)
       {
+         // Turn off ios supppression to print status message
+         if (suppress_output)
+         {
+            // restore cout stream buffer
+            cout.rdbuf(strm_buffer);
+         }
          cout << "Current time: " << t << endl;
          double lnorm = ste_gf * ste_gf, norm;
          MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
@@ -620,8 +642,14 @@ int main(int argc, char *argv[]) {
                  << ",\tt = " << std::setw(5) << std::setprecision(4) << t
                  << ",\tdt = " << std::setw(5) << std::setprecision(6) << dt
                  << ",\t|e| = " << std::setprecision(10) << std::scientific
-                 << sqrt_norm;
-            cout << endl;
+                 << sqrt_norm
+                 << endl;
+         }
+         // Turn back on suppression
+         if (suppress_output)
+         {
+            // redirect cout to /dev/null
+            cout.rdbuf(file.rdbuf());
          }
 
          if (visualization)
@@ -915,6 +943,12 @@ int main(int argc, char *argv[]) {
       default: // do nothing for all other problems
       {
       }
+   }
+
+   if (suppress_output)
+   {
+      // restore cout stream buffer
+      cout.rdbuf(strm_buffer);
    }
    
    delete pmesh;

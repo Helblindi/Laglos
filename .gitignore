@@ -5,6 +5,8 @@
 .vscode
 Laglos.code-workspace
 build/ 
+Release/
+Debug/
 compile_commands.json
 
 # Executable

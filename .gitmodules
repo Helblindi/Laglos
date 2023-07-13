@@ -1,3 +1,0 @@
-[submodule "Release/Release/_deps/matplotlib-src"]
-	path = Release/Release/_deps/matplotlib-src
-	url = https://github.com/lava/matplotlib-cpp.git

@@ -112,14 +112,17 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
       }
       case 6: // Shock tube
       {
-         Vector _n(2);
+         Vector _n(dim);
          _n[0] = cos(CompileTimeVals::rotation_angle);
-         _n[1] = sin(CompileTimeVals::rotation_angle);
+         if (dim > 1)
+         {
+            _n[1] = sin(CompileTimeVals::rotation_angle);
+         }
          double _x_tilde = x * _n;
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.000001; // Initial shock position
+         double _x0 = 0.0000000001; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -157,14 +160,14 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
          if (t == 0) { return 1.; }
          else 
          {
-            Vector _n(2);
+            Vector _n(dim);
             _n[0] = cos(CompileTimeVals::rotation_angle);
             _n[1] = sin(CompileTimeVals::rotation_angle);
             double _x_tilde = x * _n;
 
             double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-            double _x0 = 0.000001; // Initial shock position
+            double _x0 = 0.0000000001; // Initial shock position
             double _gamma = gamma_func(CompileTimeVals::shocktube);
             get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -277,14 +280,17 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, const double & t, V
       }
       case 6: // Shocktubes
       {
-         Vector _n(2);
+         Vector _n(dim);
          _n[0] = cos(CompileTimeVals::rotation_angle);
-         _n[1] = sin(CompileTimeVals::rotation_angle);
+         if (dim > 1)
+         {
+            _n[1] = sin(CompileTimeVals::rotation_angle);
+         }
          double _x_tilde = x * _n;
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.000001; // Initial shock position
+         double _x0 = 0.0000000001; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -334,7 +340,7 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, const double & t, V
 
             double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-            double _x0 = 0.000001; // Initial shock position
+            double _x0 = 0.0000000001; // Initial shock position
             double _gamma = gamma_func(CompileTimeVals::shocktube);
             get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -462,7 +468,7 @@ inline double InitialValues<problem, dim>::ste0(const Vector &x, const double & 
       case 8:
       default:
       {
-         Vector v(2);
+         Vector v(dim);
          v0(x,t,v);
          double sie = sie0(x, t);
          return sie + 0.5 * pow(v.Norml2(), 2);
@@ -527,14 +533,19 @@ inline double InitialValues<problem, dim>::IV_pressure(const Vector & x, const d
    {
       case 6:
       {
-         Vector _n(2);
+         Vector _n(dim);
+      
          _n[0] = cos(CompileTimeVals::rotation_angle);
-         _n[1] = sin(CompileTimeVals::rotation_angle);
+         if (dim > 1)
+         {
+            _n[1] = sin(CompileTimeVals::rotation_angle);
+         }
+         
          double _x_tilde = x * _n;
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.000001; // Initial shock position
+         double _x0 = 0.0000000001; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -571,14 +582,17 @@ inline double InitialValues<problem, dim>::IV_pressure(const Vector & x, const d
       {
          if (t == 0) { return 1.; } // TODO: Change pressure
          else {
-            Vector _n(2);
+            Vector _n(dim);
             _n[0] = cos(CompileTimeVals::rotation_angle);
-            _n[1] = sin(CompileTimeVals::rotation_angle);
+            if (dim > 1)
+            {
+               _n[1] = sin(CompileTimeVals::rotation_angle);
+            }
             double _x_tilde = x * _n;
 
             double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-            double _x0 = 0.000001; // Initial shock position
+            double _x0 = 0.0000000001; // Initial shock position
             double _gamma = gamma_func(CompileTimeVals::shocktube);
             get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 

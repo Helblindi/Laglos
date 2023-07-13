@@ -21,13 +21,14 @@
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
 * ./Laglos -m data/ref-square.mesh -tf 1. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
-* ./Laglos -m data/ref-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 1] // Sod
+* ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.1 -ot -visc -mm -vis -rs 3 [problem = 6, dim = 2, shocktube = 1] // Sod
 * ./Laglos -m data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 * ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 * 
 * -------------- 1D ----------
-* ./Laglos -m data/ref-segment-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 2 [problem = 6, dim = 1, shocktube = 1] // Sod
+* ./Laglos -m data/ref-segment.mesh -tf 6 -cfl 0.5 -ot -visc -mm -rs 10 [problem = 0, dim = 1] // Smooth 1D wave 2nd order IDP 2018 paper
+* ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 6, dim = 1, shocktube = 1] // Sod
 */
 
 
@@ -98,8 +99,7 @@ int main(int argc, char *argv[]) {
    double CFL = 0.5;
 
    OptionsParser args(argc, argv);
-   // args.AddOption(&problem, "-p", "--problem", "Problem setup to use.");
-   // args.AddOption(&dim, "-dim", "--dimension", "Dimension of the problem.");
+
    args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");

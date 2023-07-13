@@ -139,7 +139,7 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.0000000001; // Initial shock position
+         double _x0 = 0.5; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -308,7 +308,7 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, const double & t, V
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.0000000001; // Initial shock position
+         double _x0 = 0.5; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
@@ -563,7 +563,7 @@ inline double InitialValues<problem, dim>::IV_pressure(const Vector & x, const d
 
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.0000000001; // Initial shock position
+         double _x0 = 0.5; // Initial shock position
          double _gamma = gamma_func(CompileTimeVals::shocktube);
          get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 

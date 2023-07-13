@@ -903,8 +903,10 @@ Purpose:
 */
 void test_vel_field_1()
 {
-   a = 1., b = 0., c = 1., d = 0., e = 0., f = 1.;
+   a = 5., b = 0., c = 1., d = 0., e = 0., f = 1.;
    aq = 0., bq = 0., dq = 0., eq = 0.;
+
+   double t = 0., dt = 0.0001;
 
    // Initialize mesh
    mfem::Mesh *mesh;
@@ -1001,7 +1003,6 @@ void test_vel_field_1()
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
-   double t = 0., dt = 0.01;
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);

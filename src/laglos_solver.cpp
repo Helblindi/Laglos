@@ -1348,9 +1348,11 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
 {
    double a = 1.;
    double b = -1. * (1. + (dt / 2.) * (C(0,0) + C(1,1)));
-   double c = (pow(dt, 2) / 4.) * (C(0,1) * C(1,0) + C(0,0) * C(1,1));
+   double c = (pow(dt, 2) / 4.) * (C(0,0) * C(1,1)) + (C(0,1) * C(1,0));
+   cout << "Ci:\n";
+   C.Print(cout);
 
-   cout << "a: " << a << ", b: " << b << ", c: " << c << endl;
+   cout << "tau: " << dt / 2. << ", a: " << a << ", b: " << b << ", c: " << c << endl;
 
    cout << "discriminant: " << pow(b,2) - 4. * a * c << endl;
    double pm = sqrt(pow(b,2) - 4. * a * c);
@@ -1366,6 +1368,10 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
    cout << "d2: " << d2 << endl;
 
    d = std::max(d1, d2);
+   if (d <= 0.)
+   {
+      MFEM_ABORT("Alpha_i should be positive.\n");
+   }
 }
 
 // template<int dim, int problem>
@@ -1741,6 +1747,8 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
    compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v)
 {
+   cout << "-----\nCompute node velocity RT\n-----\n";
+   cout << "Node: " << node << endl;
    switch (dim)
    {
       case 1:

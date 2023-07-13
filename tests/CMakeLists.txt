@@ -38,3 +38,8 @@ add_executable(Test1D test_1D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglo
 target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
 target_include_directories(Test1D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test1D COMMAND Test1D)
+
+add_executable(TestLag test_lag_functions.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestLag PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_include_directories(TestLag PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME TestLag COMMAND TestLag)

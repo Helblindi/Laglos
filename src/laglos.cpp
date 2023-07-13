@@ -19,13 +19,15 @@
 * Example run time parameters:  [Remember to change the problem in compile-time-vals.h]
 *
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
-* ./Laglos -m ../data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
+* ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
 * ./Laglos -m data/ref-square.mesh -tf 1. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
-* ./Laglos -m ../data/ref-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 1] // Sod
-* ./Laglos -m ../data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
-* ./Laglos -m ../data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
-* ./Laglos -m ../data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
+* ./Laglos -m data/ref-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 1] // Sod
+* ./Laglos -m data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
+* ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
+* ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 * 
+* -------------- 1D ----------
+* ./Laglos -m data/ref-segment-tube.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 2 [problem = 6, dim = 1, shocktube = 1] // Sod
 */
 
 
@@ -876,7 +878,7 @@ int main(int argc, char *argv[]) {
          if (Mpi::Root())
          {
             ostringstream convergence_filename;
-            convergence_filename << "/Users/madisonsheridan/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
+            convergence_filename << "~/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
             if (rs_levels != 0) {
                convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
             }

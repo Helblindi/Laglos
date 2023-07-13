@@ -29,7 +29,8 @@ template <int dim, int problem>
 class LagrangianLOOperator
 {
 protected:
-   ParFiniteElementSpace &H1, &L2, &L2V, &CR;
+   ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
+   ParGridFunction v_CR_gf; // 5.7(b)
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -51,12 +52,15 @@ protected:
    const HYPRE_Int GTVSize_L2V;
    const int NDofs_L2V;
 
+   IntegrationRule RT_ir;
+
    // Tables to relate cell to the contained faces
-   Table cell_face;
+   Table element_face;
+   Table * vertex_element;
+   Table * face_element;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
-   mutable Vector v_face_intermediate; // (5.7b)
 
    const int num_vertices, num_faces, num_edges;
 
@@ -137,9 +141,12 @@ public:
                                  Vector &D,
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void RT_corner_velocity(const int & cell, const int & node, Vector &vel);
-   void compute_geo_V(const int & node);
-   void compute_geo_C(const int & node);
+
+   void compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v);
+   void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
+   void RT_int_grad(const int cell, DenseMatrix & res);
+   void compute_geo_V(const int & node, Vector & res);
+   void compute_geo_C(const int & node, DenseMatrix & res);
    
    // Functions representing development on April 2023
    void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);

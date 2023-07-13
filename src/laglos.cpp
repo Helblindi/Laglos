@@ -878,7 +878,7 @@ int main(int argc, char *argv[]) {
          if (Mpi::Root())
          {
             ostringstream convergence_filename;
-            convergence_filename << "/Users/madisonsheridan/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
+            convergence_filename << "~/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
             if (rs_levels != 0) {
                convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
             }

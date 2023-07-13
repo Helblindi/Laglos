@@ -5,9 +5,9 @@ def main():
    nx_gridpoints = 101
    ny_gridpoints = 2
 
-   x_arr = np.linspace(-1,1,nx_gridpoints)
+   x_arr = np.linspace(0,1,nx_gridpoints)
    y_arr = np.linspace(0,1,ny_gridpoints)
-   home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
+   home_dir = "/Users/sheridan7/Workspace/Laglos/"
    filename = home_dir + "data/shocktube.mesh"
    f = open(filename, "w")
 

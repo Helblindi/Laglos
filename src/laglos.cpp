@@ -832,6 +832,7 @@ int main(int argc, char *argv[]) {
       case 4: // Noh problem
       case 3:
       case 2:
+      case 0:
       {
          // Compute errors
          ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
@@ -878,7 +879,7 @@ int main(int argc, char *argv[]) {
          if (Mpi::Root())
          {
             ostringstream convergence_filename;
-            convergence_filename << "~/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
+            convergence_filename << "/Users/sheridan7/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
             if (rs_levels != 0) {
                convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
             }

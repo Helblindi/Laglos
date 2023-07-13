@@ -9,9 +9,10 @@ class CompileTimeVals
 {
 public:
 /*
-*     Case 0: Constant density and specific internal energy. 0 velocity.
-*             In this case, we shouldn't see any values changing from
-*             the prescribed initial conditions.
+*     Case 0: One dimensional smooth wave to validate convergence rates.
+*             This test case is described in the 2018 Seconds Order IDP 
+*             paper in section 5.2.
+*             Dimension = 1.
 *     Case 1: The above but with normal vector with equal components for
 *             the cell velocity.
 *     Case 2: Isentropic vortex as described in (6.1) with a stationary 
@@ -24,8 +25,8 @@ public:
 *             Requires Neumann BC on right face and Dirichlet elsewhere.
 *     Case 8: Linear velocity field to validate Least Squares method
 */
-   const static int problem = 6;
-   const static int dim = 2;
+   const static int problem = 0;
+   const static int dim = 1;
    
    /* Various parameters */
    const static bool distort_mesh = false; // Relevant in problems 7

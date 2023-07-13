@@ -1283,14 +1283,14 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       if (abs(k / U_i[0] - m) > pow(10, -8))
       {
          counter++;
-         cout << "cell: " << ci << endl;
-         cout << "MASS CONSERVATION BROKEN!!\n";
-         cout << "k / U_i[0] - m = " << k / U_i[0] - m << endl;
-         cout << "K: " << k << endl;
-         cout << "T: " << U_i[0] << endl;
-         cout << "m: " << m << endl;
-         cout << "K/T: " << k / U_i[0] << endl;
-         cout << endl;
+         // cout << "cell: " << ci << endl;
+         // cout << "MASS CONSERVATION BROKEN!!\n";
+         // cout << "k / U_i[0] - m = " << k / U_i[0] - m << endl;
+         // cout << "K: " << k << endl;
+         // cout << "T: " << U_i[0] << endl;
+         // cout << "m: " << m << endl;
+         // cout << "K/T: " << k / U_i[0] << endl;
+         // cout << endl;
       }
    }
    double cell_ratio = counter / (double)NDofs_L2;
@@ -2645,6 +2645,10 @@ double LagrangianLOOperator<dim, problem>::pressure(const Vector & U)
    switch (problem)
    {
       case 0:
+      {
+         assert(dim==1);
+         return 1.;
+      }
       case 1:
       case 2:
       case 3:

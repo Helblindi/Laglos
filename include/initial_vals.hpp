@@ -61,6 +61,23 @@ inline double InitialValues<problem, dim>::rho0(const Vector &x, const double & 
    switch (problem)
    {
       case 0: 
+      {
+         assert(dim == 1);
+         double x0 = 0.1, x1 = 0.3;
+         if (x[0] - t < x0)
+         {
+            return 1.;
+         }
+         else if (x[0] - t < x1)
+         {
+            double _rho = 1 + pow(2.,6) * (1. / pow(x1-x0,6)) * pow(x[0]-t-x0,3) * pow(x1-x[0]+t,3);
+            return _rho;
+         }
+         else 
+         {
+            return 1.;
+         }
+      }
       case 1:
       {
          return 1.0;
@@ -210,7 +227,8 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, const double & t, V
    {
       case 0:
       {
-         v = 0.;
+         assert(dim==1);
+         v = 1.;
          return;
       }
       case 1:

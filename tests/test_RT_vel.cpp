@@ -1001,15 +1001,16 @@ void test_vel_field_1()
    mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
-   double t = 0., dt = 1.;
+   double t = 0., dt = 0.01;
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
 
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      cout << "node: " << node_it << endl;
+      cout << "\nnode: " << node_it << endl;
       hydro.compute_geo_C(node_it, dm);
+      cout << "Ci:\n";
       dm.Print(cout);
       hydro.compute_node_velocity_RT(node_it, dt, vec_res);
       cout << "RT v: ";

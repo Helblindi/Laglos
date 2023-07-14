@@ -25,6 +25,10 @@ endif()
 # set the project name
 project(Laglos LANGUAGES C CXX Fortran)
 
+# Prevent in source builds
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
+include(PreventInSourceBuilds)
+
 # Verify C++ and Fortran can communicate
 include(FortranCInterface)
 FortranCInterface_VERIFY(CXX)
@@ -110,13 +114,14 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 # Set LAGLOS_DIR as a directory location that can be referred to in the C++ files using a configure file
 # https://cmake.org/cmake/help/latest/command/configure_file.html
 set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}")
-configure_file("${LAGLOS_DIR}/config/var-config.h.in" "${LAGLOS_DIR}/include/var-config.h")
+configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 
 # Add Fortran library
 add_library(comp_lambda STATIC "${PROJECT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
 
 ### Include Directories
 INCLUDE_DIRECTORIES(include)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
 # populate matplotlib repository
 include(FetchContent)

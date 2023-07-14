@@ -12,16 +12,6 @@ compile_commands.json
 # Meshes
 mesh-test-*
 
-# Tests
-tests/TestInstantiator
-tests/TestMM
-tests/TestInitiation
-tests/TestCR
-tests/TestRTvel
-tests/Test1D
-tests/TestLag
-Testing/
-
 # Save old files (may be of use in the future, I am a file hoarder)
 saved/
 

@@ -31,11 +31,11 @@
 * ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 6, dim = 1, shocktube = 1] // Sod
 */
 
-
-#include "compile_time_vals.h"
 #include "mfem.hpp"
-#include "laglos_solver.hpp"
 #include "var-config.h"
+#include "compile_time_vals.h"
+#include "laglos_solver.hpp"
+// #include "initial_vals.hpp"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -430,24 +430,24 @@ int main(int argc, char *argv[]) {
    mv_gf.SyncAliasMemory(S);
 
    // Initialize specific volume, velocity, and specific total energy
-   FunctionCoefficient sv_coeff(InitialValues<problem, dim>::sv0);
+   FunctionCoefficient sv_coeff(InitialValues<dim, problem>::sv0);
    sv_coeff.SetTime(0.);
    sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
-   VectorFunctionCoefficient v_coeff(dim, InitialValues<problem, dim>::v0);
+   VectorFunctionCoefficient v_coeff(dim, InitialValues<dim, problem>::v0);
    v_coeff.SetTime(0.);
    v_gf.ProjectCoefficient(v_coeff);
    // Sync the data location of v_gf with its base, S
    v_gf.SyncAliasMemory(S);
 
-   FunctionCoefficient ste_coeff(InitialValues<problem, dim>::ste0);
+   FunctionCoefficient ste_coeff(InitialValues<dim, problem>::ste0);
    ste_coeff.SetTime(0.);
    ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
-   FunctionCoefficient rho_coeff(InitialValues<problem, dim>::rho0); 
+   FunctionCoefficient rho_coeff(InitialValues<dim, problem>::rho0); 
    rho_coeff.SetTime(0.);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
@@ -792,7 +792,7 @@ int main(int argc, char *argv[]) {
                Vector _x(dim);
                _x = 0.;
                _x[0] = rho_x_exact_py[i];
-               rho_exact_py[i] = InitialValues<problem, dim>::rho0(_x, t);
+               rho_exact_py[i] = InitialValues<dim, problem>::rho0(_x, t);
             }
 
             

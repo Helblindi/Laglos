@@ -1,13 +1,6 @@
 #include "laglos_solver.hpp"
 #include <cassert>
 
-extern "C" {
-   void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-      double *in_rhol, double *in_ul, double *in_el, double *in_pl,
-      double *in_rhor, double *in_ur, double *in_er, double *in_pr,
-      double *in_tol, bool *no_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, double *vstar, int *k, double *b_covolume);
-}
 
 namespace mfem
 {
@@ -273,7 +266,7 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
             // viscosity contribution
             // cout << "\t---n:\n";
             // n.Print(cout);
-            d = compute_lambda_max(U_i, U_j, n) * c_norm; 
+            d = ProblemDescription<dim,problem>::compute_lambda_max(U_i, U_j, n) * c_norm; 
 
             temp_sum += d/mi;
          }
@@ -573,7 +566,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
          }
       }
 
-      DenseMatrix F_i = flux(U_i);
+      DenseMatrix F_i = ProblemDescription<dim,problem>::flux(U_i);
       sums = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -601,7 +594,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
             GetCellStateVector(S_new, cj, U_j); 
 
             // flux contribution
-            DenseMatrix dm = flux(U_j);
+            DenseMatrix dm = ProblemDescription<dim,problem>::flux(U_j);
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -611,7 +604,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
             /* viscosity contribution */
             if (use_viscosity)
             {
-               d = compute_lambda_max(U_i, U_j, n) * c_norm; 
+               d = ProblemDescription<dim,problem>::compute_lambda_max(U_i, U_j, n) * c_norm; 
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -665,7 +658,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
                      {
                         U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
                      }
-                     DenseMatrix F_i_slip = flux(U_i_bdry);
+                     DenseMatrix F_i_slip = ProblemDescription<dim,problem>::flux(U_i_bdry);
                      F_i_slip.Mult(c, y_temp_bdry);
                   }
                   else
@@ -1108,10 +1101,10 @@ void LagrangianLOOperator<dim, problem>::
 
             // cout << "(mm)\tn:\n";
             // n_vec.Print(cout);
-            d = compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
+            d = ProblemDescription<dim,problem>::compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
 
-            Vf = velocity(Uc);
-            Vf += velocity(Ucp);
+            Vf = ProblemDescription<dim,problem>::velocity(Uc);
+            Vf += ProblemDescription<dim,problem>::velocity(Ucp);
             Vf *= 0.5;
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
@@ -1119,7 +1112,7 @@ void LagrangianLOOperator<dim, problem>::
          else 
          {
             assert(FI.IsBoundary());
-            Vf = velocity(Uc);             
+            Vf = ProblemDescription<dim,problem>::velocity(Uc);             
          }
       }
       else 
@@ -1213,7 +1206,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
    {
       case 4: // Noh problem
       {
-         VectorFunctionCoefficient velocity_coeff(dim, InitialValues<problem, dim>::v0);
+         VectorFunctionCoefficient velocity_coeff(dim, InitialValues<dim, problem>::v0);
          velocity_coeff.SetTime(t);
          mv_gf_old.ProjectCoefficient(velocity_coeff);
 
@@ -2226,8 +2219,8 @@ void LagrangianLOOperator<dim, problem>::
          cp = FI.element[1].index;
          GetCellStateVector(S, c, Uc);
          GetCellStateVector(S, cp, Ucp);
-         cell_c_v = velocity(Uc);
-         cell_cp_v = velocity(Ucp);
+         cell_c_v = ProblemDescription<dim,problem>::velocity(Uc);
+         cell_cp_v = ProblemDescription<dim,problem>::velocity(Ucp);
          
          // cout << "We have an interior face: " << face << endl;
          // cout << "Cell c: " << c << ", cell cp: " << cp << endl;
@@ -2515,8 +2508,8 @@ void LagrangianLOOperator<dim, problem>::
       get_node_position(S, cell_vdof, face_x);
       
       GetCellStateVector(S, ci, Uc);
-      Vc = velocity(Uc);
-      Vc = 0.;
+      Vc = ProblemDescription<dim,problem>::velocity(Uc);
+      Vc = 0.; // TODO: Huh?
       pmesh->GetElementVertices(ci, verts);
       for (int j = 0; j < verts.Size(); j++)
       {
@@ -2628,159 +2621,6 @@ void LagrangianLOOperator<dim, problem>::get_node_position(const Vector &S, cons
       int index = node + i * NDofs_H1;
       x[i] = x_gf[index];
    }
-}
-
-/* ProblemDescription Functions */
-template<int dim, int problem>
-double LagrangianLOOperator<dim, problem>::internal_energy(const Vector & U)
-{
-   const double &rho = 1./U[0];
-   const double &e = specific_internal_energy(U);
-   return rho * e;
-}
-
-template<int dim, int problem>
-double LagrangianLOOperator<dim, problem>::specific_internal_energy(const Vector & U)
-{
-   const Vector  v   = velocity(U);
-   const double &E   = U[dim + 1]; // specific total energy
-   return E - 0.5 * pow(v.Norml2(), 2);
-}
-
-template<int dim, int problem>
-double LagrangianLOOperator<dim, problem>::pressure(const Vector & U)
-{
-   switch (problem)
-   {
-      case 0:
-      {
-         assert(dim==1);
-         return 1.;
-      }
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      default:
-      {
-         double gamma = InitialValues<problem,dim>::gamma_func();
-         return (gamma - 1.) * internal_energy(U);
-      }
-   }
-}
-
-template<int dim, int problem>
-double LagrangianLOOperator<dim, problem>::compute_lambda_max(const Vector & U_i,
-                                                     const Vector & U_j,
-                                                     const Vector & n_ij,
-                                                     const string flag) // default is 'NA'
-{
-   double in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr;
-   if (flag == "testing")
-   {
-      in_rhol = U_i[0];
-      in_ul = U_i[1];
-      in_pl = U_i[2];
-      in_el = U_i[3];
-
-      in_rhor = U_j[0]; 
-      in_ur = U_j[1];
-      in_pr = U_j[2];
-      in_er = U_j[3];
-   }
-   else 
-   {
-      assert(flag == "NA");
-
-      in_rhol = 1. / U_i[0];
-      in_ul = velocity(U_i) * n_ij; 
-      in_el = specific_internal_energy(U_i);
-      in_pl = pressure(U_i);
-
-      in_rhor = 1. / U_j[0]; 
-      in_ur = velocity(U_j) * n_ij; 
-      in_er = specific_internal_energy(U_j);
-      in_pr = pressure(U_j);
-   }
-
-   // double b_covolume = 0.1/max(in_rhol,in_rhor);
-   double b_covolume = 0.;
-
-   double in_tol = 0.0000000000001,
-          lambda_maxl_out = 0.,
-          lambda_maxr_out = 0.,
-          pstar = 0.,
-          vstar = 0.;
-   bool no_iter = true; // Had to change for test case to run
-   int k = 0; // Tells you how many iterations were needed for convergence
-
-   // cout << "CLM pre fortran function.\n";
-   __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-      &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-      &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&vstar,&k,&b_covolume);
-
-   double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
-
-   if (isnan(d))
-   {
-      cout << "nij:\n";
-      n_ij.Print(cout);
-      cout << "Ui:\n";
-      U_i.Print(cout);
-      cout << "Uj:\n";
-      U_j.Print(cout);
-      cout << "in_rhol: " << in_rhol << ", ul: " << in_ul << ", el: " << in_el << ", pl: " << in_pl << endl;
-      cout << "in_rhor: " << in_rhor << ", ur: " << in_ur << ", er: " << in_er << ", pr: " << in_pr << endl;
-      MFEM_ABORT("NaN values returned by lambda max computation!\n");
-   }
-
-   return d;
-   // return 1.;
-}
-
-template<int dim, int problem>
-Vector LagrangianLOOperator<dim, problem>::velocity(const Vector & U)
-{
-   Vector v;
-   v.SetSize(dim);
-   Array<int> dofs;
-   for (int i = 0; i < dim; i++)
-   {
-      dofs.Append(i + 1);
-   }
-   U.GetSubVector(dofs, v);
-
-   return v;
-}
-
-template<int dim, int problem>
-DenseMatrix LagrangianLOOperator<dim, problem>::flux(const Vector &U)
-{
-   DenseMatrix result(dim+2, dim);
-
-   const Vector v = velocity(U);
-   const double p = pressure(U);
-
-
-   // * is not overridden for Vector class, but *= is
-   Vector v_neg = v, vp = v;
-   v_neg *= -1.;
-   vp *= p;
-
-   // Set f(U) according to (2.1c)
-   result.SetRow(0,v_neg);
-
-
-   for (int i = 0; i < dim; i++)
-   {
-      result(i+1, i) = p;
-   }
-   result.SetRow(dim+1, vp);
-
-   return result;
 }
 
 /* Explicit n_vectantiation */

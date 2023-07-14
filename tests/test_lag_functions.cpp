@@ -9,6 +9,7 @@
 
 using namespace std;
 using namespace mfem;
+using namespace hydrodynamics;
 namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
@@ -207,7 +208,7 @@ int test_flux()
    U[2] = 3.;
 
    DenseMatrix dm(dim+2, dim), dm_exact(dim+2, dim), dm_error(dim+2, dim);
-   dm = hydro.flux(U);
+   dm = ProblemDescription<dim, problem>::flux(U);
    dm_exact(0,0) = -2.;
    dm_exact(1,0) = 1.;
    dm_exact(2,0) = 2.;

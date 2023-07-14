@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "laglos_assembly.hpp"
+#include "problem_description.hpp"
 #include "initial_vals.hpp"
 #include <iostream>
 #include <cassert>
@@ -173,21 +174,6 @@ public:
 
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);
-
-   /* Problem Description Functions */
-   static double internal_energy(const Vector &U);
-
-   static double specific_internal_energy(const Vector &U);
-   static double pressure(const Vector &U);
-
-   static double compute_lambda_max(const Vector & U_i,
-                                    const Vector & U_j,
-                                    const Vector & n_ij,
-                                    const string flag="NA");
-   
-   static Vector velocity(const Vector & U);
-
-   DenseMatrix flux(const Vector &U);
 };
 
 } // end ns hydrodynamics

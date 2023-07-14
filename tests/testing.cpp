@@ -1,10 +1,12 @@
 #include "mfem.hpp"
-#include "laglos_solver.hpp"
+#include "problem_description.hpp"
 #include <cassert>
 #include <fstream>
 #include <sstream>
 
 using namespace std;
+using namespace mfem;
+using namespace hydrodynamics;
 
 const int dim = 1;
 const int problem = 1;
@@ -80,7 +82,7 @@ void test_lambda_max_computation()
 
          
          // Call case
-         lambda_max = mfem::hydrodynamics::LagrangianLOOperator<dim, problem>::compute_lambda_max(Ul_v, Ur_v, n, "testing");
+         lambda_max = ProblemDescription<dim, problem>::compute_lambda_max(Ul_v, Ur_v, n, "testing");
          cout << "case: " << _case << ", lambda max: " << lambda_max << endl;
 
          next_step = "read_tol";
@@ -110,7 +112,7 @@ void test_lambda_max_computation()
 
 double gamma_law_internal(double rho, double p, double b_covolume)
 {
-   double vv = (p*(1-b_covolume*rho)) / ((mfem::hydrodynamics::InitialValues<problem, dim>::gamma_func() - 1.) * rho); 
+   double vv = (p*(1-b_covolume*rho)) / ((ProblemDescription<problem, dim>::gamma_func() - 1.) * rho); 
 
    // cout << "b_covolume: "
    //      << b_covolume

@@ -1,0 +1,3 @@
+#cmakedefine LAGLOS_DIR_ENABLE
+#cmakedefine LAGLOS_DIR "@LAGLOS_DIR@"
+#cmakedefine MFEM_DIR "@MFEM_DIR@"

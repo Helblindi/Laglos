@@ -23,7 +23,6 @@ cmake_install.cmake
 libcomp_lambda.a
 makefile 
 CTestTestfile.cmake
-_deps/
 
 # Tests
 tests/TestInstantiator
@@ -51,6 +50,8 @@ arbitrary_eos_lagrangian_lambda_module.mod
 # Results
 results/*
 
+# Variables defined for local machine via configuration file
+include/var-config.h
 
 #Unknown
 DartConfiguration.tcl

@@ -107,6 +107,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MFEM_CXX_FLAGS}")
 list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_INCLUDE_DIRS}")
 list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 
+# Set LAGLOS_DIR as a directory location that can be referred to in the C++ files using a configure file
+# https://cmake.org/cmake/help/latest/command/configure_file.html
+set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}")
+configure_file("${LAGLOS_DIR}/config/var-config.h.in" "${LAGLOS_DIR}/include/var-config.h")
+
 # Add Fortran library
 add_library(comp_lambda STATIC "${PROJECT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
 

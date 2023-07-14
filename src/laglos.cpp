@@ -35,6 +35,7 @@
 #include "compile_time_vals.h"
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
+#include "var-config.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -80,7 +81,7 @@ int main(int argc, char *argv[]) {
    // const int problem = 1;
 
    // Parse command line options
-   const char *mesh_file = "default";
+   const char *mesh_file_location = "default";
    int rs_levels = 0;
    int rp_levels = 0;
    int order_mv = 2;  // Order of mesh movement approximation space
@@ -100,7 +101,7 @@ int main(int argc, char *argv[]) {
 
    OptionsParser args(argc, argv);
 
-   args.AddOption(&mesh_file, "-m", "--mesh", "Mesh file to use.");
+   args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
@@ -160,8 +161,10 @@ int main(int argc, char *argv[]) {
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
    Mesh *mesh;
-   if (strncmp(mesh_file, "default", 7) != 0)
+   if (strncmp(mesh_file_location, "default", 7) != 0)
    {
+      std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
+      const char* mesh_file = result.c_str();
       mesh = new Mesh(mesh_file, true, true);
    }
    else // Default mesh
@@ -907,7 +910,8 @@ int main(int argc, char *argv[]) {
          if (Mpi::Root())
          {
             ostringstream convergence_filename;
-            convergence_filename << "/Users/sheridan7/Workspace/Laglos/saved/convergence/temp_output/np" << num_procs;
+            convergence_filename << "./results/convergence/temp_output/np" << num_procs;
+
             if (rs_levels != 0) {
                convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
             }

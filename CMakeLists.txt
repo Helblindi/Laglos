@@ -113,7 +113,7 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 
 # Set LAGLOS_DIR as a directory location that can be referred to in the C++ files using a configure file
 # https://cmake.org/cmake/help/latest/command/configure_file.html
-set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}")
+set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}/")
 configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 
 # Add Fortran library
@@ -136,6 +136,9 @@ if(NOT matplotlib_POPULATED)
 endif()
 include_directories(SYSTEM ${matplotlib_SOURCE_DIR})
 
+add_subdirectory(results)
+add_subdirectory(results/convergence)
+add_subdirectory(results/convergence/temp_output)
 add_subdirectory(src)
 
 # Enable testing

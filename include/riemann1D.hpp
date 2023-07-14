@@ -14,6 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+#ifndef RIEMANN1D
+#define RIEMANN1D
+
 #include "mfem.hpp"
 
 namespace riemann1D
@@ -21,11 +24,11 @@ namespace riemann1D
 
 using namespace mfem;
 
-double init(const double *params);
-double rho(const double *xt);
-double p(const double *xt);
-double v(const double *xt);
-double e(const double *xt);
+static double init(const double *params);
+static double rho(const double *xt);
+static double p(const double *xt);
+static double v(const double *xt);
+static double e(const double *xt);
 
 class ExactEnergyCoefficient : public Coefficient
 {
@@ -52,14 +55,14 @@ public:
    }
 };
 
-const double rel_err = 1e-14;
-const int max_iter   = 30;
+const static double rel_err = 1e-14;
+const static int max_iter   = 30;
 
-double rl, pl, ul, rr, pr, ur, gamma_, alpha_, tau_, xi;
-double cl, cr, uc, pc, clc, crc, rcl, rcr, uls, urs;
-char l_w, r_w;
+static double rl, pl, ul, rr, pr, ur, gamma_, alpha_, tau_, xi;
+static double cl, cr, uc, pc, clc, crc, rcl, rcr, uls, urs;
+static char l_w, r_w;
 
-double rho(const double *xt)
+static double rho(const double *xt)
 {
    double x = xt[0], t = xt[1];
 
@@ -222,9 +225,9 @@ double v(const double *xt)
    return ur;
 }
 
-double e(const double *xt) { return p(xt) / ((gamma_ - 1) * rho(xt)); }
+static double e(const double *xt) { return p(xt) / ((gamma_ - 1) * rho(xt)); }
 
-int exact_riemann_solver(
+static int exact_riemann_solver(
 
    // polytropic index
    const double gamma_,
@@ -315,7 +318,7 @@ int exact_riemann_solver(
    return 1;
 }
 
-double init(const double *params)
+static double init(const double *params)
 {
    rl = params[0];
    pl = params[1];
@@ -402,3 +405,5 @@ double init(const double *params)
 }
 
 } // namespace riemann1D
+
+#endif // RIEMANN1D

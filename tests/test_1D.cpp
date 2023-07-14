@@ -1,4 +1,5 @@
 #include "mfem.hpp"
+#include "var-config.h"
 #include "laglos_solver.hpp"
 #include <cassert>
 #include <fstream>
@@ -26,7 +27,9 @@ int order_mv = 2;          // Order of mesh movement approximation space
 int order_u = 0;
 const string flag = "testing";
 double tol = 1e-12;
-const char *mesh_file = "../data/ref-segment-tube.mesh";
+const char *mesh_file_location = "/data/ref-segment-tube.mesh";
+std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
+const char* mesh_file = result.c_str();
 int mesh_refinements = 1;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = false;          // Doesn't matter

@@ -115,44 +115,37 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       }
       case 6: // Shock tube
       {
-         Vector _n(dim);
-         _n[0] = cos(CompileTimeVals::rotation_angle);
-         if (dim > 1)
-         {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
-         }
-         double _x_tilde = x * _n;
-
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
          double _x0 = 0.5; // Initial shock position
          double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-         ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+         ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                             _lambda1p, _lambda3);
          double _cL = sqrt(_gamma * _pL / _rhoL);
-         double _xi = (_x_tilde - _x0) / t;
 
          if (t == 0)
          {
-            if (_xi <= _x0) { return _rhoL; } else { return _rhoR; }
+            if (x[0] <= _x0) { return _rhoL; } else { return _rhoR; }
          }
          else 
          {
-            if (_xi <= _lambda1m * t)
+            double _xi = (x[0] - _x0) / t;
+
+            if (_xi <= _lambda1m)
             {
                return _rhoL;
             }
-            else if (_xi <= _lambda1p * t)
+            else if (_xi <= _lambda1p)
             {
                double val = _rhoL * pow(2/(_gamma + 1) + ((_gamma - 1)/((_gamma + 1) * _cL))*(_vL - _xi), 2/(_gamma - 1));
                return val;
             }
-            else if (_xi <= _vstar * t)
+            else if (_xi <= _vstar)
             {
                return _rhoLstar;
             }
-            else if (_xi <= _lambda3 * t)
+            else if (_xi <= _lambda3)
             {
                return _rhoRstar;
             }
@@ -172,7 +165,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
             double _x0 = 0.0000000001; // Initial shock position
             double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-            ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+            ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                               _lambda1p, _lambda3);
             double _cL = sqrt(_gamma * _pL / _rhoL);
@@ -284,51 +277,42 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
       }
       case 6: // Shocktubes
       {
-         Vector _n(dim);
-         _n[0] = cos(CompileTimeVals::rotation_angle);
-         if (dim > 1)
-         {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
-         }
-         double _x_tilde = x * _n;
-
+         v = 0.;
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
          double _x0 = 0.5; // Initial shock position
          double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-         ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+         ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                             _lambda1p, _lambda3);
          double _cL = sqrt(_gamma * _pL / _rhoL);
-         double _xi = (_x_tilde - _x0) / t;
-
-         // our velocity will be some scaling of the normal vector
-         v = _n;
 
          if (t == 0)
          {
-            if (_xi <= _x0) { v *= _vL; } else { v *= _vR; }
+            if (x[0] <= _x0) { v[0] = _vL; } else { v[0] = _vR; }
          }
          else 
          {
-            if (_xi <= _lambda1m * t)
+            double _xi = (x[0] - _x0) / t;
+            
+            if (_xi <= _lambda1m)
             {
-               v *= _vL;
+               v[0] = _vL;
             }
-            else if (_xi <= _lambda1p * t)
+            else if (_xi <= _lambda1p)
             {
                double val = (2 / (_gamma + 1)) * (_cL + ((_gamma -1)/2.)*_vL + _xi);
-               v *= val;
+               v[0] = val;
             }
-            else if (_xi <= _vstar * t)
+            else if (_xi <= _vstar)
             {
-               v *= _vstar;
+               v[0] = _vstar;
             }
-            else if (_xi <= _lambda3 * t)
+            else if (_xi <= _lambda3)
             {
-               v *= _vstar;
+               v[0] = _vstar;
             }
-            else { v *= _vR; }
+            else { v[0] = _vR; }
          }
          return;
       }
@@ -346,7 +330,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
             double _x0 = 0.0000000001; // Initial shock position
             double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-            ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+            ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                               _lambda1p, _lambda3);
             double _cL = sqrt(_gamma * _pL / _rhoL);
@@ -436,7 +420,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
          double _p = IV_pressure(x,t);
          double _gamma = ProblemDescription<dim,problem>::gamma_func();
          double _rho = rho0(x,t);
-         return _p / (_rho * (_gamma - 1));
+         return _p / (_rho * (_gamma - 1.));
       }
       case 7:
       {
@@ -445,7 +429,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             double _p = IV_pressure(x,t);
             double _gamma = ProblemDescription<dim,problem>::gamma_func();
             double _rho = rho0(x,t);
-            return _p / (_rho * (_gamma - 1));
+            return _p / (_rho * (_gamma - 1.));
          }
       }
       default: 
@@ -489,45 +473,36 @@ inline double InitialValues<dim, problem>::IV_pressure(const Vector & x, const d
    {
       case 6:
       {
-         Vector _n(dim);
-      
-         _n[0] = cos(CompileTimeVals::rotation_angle);
-         if (dim > 1)
-         {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
-         }
-         
-         double _x_tilde = x * _n;
-
          double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
                 _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
          double _x0 = 0.5; // Initial shock position
          double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-         ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+         ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                             _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                             _lambda1p, _lambda3);
          double _cL = sqrt(_gamma * _pL / _rhoL);
-         double _xi = (_x_tilde - _x0) / t;
+         
          if (t == 0)
          {
-            if (_xi <= _x0) { return _pL; } else { return _pR; }
+            if (x[0] <= _x0) { return _pL; } else { return _pR; }
          }
          else 
          {
-            if (_xi <= _lambda1m * t)
+            double _xi = (x[0] - _x0) / t;
+            if (_xi <= _lambda1m)
             {
                return _pL;
             }
-            else if (_xi <= _lambda1p * t)
+            else if (_xi <= _lambda1p)
             {
                double val = _pL * pow( 2 / (_gamma + 1) + ((_gamma - 1)/((_gamma + 1) * _cL)) * (_vL - _xi), 2 * _gamma / (_gamma - 1) );
                return val;
             }
-            else if (_xi <= _vstar * t)
+            else if (_xi <= _vstar)
             {
                return _pstar;
             }
-            else if (_xi <= _lambda3 * t)
+            else if (_xi <= _lambda3)
             {
                return _pstar;
             }
@@ -550,7 +525,7 @@ inline double InitialValues<dim, problem>::IV_pressure(const Vector & x, const d
                   _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
             double _x0 = 0.0000000001; // Initial shock position
             double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-            ProblemDescription<dim, problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
+            ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
                               _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
                               _lambda1p, _lambda3);
             double _cL = sqrt(_gamma * _pL / _rhoL);

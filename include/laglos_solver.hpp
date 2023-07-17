@@ -2,7 +2,6 @@
 #define LAGLOS_SOLVER
 
 #include "mfem.hpp"
-#include "laglos_assembly.hpp"
 #include "problem_description.hpp"
 #include "initial_vals.hpp"
 #include <iostream>

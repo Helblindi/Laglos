@@ -687,7 +687,13 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
       } // End Face iterator
 
       sums *= dt;
-      sums /= m_hpv->Elem(ci);
+      double k = pmesh->GetElementVolume(ci);
+      cout << "element volume: " << k << endl;
+      double _mass = k / U_i[0];
+      cout << "el mass: " << _mass << endl;
+      sums /= _mass;
+      // sums /= m_hpv->Elem(ci);
+      cout << "m_hpv->Elem(ci) for el " << ci << ": " << m_hpv->Elem(ci) << endl;
       val += sums;
 
       SetCellStateVector(S_new, ci, val);
@@ -1740,8 +1746,8 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
    compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v)
 {
-   cout << "-----\nCompute node velocity RT\n-----\n";
-   cout << "Node: " << node << endl;
+   // cout << "-----\nCompute node velocity RT\n-----\n";
+   // cout << "Node: " << node << endl;
    switch (dim)
    {
       case 1:

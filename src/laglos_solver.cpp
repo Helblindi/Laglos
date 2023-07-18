@@ -488,28 +488,15 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & t, const double dt)
 {
    cout << "Making timestep\n";
-   Vector S_new = S; // We need a place to store updated cell values.
-
-   // Retrieve data from Monolithic block vector S
-   Vector* sptr = const_cast<Vector*>(&S_new);
-   ParGridFunction x_gf, mv_gf_new;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   mv_gf_new.MakeRef(&H1, *sptr, block_offsets[1]);
 
    // Update state variables contained in S_new
-   ComputeStateUpdate(S_new, t, dt);
-
-   // Check if state has been updated.
-   if (S_new.GetData() == S.GetData()) { MFEM_ABORT("\t State has not changed with step.\n"); }
+   ComputeStateUpdate(S, t, dt);
 
    // Move the mesh
    if (mm)
    {
-      MoveMesh(S_new, x_gf, mv_gf_new, t, dt);
+      MoveMesh(S, t, dt);
    }
-
-   // Update the paramters passed by reference
-   S = S_new;
 
    // Verify that our algorithm is locally mass conservative
    CheckMassConservation(S);
@@ -1225,12 +1212,13 @@ void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const in
 *        5) Modify x_gf to represent the moved nodes (Computes the (n+1)th mesh location).
 ****************************************************************************************************/
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf, GridFunction & mv_gf_new,const double & t, const double & dt)
+void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, const double & dt)
 {
    // cout << "Moving mesh\n";
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf_old;
-   mv_gf_old.MakeRef(&H1, *sptr, block_offsets[1]);
+   ParGridFunction x_gf, mv_gf;
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    switch (problem)
    {
@@ -1238,7 +1226,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
       {
          VectorFunctionCoefficient velocity_coeff(dim, InitialValues<dim, problem>::v0);
          velocity_coeff.SetTime(t);
-         mv_gf_old.ProjectCoefficient(velocity_coeff);
+         mv_gf.ProjectCoefficient(velocity_coeff);
 
          break;
       }
@@ -1265,11 +1253,8 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
    }
 
    // Finally, move x_gf according to mv_gf_old
-   add(x_gf, dt, mv_gf_old, x_gf);
-   pmesh->NewNodes(x_gf, false);
-
-   // Set mv_gf that corresponds to S_new.
-   mv_gf_new = mv_gf_old;
+   add(x_gf, dt, mv_gf, x_gf);
+   pmesh->NodesUpdated();
 }
 
 

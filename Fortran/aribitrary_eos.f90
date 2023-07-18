@@ -1,6 +1,6 @@
 !===Authors: Bennett Clayton, Jean-Luc Guermond, and Bojan Popov, Texas A&M, April 5, 2021
 !===Revised September 1, 2022 for Lagrangian coortdinates
-MODULE arbitrary_eos_Lagrangian_lambda_module
+MODULE arbitrary_eos_lambda_module
   IMPLICIT NONE
   PUBLIC               :: Lagrangian_lambda_arbitrary_eos !===Main function
   PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
@@ -26,7 +26,7 @@ CONTAINS
   !===Outputs: lambda_maxl_out,lambda_maxr_out,pstar,vstar,k
   !===use no_iter=.true. if one does not want iterative line search. Then the parameter ``in_tol'' is useless.
   !===use no_iter=.false. to enable the line search with ``in_tol'' tolerance. Then ``k'' is the numer of iterations used.
-  SUBROUTINE Lagrangian_lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
+  SUBROUTINE lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
        lambda_maxl_out,lambda_maxr_out,pstar,vstar,k, b_covolume)
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol

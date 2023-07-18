@@ -4,14 +4,23 @@
 using namespace mfem;
 using namespace std;
 
-// Fortran subroutine
+// Fortran subroutine from Eulerian code
 extern "C" {
    void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-      double *in_rhol, double *in_ul, double *in_el, double *in_pl,
-      double *in_rhor, double *in_ur, double *in_er, double *in_pr,
+      double *in_taul, double *in_ul, double *in_el, double *in_pl,
+      double *in_taur, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *no_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, double *vstar, int *k, double *b_covolume);
+      double *lambda_maxr_out, double *pstar, int *k);
 }
+
+// Fortran subroutine from Lagrangian code
+// extern "C" {
+//    void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+//       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
+//       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
+//       double *in_tol, bool *no_iter,double *lambda_maxl_out,
+//       double *lambda_maxr_out, double *pstar, double *vstar, int *k, double *b_covolume);
+// }
 
 namespace mfem
 {
@@ -193,15 +202,15 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
    const Vector & n_ij,
    const string flag) // default is 'NA'
 {
-   double in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr;
+   double in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr;
    if (flag == "testing")
    {
-      in_rhol = U_i[0];
+      in_taul = U_i[0];
       in_ul = U_i[1];
       in_pl = U_i[2];
       in_el = U_i[3];
 
-      in_rhor = U_j[0]; 
+      in_taur = U_j[0]; 
       in_ur = U_j[1];
       in_pr = U_j[2];
       in_er = U_j[3];
@@ -210,19 +219,16 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
    {
       assert(flag == "NA");
 
-      in_rhol = 1. / U_i[0];
+      in_taul = U_i[0];
       in_ul = velocity(U_i) * n_ij; 
       in_el = specific_internal_energy(U_i);
       in_pl = pressure(U_i);
 
-      in_rhor = 1. / U_j[0]; 
+      in_taur = U_j[0]; 
       in_ur = velocity(U_j) * n_ij; 
       in_er = specific_internal_energy(U_j);
       in_pr = pressure(U_j);
    }
-
-   // double b_covolume = 0.1/max(in_rhol,in_rhor);
-   double b_covolume = 0.;
 
    double in_tol = 0.0000000000001,
           lambda_maxl_out = 0.,
@@ -234,8 +240,8 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
 
    // cout << "CLM pre fortran function.\n";
    __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-      &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-      &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&vstar,&k,&b_covolume);
+      &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
+      &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
 
    double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
 
@@ -247,8 +253,8 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
       U_i.Print(cout);
       cout << "Uj:\n";
       U_j.Print(cout);
-      cout << "in_rhol: " << in_rhol << ", ul: " << in_ul << ", el: " << in_el << ", pl: " << in_pl << endl;
-      cout << "in_rhor: " << in_rhor << ", ur: " << in_ur << ", er: " << in_er << ", pr: " << in_pr << endl;
+      cout << "in_taul: " << in_taul << ", ul: " << in_ul << ", el: " << in_el << ", pl: " << in_pl << endl;
+      cout << "in_taur: " << in_taur << ", ur: " << in_ur << ", er: " << in_er << ", pr: " << in_pr << endl;
       MFEM_ABORT("NaN values returned by lambda max computation!\n");
    }
 

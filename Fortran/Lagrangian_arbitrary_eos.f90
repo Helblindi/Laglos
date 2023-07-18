@@ -1,7 +1,7 @@
 !===Authors: Bennett Clayton, Jean-Luc Guermond, and Bojan Popov, Texas A&M, April 5, 2021
-MODULE arbitrary_eos_lambda_module
+MODULE arbitrary_eos_lagrangian_lambda_module
    IMPLICIT NONE
-   PUBLIC               :: lambda_arbitrary_eos !===Main function
+   PUBLIC               :: lagrangian_lambda_arbitrary_eos !===Main function
    PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
    REAL(KIND=8), PUBLIC :: b_covolume = 0.d0   !===Covolume constant, if known
    REAL(KIND=8), PUBLIC :: p_infty = 0.d0      !===Reference pressure
@@ -22,7 +22,7 @@ MODULE arbitrary_eos_lambda_module
 
 CONTAINS
 
-   SUBROUTINE lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
+   SUBROUTINE lagrangian_lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
                                    WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k)
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: in_taul, in_el, in_taur, in_er, in_tol
@@ -122,7 +122,7 @@ CONTAINS
             k = k + 1
          END DO
       END IF
-   END SUBROUTINE lambda_arbitrary_eos
+   END SUBROUTINE lagrangian_lambda_arbitrary_eos
 
    SUBROUTINE init(tau, e, p, gamma, a, alpha, capA, capB, capC, expo)
       IMPLICIT NONE
@@ -308,4 +308,4 @@ CONTAINS
       END IF
    END FUNCTION rhostar
 
-END MODULE arbitrary_eos_lambda_module
+END MODULE arbitrary_eos_lagrangian_lambda_module

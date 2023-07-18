@@ -29,6 +29,7 @@ static double rho(const double *xt);
 static double p(const double *xt);
 static double v(const double *xt);
 static double e(const double *xt);
+static double ste(const double *xt);
 
 class ExactEnergyCoefficient : public Coefficient
 {
@@ -36,7 +37,7 @@ public:
    ExactEnergyCoefficient()
    {
       double params[8];
-      params[0] = 1.0; params[3] = 0.1; // rho
+      params[0] = 1.0; params[3] = 0.125; // rho
       params[1] = 1.0; params[4] = 0.1; // p
       params[2] = params[5] = 0.0;      // u
       params[6] = 1.4;                  // gamma
@@ -54,6 +55,83 @@ public:
       return e(p);
    }
 };
+
+class ExactDensityCoefficient : public Coefficient
+{
+public:
+   ExactDensityCoefficient()
+   {
+      double params[8];
+      params[0] = 1.0; params[3] = 0.125; // rho
+      params[1] = 1.0; params[4] = 0.1; // p
+      params[2] = params[5] = 0.0;      // u
+      params[6] = 1.4;                  // gamma
+      params[7] = 0.5;                  // x_center
+      init(params);
+   }
+
+   virtual double Eval(ElementTransformation &T,
+                       const IntegrationPoint &ip)
+   {
+      Vector pos(3);
+      T.Transform(ip, pos);
+
+      double p[2]; p[0] = pos(0); p[1] = time;
+      return rho(p);
+   }
+};
+
+class ExactVelocityCoefficient : public Coefficient
+{
+public:
+   ExactVelocityCoefficient()
+   {
+      double params[8];
+      params[0] = 1.0; params[3] = 0.125; // rho
+      params[1] = 1.0; params[4] = 0.1; // p
+      params[2] = params[5] = 0.0;      // u
+      params[6] = 1.4;                  // gamma
+      params[7] = 0.5;                  // x_center
+      init(params);
+   }
+
+   virtual double Eval(ElementTransformation &T,
+                       const IntegrationPoint &ip)
+   {
+      Vector pos(3);
+      T.Transform(ip, pos);
+
+      double p[2]; p[0] = pos(0); p[1] = time;
+      return v(p);
+   }
+};
+
+class ExactSTEnergyCoefficient : public Coefficient
+{
+public:
+   ExactSTEnergyCoefficient()
+   {
+      double params[8];
+      params[0] = 1.0; params[3] = 0.125; // rho
+      params[1] = 1.0; params[4] = 0.1; // p
+      params[2] = params[5] = 0.0;      // u
+      params[6] = 1.4;                  // gamma
+      params[7] = 0.5;                  // x_center
+      init(params);
+   }
+
+   virtual double Eval(ElementTransformation &T,
+                       const IntegrationPoint &ip)
+   {
+      Vector pos(3);
+      T.Transform(ip, pos);
+
+      double p[2]; p[0] = pos(0); p[1] = time;
+      return ste(p);
+   }
+};
+
+
 
 const static double rel_err = 1e-14;
 const static int max_iter   = 30;
@@ -226,6 +304,11 @@ double v(const double *xt)
 }
 
 static double e(const double *xt) { return p(xt) / ((gamma_ - 1) * rho(xt)); }
+
+static double ste(const double *xt)
+{
+   return e(xt) + 0.5 * pow(v(xt), 2);
+}
 
 static int exact_riemann_solver(
 

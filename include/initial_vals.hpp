@@ -113,45 +113,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       {
          return x[0];
       }
-      case 6: // Shock tube
-      {
-         double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
-                _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.5; // Initial shock position
-         double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-         ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
-                            _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
-                            _lambda1p, _lambda3);
-         double _cL = sqrt(_gamma * _pL / _rhoL);
-
-         if (t == 0)
-         {
-            if (x[0] <= _x0) { return _rhoL; } else { return _rhoR; }
-         }
-         else 
-         {
-            double _xi = (x[0] - _x0) / t;
-
-            if (_xi <= _lambda1m)
-            {
-               return _rhoL;
-            }
-            else if (_xi <= _lambda1p)
-            {
-               double val = _rhoL * pow(2/(_gamma + 1) + ((_gamma - 1)/((_gamma + 1) * _cL))*(_vL - _xi), 2/(_gamma - 1));
-               return val;
-            }
-            else if (_xi <= _vstar)
-            {
-               return _rhoLstar;
-            }
-            else if (_xi <= _lambda3)
-            {
-               return _rhoRstar;
-            }
-            else { return _rhoR; }
-         }
-      }
+      case 6: return (x(0) < 0.5) ? 1.0 : 0.125; // Sod shocktube
       case 7:{
          if (t == 0) { return 1.; }
          else 
@@ -275,47 +237,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          v[1] = 0.;
          return;
       }
-      case 6: // Shocktubes
-      {
-         v = 0.;
-         double _rhoL, _rhoR, _rhoLstar, _rhoRstar, _vL, _vR, _vstar, 
-                _pL, _pR, _pstar, _lambda1m, _lambda1p, _lambda3;
-         double _x0 = 0.5; // Initial shock position
-         double _gamma = ProblemDescription<dim,problem>::gamma_func(CompileTimeVals::shocktube);
-         ProblemDescription<dim,problem>::get_shocktube_vals(CompileTimeVals::shocktube, _rhoL, _rhoR, _rhoLstar, _rhoRstar, 
-                            _vL, _vR, _vstar, _pL, _pR, _pstar, _lambda1m, 
-                            _lambda1p, _lambda3);
-         double _cL = sqrt(_gamma * _pL / _rhoL);
-
-         if (t == 0)
-         {
-            if (x[0] <= _x0) { v[0] = _vL; } else { v[0] = _vR; }
-         }
-         else 
-         {
-            double _xi = (x[0] - _x0) / t;
-            
-            if (_xi <= _lambda1m)
-            {
-               v[0] = _vL;
-            }
-            else if (_xi <= _lambda1p)
-            {
-               double val = (2 / (_gamma + 1)) * (_cL + ((_gamma -1)/2.)*_vL + _xi);
-               v[0] = val;
-            }
-            else if (_xi <= _vstar)
-            {
-               v[0] = _vstar;
-            }
-            else if (_xi <= _lambda3)
-            {
-               v[0] = _vstar;
-            }
-            else { v[0] = _vR; }
-         }
-         return;
-      }
+      case 6: v = 0.0; break; // Sod
       case 7: // Saltzman
       {
          if (t == 0) { v = 0.; }
@@ -415,13 +337,8 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             return p / ((gamma - 1) * rho0(x,t));
          }
       }
-      case 6: // Sod tube, pressure is given
-      {
-         double _p = IV_pressure(x,t);
-         double _gamma = ProblemDescription<dim,problem>::gamma_func();
-         double _rho = rho0(x,t);
-         return _p / (_rho * (_gamma - 1.));
-      }
+      case 6: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0)
+                        : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
       case 7:
       {
          if (t == 0) { return pow(10, -4); }
@@ -458,8 +375,7 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
       {
          Vector v(dim);
          v0(x,t,v);
-         double sie = sie0(x, t);
-         return sie + 0.5 * pow(v.Norml2(), 2);
+         return sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
       }
    }
    

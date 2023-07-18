@@ -11,6 +11,7 @@ compile_commands.json
 
 # Meshes
 mesh-test-*
+results/mesh-*
 
 # Save old files (may be of use in the future, I am a file hoarder)
 saved/

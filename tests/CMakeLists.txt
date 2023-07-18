@@ -35,14 +35,14 @@ target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
 target_include_directories(Test1D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test1D COMMAND Test1D)
 
-add_executable(TestLag EXCLUDE_FROM_ALL test_lag_functions.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestLag PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
-target_include_directories(TestLag PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
-add_test(NAME TestLag COMMAND TestLag)
+add_executable(Test2D EXCLUDE_FROM_ALL test_2D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_include_directories(Test2D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME Test2D COMMAND Test2D)
 
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestInstantiator TestMM TestInitiation TestCR TestRTvel Test1D TestLag)
+add_dependencies(build_tests TestInstantiator TestMM TestInitiation TestCR TestRTvel Test1D Test2D)

@@ -111,7 +111,7 @@ double ProblemDescription<dim, problem>::pressure(const Vector & U)
          assert(dim==1);
          return 1.;
       }
-      case 1:
+      case 1: // Sod
       case 2:
       case 3:
       case 4:
@@ -159,7 +159,7 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
    switch (problem)
    {
       case 0:
-      case 1:
+      case 1: { return 7./5.; } // Sod
       case 2:
       case 3:
       case 5:
@@ -172,7 +172,7 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
          switch (shocktube)
          {
             case 0:
-            case 1:                    // Sod
+            case 1: {MFEM_ABORT("Not implemented.\n"); }
             case 2: { return 7./5.; }  // Lax
             case 3: { return 5./3.; }  // Leblanc
             default:

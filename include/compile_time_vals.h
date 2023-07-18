@@ -13,19 +13,18 @@ public:
 *             This test case is described in the 2018 Seconds Order IDP 
 *             paper in section 5.2.
 *             Dimension = 1.
-*     Case 1: The above but with normal vector with equal components for
-*             the cell velocity.
+*     Case 1: Sod shocktube in 1D
 *     Case 2: Isentropic vortex as described in (6.1) with a stationary 
 *             center at the origin.
 *     Case 3: Isentropic vortex (see above) with moving center.
 *     Case 4: Noh problem as described in (6.3)
 *     Case 5: 1D Horizontal Movement on 2D mesh
-*     Case 6: Shocktubes 1 - Sod, 2 - Lax, 3 - Leblanc
+*     Case 6: Shocktubes 1 - Sod, 2 - Lax, 3 - Leblanc -- Not currently implemented
 *     Case 7: Saltzman problem. See https://people.tamu.edu/~guermond/PUBLICATIONS/guermond_popov_Saavedra_JCP_2020.pdf.
 *             Requires Neumann BC on right face and Dirichlet elsewhere.
 *     Case 8: Linear velocity field to validate Least Squares method
 */
-   const static int problem = 6;
+   const static int problem = 1;
    const static int dim = 1;
    
    /* Various parameters */
@@ -34,7 +33,7 @@ public:
    constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity
 
    /* Saltzman Problem parameters */
-   const static bool change_CFL = true;
+   const static bool change_CFL = false;
    constexpr static double CFL_first = 0.01;
    constexpr static double CFL_second = 0.25;
    constexpr static double CFL_time_change = 0.01; // From Boscheri's paper

@@ -123,9 +123,18 @@ def compute_rates(vals):
             table.append([vals['n_Dofs'][i], vals['vel_L1_Error'][i], "{---}", vals['vel_L2_Error'][i], "{---}",
                           vals['vel_Linf_Error'][i], "{---}"])
         else:
-            L1_rate = np.around(np.log(vals['vel_L1_Error'][i]/vals['vel_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
-            L2_rate = np.around(np.log(vals['vel_L2_Error'][i]/vals['vel_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
-            Linf_rate = np.around(np.log(vals['vel_Linf_Error'][i]/vals['vel_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if (vals['vel_L1_Error'][i-1] != 0):
+                L1_rate = np.around(np.log(vals['vel_L1_Error'][i]/vals['vel_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            else:
+                L1_rate = "---"
+            if (vals['vel_L2_Error'][i-1] != 0):
+                L2_rate = np.around(np.log(vals['vel_L2_Error'][i]/vals['vel_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            else:
+                L2_rate = "---"
+            if (vals['vel_Linf_Error'][i-1] != 0):
+                Linf_rate = np.around(np.log(vals['vel_Linf_Error'][i]/vals['vel_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            else:
+                Linf_rate = "---"
 
             table.append([vals['n_Dofs'][i], vals['vel_L1_Error'][i], L1_rate,
                         vals['vel_L2_Error'][i], L2_rate,

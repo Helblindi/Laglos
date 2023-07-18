@@ -5,8 +5,7 @@
 *     Case 0: Constant density and specific internal energy. 0 velocity.
 *             In this case, we shouldn't see any values changing from
 *             the prescribed initial conditions.
-*     Case 1: The above but with normal vector with equal components for
-*             the cell velocity.
+*     Case 1: Sod Shocktube 1D
 *     Case 2: Isentropic vortex as described in (6.1) with a stationary 
 *             center at the origin.
 *     Case 3: Isentropic vortex (see above) with moving center.
@@ -64,10 +63,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
             return 1.;
          }
       }
-      case 1:
-      {
-         return 1.0;
-      }
+      case 1: return (x(0) < 0.5) ? 1.0 : 0.125; // Sod shocktube
       case 2: // Isentropic vortex
       {
          const double beta = 5.; // vortex strength
@@ -113,7 +109,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       {
          return x[0];
       }
-      case 6: return (x(0) < 0.5) ? 1.0 : 0.125; // Sod shocktube
+      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7:{
          if (t == 0) { return 1.; }
          else 
@@ -172,12 +168,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          v = 1.;
          return;
       }
-      case 1:
-      {
-         v = 1;
-         v /= v.Norml2();
-         return;
-      }
+      case 1: v = 0.0; break; // Sod
       case 2: // Isentropic vortex with 0 velocity
       {
          const double beta = 5.; // vortex strength
@@ -237,7 +228,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          v[1] = 0.;
          return;
       }
-      case 6: v = 0.0; break; // Sod
+      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7: // Saltzman
       {
          if (t == 0) { v = 0.; }
@@ -310,7 +301,8 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
    switch (problem)
    {
       case 0:
-      case 1:
+      case 1: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0) // Sod
+                        : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
       case 2: // Isentropic vortex
       case 3: 
       case 5: // 1D horizontal motion
@@ -337,8 +329,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             return p / ((gamma - 1) * rho0(x,t));
          }
       }
-      case 6: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0)
-                        : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
+      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7:
       {
          if (t == 0) { return pow(10, -4); }
@@ -363,7 +354,7 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
    switch (problem)
    {
       case 0:
-      case 1:
+      case 1: // Sod
       case 2:
       case 3:
       case 4:

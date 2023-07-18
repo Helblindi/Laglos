@@ -134,7 +134,6 @@ DenseMatrix ProblemDescription<dim, problem>::flux(const Vector &U)
    const Vector v = velocity(U);
    const double p = pressure(U);
 
-
    // * is not overridden for Vector class, but *= is
    Vector v_neg = v, vp = v;
    v_neg *= -1.;
@@ -143,11 +142,11 @@ DenseMatrix ProblemDescription<dim, problem>::flux(const Vector &U)
    // Set f(U) according to (2.1c)
    result.SetRow(0,v_neg);
 
-
    for (int i = 0; i < dim; i++)
    {
       result(i+1, i) = p;
    }
+
    result.SetRow(dim+1, vp);
 
    return result;

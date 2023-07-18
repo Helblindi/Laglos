@@ -490,8 +490,10 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
    cout << "Making timestep\n";
 
    // Update state variables contained in S_new
+   cout << "Verifying S has been modified. S.Normle(): " << S.Norml2() << endl;
    ComputeStateUpdate(S, t, dt);
-
+   cout << "S.Norml2(): " << S.Norml2() << endl;
+   // assert(false);
    // Move the mesh
    if (mm)
    {
@@ -538,10 +540,10 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
    for (; ci < NDofs_L2; ci++) // Cell iterator
    {
       sum_validation = 0.;
-      cout << "CSU::ci: " << ci << endl;
+      // cout << "CSU::ci: " << ci << endl;
       GetCellStateVector(S, ci, U_i);
-      cout << "cell state vector:\n";
-      U_i.Print(cout);
+      // cout << "cell state vector:\n";
+      // U_i.Print(cout);
       
       val = U_i;
 
@@ -565,8 +567,8 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
 
       DenseMatrix F_i = ProblemDescription<dim,problem>::flux(U_i);
       sums = 0.;
-      cout << "Flux at U_i:\n";
-      F_i.Print(cout);
+      // cout << "Flux at U_i:\n";
+      // F_i.Print(cout);
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
@@ -580,10 +582,11 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          n /= F;
          assert(1. - n.Norml2() < 1e-12);
          FI = pmesh->GetFaceInformation(fids[j]);
+         cout << "\tcell: " << ci << ", face: " << fids[j] << endl;
 
          if (FI.IsInterior())
          {
-            cout << "CSU::Interior face\n";
+            cout << "\t\tCSU::Interior face\n";
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -592,15 +595,10 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
                assert(ci == FI.element[1].index);
                cj = FI.element[0].index; 
             }
-            cout << "cell: " << cj << endl;
             GetCellStateVector(S, cj, U_j); 
-            cout << "Cell state vector for cj:\n";
-            U_j.Print(cout);
 
             // flux contribution
             DenseMatrix dm = ProblemDescription<dim,problem>::flux(U_j);
-            cout << "DM for j:";
-            dm.Print(cout);
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -611,7 +609,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
             if (use_viscosity)
             {
                d = ProblemDescription<dim,problem>::compute_lambda_max(U_i, U_j, n) * c_norm; 
-               cout << "viscosity: " << d << endl;
+               // cout << "viscosity: " << d << endl;
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -620,7 +618,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          }
          else
          {
-            cout << "CSU::boundary\n";
+            cout << "\t\tCSU::boundary\n";
             assert(FI.IsBoundary());
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
 
@@ -674,7 +672,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
                      cout << "invalid boundary attribute: " << bdr_attribute << endl;
                      cout << "cell : " << ci << endl;
                      cout << "face: " << fids[j] << endl;  
-                     y_temp *= 2; 
+                     y_temp *= 2.; 
                   }
 
                   y_temp += y_temp_bdry;
@@ -683,14 +681,12 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
 
                default:
                {
-                  y_temp *= 2;
+                  y_temp *= 2.;
                   break;
                }
             } // End switch case
 
             // Add in boundary contribution
-            cout << "boundary contribution: \n";
-            y_temp.Print(cout);
             sums -= y_temp;
          } // End boundary face        
 
@@ -700,16 +696,9 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
 
       sums *= dt;
       double k = pmesh->GetElementVolume(ci);
-      cout << "element volume: " << k << endl;
       double _mass = k / U_i[0];
-      cout << "el mass: " << _mass << endl;
       sums /= _mass;
-      // sums /= m_hpv->Elem(ci);
-      cout << "m_hpv->Elem(ci) for el " << ci << ": " << m_hpv->Elem(ci) << endl;
       val += sums;
-
-      cout << "state update: \n";
-      val.Print(cout);
 
       SetCellStateVector(S_new, ci, val);
       
@@ -746,7 +735,8 @@ void LagrangianLOOperator<dim, problem>::GetCellStateVector(const Vector &S,
    // Ex: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
    for (int i = 0; i < dim; i++)
    {
-      int index = cell + i*NDofs_L2V;
+      int index = cell + i*NDofs_L2;
+      assert(index < v_gf.Size());
       U[i+1] = v_gf.Elem(index);
    }
 
@@ -777,7 +767,7 @@ void LagrangianLOOperator<dim, problem>::SetCellStateVector(Vector &S_new,
 
    for (int i = 1; i < dim; i++)
    {
-      dofs.Append(cell + i*NDofs_L2V);
+      dofs.Append(cell + i*NDofs_L2);
       sub_dofs.Append(i+1);
    }
 
@@ -855,13 +845,13 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
          get_node_position(S, face_dof, face_x);
          get_node_position(S, face_vdof1, vdof1_x);
          get_node_position(S, face_vdof2, vdof2_x);
-         cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
-         cout << "face_x: ";
-         face_x.Print(cout);
-         cout << "vdof1_x: ";
-         vdof1_x.Print(cout);
-         cout << "vdof2_x: ";
-         vdof2_x.Print(cout);
+         // cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
+         // cout << "face_x: ";
+         // face_x.Print(cout);
+         // cout << "vdof1_x: ";
+         // vdof1_x.Print(cout);
+         // cout << "vdof2_x: ";
+         // vdof2_x.Print(cout);
 
          Vector secant(dim);
          subtract(vdof2_x, vdof1_x, secant);
@@ -1116,13 +1106,13 @@ void LagrangianLOOperator<dim, problem>::
             n_vec = n_int;
 
             double F = n_vec.Norml2();
-            cout << "F: " << F << endl;
+            // cout << "F: " << F << endl;
             n_vec /= F;
             assert(1. - n_vec.Norml2() < 1e-12);
             c_vec = n_int;
             c_vec /= 2.;
             double c_norm = c_vec.Norml2();
-            cout << "c_norm: " << c_norm << endl;
+            // cout << "c_norm: " << c_norm << endl;
 
             // cout << "(mm)\tn:\n";
             // n_vec.Print(cout);
@@ -1131,15 +1121,15 @@ void LagrangianLOOperator<dim, problem>::
             Vf = ProblemDescription<dim,problem>::velocity(Uc);
             Vf += ProblemDescription<dim,problem>::velocity(Ucp);
             Vf *= 0.5;
-            cout << "averaged cell velocities:\n";
-            Vf.Print(cout);
+            // cout << "averaged cell velocities:\n";
+            // Vf.Print(cout);
             double coeff = d * (Ucp[0] - Uc[0]) / F;
-            cout << "coeff: " << coeff << endl;
+            // cout << "coeff: " << coeff << endl;
             Vf.Add(coeff, n_vec);
-            cout << "n_vec:\n";
-            n_vec.Print(cout);
-            cout << "final face velocity:\n";
-            Vf.Print(cout);
+            // cout << "n_vec:\n";
+            // n_vec.Print(cout);
+            // cout << "final face velocity:\n";
+            // Vf.Print(cout);
          }
          else 
          {
@@ -1248,8 +1238,8 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
       default: // Move mesh according to paper
       {
          compute_intermediate_face_velocities(S, t);
-         cout << "output intermediate face velocities:\n";
-         v_CR_gf.Print(cout);
+         // cout << "output intermediate face velocities:\n";
+         // v_CR_gf.Print(cout);
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2
@@ -1270,7 +1260,7 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
             double val = 0., k=0., temp_sum = 0.;
             for (int ci = 0; ci < NDofs_L2; ci++)
             {  
-               cout << "cell: " << ci << endl;
+               // cout << "cell: " << ci << endl;
                val = 1.;
                k = pmesh->GetElementVolume(ci);
                temp_sum = 0.;
@@ -1329,11 +1319,11 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
 
-      cout << "ci: " << ci << endl;
-      cout << "m from m_hpv: " << m << endl;
-      cout << "k: " << k << endl;
-      cout << "tau: " << U_i[0] << endl;
-      cout << "Element mass calculation: " << k / U_i[0] << endl;
+      // cout << "ci: " << ci << endl;
+      // cout << "m from m_hpv: " << m << endl;
+      // cout << "k: " << k << endl;
+      // cout << "tau: " << U_i[0] << endl;
+      // cout << "Element mass calculation: " << k / U_i[0] << endl;
 
       if (abs(k / U_i[0] - m) > pow(10, -8))
       {

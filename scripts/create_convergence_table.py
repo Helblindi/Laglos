@@ -34,6 +34,28 @@ def gather_vals():
             'n_refinements': [],
             'n_Dofs': [],
             'h': [],
+            # rho
+            'rho_L1_Error': [],
+            'rho_L1_Rates': [],
+            'rho_L2_Error': [],
+            'rho_L2_Rates': [],
+            'rho_Linf_Error': [],
+            'rho_Linf_Rates': [],
+            # vel 
+            'vel_L1_Error': [],
+            'vel_L1_Rates': [],
+            'vel_L2_Error': [],
+            'vel_L2_Rates': [],
+            'vel_Linf_Error': [],
+            'vel_Linf_Rates': [],
+            # ste
+            'ste_L1_Error': [],
+            'ste_L1_Rates': [],
+            'ste_L2_Error': [],
+            'ste_L2_Rates': [],
+            'ste_Linf_Error': [],
+            'ste_Linf_Rates': [],
+            # composite
             'L1_Error': [],
             'L1_Rates': [],
             'L2_Error': [],
@@ -55,7 +77,109 @@ def gather_vals():
 
 def compute_rates(vals):
 
-    # Use tabulate to create a formatted table
+    ########## Use tabulate to create a formatted table for density rates ##########
+    table = []
+    for i in range(len(vals['h'])):
+        if i == 0:
+            table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], "{---}", vals['rho_L2_Error'][i], "{---}",
+                          vals['rho_Linf_Error'][i], "{---}", vals['mass_loss'][i], "{---}"])
+        else:
+            L1_rate = np.around(np.log(vals['rho_L1_Error'][i]/vals['rho_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            L2_rate = np.around(np.log(vals['rho_L2_Error'][i]/vals['rho_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            Linf_rate = np.around(np.log(vals['rho_Linf_Error'][i]/vals['rho_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if vals['mass_loss'][i-1] > pow(10,-14):
+                mass_loss_rate = np.around(np.log(vals['mass_loss'][i]/vals['mass_loss'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+                table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], L1_rate,
+                          vals['rho_L2_Error'][i], L2_rate,
+                          vals['rho_Linf_Error'][i], Linf_rate,
+                          vals['mass_loss'][i], mass_loss_rate])
+            else:
+                table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], L1_rate,
+                          vals['rho_L2_Error'][i], L2_rate,
+                          vals['rho_Linf_Error'][i], Linf_rate,
+                          vals['mass_loss'][i], "{---}"])
+            
+
+    s_table = tabulate(table,
+                       headers=["# dof", "rho L1 Error", "Rate", "rho L2 Error",
+                                "Rate", "rho L-Inf Error", "Rate", "Mass Loss", "Rate"],
+                       tablefmt="latex")
+
+    # Output table to console
+    print("             ")
+    print("Density Rates")
+    print("             ")
+    print(s_table)
+
+    # Output table to txt file
+    f = open("../saved/convergence/density_convergence_rates.txt", "w+")
+    f.write(s_table)
+    f.close()
+
+    ########## Use tabulate to create a formatted table for velocity rates ##########
+    table = []
+    for i in range(len(vals['h'])):
+        if i == 0:
+            table.append([vals['n_Dofs'][i], vals['vel_L1_Error'][i], "{---}", vals['vel_L2_Error'][i], "{---}",
+                          vals['vel_Linf_Error'][i], "{---}"])
+        else:
+            L1_rate = np.around(np.log(vals['vel_L1_Error'][i]/vals['vel_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            L2_rate = np.around(np.log(vals['vel_L2_Error'][i]/vals['vel_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            Linf_rate = np.around(np.log(vals['vel_Linf_Error'][i]/vals['vel_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+
+            table.append([vals['n_Dofs'][i], vals['vel_L1_Error'][i], L1_rate,
+                        vals['vel_L2_Error'][i], L2_rate,
+                        vals['vel_Linf_Error'][i], Linf_rate])
+            
+
+    s_table = tabulate(table,
+                       headers=["# dof", "vel L1 Error", "Rate", "vel L2 Error",
+                                "Rate", "vel L-Inf Error", "Rate"],
+                       tablefmt="latex")
+
+    # Output table to console
+    print("             ")
+    print("Velocity Rates")
+    print("             ")
+    print(s_table)
+
+    # Output table to txt file
+    f = open("../saved/convergence/velocity_convergence_rates.txt", "w+")
+    f.write(s_table)
+    f.close()
+
+    ########## Use tabulate to create a formatted table for specific total energy rates ##########
+    table = []
+    for i in range(len(vals['h'])):
+        if i == 0:
+            table.append([vals['n_Dofs'][i], vals['ste_L1_Error'][i], "{---}", vals['ste_L2_Error'][i], "{---}",
+                          vals['ste_Linf_Error'][i], "{---}"])
+        else:
+            L1_rate = np.around(np.log(vals['ste_L1_Error'][i]/vals['ste_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            L2_rate = np.around(np.log(vals['ste_L2_Error'][i]/vals['ste_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            Linf_rate = np.around(np.log(vals['ste_Linf_Error'][i]/vals['ste_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            table.append([vals['n_Dofs'][i], vals['ste_L1_Error'][i], L1_rate,
+                          vals['ste_L2_Error'][i], L2_rate,
+                          vals['ste_Linf_Error'][i], Linf_rate])
+            
+
+    s_table = tabulate(table,
+                       headers=["# dof", "ste L1 Error", "Rate", "ste L2 Error",
+                                "Rate", "ste L-Inf Error", "Rate"],
+                       tablefmt="latex")
+
+    # Output table to console
+    print("             ")
+    print("Specific Total Energy Rates")
+    print("             ")
+    print(s_table)
+
+    # Output table to txt file
+    f = open("../saved/convergence/ste_convergence_rates.txt", "w+")
+    f.write(s_table)
+    f.close()
+
+    ########## Use tabulate to create a formatted table for composite rates ##########
     table = []
     for i in range(len(vals['h'])):
         if i == 0:
@@ -85,10 +209,12 @@ def compute_rates(vals):
 
     # Output table to console
     print("             ")
+    print("Composite Rates")
+    print("             ")
     print(s_table)
 
     # Output table to txt file
-    f = open("../saved/convergence/convergence_rates.txt", "w+")
+    f = open("../saved/convergence/composite_convergence_rates.txt", "w+")
     f.write(s_table)
     f.close()
 

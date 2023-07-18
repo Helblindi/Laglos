@@ -485,7 +485,7 @@ bool LagrangianLOOperator<dim, problem>::IsBdrVertex(const int & node)
 *     
 ****************************************************************************************************/
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, double dt)
+void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & t, const double dt)
 {
    cout << "Making timestep\n";
    Vector S_new = S; // We need a place to store updated cell values.
@@ -499,15 +499,17 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, double & t, dou
    // Update state variables contained in S_new
    ComputeStateUpdate(S_new, t, dt);
 
+   // Check if state has been updated.
+   if (S_new.GetData() == S.GetData()) { MFEM_ABORT("\t State has not changed with step.\n"); }
+
    // Move the mesh
    if (mm)
    {
-      MoveMesh(S, x_gf, mv_gf_new, t, dt);
+      MoveMesh(S_new, x_gf, mv_gf_new, t, dt);
    }
 
    // Update the paramters passed by reference
    S = S_new;
-   t += dt;
 
    // Verify that our algorithm is locally mass conservative
    CheckMassConservation(S);
@@ -1221,6 +1223,8 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, GridFunction &x_gf,
       default: // Move mesh according to paper
       {
          compute_intermediate_face_velocities(S, t);
+         cout << "output intermediate face velocities:\n";
+         v_CR_gf.Print(cout);
          // Construct ti, face normals
          // ti = [0. 0.]^T in 2D
          // 3DTODO: Modify this according to seciton 5.2

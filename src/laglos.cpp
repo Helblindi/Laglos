@@ -36,6 +36,7 @@
 #include "compile_time_vals.h"
 #include "laglos_solver.hpp"
 // #include "initial_vals.hpp"
+#include "riemann1D.hpp"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -464,115 +465,114 @@ int main(int argc, char *argv[]) {
 
    ParGridFunction rho_gf(&L2FESpace);
 
-   if (visualization)
-   {
-      // Compute Density
-      for (int i = 0; i < sv_gf.Size(); i++)
-      {
-         rho_gf[i] = 1./sv_gf[i];
-      } 
+   // if (visualization)
+   // {
+   //    // Compute Density
+   //    for (int i = 0; i < sv_gf.Size(); i++)
+   //    {
+   //       rho_gf[i] = 1./sv_gf[i];
+   //    } 
 
-      // Make sure all MPI ranks have sent their 'v' solution before initiating
-      // another set of GLVis connections (one from each rank):
-      MPI_Barrier(pmesh->GetComm());
+   //    // Make sure all MPI ranks have sent their 'v' solution before initiating
+   //    // another set of GLVis connections (one from each rank):
+   //    MPI_Barrier(pmesh->GetComm());
 
-      vis_rho.precision(8);
-      vis_v.precision(8);
-      vis_ste.precision(8);
+   //    vis_rho.precision(8);
+   //    vis_v.precision(8);
+   //    vis_ste.precision(8);
 
-      vis_rho_ex.precision(8);
-      vis_v_ex.precision(8);
-      vis_ste_ex.precision(8);
+   //    vis_rho_ex.precision(8);
+   //    vis_v_ex.precision(8);
+   //    vis_ste_ex.precision(8);
 
-      vis_rho_err.precision(8);
-      vis_v_err.precision(8);
-      vis_ste_err.precision(8);
+   //    vis_rho_err.precision(8);
+   //    vis_v_err.precision(8);
+   //    vis_ste_err.precision(8);
 
-      int Wx = 0, Wy = 0; // window position
-      const int Ww = 350, Wh = 350; // window size
-      int offx = Ww+10, offy = Wh+45;; // window offsets
+   //    int Wx = 0, Wy = 0; // window position
+   //    const int Ww = 350, Wh = 350; // window size
+   //    int offx = Ww+10, offy = Wh+45;; // window offsets
 
-      VisualizeField(vis_rho, vishost, visport, rho_gf,
-                     "Density", Wx, Wy, Ww, Wh);
-      Wx += offx;
-      VisualizeField(vis_v, vishost, visport, v_gf,
-                     "Velocity", Wx, Wy, Ww, Wh);
-      Wx += offx;
-      VisualizeField(vis_ste, vishost, visport, ste_gf,
-                     "Specific Total Energy", Wx, Wy, Ww, Wh);
-      Wx = 0;
-      Wy += offy;
+   //    VisualizeField(vis_rho, vishost, visport, rho_gf,
+   //                   "Density", Wx, Wy, Ww, Wh);
+   //    Wx += offx;
+   //    VisualizeField(vis_v, vishost, visport, v_gf,
+   //                   "Velocity", Wx, Wy, Ww, Wh);
+   //    Wx += offx;
+   //    VisualizeField(vis_ste, vishost, visport, ste_gf,
+   //                   "Specific Total Energy", Wx, Wy, Ww, Wh);
+   //    Wx = 0;
+   //    Wy += offy;
 
-      switch(problem)
-      {
-         case 8:
-         case 7:
-         case 6:
-         case 5:
-         case 4: // Noh Problem
-         case 3:
-         case 2:
-         case 1:
-         case 0:
-         {
-            // Compute errors
-            ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-            ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-            ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+   //    // Compute errors
+   //    ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+   //    ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+   //    ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
 
-            rho_ex->ProjectCoefficient(rho_coeff);
-            vel_ex->ProjectCoefficient(v_coeff);
-            ste_ex->ProjectCoefficient(ste_coeff);
+   //    switch(problem)
+   //    {
+   //       case 8:
+   //       case 7:
+   //       case 6:
+   //       case 5:
+   //       case 4: // Noh Problem
+   //       case 3:
+   //       case 2:
+   //       case 1:
+   //       case 0:
+   //       {
+   //          rho_ex->ProjectCoefficient(rho_coeff);
+   //          vel_ex->ProjectCoefficient(v_coeff);
+   //          ste_ex->ProjectCoefficient(ste_coeff);
 
-            ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-            rho_err -= *rho_ex;
-            vel_err -= *vel_ex;
-            ste_err -= *ste_ex;
+   //          ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+   //          rho_err -= *rho_ex;
+   //          vel_err -= *vel_ex;
+   //          ste_err -= *ste_ex;
 
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
-                           "Exact: Density", Wx, Wy, Ww, Wh);
+   //          // Visualize difference between exact and approx
+   //          VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+   //                         "Exact: Density", Wx, Wy, Ww, Wh);
             
-            Wx += offx;
-            VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
-                           "Exact: Velocity", Wx, Wy, Ww, Wh);
+   //          Wx += offx;
+   //          VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+   //                         "Exact: Velocity", Wx, Wy, Ww, Wh);
             
-            Wx += offx;
-            VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
-                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-            Wx = 0;
-            Wy += offy;
+   //          Wx += offx;
+   //          VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+   //                         "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+   //          Wx = 0;
+   //          Wy += offy;
 
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_err, vishost, visport, rho_err,
-                           "Error: Density", Wx, Wy, Ww, Wh);
+   //          // Visualize difference between exact and approx
+   //          VisualizeField(vis_rho_err, vishost, visport, rho_err,
+   //                         "Error: Density", Wx, Wy, Ww, Wh);
             
-            Wx += offx;
-            VisualizeField(vis_v_err, vishost, visport, vel_err,
-                           "Error: Velocity", Wx, Wy, Ww, Wh);
+   //          Wx += offx;
+   //          VisualizeField(vis_v_err, vishost, visport, vel_err,
+   //                         "Error: Velocity", Wx, Wy, Ww, Wh);
             
-            Wx += offx;
-            VisualizeField(vis_ste_err, vishost, visport, ste_err,
-                           "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
+   //          Wx += offx;
+   //          VisualizeField(vis_ste_err, vishost, visport, ste_err,
+   //                         "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
 
-            delete rho_ex;
-            delete vel_ex;
-            delete ste_ex;
-         }
-      }
-   }
+   //          delete rho_ex;
+   //          delete vel_ex;
+   //          delete ste_ex;
+   //       }
+   //    }
+   // }
 
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
-   double t = 0.0, t_old;
+   double t = 0.0;
    if (convergence_testing)
    {
       dt = hmin; // Set timestep to smalled h val for convergence testing
    }
 
    bool last_step = false;
-   int steps = 0;
    BlockVector S_old(S);
 
    cout << "Entering time loop\n";
@@ -598,13 +598,20 @@ int main(int argc, char *argv[]) {
          dt = t_final - t;
          last_step = true;
       }
-      if (steps == max_tsteps) { last_step = true; }
+      if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
-      t_old = t;
 
-      hydro.MakeTimeStep(S, t, dt); // testing
-      steps++;
+      if (ti == 1)
+      {
+         cout << "x_gf at first time step:\n";
+         x_gf.Print(cout);
+         cout << "mv_gf at first time step:\n";
+         mv_gf.Print(cout);
+      }
+
+      hydro.MakeTimeStep(S, t, dt);
+      t += dt;
       
       if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
 
@@ -617,12 +624,19 @@ int main(int argc, char *argv[]) {
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
 
+      if (ti == 1)
+      {
+         cout << "dt: " << dt << endl;
+         cout << "x_gf at first time step:\n";
+         x_gf.Print(cout);
+         cout << "mv_gf at first time step:\n";
+         mv_gf.Print(cout);
+      }
+
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
       pmesh->NewNodes(x_gf, false);
-
-      
 
       if (last_step || (ti % vis_steps) == 0)
       {
@@ -703,9 +717,16 @@ int main(int argc, char *argv[]) {
                   v_coeff.SetTime(t);
                   ste_coeff.SetTime(t);
 
-                  rho_ex->ProjectCoefficient(rho_coeff);
-                  vel_ex->ProjectCoefficient(v_coeff);
-                  ste_ex->ProjectCoefficient(ste_coeff);
+                  riemann1D::ExactDensityCoefficient rho_coeff_r;
+                  rho_coeff_r.SetTime(t);
+                  riemann1D::ExactVelocityCoefficient v_coeff_r;
+                  v_coeff_r.SetTime(t);
+                  riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
+                  ste_coeff_r.SetTime(t);
+
+                  rho_ex->ProjectCoefficient(rho_coeff_r);
+                  vel_ex->ProjectCoefficient(v_coeff_r);
+                  ste_ex->ProjectCoefficient(ste_coeff_r);
 
                   ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
                   rho_err -= *rho_ex;
@@ -874,6 +895,14 @@ int main(int argc, char *argv[]) {
          v_coeff.SetTime(t);
          ste_coeff.SetTime(t);
 
+         cout << "Setting time for coefficients: " << t << ", final time: " << t_final << endl;
+         riemann1D::ExactVelocityCoefficient v_coeff;
+         v_coeff.SetTime(t);
+         riemann1D::ExactDensityCoefficient rho_coeff;
+         rho_coeff.SetTime(t);
+         riemann1D::ExactSTEnergyCoefficient ste_coeff;
+         ste_coeff.SetTime(t);
+
          rho_ex->ProjectCoefficient(rho_coeff);
          vel_ex->ProjectCoefficient(v_coeff);
          ste_ex->ProjectCoefficient(ste_coeff);
@@ -930,6 +959,19 @@ int main(int argc, char *argv[]) {
                              << to_string(rp_levels + rs_levels) << "\n"
                              << "n_Dofs " << global_vSize << "\n"
                              << "h " << hmin << "\n"
+                             // rho
+                             << "rho_L1_Error " << rho_L1_error_n << "\n"
+                             << "rho_L2_Error " << rho_L2_error_n << "\n"
+                             << "rho_Linf_Error " << rho_Max_error_n << "\n"
+                             // vel
+                             << "vel_L1_Error " << vel_L1_error_n << "\n"
+                             << "vel_L2_Error " << vel_L2_error_n << "\n"
+                             << "vel_Linf_Error " << vel_Max_error_n << "\n"
+                             // ste
+                             << "ste_L1_Error " << ste_L1_error_n << "\n"
+                             << "ste_L2_Error " << ste_L2_error_n << "\n"
+                             << "ste_Linf_Error " << ste_Max_error_n << "\n"
+                             // total
                              << "L1_Error " << L1_error << "\n"
                              << "L2_Error " << L2_error << "\n"
                              << "Linf_Error " << Max_error << "\n"

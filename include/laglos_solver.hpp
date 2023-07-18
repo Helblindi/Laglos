@@ -98,7 +98,7 @@ public:
 
    bool IsBdrVertex(const int & node);
 
-   void MakeTimeStep(Vector &S, double & t, double dt);
+   void MakeTimeStep(Vector &S, const double & t, const double dt);
 
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 

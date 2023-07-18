@@ -609,7 +609,7 @@ int main(int argc, char *argv[]) {
          cout << "mv_gf at first time step:\n";
          mv_gf.Print(cout);
       }
-
+      
       hydro.MakeTimeStep(S, t, dt);
       t += dt;
       
@@ -632,6 +632,8 @@ int main(int argc, char *argv[]) {
          cout << "mv_gf at first time step:\n";
          mv_gf.Print(cout);
       }
+
+      assert(false);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors

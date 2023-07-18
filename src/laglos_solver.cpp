@@ -534,8 +534,10 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
 
+   Vector sum_validation(dim);
    for (; ci < NDofs_L2; ci++) // Cell iterator
    {
+      sum_validation = 0.;
       cout << "CSU::ci: " << ci << endl;
       GetCellStateVector(S, ci, U_i);
       cout << "cell state vector:\n";
@@ -571,6 +573,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          CalcOutwardNormalInt(S, ci, fids[j], n_int);
          c = n_int;
          c /= 2.;
+         sum_validation.Add(1., c);
          c_norm = c.Norml2();
          n = n_int;
          double F = n.Norml2();
@@ -692,6 +695,8 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          } // End boundary face        
 
       } // End Face iterator
+
+      assert(sum_validation.Norml2 < 1e-12);
 
       sums *= dt;
       double k = pmesh->GetElementVolume(ci);
@@ -1102,6 +1107,7 @@ void LagrangianLOOperator<dim, problem>::
       {
          if (FI.IsInterior())
          {
+            cout << "\tface: " << face << ", inside cell: " << c << endl;
             // this vector is only needed for interior faces
             GetCellStateVector(S, cp, Ucp);
 
@@ -1110,11 +1116,13 @@ void LagrangianLOOperator<dim, problem>::
             n_vec = n_int;
 
             double F = n_vec.Norml2();
+            cout << "F: " << F << endl;
             n_vec /= F;
             assert(1. - n_vec.Norml2() < 1e-12);
             c_vec = n_int;
             c_vec /= 2.;
             double c_norm = c_vec.Norml2();
+            cout << "c_norm: " << c_norm << endl;
 
             // cout << "(mm)\tn:\n";
             // n_vec.Print(cout);
@@ -1123,8 +1131,15 @@ void LagrangianLOOperator<dim, problem>::
             Vf = ProblemDescription<dim,problem>::velocity(Uc);
             Vf += ProblemDescription<dim,problem>::velocity(Ucp);
             Vf *= 0.5;
+            cout << "averaged cell velocities:\n";
+            Vf.Print(cout);
             double coeff = d * (Ucp[0] - Uc[0]) / F;
+            cout << "coeff: " << coeff << endl;
             Vf.Add(coeff, n_vec);
+            cout << "n_vec:\n";
+            n_vec.Print(cout);
+            cout << "final face velocity:\n";
+            Vf.Print(cout);
          }
          else 
          {

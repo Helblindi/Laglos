@@ -529,11 +529,14 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
 *     method as described in (Guermond et al, eqn 4.9) is used.
 ****************************************************************************************************/
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const double &t, const double dt)
+void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const double &t, const double dt)
 {
-   // cout << "========================================\n";
-   // cout << "Computing State Update\n";
-   // cout << "========================================\n";
+   cout << "========================================\n";
+   cout << "Computing State Update\n";
+   cout << "========================================\n";
+
+   // We need a place to store the new state variables
+   Vector S_new = S;
 
    Vector val(dim+2), c(dim), n(dim), n_int(dim), U_i(dim+2), U_j(dim+2), sums(dim+2);
    Array<int> fids, fids2, oris, oris2, verts; // TODO: Remove fids2, oris2, These are for testing.
@@ -546,7 +549,10 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
 
    for (; ci < NDofs_L2; ci++) // Cell iterator
    {
-      GetCellStateVector(S_new, ci, U_i);
+      cout << "CSU::ci: " << ci << endl;
+      GetCellStateVector(S, ci, U_i);
+      cout << "cell state vector:\n";
+      U_i.Print(cout);
       
       val = U_i;
 
@@ -570,10 +576,12 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
 
       DenseMatrix F_i = ProblemDescription<dim,problem>::flux(U_i);
       sums = 0.;
+      cout << "Flux at U_i:\n";
+      F_i.Print(cout);
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
-         CalcOutwardNormalInt(S_new, ci, fids[j], n_int);
+         CalcOutwardNormalInt(S, ci, fids[j], n_int);
          c = n_int;
          c /= 2.;
          c_norm = c.Norml2();
@@ -585,6 +593,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
 
          if (FI.IsInterior())
          {
+            cout << "CSU::Interior face\n";
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -593,10 +602,15 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
                assert(ci == FI.element[1].index);
                cj = FI.element[0].index; 
             }
-            GetCellStateVector(S_new, cj, U_j); 
+            cout << "cell: " << cj << endl;
+            GetCellStateVector(S, cj, U_j); 
+            cout << "Cell state vector for cj:\n";
+            U_j.Print(cout);
 
             // flux contribution
             DenseMatrix dm = ProblemDescription<dim,problem>::flux(U_j);
+            cout << "DM for j:";
+            dm.Print(cout);
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -607,6 +621,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
             if (use_viscosity)
             {
                d = ProblemDescription<dim,problem>::compute_lambda_max(U_i, U_j, n) * c_norm; 
+               cout << "viscosity: " << d << endl;
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -615,6 +630,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
          }
          else
          {
+            cout << "CSU::boundary\n";
             assert(FI.IsBoundary());
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
 
@@ -683,6 +699,8 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
             } // End switch case
 
             // Add in boundary contribution
+            cout << "boundary contribution: \n";
+            y_temp.Print(cout);
             sums -= y_temp;
          } // End boundary face        
 
@@ -698,9 +716,13 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S_new, const
       cout << "m_hpv->Elem(ci) for el " << ci << ": " << m_hpv->Elem(ci) << endl;
       val += sums;
 
+      cout << "state update: \n";
+      val.Print(cout);
+
       SetCellStateVector(S_new, ci, val);
       
    } // End cell iterator
+   S = S_new;
 }
 
 
@@ -1282,6 +1304,12 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
+
+      cout << "ci: " << ci << endl;
+      cout << "m from m_hpv: " << m << endl;
+      cout << "k: " << k << endl;
+      cout << "tau: " << U_i[0] << endl;
+      cout << "Element mass calculation: " << k / U_i[0] << endl;
 
       if (abs(k / U_i[0] - m) > pow(10, -8))
       {

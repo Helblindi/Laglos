@@ -696,7 +696,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
 
       } // End Face iterator
 
-      assert(sum_validation.Norml2 < 1e-12);
+      assert(sum_validation.Norml2() < 1e-12);
 
       sums *= dt;
       double k = pmesh->GetElementVolume(ci);
@@ -1261,6 +1261,30 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
             //3DTODO: Modify for 3d case
             fill_face_velocities_with_average(S);
             // compute_corrective_face_velocities(S, t, dt);
+         }
+         else
+         {
+            // Validate conditions for mass conservation in 1D given in Theorem 5.4
+            Array<int> fids;
+            Vector n_int(dim), n(dim), Vf(dim);
+            double val = 0., k=0., temp_sum = 0.;
+            for (int ci = 0; ci < NDofs_L2; ci++)
+            {  
+               cout << "cell: " << ci << endl;
+               val = 1.;
+               k = pmesh->GetElementVolume(ci);
+               temp_sum = 0.;
+               pmesh->GetElementVertices(ci, fids);
+               for (int j=0; j < fids.Size(); j++) // Face iterator
+               {
+                  CalcOutwardNormalInt(S, ci, fids[j], n);
+                  get_intermediate_face_velocity(fids[j], Vf);
+                  temp_sum += n[0] * Vf[0];
+               }
+               val += (dt / k) * temp_sum;
+               // cout << "val: " << val << endl;
+               assert(val > 0.);
+            }
          }
          fill_center_velocities_with_average(S);
       }

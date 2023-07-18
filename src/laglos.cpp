@@ -633,7 +633,7 @@ int main(int argc, char *argv[]) {
          mv_gf.Print(cout);
       }
 
-      assert(false);
+      // assert(false);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors

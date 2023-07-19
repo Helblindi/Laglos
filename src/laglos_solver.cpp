@@ -210,7 +210,7 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
    for (; ci < NDofs_L2; ci++) // Cell iterator
    {
       temp_sum = 0.;
-      mi = m_hpv->Elem(ci);
+      mi = m_hpv->Elem(ci); // TODO
 
       GetCellStateVector(S, ci, U_i);
       // cout << "cell state vector: \n";
@@ -268,11 +268,11 @@ void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
             // n.Print(cout);
             d = ProblemDescription<dim,problem>::compute_lambda_max(U_i, U_j, n) * c_norm; 
 
-            temp_sum += d/mi;
+            temp_sum += d;
          }
       }
       
-      t_temp = CFL / temp_sum;
+      t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
       if (t_temp < t_min && t_temp > 1e-12) { t_min = t_temp; }
    } // End cell iterator

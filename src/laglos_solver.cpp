@@ -488,17 +488,25 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & t, const double dt)
 {
    cout << "Making timestep\n";
-
-   // Update state variables contained in S_new
-   cout << "Verifying S has been modified. S.Normle(): " << S.Norml2() << endl;
-   ComputeStateUpdate(S, t, dt);
-   cout << "S.Norml2(): " << S.Norml2() << endl;
-   // assert(false);
-   // Move the mesh
    if (mm)
    {
+      // Compute mesh velocities
       MoveMesh(S, t, dt);
    }
+
+   // Update state variables contained in S_new
+   // cout << "Verifying S has been modified. S.Normle(): " << S.Norml2() << endl;
+   ComputeStateUpdate(S, t, dt);
+   // cout << "S.Norml2(): " << S.Norml2() << endl;
+
+   // Move the mesh
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf, mv_gf;
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+
+   add(x_gf, dt, mv_gf, x_gf);
+   pmesh->NodesUpdated();
 
    // Verify that our algorithm is locally mass conservative
    CheckMassConservation(S);
@@ -582,11 +590,11 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          n /= F;
          assert(1. - n.Norml2() < 1e-12);
          FI = pmesh->GetFaceInformation(fids[j]);
-         cout << "\tcell: " << ci << ", face: " << fids[j] << endl;
+         // cout << "\tcell: " << ci << ", face: " << fids[j] << endl;
 
          if (FI.IsInterior())
          {
-            cout << "\t\tCSU::Interior face\n";
+            // cout << "\t\tCSU::Interior face\n";
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -618,7 +626,7 @@ void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const dou
          }
          else
          {
-            cout << "\t\tCSU::boundary\n";
+            // cout << "\t\tCSU::boundary\n";
             assert(FI.IsBoundary());
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
 
@@ -1097,7 +1105,7 @@ void LagrangianLOOperator<dim, problem>::
       {
          if (FI.IsInterior())
          {
-            cout << "\tface: " << face << ", inside cell: " << c << endl;
+            // cout << "\tface: " << face << ", inside cell: " << c << endl;
             // this vector is only needed for interior faces
             GetCellStateVector(S, cp, Ucp);
 
@@ -1220,21 +1228,21 @@ template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, const double & dt)
 {
    // cout << "Moving mesh\n";
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction x_gf, mv_gf;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   // Vector* sptr = const_cast<Vector*>(&S);
+   // ParGridFunction x_gf, mv_gf;
+   // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    switch (problem)
    {
-      case 4: // Noh problem
-      {
-         VectorFunctionCoefficient velocity_coeff(dim, InitialValues<dim, problem>::v0);
-         velocity_coeff.SetTime(t);
-         mv_gf.ProjectCoefficient(velocity_coeff);
+      // case 4: // Noh problem
+      // {
+      //    VectorFunctionCoefficient velocity_coeff(dim, InitialValues<dim, problem>::v0);
+      //    velocity_coeff.SetTime(t);
+      //    mv_gf.ProjectCoefficient(velocity_coeff);
 
-         break;
-      }
+      //    break;
+      // }
       default: // Move mesh according to paper
       {
          compute_intermediate_face_velocities(S, t);
@@ -1282,8 +1290,8 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
    }
 
    // Finally, move x_gf according to mv_gf_old
-   add(x_gf, dt, mv_gf, x_gf);
-   pmesh->NodesUpdated();
+   // add(x_gf, dt, mv_gf, x_gf);
+   // pmesh->NodesUpdated();
 }
 
 
@@ -1339,10 +1347,10 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       }
    }
    double cell_ratio = counter / (double)NDofs_L2;
-   if (cell_ratio > 0.)
-   {
-      cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
-   }
+   // if (cell_ratio > 0.)
+   // {
+   cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
+   // }
 }
 
 

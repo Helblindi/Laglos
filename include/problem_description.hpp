@@ -33,8 +33,6 @@ class ProblemDescription
 public:
    static constexpr unsigned int problem_dimension = 2 + dim;
 
-   static constexpr double gamma = 7. / 5.;
-
    static inline double internal_energy(const Vector &U);
 
    static inline double specific_internal_energy(const Vector &U);
@@ -157,39 +155,18 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
 {
    switch (problem)
    {
-      case 0:
-      case 1: { return 7./5.; } // Sod
-      case 2:
-      case 3:
-      case 5:
-      case 8:
-      {
-         return 7./5.;
-      }
-      case 6:
-      {
-         switch (shocktube)
-         {
-            case 0:
-            case 1: {MFEM_ABORT("Not implemented.\n"); }
-            case 2: { return 7./5.; }  // Lax
-            case 3: { return 5./3.; }  // Leblanc
-            default:
-            {
-               MFEM_ABORT("Bad number given for shocktube case number.");
-               return 0.0;
-            }
-         }
-      }
-      case 7:
-      case 4:
-      {
-         return 5./3.;
-      }
+      case 0: return 7./5.;
+      case 1: return 7./5.; // Sod
+      case 2: MFEM_ABORT("Case not implemented.\n");
+      case 3: MFEM_ABORT("Case not implemented.\n");
+      case 4: MFEM_ABORT("Case not implemented.\n");
+      case 5: return 7./5.;
+      case 6: return 7./5.;
+      case 7: MFEM_ABORT("Case not implemented.\n");
       default:
       {
          MFEM_ABORT("Bad number given for problem id!"); 
-         return 0.0;
+         return 0.;
       }
    }
 }

@@ -6,14 +6,14 @@
 *             In this case, we shouldn't see any values changing from
 *             the prescribed initial conditions.
 *     Case 1: Sod Shocktube 1D
-*     Case 2: Isentropic vortex as described in (6.1) with a stationary 
-*             center at the origin.
-*     Case 3: Isentropic vortex (see above) with moving center.
-*     Case 4: Noh problem as described in (6.3)
-*     Case 5: 1D Horizontal Movement on 2D mesh
-*     Case 6: Shocktubes 1 - Sod, 2 - Lax, 3 - Leblanc
+*     Case 2: Lax Shocktube 1D ---TODO---
+*     Case 3: Leblanc Shocktube 1D ---TODO---
+*     Case 4: Noh problem as described in (6.3) ---TODO---
+*     Case 5: Isentropic vortex as described in (6.1) with a stationary 
+*             center at the origin. ---TODO---
+*     Case 6: Isentropic vortex (see above) with moving center. ---TODO---
 *     Case 7: Saltzman problem. See https://people.tamu.edu/~guermond/PUBLICATIONS/guermond_popov_Saavedra_JCP_2020.pdf.
-*             Requires Neumann BC on right face and Dirichlet elsewhere.
+*             Requires Neumann BC on right face and Dirichlet elsewhere. ---TODO---
 */
 
 #include "mfem.hpp"
@@ -64,7 +64,23 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          }
       }
       case 1: return (x(0) < 0.5) ? 1.0 : 0.125; // Sod shocktube
-      case 2: // Isentropic vortex
+      case 2:
+      case 3:
+      case 4: // NOH
+      {
+         // const double norm_x = x.Norml2();
+         // if (norm_x <= t / 3)
+         // {
+         //    return 16.;
+         // }
+         // else
+         // {
+         //    return 1. + (t / norm_x);
+         // }
+         MFEM_ABORT("Not Implemented.\n"); 
+      }
+      
+      case 5: // Isentropic vortex
       {
          const double beta = 5.; // vortex strength
          const double gamma = ProblemDescription<dim,problem>::gamma_func(); 
@@ -74,10 +90,10 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          x_bar -= center;
          const double r = x_bar.Norml2();
          const double dT = -1. * (exp(1 - pow(r,2)) * pow(beta, 2) * (gamma - 1)) / (8 * gamma * pow(M_PI, 2));
-         const double rho = pow(1. + dT, 1/(gamma - 1));
+         const double rho = pow(1. + dT, 1./(gamma - 1.));
          return rho;
       }
-      case 3: // Isentropic vortex with moving center
+      case 6: // Isentropic vortex with moving center
       {
          const double beta = 5.; // vortex strength
          const double gamma = ProblemDescription<dim,problem>::gamma_func(); 
@@ -93,23 +109,6 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          const double rho = pow(1. + dT, 1/(gamma - 1));
          return rho;
       }
-      case 4: // Noh problem
-      {
-         const double norm_x = x.Norml2();
-         if (norm_x <= t / 3)
-         {
-            return 16.;
-         }
-         else
-         {
-            return 1. + (t / norm_x);
-         }
-      }
-      case 5: // 1D Horizontal motion
-      {
-         return x[0];
-      }
-      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7:{
          if (t == 0) { return 1.; }
          else 
@@ -145,10 +144,6 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          }
          return 0.;
       }
-      case 8:
-      {
-         return 1.;
-      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!"); 
@@ -169,7 +164,26 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          return;
       }
       case 1: v = 0.0; break; // Sod
-      case 2: // Isentropic vortex with 0 velocity
+      case 2:
+      case 3:
+      case 4: // Noh Problem
+      {
+         // const double norm_x = x.Norml2();
+         // if (norm_x <= t / 3)
+         // {
+         //    v = 0.;
+         //    return;
+         // }
+         // else
+         // {
+         //    v = x;
+         //    v /= norm_x;
+         //    v *= -16.;
+         //    return;
+         // }
+         MFEM_ABORT("Not Implemented.\n"); 
+      }
+      case 5: // Isentropic vortex with 0 velocity
       {
          const double beta = 5.; // vortex strength
          const double gamma = ProblemDescription<dim,problem>::gamma_func(); 
@@ -186,7 +200,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          v[1] = coeff * x_bar[0];
          return;
       }
-      case 3: // isentropic vortex with moving center
+      case 6: // isentropic vortex with moving center
       {
          const double beta = 5.; // vortex strength
          const double gamma = ProblemDescription<dim,problem>::gamma_func(); 
@@ -205,30 +219,6 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          v[1] = coeff * x_bar[0];
          return;
       }
-      case 4: // Noh Problem
-      {
-         const double norm_x = x.Norml2();
-         if (norm_x <= t / 3)
-         {
-            v = 0.;
-            return;
-         }
-         else
-         {
-            v = x;
-            v /= norm_x;
-            v *= -16.;
-            return;
-         }
-      }
-      case 5:
-      {
-         // v[0] = atan(x[0]);
-         v[0] = x[0];
-         v[1] = 0.;
-         return;
-      }
-      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7: // Saltzman
       {
          if (t == 0) { v = 0.; }
@@ -268,17 +258,6 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          }
          return;
       }
-      case 8: // Linear velocity field constant in time
-      {
-         if (t == 0) {
-            for (int i = 0; i < dim; i++)
-            {
-               v[i] = 1.0 * x[i] + 1.0;
-            } 
-            // v[0] = 1.;
-         }
-         return;
-      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!");
@@ -300,22 +279,9 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
 {
    switch (problem)
    {
-      case 0:
       case 1: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0) // Sod
                         : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
-      case 2: // Isentropic vortex
-      case 3: 
-      case 5: // 1D horizontal motion
-      case 8:
-      {
-         // Use pressure law to get specific internal energy
-         const double gamma = ProblemDescription<dim,problem>::gamma_func();
-         double rho = rho0(x, t);
-         double p = pow(rho,gamma);
-         const double val = p / ((gamma - 1) * rho);
-         return val;
-      }
-      case 4:
+      case 4: // Noh
       {
          const double norm_x = x.Norml2();
          if (norm_x <= t / 3)
@@ -329,7 +295,6 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             return p / ((gamma - 1) * rho0(x,t));
          }
       }
-      case 6: {MFEM_ABORT("Not Implemented.\n"); }
       case 7:
       {
          if (t == 0) { return pow(10, -4); }
@@ -339,6 +304,19 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             double _rho = rho0(x,t);
             return _p / (_rho * (_gamma - 1.));
          }
+      }
+      /* In all other cased use pressure law to get specific internal energy */
+      case 0:
+      case 2:
+      case 3: 
+      case 5: 
+      case 6:
+      {
+         const double gamma = ProblemDescription<dim,problem>::gamma_func();
+         double rho = rho0(x, t);
+         double p = pow(rho,gamma);
+         const double val = p / ((gamma - 1) * rho);
+         return val;
       }
       default: 
       {
@@ -353,15 +331,6 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
 {
    switch (problem)
    {
-      case 0:
-      case 1: // Sod
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
       default:
       {
          Vector v(dim);
@@ -373,6 +342,7 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
 }
 
 
+// TODO: Get rid of this function
 template<int dim, int problem>
 inline double InitialValues<dim, problem>::IV_pressure(const Vector & x, const double & t)
 {

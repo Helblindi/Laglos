@@ -169,7 +169,7 @@ public:
 
    void EnforceBoundaryConditions(Vector &S);
 
-   void MoveMesh(Vector &S, const double & t, const double & dt);
+   void ComputeMeshVelocities(Vector &S, const double & t, const double & dt);
 
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);

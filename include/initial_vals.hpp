@@ -194,7 +194,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          x_bar -= center;
 
          const double r = x_bar.Norml2();
-         const double coeff = (exp((1 - pow(r,2)) / 2) * beta) / (2 * M_PI);
+         const double coeff = (exp((1. - pow(r,2)) / 2.) * beta) / (2. * M_PI);
 
          v[0] = coeff * x_bar[1] * -1.;
          v[1] = coeff * x_bar[0];
@@ -213,7 +213,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          x_bar -= center;
 
          const double r = x_bar.Norml2();
-         const double coeff = (exp((1 - pow(r,2)) / 2) * beta) / (2 * M_PI);
+         const double coeff = (exp((1. - pow(r,2)) / 2.) * beta) / (2. * M_PI);
 
          v[0] = 2. + coeff * x_bar[1] * -1.;
          v[1] = coeff * x_bar[0];

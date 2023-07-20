@@ -21,8 +21,8 @@ rm -rf *
 cd $bin_dir
 
 # Dim = 1 cases
-options="-m data/ref-segment.mesh -visc -mm -tf 0.6 -ot -cfl 1 -so -vs 100" # 1D Smooth Wave 2nd Order IDP Paper
-# options="-m data/ref-segment.mesh -visc -mm -tf 0.225 -ot -cfl 0.25 -so -vs 100" # Shocktube testing, no rotation
+# options="-m data/ref-segment.mesh -visc -mm -tf 0.6 -ot -cfl 1 -so -vs 100" # 1D Smooth Wave 2nd Order IDP Paper
+options="-m data/ref-segment.mesh -visc -mm -tf 0.225 -ot -cfl 0.25 -so -vs 100" # Shocktube testing, no rotation
 
 # Dim = 2 cases
 # options="-m ../data/rectangle_saltzman.mesh -visc -mm -tf 0.6 -ot -cfl 0.01" # Saltzman
@@ -39,8 +39,8 @@ options="-m data/ref-segment.mesh -visc -mm -tf 0.6 -ot -cfl 1 -so -vs 100" # 1D
 ./Laglos -rs 6 $options
 ./Laglos -rs 7 $options
 ./Laglos -rs 8 $options
-# ./Laglos -rs 9 $options
-# ./Laglos -rs 10 $options
+./Laglos -rs 9 $options
+./Laglos -rs 10 $options
 # ./Laglos -rs 11 $options
 # ./Laglos -rs 12 $options
 cd $scripts_dir

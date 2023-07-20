@@ -491,7 +491,7 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
    if (mm)
    {
       // Compute mesh velocities
-      MoveMesh(S, t, dt);
+      ComputeMeshVelocities(S, t, dt);
    }
 
    // Update state variables contained in S_new
@@ -853,13 +853,14 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
          get_node_position(S, face_dof, face_x);
          get_node_position(S, face_vdof1, vdof1_x);
          get_node_position(S, face_vdof2, vdof2_x);
-         // cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
-         // cout << "face_x: ";
-         // face_x.Print(cout);
-         // cout << "vdof1_x: ";
-         // vdof1_x.Print(cout);
-         // cout << "vdof2_x: ";
-         // vdof2_x.Print(cout);
+         cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
+         cout << "face_dof: " << row[2] << endl;
+         cout << "face_x: ";
+         face_x.Print(cout);
+         cout << "vdof1_x: ";
+         vdof1_x.Print(cout);
+         cout << "vdof2_x: ";
+         vdof2_x.Print(cout);
 
          Vector secant(dim);
          subtract(vdof2_x, vdof1_x, secant);
@@ -1205,7 +1206,7 @@ void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const in
 }
 
 /****************************************************************************************************
-* Function: MoveMesh
+* Function: ComputeMeshVelocities
 * Parameters:
 *     S         - BlockVector corresponding to nth timestep that stores mesh information, 
 *                 mesh velocity, and state variables.
@@ -1225,7 +1226,7 @@ void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const in
 *        5) Modify x_gf to represent the moved nodes (Computes the (n+1)th mesh location).
 ****************************************************************************************************/
 template<int dim, int problem>
-void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, const double & dt)
+void LagrangianLOOperator<dim, problem>::ComputeMeshVelocities(Vector &S, const double & t, const double & dt)
 {
    // cout << "Moving mesh\n";
    // Vector* sptr = const_cast<Vector*>(&S);
@@ -1245,20 +1246,18 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
       // }
       default: // Move mesh according to paper
       {
-         compute_intermediate_face_velocities(S, t);
-         // cout << "output intermediate face velocities:\n";
-         // v_CR_gf.Print(cout);
-         // Construct ti, face normals
-         // ti = [0. 0.]^T in 2D
-         // 3DTODO: Modify this according to seciton 5.2
+         compute_intermediate_face_velocities(S, t);         
 
          compute_node_velocities(S, t, dt);
          if (dim > 1)
          {
             // Don't need to fill face velocities with average in dim=1
-            //3DTODO: Modify for 3d case
-            fill_face_velocities_with_average(S);
-            // compute_corrective_face_velocities(S, t, dt);
+            // fill_face_velocities_with_average(S);
+            compute_corrective_face_velocities(S, t, dt);
+
+            // Construct ti, face normals
+            // ti = [0. 0.]^T in 2D
+            // 3DTODO: Modify this according to seciton 5.2
          }
          else
          {
@@ -1288,10 +1287,6 @@ void LagrangianLOOperator<dim, problem>::MoveMesh(Vector &S, const double & t, c
       }
       break;
    }
-
-   // Finally, move x_gf according to mv_gf_old
-   // add(x_gf, dt, mv_gf, x_gf);
-   // pmesh->NodesUpdated();
 }
 
 

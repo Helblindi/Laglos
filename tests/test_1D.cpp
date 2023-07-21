@@ -22,7 +22,7 @@ double a = 1.,
 
 // Problem
 const int dim = 1;
-const int problem = 8;     // This value doesn't matter (1-8)
+const int problem = 1;     // This value doesn't matter (1-8)
 int order_mv = 2;          // Order of mesh movement approximation space
 int order_u = 0;
 const string flag = "testing";

@@ -487,7 +487,7 @@ bool LagrangianLOOperator<dim, problem>::IsBdrVertex(const int & node)
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & t, const double dt)
 {
-   cout << "Making timestep\n";
+   // cout << "Making timestep\n";
    if (mm)
    {
       // Compute mesh velocities
@@ -509,7 +509,7 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
    pmesh->NodesUpdated();
 
    // Verify that our algorithm is locally mass conservative
-   CheckMassConservation(S);
+   // CheckMassConservation(S);
 } 
 
 
@@ -528,9 +528,9 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::ComputeStateUpdate(Vector &S, const double &t, const double dt)
 {
-   cout << "========================================\n";
-   cout << "Computing State Update\n";
-   cout << "========================================\n";
+   // cout << "========================================\n";
+   // cout << "Computing State Update\n";
+   // cout << "========================================\n";
 
    // We need a place to store the new state variables
    Vector S_new = S;
@@ -816,6 +816,9 @@ void LagrangianLOOperator<dim, problem>::SetCellStateVector(Vector &S_new,
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res)
 {
+   // cout << "=======================================\n"
+   //      << "  Calculating outward normal integral  \n"
+   //      << "=======================================\n";
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
@@ -846,6 +849,8 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
       case 2:
       {
          H1.GetFaceDofs(face, row);
+         // cout << "face dofs row for face: " << face << endl;
+         // row.Print(cout);
          int face_vdof1 = row[1], face_vdof2 = row[0];
          face_dof = row[2];
 
@@ -853,14 +858,14 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
          get_node_position(S, face_dof, face_x);
          get_node_position(S, face_vdof1, vdof1_x);
          get_node_position(S, face_vdof2, vdof2_x);
-         cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
-         cout << "face_dof: " << row[2] << endl;
-         cout << "face_x: ";
-         face_x.Print(cout);
-         cout << "vdof1_x: ";
-         vdof1_x.Print(cout);
-         cout << "vdof2_x: ";
-         vdof2_x.Print(cout);
+         // cout << "caloutwardnormalint, cell: " << cell << ", face: " << face << endl;
+         // cout << "face_dof: " << row[2] << endl;
+         // cout << "face_x: ";
+         // face_x.Print(cout);
+         // cout << "vdof1_x: ";
+         // vdof1_x.Print(cout);
+         // cout << "vdof2_x: ";
+         // vdof2_x.Print(cout);
 
          Vector secant(dim);
          subtract(vdof2_x, vdof1_x, secant);
@@ -882,8 +887,8 @@ void LagrangianLOOperator<dim, problem>::CalcOutwardNormalInt(const Vector &S, c
                res *= -1.;
             }
          }
-         cout << "int n: ";
-         res.Print(cout);
+         // cout << "int n: ";
+         // res.Print(cout);
 
          break;
       }
@@ -1293,7 +1298,7 @@ void LagrangianLOOperator<dim, problem>::ComputeMeshVelocities(Vector &S, const 
 template<int dim, int problem>
 double LagrangianLOOperator<dim, problem>::CalcMassLoss(const Vector &S)
 {
-   // cout << "Checking Mass Conservation\n";
+   // cout << "Checking Mass Loss\n";
    Vector U_i(dim + 2);
 
    double num = 0., denom = 0.;
@@ -1322,12 +1327,6 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
 
-      // cout << "ci: " << ci << endl;
-      // cout << "m from m_hpv: " << m << endl;
-      // cout << "k: " << k << endl;
-      // cout << "tau: " << U_i[0] << endl;
-      // cout << "Element mass calculation: " << k / U_i[0] << endl;
-
       if (abs(k / U_i[0] - m) > pow(10, -8))
       {
          counter++;
@@ -1342,10 +1341,8 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
       }
    }
    double cell_ratio = counter / (double)NDofs_L2;
-   // if (cell_ratio > 0.)
-   // {
+
    cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
-   // }
 }
 
 
@@ -1394,17 +1391,21 @@ void LagrangianLOOperator<dim, problem>::compute_B(const DenseMatrix &C, const V
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
 {
+   // cout << "=====================\n";
+   // cout << "Computing determinant\n";
+   // cout << "=====================\n";
+
    double a = 1.;
    double b = -1. * (1. + (dt / 2.) * (C(0,0) + C(1,1)));
-   double c = (pow(dt, 2) / 4.) * (C(0,0) * C(1,1)) + (C(0,1) * C(1,0));
-   cout << "Ci:\n";
-   C.Print(cout);
+   double c = (pow(dt, 2) / 4.) * ((C(0,0) * C(1,1)) - (C(0,1) * C(1,0)));
+   // cout << "Ci:\n";
+   // C.Print(cout);
 
-   cout << "tau: " << dt / 2. << ", a: " << a << ", b: " << b << ", c: " << c << endl;
+   // cout << "tau: " << dt / 2. << ", a: " << a << ", b: " << b << ", c: " << c << endl;
 
-   cout << "discriminant: " << pow(b,2) - 4. * a * c << endl;
+   // cout << "discriminant: " << pow(b,2) - 4. * a * c << endl;
    double pm = sqrt(pow(b,2) - 4. * a * c);
-   cout << "pm: " << pm << endl;
+   // cout << "pm: " << pm << endl;
 
    double d1 = -1 * b + pm;
    d1 /= (2. * a);
@@ -1412,8 +1413,8 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
    double d2 = -1 * b - pm;
    d2 /= (2. * a);
 
-   cout << "d1: " << d1 << endl;
-   cout << "d2: " << d2 << endl;
+   // cout << "d1: " << d1 << endl;
+   // cout << "d2: " << d2 << endl;
 
    d = std::max(d1, d2);
    if (d <= 0.)
@@ -1496,7 +1497,7 @@ void LagrangianLOOperator<dim, problem>::
 
    // First, compute d
    compute_determinant(C, dt/2., d);
-   cout << "d: " << d << endl;
+   // cout << "d: " << d << endl;
 
    // Second, compute A
    compute_A(C, d, dt/2., A);
@@ -1509,22 +1510,22 @@ void LagrangianLOOperator<dim, problem>::
    // B.Print(cout);
 
    /* Print values */
-   cout << "- LS Velocity -\n";
-   cout << "C:\n";
-   C.Print(cout);
-   cout << "D:\n";
-   D.Print(cout);
+   // cout << "- LS Velocity -\n";
+   // cout << "C:\n";
+   // C.Print(cout);
+   // cout << "D:\n";
+   // D.Print(cout);
 
-   cout << "- Corrected Velocity -\n";
-   cout << "A:\n";
-   A.Print(cout);
-   cout << "B:\n";
-   B.Print(cout);
+   // cout << "- Corrected Velocity -\n";
+   // cout << "A:\n";
+   // A.Print(cout);
+   // cout << "B:\n";
+   // B.Print(cout);
 
-   cout << "vertex_x:\n";
-   vertex_x.Print(cout);
-   cout << "Pre corrected velocity:\n";
-   vertex_v.Print(cout);
+   // cout << "vertex_x:\n";
+   // vertex_x.Print(cout);
+   // cout << "Pre corrected velocity:\n";
+   // vertex_v.Print(cout);
    // cout << "C:\n";
    // C.Print(cout);
    // cout << "A:\n";
@@ -1537,8 +1538,8 @@ void LagrangianLOOperator<dim, problem>::
    // Finally, evaluate velocity at vertex_x and put resulting value into vertex_v
    A.Mult(vertex_x, vertex_v);
    vertex_v += B;
-   cout << "Post corrected velocity:\n";
-   vertex_v.Print(cout);
+   // cout << "Post corrected velocity:\n";
+   // vertex_v.Print(cout);
 }
 
 /*
@@ -2193,6 +2194,11 @@ void LagrangianLOOperator<dim, problem>::
    {
       compute_node_velocity_RT(vertex, dt, vertex_v);
 
+      // if (vertex_v != vertex_v)
+      // {
+      //    cout << "NaN velocity encountered in compute_node_velocities at vertex: " << vertex << endl;
+      //    MFEM_ABORT("Aborting due to NaNs.\n");
+      // }
       update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
 }
@@ -2639,6 +2645,7 @@ Purpose:
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::update_node_velocity(Vector &S, const int & node, const Vector & vel)
 {
+
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
@@ -2646,6 +2653,10 @@ void LagrangianLOOperator<dim, problem>::update_node_velocity(Vector &S, const i
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
+      // if (vel[i] != vel[i]) { 
+      //    cout << "Node: " << node << endl;
+      //    MFEM_ABORT("NaN val encountered."); 
+      // }
       mv_gf[index] = vel[i];
    }
 }
@@ -2667,6 +2678,10 @@ void LagrangianLOOperator<dim, problem>::get_node_velocity(const Vector &S, cons
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::get_node_position(const Vector &S, const int & node, Vector & x)
 {
+   // cout << "=======================================\n"
+   //      << "          Get Node Positions           \n"
+   //      << "=======================================\n";
+   // cout << "node: " << node << ", NDofs_H1: " << NDofs_H1 << endl;
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -2674,6 +2689,7 @@ void LagrangianLOOperator<dim, problem>::get_node_position(const Vector &S, cons
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
+      // cout << "i: " << i << ", val: " << x_gf[index] << endl;
       x[i] = x_gf[index];
    }
 }

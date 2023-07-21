@@ -294,6 +294,10 @@ int main(int argc, char *argv[]) {
    cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
    cout << "num total faces: " << pmesh->GetNumFaces() << endl;
 
+   /* Print element information */
+   cout << "num boundary elements: " << pmesh->GetNBE() << endl;
+   cout << "num elements: " << pmesh->GetNE() << endl;
+
    /* The monolithic BlockVector stores unknown fields as:
    *   - 0 -> position
    *   - 1 -> mesh velocity
@@ -331,9 +335,6 @@ int main(int argc, char *argv[]) {
    pmesh->SetNodalGridFunction(&x_gf);
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
-
-   // cout << "Printing initial x_gf positions\n";
-   // x_gf.Print(cout);
 
    /* Distort Mesh for Saltzman Problem */
    if (CompileTimeVals::distort_mesh)
@@ -410,9 +411,6 @@ int main(int argc, char *argv[]) {
       }
       cout << "Mesh distorted\n";
    }
-   
-   // cout << "Printing initial x_gf positions\n";
-   // x_gf.Print(cout);
 
    // Print initialized mesh
    // Can be visualized with glvis -np # -m ./results/mesh-test-init
@@ -601,14 +599,6 @@ int main(int argc, char *argv[]) {
       if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
-
-      if (ti == 1)
-      {
-         cout << "x_gf at first time step:\n";
-         x_gf.Print(cout);
-         cout << "mv_gf at first time step:\n";
-         mv_gf.Print(cout);
-      }
       
       hydro.MakeTimeStep(S, t, dt);
       t += dt;
@@ -623,17 +613,6 @@ int main(int argc, char *argv[]) {
       sv_gf.SyncAliasMemory(S);
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
-
-      if (ti == 1)
-      {
-         cout << "dt: " << dt << endl;
-         cout << "x_gf at first time step:\n";
-         x_gf.Print(cout);
-         cout << "mv_gf at first time step:\n";
-         mv_gf.Print(cout);
-      }
-
-      // assert(false);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -664,6 +643,9 @@ int main(int argc, char *argv[]) {
                  << sqrt_norm
                  << endl;
          }
+         // Output mass conservation information
+         hydro.CheckMassConservation(S);
+
          // Turn back on suppression
          if (suppress_output)
          {
@@ -935,6 +917,8 @@ int main(int argc, char *argv[]) {
       }
       // case 8: // 8TODO
       case 7:
+      case 6:
+      case 5:
       case 4: // Noh problem
       case 3:
       case 2:

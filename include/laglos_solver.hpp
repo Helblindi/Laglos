@@ -98,7 +98,7 @@ public:
 
    bool IsBdrVertex(const int & node);
 
-   void MakeTimeStep(Vector &S, const double & t, const double dt);
+   void MakeTimeStep(Vector &S, const double & t, double & dt);
 
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
@@ -142,7 +142,7 @@ public:
                                  const string flag="NA", 
                                  void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void compute_node_velocity_RT(const int & node, const double & dt, Vector &node_v);
+   void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v);
    void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const int cell, DenseMatrix & res);
    void compute_geo_V(const int & node, Vector & res);
@@ -154,7 +154,7 @@ public:
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
    void compute_corrected_node_velocity(const DenseMatrix &C, const Vector &D, const double & dt, const Vector &vertex_x, Vector &vertex_v, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void compute_node_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void compute_node_velocities(Vector &S, const double & t, double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
    void compute_corrective_face_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
@@ -169,7 +169,7 @@ public:
 
    void EnforceBoundaryConditions(Vector &S);
 
-   void ComputeMeshVelocities(Vector &S, const double & t, const double & dt);
+   void ComputeMeshVelocities(Vector &S, const double & t, double & dt);
 
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);

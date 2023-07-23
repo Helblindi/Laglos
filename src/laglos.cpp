@@ -618,6 +618,8 @@ int main(int argc, char *argv[]) {
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
       pmesh->NewNodes(x_gf, false);
+      cout << "Printing x_gf:\n";
+      x_gf.Print(cout);
 
       if (last_step || (ti % vis_steps) == 0)
       {

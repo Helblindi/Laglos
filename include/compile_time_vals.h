@@ -9,7 +9,7 @@ class CompileTimeVals
 {
 public:
    /* See initial_vals.hpp for test problems */
-   const static int problem = 5;
+   const static int problem = 1;
    const static int dim = 2;
    
    /* Various parameters */

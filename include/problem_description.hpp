@@ -159,10 +159,11 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
       case 1: return 7./5.; // Sod
       case 2: MFEM_ABORT("Case not implemented.\n");
       case 3: MFEM_ABORT("Case not implemented.\n");
-      case 4: MFEM_ABORT("Case not implemented.\n");
+      case 4: return 5./3.;
       case 5: return 7./5.;
       case 6: return 7./5.;
-      case 7: MFEM_ABORT("Case not implemented.\n");
+      case 7: return 5./3.;
+      // case 7: MFEM_ABORT("Case not implemented.\n");
       default:
       {
          MFEM_ABORT("Bad number given for problem id!"); 

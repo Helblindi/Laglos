@@ -9,6 +9,9 @@
 *     Case 2: Lax Shocktube 1D ---TODO---
 *     Case 3: Leblanc Shocktube 1D ---TODO---
 *     Case 4: Noh problem as described in (6.3) ---TODO---
+*             Per Eric, the cases from the 2017 paper should be flipped.  
+*             The boundary should not collapse like it does in the images 
+*             from the paper.
 *     Case 5: Isentropic vortex as described in (6.1) with a stationary 
 *             center at the origin. ---TODO---
 *     Case 6: Isentropic vortex (see above) with moving center. ---TODO---
@@ -68,16 +71,20 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       case 3:
       case 4: // NOH
       {
-         // const double norm_x = x.Norml2();
-         // if (norm_x <= t / 3)
-         // {
-         //    return 16.;
-         // }
-         // else
-         // {
-         //    return 1. + (t / norm_x);
-         // }
-         MFEM_ABORT("Not Implemented.\n"); 
+         /* Initial condition */
+         double norm = x.Norml2();
+
+         if (t < 1.e-16) {
+            return 1.;
+         }
+         /* Exact solution */
+         else if (t / 3. < norm) {
+            // cout << "rho0: " << 1.0 + t / norm << endl;
+            return 1.0 + t / norm;
+            // return 1.;
+         } else if (t / 3. >= norm) {
+            return 16.0;
+         }
       }
       
       case 5: // Isentropic vortex
@@ -168,20 +175,25 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
       case 3:
       case 4: // Noh Problem
       {
-         // const double norm_x = x.Norml2();
-         // if (norm_x <= t / 3)
-         // {
-         //    v = 0.;
-         //    return;
-         // }
-         // else
-         // {
-         //    v = x;
-         //    v /= norm_x;
-         //    v *= -16.;
-         //    return;
-         // }
-         MFEM_ABORT("Not Implemented.\n"); 
+         double norm = x.Norml2();
+         v = 0.;
+
+         /* Initial condition */
+         if (t < 1.e-16) {
+            if (norm > 1.e-16) {
+              v[0] = -x[0] / norm, v[1] = -x[1] / norm;
+            }
+          }
+
+          /* Exact solution */
+          else if (t / 3. < norm) {
+            if (norm > 1.e-16) {
+               v[0] = -x[0] / norm, v[1] = -x[1] / norm;
+            }
+          } else if (t / 3. >= norm) {
+            v[0] = 0.0, v[1] = 0.0;
+          }
+         return;
       }
       case 5: // Isentropic vortex with 0 velocity
       {
@@ -281,20 +293,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
    {
       case 1: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0) // Sod
                         : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
-      case 4: // Noh
-      {
-         const double norm_x = x.Norml2();
-         if (norm_x <= t / 3)
-         {
-            return 8.;
-         }
-         else
-         {
-            // return 0.5 * (1 + (t / norm_x));
-            double p = 0.00001, gamma = ProblemDescription<dim,problem>::gamma_func();
-            return p / ((gamma - 1) * rho0(x,t));
-         }
-      }
+      case 4: { MFEM_ABORT("Noh should not call sie function.\n"); }
       case 7:
       {
          if (t == 0) { return pow(10, -4); }
@@ -331,6 +330,31 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
 {
    switch (problem)
    {
+      case 4: // Noh problem
+      {
+         // In the Noh problem, the total energy is specified
+         double rho = rho0(x,t);
+         double gamma = ProblemDescription<dim, problem>::gamma_func();
+      
+         Vector vel(dim);
+         v0(x,t,vel);
+         double norm = x.Norml2();
+
+         /* Initial condition */
+         if (t < 1.e-16) {
+            return 1.e-12 / ((gamma - 1.) * rho) +
+                0.5 * (vel[0] * vel[0] + vel[1] * vel[1]);
+         }
+
+         /* Exact solution */
+         else if (t / 3. < norm) {
+            return 0.5 + 1.e-12 / (rho * (gamma - 1.));
+         } else if (t / 3. >= norm) {
+            return .5 + 1.e-12 / (rho * (gamma - 1.));
+         }
+
+          break;
+      }   
       default:
       {
          Vector v(dim);
@@ -338,6 +362,7 @@ inline double InitialValues<dim, problem>::ste0(const Vector &x, const double & 
          return sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
       }
    }
+   return 0.0;
    
 }
 
@@ -430,6 +455,7 @@ inline double InitialValues<dim, problem>::IV_pressure(const Vector & x, const d
          return 0.0;
       }
    }
+   return 0.0;
 }
 
 } // ns hydrodynamics

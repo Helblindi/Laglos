@@ -20,7 +20,7 @@
 *
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
-* ./Laglos -m data/ref-square.mesh -tf 1. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
+* 
 * ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.1 -ot -visc -mm -vis -rs 3 [problem = 6, dim = 2, shocktube = 1] // Sod
 * ./Laglos -m data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
@@ -29,6 +29,11 @@
 * -------------- 1D ----------
 * ./Laglos -m data/ref-segment.mesh -tf 6 -cfl 0.5 -ot -visc -mm -rs 10 [problem = 0, dim = 1] // Smooth 1D wave 2nd order IDP 2018 paper
 * ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1, shocktube = 1] // Sod
+*
+* -------------- 2D ----------
+* ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2]
+* ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
+* 
 */
 
 #include "mfem.hpp"
@@ -358,27 +363,6 @@ int main(int argc, char *argv[]) {
                x_gf[vertex] = x_new;
             }
          }
-         // case 8: // Linear node movement
-         // {
-         //    Array<double> coords(dim), coords_new(dim);
-         //    cout << "pmesh call: " << pmesh->GetNV() << endl;
-         //    cout << "H1 call: " << H1FESpace.GetNDofs() << endl;
-         //    cout << "pmesh num faces: " << pmesh->GetNumFaces() << endl;
-         
-         //    // Distort all corner nodes
-         //    // pmesh->GetNV will give # corner nodes 
-         //    for (int vertex = 0; vertex < pmesh->GetNV(); vertex++)
-         //    {
-         //       cout << "vertex: " << vertex << endl;
-         //       for (int i = 0; i < dim; i++)
-         //       {
-         //          int index = vertex + i * H1FESpace.GetNDofs();
-         //          cout << "index: " << index << endl;
-
-         //          coords_new[i] = coords[i]; //*pow(coords[i], 2);
-         //          x_gf[index] = coords_new[i];
-         //       }
-         //    }
 
          //    // Adjust all face nodes to be averages of their adjacent corners
          //    mfem::Mesh::FaceInformation FI;
@@ -463,103 +447,102 @@ int main(int argc, char *argv[]) {
 
    ParGridFunction rho_gf(&L2FESpace);
 
-   // if (visualization)
-   // {
-   //    // Compute Density
-   //    for (int i = 0; i < sv_gf.Size(); i++)
-   //    {
-   //       rho_gf[i] = 1./sv_gf[i];
-   //    } 
+   if (visualization)
+   {
+      // Compute Density
+      for (int i = 0; i < sv_gf.Size(); i++)
+      {
+         rho_gf[i] = 1./sv_gf[i];
+      } 
 
-   //    // Make sure all MPI ranks have sent their 'v' solution before initiating
-   //    // another set of GLVis connections (one from each rank):
-   //    MPI_Barrier(pmesh->GetComm());
+      // Make sure all MPI ranks have sent their 'v' solution before initiating
+      // another set of GLVis connections (one from each rank):
+      MPI_Barrier(pmesh->GetComm());
 
-   //    vis_rho.precision(8);
-   //    vis_v.precision(8);
-   //    vis_ste.precision(8);
+      vis_rho.precision(8);
+      vis_v.precision(8);
+      vis_ste.precision(8);
 
-   //    vis_rho_ex.precision(8);
-   //    vis_v_ex.precision(8);
-   //    vis_ste_ex.precision(8);
+      vis_rho_ex.precision(8);
+      vis_v_ex.precision(8);
+      vis_ste_ex.precision(8);
 
-   //    vis_rho_err.precision(8);
-   //    vis_v_err.precision(8);
-   //    vis_ste_err.precision(8);
+      vis_rho_err.precision(8);
+      vis_v_err.precision(8);
+      vis_ste_err.precision(8);
 
-   //    int Wx = 0, Wy = 0; // window position
-   //    const int Ww = 350, Wh = 350; // window size
-   //    int offx = Ww+10, offy = Wh+45;; // window offsets
+      int Wx = 0, Wy = 0; // window position
+      const int Ww = 350, Wh = 350; // window size
+      int offx = Ww+10, offy = Wh+45;; // window offsets
 
-   //    VisualizeField(vis_rho, vishost, visport, rho_gf,
-   //                   "Density", Wx, Wy, Ww, Wh);
-   //    Wx += offx;
-   //    VisualizeField(vis_v, vishost, visport, v_gf,
-   //                   "Velocity", Wx, Wy, Ww, Wh);
-   //    Wx += offx;
-   //    VisualizeField(vis_ste, vishost, visport, ste_gf,
-   //                   "Specific Total Energy", Wx, Wy, Ww, Wh);
-   //    Wx = 0;
-   //    Wy += offy;
+      VisualizeField(vis_rho, vishost, visport, rho_gf,
+                     "Density", Wx, Wy, Ww, Wh);
+      Wx += offx;
+      VisualizeField(vis_v, vishost, visport, v_gf,
+                     "Velocity", Wx, Wy, Ww, Wh);
+      Wx += offx;
+      VisualizeField(vis_ste, vishost, visport, ste_gf,
+                     "Specific Total Energy", Wx, Wy, Ww, Wh);
+      Wx = 0;
+      Wy += offy;
 
-   //    // Compute errors
-   //    ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-   //    ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-   //    ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+      // Compute errors
+      ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
 
-   //    switch(problem)
-   //    {
-   //       case 8:
-   //       case 7:
-   //       case 6:
-   //       case 5:
-   //       case 4: // Noh Problem
-   //       case 3:
-   //       case 2:
-   //       case 1:
-   //       case 0:
-   //       {
-   //          rho_ex->ProjectCoefficient(rho_coeff);
-   //          vel_ex->ProjectCoefficient(v_coeff);
-   //          ste_ex->ProjectCoefficient(ste_coeff);
+      switch(problem)
+      {
+         case 7:
+         case 6:
+         case 5:
+         case 4: // Noh Problem
+         case 3:
+         case 2:
+         case 1:
+         case 0:
+         {
+            rho_ex->ProjectCoefficient(rho_coeff);
+            vel_ex->ProjectCoefficient(v_coeff);
+            ste_ex->ProjectCoefficient(ste_coeff);
 
-   //          ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-   //          rho_err -= *rho_ex;
-   //          vel_err -= *vel_ex;
-   //          ste_err -= *ste_ex;
+            ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+            rho_err -= *rho_ex;
+            vel_err -= *vel_ex;
+            ste_err -= *ste_ex;
 
-   //          // Visualize difference between exact and approx
-   //          VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
-   //                         "Exact: Density", Wx, Wy, Ww, Wh);
+            // Visualize difference between exact and approx
+            VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+                           "Exact: Density", Wx, Wy, Ww, Wh);
             
-   //          Wx += offx;
-   //          VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
-   //                         "Exact: Velocity", Wx, Wy, Ww, Wh);
+            Wx += offx;
+            VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+                           "Exact: Velocity", Wx, Wy, Ww, Wh);
             
-   //          Wx += offx;
-   //          VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
-   //                         "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-   //          Wx = 0;
-   //          Wy += offy;
+            Wx += offx;
+            VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+            Wx = 0;
+            Wy += offy;
 
-   //          // Visualize difference between exact and approx
-   //          VisualizeField(vis_rho_err, vishost, visport, rho_err,
-   //                         "Error: Density", Wx, Wy, Ww, Wh);
+            // Visualize difference between exact and approx
+            VisualizeField(vis_rho_err, vishost, visport, rho_err,
+                           "Error: Density", Wx, Wy, Ww, Wh);
             
-   //          Wx += offx;
-   //          VisualizeField(vis_v_err, vishost, visport, vel_err,
-   //                         "Error: Velocity", Wx, Wy, Ww, Wh);
+            Wx += offx;
+            VisualizeField(vis_v_err, vishost, visport, vel_err,
+                           "Error: Velocity", Wx, Wy, Ww, Wh);
             
-   //          Wx += offx;
-   //          VisualizeField(vis_ste_err, vishost, visport, ste_err,
-   //                         "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
+            Wx += offx;
+            VisualizeField(vis_ste_err, vishost, visport, ste_err,
+                           "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
 
-   //          delete rho_ex;
-   //          delete vel_ex;
-   //          delete ste_ex;
-   //       }
-   //    }
-   // }
+            delete rho_ex;
+            delete vel_ex;
+            delete ste_ex;
+         }
+      }
+   }
 
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
@@ -618,8 +601,8 @@ int main(int argc, char *argv[]) {
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
       pmesh->NewNodes(x_gf, false);
-      cout << "Printing x_gf:\n";
-      x_gf.Print(cout);
+      // cout << "Printing x_gf:\n";
+      // x_gf.Print(cout);
 
       if (last_step || (ti % vis_steps) == 0)
       {
@@ -768,88 +751,91 @@ int main(int argc, char *argv[]) {
    /* Plots end y velocity in the case of the Saltzman problem */
    if (visualization)
    {
-      switch (problem)
-      {
-         case 7:
+      if (dim == 2) {
+         switch (problem)
          {
-            /* Prepare data */
-            // Velocity plot
-            int nv_py = pmesh->GetNV();
-            std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
-            // for(int i = 0; i < n_py; i++) {
-            //    x.at(i) = i*i;
-            //    y.at(i) = sin(2*M_PI*i/360.0);
-            //    z.at(i) = log(i);
-            // }
-            for(int i = 0; i < nv_py; i++) {
-               xgf_py[i] = x_gf[i];
-               // mv_y_py[i] = mv_gf[i];
-               mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
-            }
-
-            // Density plot 
-            int nc_py = L2FESpace.GetNE();
-            cout << "nc_py: " << nc_py << endl;
-            Vector center(dim);
-            std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
-            double _min = 0.6, _max = 1.;
-            for (int ci = 0; ci < nc_py; ci++) // cell iterator
+            case 1:
+            case 7:
             {
-               pmesh->GetElementCenter(ci, center);
-               rho_x_py[ci] = center[0];
-               rho_py[ci] = rho_gf[ci];
-            }
+               /* Prepare data */
+               // Velocity plot
+               int nv_py = pmesh->GetNV();
+               std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
+               // for(int i = 0; i < n_py; i++) {
+               //    x.at(i) = i*i;
+               //    y.at(i) = sin(2*M_PI*i/360.0);
+               //    z.at(i) = log(i);
+               // }
+               for(int i = 0; i < nv_py; i++) {
+                  xgf_py[i] = x_gf[i];
+                  // mv_y_py[i] = mv_gf[i];
+                  mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
+               }
 
-            std::vector<double> rho_x_exact_py(200), rho_exact_py(200);
-            double _h = (_max - _min) / 200.;
-            for (int i = 0; i < 200; i++)
+               // Density plot 
+               int nc_py = L2FESpace.GetNE();
+               cout << "nc_py: " << nc_py << endl;
+               Vector center(dim);
+               std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
+               double _min = 0.6, _max = 1.;
+               for (int ci = 0; ci < nc_py; ci++) // cell iterator
+               {
+                  pmesh->GetElementCenter(ci, center);
+                  rho_x_py[ci] = center[0];
+                  rho_py[ci] = rho_gf[ci];
+               }
+
+               std::vector<double> rho_x_exact_py(200), rho_exact_py(200);
+               double _h = (_max - _min) / 200.;
+               for (int i = 0; i < 200; i++)
+               {
+                  rho_x_exact_py[i] = _min + i*_h;
+                  Vector _x(dim);
+                  _x = 0.;
+                  _x[0] = rho_x_exact_py[i];
+                  rho_exact_py[i] = InitialValues<dim, problem>::rho0(_x, t);
+               }
+
+               
+               // Set the size of output image = 1200x780 pixels
+               plt::figure_size(1200, 780);
+
+               // Plot line from given x and y data. Color is selected automatically.
+               // plt::scatter(xgf_py, mv_y_py);
+               // plt::scatter(rho_x_py, rho_py);
+
+               const long nrows=1, ncols=2;
+               long row = 0, col = 0;
+
+               plt::subplot2grid(nrows, ncols, row, col);
+               plt::scatter(rho_x_py, rho_py);
+               plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
+               plt::legend();
+               plt::title("Density");
+
+               col = 1;
+               plt::subplot2grid(nrows, ncols, row, col);
+               plt::scatter(xgf_py, mv_y_py);
+               plt::title("Y Velocity");
+
+               // Plot a red dashed line from given x and y data.
+               // plt::plot(x, w,"r--");
+
+               // Plot a line whose name will show up as "log(x)" in the legend.
+               // plt::named_plot("log(x)", x, z);
+
+               // Enable legend.
+               plt::show();
+
+               // save figure
+               // const char* filename = "./basic.png";
+               // std::cout << "Saving result to " << filename << std::endl;;
+               // plt::save(filename);
+               break;
+            }
+            default: // do nothing for all other problems
             {
-               rho_x_exact_py[i] = _min + i*_h;
-               Vector _x(dim);
-               _x = 0.;
-               _x[0] = rho_x_exact_py[i];
-               rho_exact_py[i] = InitialValues<dim, problem>::rho0(_x, t);
             }
-
-            
-            // Set the size of output image = 1200x780 pixels
-            plt::figure_size(1200, 780);
-
-            // Plot line from given x and y data. Color is selected automatically.
-            // plt::scatter(xgf_py, mv_y_py);
-            // plt::scatter(rho_x_py, rho_py);
-
-            const long nrows=1, ncols=2;
-            long row = 0, col = 0;
-
-            plt::subplot2grid(nrows, ncols, row, col);
-            plt::scatter(rho_x_py, rho_py);
-            plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
-            plt::legend();
-            plt::title("Density");
-
-            col = 1;
-            plt::subplot2grid(nrows, ncols, row, col);
-            plt::scatter(xgf_py, mv_y_py);
-            plt::title("Y Velocity");
-
-            // Plot a red dashed line from given x and y data.
-            // plt::plot(x, w,"r--");
-
-            // Plot a line whose name will show up as "log(x)" in the legend.
-            // plt::named_plot("log(x)", x, z);
-
-            // Enable legend.
-            plt::show();
-
-            // save figure
-            // const char* filename = "./basic.png";
-            // std::cout << "Saving result to " << filename << std::endl;;
-            // plt::save(filename);
-            break;
-         }
-         default: // do nothing for all other problems
-         {
          }
       }
    }
@@ -917,7 +903,6 @@ int main(int argc, char *argv[]) {
          
          break;
       }
-      // case 8: // 8TODO
       case 7:
       case 6:
       case 5:

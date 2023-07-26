@@ -119,9 +119,6 @@ public:
 
    Vector GetIntDerRefShapeFunctions();
 
-   /* RP Functions */
-   double cosineSimilarity(const Vector &v1, const Vector &v2);
-
    /* Mesh movement */
    void compute_intermediate_face_velocities(const Vector &S, 
                                              const double t,
@@ -131,17 +128,6 @@ public:
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
-   void compute_node_velocity_LS(const Vector &S, 
-                                 const Table &vertex_edge,  
-                                 const int &vertex,
-                                 const double & t, 
-                                 const double & dt, 
-                                 Vector &vertex_v,
-                                 DenseMatrix &C,
-                                 Vector &D,
-                                 const string flag="NA", 
-                                 void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-
    void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v);
    void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const int cell, DenseMatrix & res);
@@ -149,10 +135,7 @@ public:
    void compute_geo_C(const int & node, DenseMatrix & res);
    
    // Functions representing development on April 2023
-   void compute_A(const DenseMatrix & C, const double d, const double &dt, DenseMatrix &A);
-   void compute_B(const DenseMatrix &C, const Vector & D, const double d, const double &dt, Vector &B);
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
-   void compute_corrected_node_velocity(const DenseMatrix &C, const Vector &D, const double & dt, const Vector &vertex_x, Vector &vertex_v, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void compute_node_velocities(Vector &S, const double & t, double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    

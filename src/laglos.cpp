@@ -31,9 +31,9 @@
 * ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1, shocktube = 1] // Sod
 *
 * -------------- 2D ----------
-* ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2]
-* ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2]
-* 
+* ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 2 -vis -so [problem = 1, dim = 2] // Sod in 2D
+* ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
+* ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2] // Isentropic Vortex, stationary center
 */
 
 #include "mfem.hpp"
@@ -59,20 +59,6 @@ using namespace hydrodynamics;
 using namespace std;
 namespace plt = matplotlibcpp;
 
-// // Forward declarations
-// double free_steam_conditions(const Vector &x);
-// void free_steam_conditions_v(const Vector &x, Vector &v);
-// void orthogonal(Vector &v);
-// void build_C(ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt);
-// void calc_outward_normal_int(int cell, int face, ParFiniteElementSpace &pfes, ParGridFunction & velocities, double dt, Vector & res);
-// Vector Get_Int_Der_Ref_Shap_Functions();
-
-// // double compute_viscosity();
-// void move_mesh(ParFiniteElementSpace & pfes, const ParGridFunction * velocities);
-
-// double fRand(double fMin, double fMax);
-// void mesh_v(const Vector &x, const double t, Vector &res); // Initial mesh velocity
-
 
 int main(int argc, char *argv[]) {
    // Initialize MPI.
@@ -83,8 +69,6 @@ int main(int argc, char *argv[]) {
 
    const int dim = CompileTimeVals::dim;
    const int problem = CompileTimeVals::problem;
-   // const int dim = 2;
-   // const int problem = 1;
 
    // Parse command line options
    const char *mesh_file_location = "default";
@@ -149,6 +133,7 @@ int main(int argc, char *argv[]) {
 
    // Optionally suppress std::ios output to console
    ofstream file("/dev/null");
+
    //save cout stream buffer
    streambuf* strm_buffer = cout.rdbuf();
    if (suppress_output)
@@ -197,8 +182,6 @@ int main(int argc, char *argv[]) {
       return -1;
    }
    cout << "Meshing done\n";
-   // dim = mesh->Dimension(); // Set the correct dimension if a mesh other than
-   //                          // 'default' was provided.
 
    // mesh->SetCurvature(2);
 
@@ -241,6 +224,7 @@ int main(int argc, char *argv[]) {
    // Define the parallel finite element spaces. We use:
    // - H1 (Q2, continuous) for mesh movement.
    // - L2 (Q0, discontinuous) for state variables
+   // - CR/RT for mesh reconstruction at nodes
    H1_FECollection H1FEC(order_mv, dim);
    // H1Ser_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
@@ -601,8 +585,6 @@ int main(int argc, char *argv[]) {
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
       pmesh->NewNodes(x_gf, false);
-      // cout << "Printing x_gf:\n";
-      // x_gf.Print(cout);
 
       if (last_step || (ti % vis_steps) == 0)
       {
@@ -761,14 +743,9 @@ int main(int argc, char *argv[]) {
                // Velocity plot
                int nv_py = pmesh->GetNV();
                std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
-               // for(int i = 0; i < n_py; i++) {
-               //    x.at(i) = i*i;
-               //    y.at(i) = sin(2*M_PI*i/360.0);
-               //    z.at(i) = log(i);
-               // }
+
                for(int i = 0; i < nv_py; i++) {
                   xgf_py[i] = x_gf[i];
-                  // mv_y_py[i] = mv_gf[i];
                   mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
                }
 

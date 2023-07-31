@@ -119,6 +119,7 @@ LagrangianLOOperator<dim, problem>::LagrangianLOOperator(ParFiniteElementSpace &
    mm(mm),
    CFL(CFL)
 {
+   cout << "Instantiating hydro op\n";
    block_offsets[0] = 0;
    block_offsets[1] = block_offsets[0] + Vsize_H1;
    block_offsets[2] = block_offsets[1] + Vsize_H1;
@@ -1290,7 +1291,7 @@ void LagrangianLOOperator<dim, problem>::get_intermediate_face_velocity(const in
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::ComputeMeshVelocities(Vector &S, const double & t, double & dt)
 {
-   cout << "Compute mesh velocities\n";
+   // cout << "Compute mesh velocities\n";
    // Vector* sptr = const_cast<Vector*>(&S);
    // ParGridFunction x_gf, mv_gf;
    // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -1314,8 +1315,8 @@ void LagrangianLOOperator<dim, problem>::ComputeMeshVelocities(Vector &S, const 
          if (dim > 1)
          {
             // Don't need to fill face velocities with average in dim=1
-            fill_face_velocities_with_average(S);
-            // compute_corrective_face_velocities(S, t, dt);
+            // fill_face_velocities_with_average(S);
+            compute_corrective_face_velocities(S, t, dt);
             // S.Print(cout);
 
             // Construct ti, face normals
@@ -1733,7 +1734,7 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
    {
       const IntegrationPoint &ip = RT_ir.IntPoint(i);
       trans->SetIntPoint(&ip);
-      // cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << ", weight: " << ip.weight << endl;
+      cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << ", weight: " << ip.weight << endl;
 
       // cout << "el " << cell << " at integration point " << i << endl;
       for (int j = 0; j < dim; j++)
@@ -1741,8 +1742,15 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
          // cout << "dim: " << j << endl;
          CRc_gf.MakeRef(&CRc, v_CR_gf, j*size);
          CRc_gf.GetGradient(*trans, grad);
-         // cout << "grad: ";
-         // grad.Print(cout);
+         if (grad.Norml2() > 0.)
+         {
+            cout << "grad: ";
+            grad.Print(cout);
+            cout << "at cell: " << cell << endl;
+         }
+
+         cout << "CRc_gf: " << endl;
+         CRc_gf.Print(cout);
 
          // Put information into Dense Matrix
          res.GetRow(j, row);
@@ -1750,6 +1758,8 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
          res.SetRow(j, row);
       }
    }
+   cout << "Resulting matrix:\n";
+   res.Print(cout);
 }
 
 /***********************************************************************************************************
@@ -1900,8 +1910,8 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
    // cout << "denom: " << denom << endl;
    res *= 1./denom;
 
-   // cout << "Ci for node: " << node << endl;
-   // res.Print(cout);
+   cout << "\t\tCi for node: " << node << endl;
+   res.Print(cout);
 }
 
 
@@ -1913,7 +1923,7 @@ void LagrangianLOOperator<dim, problem>::
                            const string flag, // Default NA
                            void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
-   cout << "Compute node velocities\n";
+   // cout << "Compute node velocities\n";
    Vector vertex_v(dim);
 
    // Iterate over vertices
@@ -1929,6 +1939,7 @@ void LagrangianLOOperator<dim, problem>::
 
       update_node_velocity(S, vertex, vertex_v);
    } // End Vertex iterator
+   // assert(false);
 }
 
 
@@ -2465,8 +2476,9 @@ template class LagrangianLOOperator<2, 7>;
 template class LagrangianLOOperator<3, 7>;
 
 template class LagrangianLOOperator<1, 8>;
-template class LagrangianLOOperator<2, 8>;
-template class LagrangianLOOperator<3, 8>;
+template class LagrangianLOOperator<1, 9>;
+template class LagrangianLOOperator<1, 10>;
+template class LagrangianLOOperator<1, 11>;
 
 } // end ns hydrodynamics
 

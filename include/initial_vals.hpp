@@ -5,7 +5,7 @@
 *     Case 0: Constant density and specific internal energy. 0 velocity.
 *             In this case, we shouldn't see any values changing from
 *             the prescribed initial conditions.
-*     Case 1: Sod Shocktube 1D
+*     Case 1: Sod Shocktube 1D, 2D ---TODO---
 *     Case 2: Lax Shocktube 1D ---TODO---
 *     Case 3: Leblanc Shocktube 1D ---TODO---
 *     Case 4: Noh problem as described in (6.3) ---TODO---
@@ -17,6 +17,10 @@
 *     Case 6: Isentropic vortex (see above) with moving center. ---TODO---
 *     Case 7: Saltzman problem. See https://people.tamu.edu/~guermond/PUBLICATIONS/guermond_popov_Saavedra_JCP_2020.pdf.
 *             Requires Neumann BC on right face and Dirichlet elsewhere. ---TODO---
+*     Case 8: (6.1) from 2022 Clayton et al with van der Walls eos, 1D
+*     Case 9: (6.4) from 2022 Clayton et al with van der Walls eos, 1D
+*     Case 10: (6.5) from 2022 Clayton et al with van der Walls eos, 1D
+*     Case 11: (6.6) from 2022 Clayton et al with van der Walls eos, 1D ---TODO---
 */
 
 #include "mfem.hpp"
@@ -151,6 +155,60 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          }
          return 0.;
       }
+      case 8:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.)
+            {
+               return 0.10;
+            }
+            else
+            {
+               assert(x[0] <= 1.);
+               return 0.39;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation of sie0
+         }
+         break;
+      }
+      case 9:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.)
+            {
+               return 0.2450;
+            }
+            else
+            {
+               // assert(x[0] <= 1.);
+               return 0.1225;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation of sie0
+         }
+         break;
+      }
+      case 10:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.25)
+            {
+               return 0.25;
+            }
+            else
+            {
+               // assert(x[0] <= 1.);
+               return 4.9e-5;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation 
+         }
+         break;
+      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!"); 
@@ -270,6 +328,41 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
          }
          return;
       }
+      case 8:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0)
+            {
+               v[0] = -0.475504638574729;
+               return;
+            }
+            else
+            {
+               assert(x[0]<=1.);
+               v[0] = -0.121375781741349;
+               return;
+            }
+         }
+         else {
+            v[0] = 14.; // TODO: Exact representation of sie0
+            return; 
+         }
+         break;
+      }
+      case 9:
+      case 10:
+      {
+         if (t < 1.e-16) {
+            assert(dim == 1);
+            v[0] = 0.;
+            return;
+         }
+         else {
+            v[0] = 0.; // TODO: Exact representation of sie0
+            return; 
+         }
+         break;
+      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!");
@@ -303,6 +396,60 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             double _rho = rho0(x,t);
             return _p / (_rho * (_gamma - 1.));
          }
+      }
+      case 8:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.)
+            {
+               return 14.337916411885988;
+            }
+            else
+            {
+               assert(x[0]<=1.);
+               return 14.560722040683306;
+            }
+         }
+         else {
+            return 14.; // TODO: Exact representation of sie0
+         }
+         break;
+      }
+      case 9:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.)
+            {
+               return 13.49120718802014;
+            }
+            else
+            {
+               assert(x[0]<=1.);
+               return 12.661115131212163;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation of sie0
+         }
+         break;
+      }
+      case 10:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= 0.25)
+            {
+               return 13.624999999999986;
+            }
+            else
+            {
+               assert(x[0]<=1.);
+               return 0.05341878811326526;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation 
+         }
+         break;
       }
       /* In all other cased use pressure law to get specific internal energy */
       case 0:

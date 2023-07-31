@@ -109,6 +109,22 @@ double ProblemDescription<dim, problem>::pressure(const Vector & U)
          assert(dim==1);
          return 1.;
       }
+      case 8:  // vdw
+      case 9:  // vdw
+      case 10: // vdw
+      {
+         // Use van der Waals
+         double rho = 1. / U[0];
+         double gamma = gamma_func();
+         double sie = specific_internal_energy(U);
+
+         // _a and _b are constants depending on the nature of the fluid
+         double _a = 1.;
+         double _b = 1.;
+
+         double val = (gamma - 1.) * (rho * sie + _a * pow(rho, 2)) / (1. - _b * rho) - _a * pow(rho,2);
+         return val;
+      }
       case 1: // Sod
       case 2:
       case 3:
@@ -163,7 +179,9 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
       case 5: return 7./5.;
       case 6: return 7./5.;
       case 7: return 5./3.;
-      // case 7: MFEM_ABORT("Case not implemented.\n");
+      case 8: 
+      case 9: 
+      case 10: return 1.02;
       default:
       {
          MFEM_ABORT("Bad number given for problem id!"); 
@@ -370,8 +388,9 @@ template class ProblemDescription<2, 7>;
 template class ProblemDescription<3, 7>;
 
 template class ProblemDescription<1, 8>;
-template class ProblemDescription<2, 8>;
-template class ProblemDescription<3, 8>;
+template class ProblemDescription<1, 9>;
+template class ProblemDescription<1, 10>;
+template class ProblemDescription<1, 11>;
 
 } // end ns hydrodynamics
 } // end ns mfem

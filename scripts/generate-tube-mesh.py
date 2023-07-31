@@ -2,7 +2,7 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 101
+   nx_gridpoints = 41
    ny_gridpoints = 2
 
    x_arr = np.linspace(0,1,nx_gridpoints)

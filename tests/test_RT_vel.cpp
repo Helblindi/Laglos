@@ -14,11 +14,11 @@ namespace plt = matplotlibcpp;
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
 double a = 1.,
-       b = 1.,
-       c = 1.,
-       d = 1.,
-       e = -0.5,
-       f = 1.,
+       b = 0.,
+       c = 0.,
+       d = 0.,
+       e = 0,
+       f = 0.,
        aq = 0.,
        bq = 0.,
        dq = 0.,
@@ -26,7 +26,7 @@ double a = 1.,
 
 // Problem
 const int dim = 2;
-const int problem = 8;     // This value doesn't matter (1-8)
+const int problem = 1;     // This value doesn't matter (1-8)
 int order_mv = 2;          // Order of mesh movement approximation space
 int order_u = 0;
 const string flag = "testing";
@@ -540,6 +540,7 @@ int test_RT_int_grad()
       hydro.RT_int_grad(cell_it, dm);
       cout << "Dense Matrix for cell: " << cell_it << endl;
       dm.Print(cout);
+      // assert(false);
 
       Add(dm, true_grad, -1., grad_error);
       _error += grad_error.FNorm();

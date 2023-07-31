@@ -28,7 +28,11 @@
 * 
 * -------------- 1D ----------
 * ./Laglos -m data/ref-segment.mesh -tf 6 -cfl 0.5 -ot -visc -mm -rs 10 [problem = 0, dim = 1] // Smooth 1D wave 2nd order IDP 2018 paper
-* ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1, shocktube = 1] // Sod
+* ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1] // Sod
+*   --- vdw ---
+* ./Laglos -m data/ref-segment-c0.mesh -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis [problem = 8, dim = 1]
+* ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis [problem = 9, dim = 1]
+* ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis [problem = 10, dim = 1]
 *
 * -------------- 2D ----------
 * ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 2 -vis -so [problem = 1, dim = 2] // Sod in 2D
@@ -420,6 +424,10 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
+   cout << "GridFunctions initiated.\n";
+
+   S.Print(cout);
+
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, mm, CFL);
    cout << "Solver created.\n";
@@ -477,6 +485,9 @@ int main(int argc, char *argv[]) {
 
       switch(problem)
       {
+         case 10:
+         case 9:
+         case 8:
          case 7:
          case 6:
          case 5:
@@ -669,6 +680,8 @@ int main(int argc, char *argv[]) {
 
                   break;
                }
+               case 10:
+               case 9:
                case 8:
                case 7:
                case 6:
@@ -733,12 +746,12 @@ int main(int argc, char *argv[]) {
    /* Plots end y velocity in the case of the Saltzman problem */
    if (visualization)
    {
-      if (dim == 2) {
-         switch (problem)
+      switch (problem)
+      {
+         case 1:
+         case 7: /* Plots end y velocity in the case of the Saltzman problem */
          {
-            case 1:
-            case 7:
-            {
+            if (dim == 2) {
                /* Prepare data */
                // Velocity plot
                int nv_py = pmesh->GetNV();
@@ -810,9 +823,58 @@ int main(int argc, char *argv[]) {
                // plt::save(filename);
                break;
             }
-            default: // do nothing for all other problems
+         }
+         case 8: /* Plot pressure-specific volume diagram for vdw */
+         case 9:
+         case 10:
+         {
+            // Form pressure gf
+            ParGridFunction press_gf(&L2FESpace);
+            std::vector<double> press_gf_py(pmesh->GetNV()), sv_gf_py(pmesh->GetNV()), x_gf_py(pmesh->GetNV());
+            Vector U(dim+2), center(dim);
+            // Compute Density
+            for (int i = 0; i < sv_gf.Size(); i++)
             {
-            }
+               hydro.GetCellStateVector(S, i, U);
+               double pressure = ProblemDescription<dim, problem>::pressure(U);
+               press_gf[i] = pressure;
+               // Form python arrays
+               press_gf_py[i] = pressure;
+               sv_gf_py[i] = U[0];
+
+               pmesh->GetElementCenter(i, center);
+               x_gf_py[i] = center[0];
+            } 
+            
+            /* --- Plot stuff --- */
+            // Set the size of output image = 1200x780 pixels
+            plt::figure_size(1200, 780);
+
+            // Plot line from given x and y data. Color is selected automatically.
+            // plt::scatter(xgf_py, mv_y_py);
+            // plt::scatter(rho_x_py, rho_py);
+
+            const long nrows=1, ncols=2;
+            long row = 0, col = 0;
+
+
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(sv_gf_py, press_gf_py);
+            // plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
+            plt::legend();
+            plt::title("Pressure-Specific Volume Diagram");
+
+            col = 1;
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(x_gf_py, press_gf_py);
+            plt::title("Pressure");
+
+            plt::show();
+
+            break;
+         }
+         default: // do nothing for all other problems
+         {
          }
       }
    }
@@ -880,6 +942,9 @@ int main(int argc, char *argv[]) {
          
          break;
       }
+      case 10:
+      case 9:
+      case 8:
       case 7:
       case 6:
       case 5:

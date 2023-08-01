@@ -331,7 +331,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
       case 8:
       {
          if (t < 1.e-16) {
-            if (x[0] <= 0)
+            if (x[0] <= 0.)
             {
                v[0] = -0.475504638574729;
                return;

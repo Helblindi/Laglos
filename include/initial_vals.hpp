@@ -385,7 +385,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
    switch (problem)
    {
       case 1: return (x(0) < 0.5) ? 1.0 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0) // Sod
-                        : 0.1 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
+                        : 0.125 / rho0(x, t) / (ProblemDescription<dim,problem>::gamma_func() - 1.0);
       case 4: { MFEM_ABORT("Noh should not call sie function.\n"); }
       case 7:
       {

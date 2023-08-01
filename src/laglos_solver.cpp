@@ -1693,30 +1693,30 @@ void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, con
          break;
       }
       case 1: // face
-      // {
-      //    bool face_is_part_of_cell = false;
-      //    // Check is face is part of the provided cell
-      //    for (int face_it = 0; face_it < row_length; face_it++)
-      //    {
-      //       if (EDof == element_face_row[face_it])
-      //       {
-      //          face_is_part_of_cell = true;
-      //       }
-      //    }
+      {
+         bool face_is_part_of_cell = false;
+         // Check is face is part of the provided cell
+         for (int face_it = 0; face_it < row_length; face_it++)
+         {
+            if (EDof == element_face_row[face_it])
+            {
+               face_is_part_of_cell = true;
+            }
+         }
 
-      //    if (!face_is_part_of_cell)
-      //    {
-      //       cout << "cell: " << cell << ", node " << node << endl;
-      //       MFEM_ABORT("Provided face is not adjacent to cell");
-      //    }
+         if (!face_is_part_of_cell)
+         {
+            cout << "cell: " << cell << ", node " << node << endl;
+            MFEM_ABORT("Provided face is not adjacent to cell");
+         }
 
-      //    // Simply return the intermediate face velocity
-      //    get_intermediate_face_velocity(EDof, vel);
-      //    break;
-      // }
+         // Simply return the intermediate face velocity
+         get_intermediate_face_velocity(EDof, vel);
+         break;
+      }
       case 2: // cell
       {
-         MFEM_ABORT("No need to RT_Nodal velocity at cell centers or faces.\n");
+         MFEM_ABORT("No need to RT_Nodal velocity at cell centers.\n");
          break;
       }
       default:
@@ -1831,9 +1831,13 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
          break;
       }
       case 1: // face
+      {
+         face_element->GetRow(EDof, row);
+         break;
+      }
       case 2: // cell
       {
-         MFEM_ABORT("No need to compute V_i at cell centers or faces.\n");
+         MFEM_ABORT("No need to compute V_i at cell centers.\n");
       }
       default:
       {
@@ -1902,9 +1906,14 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
          break;
       }
       case 1: // face
+      {
+         // cout << "face node\n";
+         face_element->GetRow(EDof, row);
+         break;
+      }
       case 2: // cell
       {
-         MFEM_ABORT("No need to compute C_i at faces or cell centers.\n");
+         MFEM_ABORT("No need to compute C_i at cell centers.\n");
       }
       default:
       {
@@ -1956,14 +1965,6 @@ void LagrangianLOOperator<dim, problem>::
    {
       compute_node_velocity_RT(vertex, dt, vertex_v, is_dt_changed);
 
-      // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
-      if (is_dt_changed)
-      {
-         vertex = 0;
-         is_dt_changed = false;
-         cout << "Restarting vertex iterator\n";
-      }
-
       if (vertex_v[0] != vertex_v[0] || vertex_v[1] != vertex_v[1])
       {
          cout << "NaN velocity encountered in compute_node_velocities at vertex: " << vertex << endl;
@@ -1971,6 +1972,14 @@ void LagrangianLOOperator<dim, problem>::
       }
 
       update_node_velocity(S, vertex, vertex_v);
+
+      // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
+      if (is_dt_changed)
+      {
+         vertex = -1;
+         is_dt_changed = false;
+         cout << "Restarting vertex iterator\n";
+      }
    } // End Vertex iterator
    // assert(false);
 }

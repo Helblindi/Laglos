@@ -708,13 +708,14 @@ void plot_velocities()
 
    Vector x(dim), vec_res(dim);
    double dt = 1.;
+   bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
       // hydro.get_node_position(S, node_it, x);
       // cout << "node position for node: " << node << endl;
       // x.Print(cout);
 
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res);
+      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
       hydro.update_node_velocity(S, node_it, vec_res);
 
       // Also store for plotting simple the averaged geometric V
@@ -723,6 +724,13 @@ void plot_velocities()
       {
          int index = node_it + i*H1FESpace.GetNDofs();
          vgeo_gf[index] = vec_res[i];
+      }
+
+      // restart nodal velocity computation if the timestep has been restricted
+      if (is_dt_changed)
+      {
+         is_dt_changed = false;
+         node_it = -1;
       }
    }
 
@@ -1010,14 +1018,15 @@ void test_vel_field_1()
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-
+   bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
       cout << "\nnode: " << node_it << endl;
       hydro.compute_geo_C(node_it, dm);
       cout << "Ci:\n";
       dm.Print(cout);
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res);
+      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
+      // hydro.get_intermediate_face_velocity(node_it, vec_res);
       cout << "RT v: ";
       vec_res.Print(cout);
       hydro.update_node_velocity(S, node_it, vec_res);
@@ -1030,6 +1039,13 @@ void test_vel_field_1()
       {
          int index = node_it + i*H1FESpace.GetNDofs();
          vgeo_gf[index] = vec_res[i];
+      }
+
+      // restart nodal velocity computation if the timestep has been restricted
+      if (is_dt_changed)
+      {
+         is_dt_changed = false;
+         node_it = -1;
       }
    }
 

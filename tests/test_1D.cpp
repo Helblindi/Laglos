@@ -469,11 +469,17 @@ int test_vel_field_1()
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-
+   bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res);
+      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
       hydro.update_node_velocity(S, node_it, vec_res);
+      // restart nodal velocity computation if the timestep has been restricted
+      if (is_dt_changed)
+      {
+         is_dt_changed = false;
+         node_it = -1;
+      }
    }
 
    // hydro.compute_corrective_face_velocities(S, t, dt);

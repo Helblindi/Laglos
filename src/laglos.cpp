@@ -35,7 +35,7 @@
 * ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis [problem = 10, dim = 1]
 *
 * -------------- 2D ----------
-* ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 2 -vis -so [problem = 1, dim = 2] // Sod in 2D
+* ./Laglos -m data/ref-square.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 4 -vis -so [problem = 1, dim = 2] // Sod in 2D
 * ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
 * ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2] // Isentropic Vortex, stationary center
 */
@@ -743,7 +743,7 @@ int main(int argc, char *argv[]) {
       }
    } // End time step iteration
 
-   /* Plots end y velocity in the case of the Saltzman problem */
+   /* Various problem-specific plots */
    if (visualization)
    {
       switch (problem)
@@ -821,8 +821,8 @@ int main(int argc, char *argv[]) {
                // const char* filename = "./basic.png";
                // std::cout << "Saving result to " << filename << std::endl;;
                // plt::save(filename);
-               break;
             }
+            break;
          }
          case 8: /* Plot pressure-specific volume diagram for vdw */
          case 9:
@@ -830,7 +830,8 @@ int main(int argc, char *argv[]) {
          {
             // Form pressure gf
             ParGridFunction press_gf(&L2FESpace);
-            std::vector<double> press_gf_py(pmesh->GetNV()), sv_gf_py(pmesh->GetNV()), x_gf_py(pmesh->GetNV());
+            std::vector<double> press_gf_py(pmesh->GetNE()), sv_gf_py(pmesh->GetNE()), x_gf_py(pmesh->GetNE());
+            std::vector<double> rho_gf_py(pmesh->GetNE()), ss_gf_py(pmesh->GetNE());
             Vector U(dim+2), center(dim);
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
@@ -841,6 +842,8 @@ int main(int argc, char *argv[]) {
                // Form python arrays
                press_gf_py[i] = pressure;
                sv_gf_py[i] = U[0];
+               rho_gf_py[i] = 1./U[0];
+               ss_gf_py[i] = ProblemDescription<dim, problem>::sound_speed(U);
 
                pmesh->GetElementCenter(i, center);
                x_gf_py[i] = center[0];
@@ -848,26 +851,41 @@ int main(int argc, char *argv[]) {
             
             /* --- Plot stuff --- */
             // Set the size of output image = 1200x780 pixels
-            plt::figure_size(1200, 780);
+            plt::figure_size(1500, 1080);
 
             // Plot line from given x and y data. Color is selected automatically.
             // plt::scatter(xgf_py, mv_y_py);
             // plt::scatter(rho_x_py, rho_py);
 
-            const long nrows=1, ncols=2;
+            const long nrows=2, ncols=2;
             long row = 0, col = 0;
-
-
             plt::subplot2grid(nrows, ncols, row, col);
-            plt::scatter(sv_gf_py, press_gf_py);
-            // plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
-            plt::legend();
-            plt::title("Pressure-Specific Volume Diagram");
+            plt::scatter(x_gf_py, rho_gf_py);
+            plt::title("Density");
+            plt::xlabel("$x$");
+            plt::ylabel("Density");
 
             col = 1;
             plt::subplot2grid(nrows, ncols, row, col);
             plt::scatter(x_gf_py, press_gf_py);
             plt::title("Pressure");
+            plt::xlabel("$x$");
+            plt::ylabel("Pressure $p$");
+
+
+            row = 1, col = 0;
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(x_gf_py, ss_gf_py);
+            plt::title("Sound Speed");
+            plt::xlabel("$x$");
+            plt::ylabel("Sound Speed $c$");
+
+            col = 1;
+            plt::subplot2grid(nrows, ncols, row, col);
+            plt::scatter(sv_gf_py, press_gf_py);
+            plt::title("Pressure-Specific Volume Diagram");
+            plt::xlabel("Specific Volume");
+            plt::ylabel("Pressure $p$");
 
             plt::show();
 

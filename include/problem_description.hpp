@@ -39,6 +39,8 @@ public:
 
    static inline double pressure(const Vector &U);
 
+   static inline double sound_speed(const Vector &U);
+
    static inline double gamma_func(const int shocktube = 0);
 
    static inline double compute_lambda_max(const Vector & U_i,
@@ -138,6 +140,44 @@ double ProblemDescription<dim, problem>::pressure(const Vector & U)
          return (gamma - 1.) * internal_energy(U);
       }
    }
+}
+
+template<int dim, int problem> inline
+double ProblemDescription<dim, problem>::sound_speed(const Vector &U)
+{
+   switch (problem)
+   {
+      case 0:
+      case 1: // Sod
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7: MFEM_ABORT("Case not implemented.\n");
+      case 8:
+      case 9:
+      case 10: {
+         double _pressure = pressure(U);
+         double density = 1. / U[0];
+         double gamma = gamma_func();
+
+         // _a and _b are constants depending on the nature of the fluid
+         double _a = 1.;
+         double _b = 1.;
+
+         double val = gamma * (_pressure + _a * pow(density,2)) / (density * (1. - _b * density));
+         val -= 2 * _a * density;
+         val = pow(val, 0.5);
+         return val;
+      }
+      default:
+      {
+         MFEM_ABORT("Bad number given for problem id!"); 
+         return 0.;
+      }
+   }
+   return 1.;
 }
 
 template<int dim, int problem> inline

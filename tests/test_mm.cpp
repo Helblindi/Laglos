@@ -403,12 +403,13 @@ int test_determinant_basic()
    double d = 0.;
    hydro.compute_determinant(C, dt, d);
    
-   if (d == 4.)
+   if (d == 1.)
    {
       return 0;
    }
    else
    {
+      cout << "Failed determinant basic.\n";
       return 1;
    }
 }
@@ -528,6 +529,7 @@ int test_determinant_advanced()
    }
    else
    {
+      cout << "failed determinant advanced.\n";
       return 1;
    }
 }

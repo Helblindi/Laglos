@@ -1456,6 +1456,9 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
       cout << "d1: " << d1 << ", d2: " << d2 << endl;
       MFEM_ABORT("Alpha_i should be positive.\n");
    }
+
+   if (d2 > 0.) { d = d2; }
+   else { d = d1; }
 }
 
 
@@ -1553,8 +1556,8 @@ void LagrangianLOOperator<dim, problem>::
             Vgeo.Print(cout);
             // assert(false);
          }
-         // cout << "V geo: ";
-         // Vgeo.Print(cout);
+         cout << "V geo: ";
+         Vgeo.Print(cout);
 
          compute_determinant(Ci, dt, d);
          // cout << "det: " << d << endl;
@@ -1566,12 +1569,24 @@ void LagrangianLOOperator<dim, problem>::
          {
             _mat(i,i) += d;
          }
+         if (abs(Ci(0,0) - 1.) <= .00005 )
+         {
+            cout << "Found a Ci with a non-one top left entry.\n";
+         }
+         cout << "Ci: ";
+         Ci.Print(cout);
          cout << "Pre inverse: \n";
          _mat.Print(cout);
+
          _mat.Invert();
          cout << "Inverse: \n";
          _mat.Print(cout);
+
          _mat.Mult(Vgeo, node_v);
+         cout << "V geo: ";
+         Vgeo.Print(cout);
+         cout << "node_v: ";
+         node_v.Print(cout);
          break;
       }
    }

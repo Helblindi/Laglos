@@ -815,7 +815,7 @@ int test_determinant()
       cout << "Failed 1st determinant test.\n";
       return 1;
    }
-   else { cout << "Passed 1st derminant test.\n"}
+   else { cout << "Passed 1st derminant test.\n"; }
 
    // Second determinant test
    C = 0.;
@@ -827,7 +827,7 @@ int test_determinant()
       cout << "Failed 2nd determinant test.\n";
       return 1;
    }
-   else { cout << "Passed 2nd derminant test.\n"}
+   else { cout << "Passed 2nd derminant test.\n"; }
 
    // Third determinant test
    C = -1.;
@@ -840,7 +840,23 @@ int test_determinant()
       cout << "Failed 3rd determinant test.\n";
       return 1;
    }
-   else { cout << "Passed 3rd derminant test.\n"}
+   else { cout << "Passed 3rd derminant test.\n"; }
+
+   // Fourth determinant test
+   C = 0.;
+   C(0,0) = 4.;
+   C(0,1) = -8.;
+   C(1,0) = 1.;
+   C(1,1) = 4.;
+
+   d = 0.;
+   hydro.compute_determinant(C, dt, d);
+   if (d != 2.)
+   {
+      cout << "Failed 4th determinant test.\n";
+      return 1;
+   }
+   else { cout << "Passed 4th derminant test.\n"; }
 
    return 0;
 }

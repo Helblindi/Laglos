@@ -17,7 +17,7 @@ def vdw_pressure(gamma, rho, sie, a, b):
 
 
 def vdw_sie(gamma, rho, pressure, a, b):
-   return ((1. / rho - b) * (pressure + a * (rho**2)) / (gamma - 1)) - a * rho
+   return ((1. / rho - b) * (pressure + a * (rho**2)) / (gamma - 1.)) - a * rho
 
 
 main()

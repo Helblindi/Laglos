@@ -128,7 +128,7 @@ public:
 
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
-   void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v);
+   void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const int cell, DenseMatrix & res);
    void compute_geo_V(const int & node, Vector & res);

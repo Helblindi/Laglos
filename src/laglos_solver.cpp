@@ -505,9 +505,7 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
    }
 
    // Update state variables contained in S_new
-   // cout << "Verifying S has been modified. S.Normle(): " << S.Norml2() << endl;
    ComputeStateUpdate(S, t, dt);
-   // cout << "S.Norml2(): " << S.Norml2() << endl;
 
    // Move the mesh
    Vector* sptr = const_cast<Vector*>(&S);
@@ -517,9 +515,6 @@ void LagrangianLOOperator<dim, problem>::MakeTimeStep(Vector &S, const double & 
 
    add(x_gf, dt, mv_gf, x_gf);
    pmesh->NodesUpdated();
-
-   // Verify that our algorithm is locally mass conservative
-   // CheckMassConservation(S);
 } 
 
 
@@ -1399,7 +1394,7 @@ void LagrangianLOOperator<dim, problem>::CheckMassConservation(const Vector &S)
          // cout << endl;
       }
    }
-   double cell_ratio = counter / (double)NDofs_L2;
+   double cell_ratio = (double)counter / (double)NDofs_L2;
 
    cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
 }
@@ -1423,11 +1418,14 @@ void LagrangianLOOperator<dim, problem>::tensor(const Vector & v1, const Vector 
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
 {
-   // cout << "=====================\n";
-   // cout << "Computing determinant\n";
-   // cout << "=====================\n";
+   cout << "=====================\n";
+   cout << "Computing determinant\n";
+   cout << "=====================\n";
    double trace = C.Trace();
    double det = C.Det();
+   cout << "Matrix C:\n";
+   C.Print(cout);
+   cout << "trace: " << trace << ", det: " << det << endl;
 
    double a = 1.;
    // double b = -1. * (1. + (dt / 2.) * (C(0,0) + C(1,1)));
@@ -1443,10 +1441,10 @@ void LagrangianLOOperator<dim, problem>::compute_determinant(const DenseMatrix &
    double pm = sqrt(pow(b,2) - 4. * a * c);
    cout << "pm: " << pm << endl;
 
-   double d1 = -1 * b + pm;
+   double d1 = -1. * b + pm;
    d1 /= (2. * a);
 
-   double d2 = -1 * b - pm;
+   double d2 = -1. * b - pm;
    d2 /= (2. * a);
 
    cout << "d1: " << d1 << endl;
@@ -1470,7 +1468,7 @@ Purpose:
 */
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::
-   compute_node_velocity_RT(const int & node, double & dt, Vector &node_v)
+   compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "-----\nCompute node velocity RT\n-----\n";
    // cout << "Node: " << node << endl;
@@ -1499,14 +1497,24 @@ void LagrangianLOOperator<dim, problem>::
             // Verify determinant > 0
             double trace = Ci.Trace();
             double det = Ci.Det();
-            // assert(det >= 0.);
+            if (det <= 1.e-12)
+            {
+               double _c = abs(Ci(0,0));
+               _c += 1.;
+               if (dt > 2. / _c)
+               {
+                  dt = 2. / _c;
+                  is_dt_changed = true;
+                  cout << "averting alpha_i <= 0 abort call.\n";
+               }
+            }
             
             // Enforce timestep restriction
             double val = 2. * sqrt(det);
             double zero1 = 1. / (-trace - val);
             double zero2 = 1. / (-trace + val);
 
-            // cout << "trace: " << trace << ", det: " << det << ", z1: " << zero1 << ", z2: " << zero2 << endl;
+            cout << "trace: " << trace << ", det: " << det << ", z1: " << zero1 << ", z2: " << zero2 << endl;
 
             // cout << "Printing Ci:\n";
             // Ci.Print(cout);
@@ -1515,26 +1523,36 @@ void LagrangianLOOperator<dim, problem>::
                if (zero2 > 0.) // z1 0 z2
                {
                   // We must enforce dt <= 2*z2
-                  if (dt > zero2) { 
-                     // cout << "restricting timestep, z1,0,z2\n";
-                     // cout << "old timestep: " << dt << ", new timestep: " << zero2 << endl;
-                     dt = zero2; 
+                  if (dt > 2.*zero2) { 
+                     cout << "restricting timestep, z1,0,z2\n";
+                     cout << "old timestep: " << dt << ", new timestep: " << zero2 << endl;
+                     dt = 2.*zero2; 
+                     is_dt_changed = true;
                   }
                }
                // else // z1 z2 0 - no enforcement on timestep
             }
             else // 0 z1 z2
             {
-               if (dt > zero1)
+               if (dt > 2.*zero1) // 0 z1 dt z2    --- or --- 0 z1 z2 dt
                {
-                  // cout << "restricting timestep, 0,z1,z2\n";
-                  // cout << "old timestep: " << dt << ", new timestep: " << zero1 << endl;
-                  dt = zero1;
+                  cout << "restricting timestep, 0,z1,z2\n";
+                  cout << "old timestep: " << dt << ", new timestep: " << zero1 << endl;
+                  dt = 2.*zero1;
+                  is_dt_changed = true;
                }
             }
          }
 
          compute_geo_V(node, Vgeo);
+         if (Ci.FNorm() > 0.)
+         {
+            cout << "\t\tCi for node: " << node << endl;
+            Ci.Print(cout);
+            cout << "Vgeo: ";
+            Vgeo.Print(cout);
+            // assert(false);
+         }
          // cout << "V geo: ";
          // Vgeo.Print(cout);
 
@@ -1548,11 +1566,11 @@ void LagrangianLOOperator<dim, problem>::
          {
             _mat(i,i) += d;
          }
-         // cout << "Pre inverse: \n";
-         // _mat.Print(cout);
+         cout << "Pre inverse: \n";
+         _mat.Print(cout);
          _mat.Invert();
-         // cout << "Inverse: \n";
-         // _mat.Print(cout);
+         cout << "Inverse: \n";
+         _mat.Print(cout);
          _mat.Mult(Vgeo, node_v);
          break;
       }
@@ -1624,17 +1642,18 @@ void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, con
    // Reset velocity
    vel = 0.;
 
-
    switch (entity)
    {
       case 0: // corner
       {
+         cout << "working on a corner entity\n";
+         cout << "node: " << node << endl;
          // Get integration point corresponding to node location
          Array<int> verts;
          pmesh->GetElementVertices(cell, verts);
 
-         // cout << "cell: " << cell << ", verts: \n";
-         // verts.Print(cout);
+         cout << "cell: " << cell << ", verts: \n";
+         verts.Print(cout);
 
          IntegrationPoint test_ip;
          if (node == verts[0]) {
@@ -1666,34 +1685,38 @@ void LagrangianLOOperator<dim, problem>::RT_nodal_velocity(const int & cell, con
 
             // Get intermediate face velocities corresponding to faces
             get_intermediate_face_velocity(face, face_vel);
+            cout << "face vel on face: " << face << endl;
+            face_vel.Print(cout);
+            cout << "shapes at face_it: " << shapes[face_it] << endl;
             vel.Add(shapes[face_it], face_vel);
          }
          break;
       }
       case 1: // face
-      {
-         bool face_is_part_of_cell = false;
-         // Check is face is part of the provided cell
-         for (int face_it = 0; face_it < row_length; face_it++)
-         {
-            if (EDof == element_face_row[face_it])
-            {
-               face_is_part_of_cell = true;
-            }
-         }
+      // {
+      //    bool face_is_part_of_cell = false;
+      //    // Check is face is part of the provided cell
+      //    for (int face_it = 0; face_it < row_length; face_it++)
+      //    {
+      //       if (EDof == element_face_row[face_it])
+      //       {
+      //          face_is_part_of_cell = true;
+      //       }
+      //    }
 
-         if (!face_is_part_of_cell)
-         {
-            cout << "cell: " << cell << ", node " << node << endl;
-            MFEM_ABORT("Provided face is not adjacent to cell");
-         }
+      //    if (!face_is_part_of_cell)
+      //    {
+      //       cout << "cell: " << cell << ", node " << node << endl;
+      //       MFEM_ABORT("Provided face is not adjacent to cell");
+      //    }
 
-         // Simply return the intermediate face velocity
-         get_intermediate_face_velocity(EDof, vel);
-         break;
-      }
+      //    // Simply return the intermediate face velocity
+      //    get_intermediate_face_velocity(EDof, vel);
+      //    break;
+      // }
       case 2: // cell
       {
+         MFEM_ABORT("No need to RT_Nodal velocity at cell centers or faces.\n");
          break;
       }
       default:
@@ -1722,35 +1745,38 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
 {
    // cout << "RT_int_grad funcall.\n";
    ParGridFunction CRc_gf(&CRc);
-   const int size = CRc.GetVSize();
+   const int _size = CRc.GetVSize();
 
    ElementTransformation * trans = pmesh->GetElementTransformation(cell);
    Vector grad(dim), row(dim);
-   res = 0., row = 0.;
    res.SetSize(dim);
+   res = 0., row = 0.;
 
    // Iterate over quadrature
    for (int i = 0; i < RT_ir.GetNPoints(); i++)
    {
       const IntegrationPoint &ip = RT_ir.IntPoint(i);
       trans->SetIntPoint(&ip);
-      cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << ", weight: " << ip.weight << endl;
+      // cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << ", weight: " << ip.weight << endl;
 
       // cout << "el " << cell << " at integration point " << i << endl;
       for (int j = 0; j < dim; j++)
       {
          // cout << "dim: " << j << endl;
-         CRc_gf.MakeRef(&CRc, v_CR_gf, j*size);
+         CRc_gf.MakeRef(&CRc, v_CR_gf, j*_size);
          CRc_gf.GetGradient(*trans, grad);
-         if (grad.Norml2() > 0.)
-         {
-            cout << "grad: ";
-            grad.Print(cout);
-            cout << "at cell: " << cell << endl;
-         }
+         // if (grad.Norml2() > 0.)
+         // {
+         //    cout << "grad: ";
+         //    grad.Print(cout);
+         //    cout << "at cell: " << cell << endl;
+         // }
 
-         cout << "CRc_gf: " << endl;
-         CRc_gf.Print(cout);
+         // cout << "dim: " << j << endl;
+         // cout << "v_CR_gf: " << endl;
+         // v_CR_gf.Print(cout);
+         // cout << "CRc_gf: " << endl;
+         // CRc_gf.Print(cout);
 
          // Put information into Dense Matrix
          res.GetRow(j, row);
@@ -1758,8 +1784,13 @@ void LagrangianLOOperator<dim, problem>::RT_int_grad(const int cell, DenseMatrix
          res.SetRow(j, row);
       }
    }
-   cout << "Resulting matrix:\n";
-   res.Print(cout);
+   // if (res.FNorm() > 0.)
+   // {
+   //    cout << "Resulting nonzero matrix:\n";
+   //    res.Print(cout);
+   //    assert(false);
+   // }
+   
 }
 
 /***********************************************************************************************************
@@ -1800,13 +1831,9 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
          break;
       }
       case 1: // face
-      {
-         face_element->GetRow(EDof, row);
-         break;
-      }
       case 2: // cell
       {
-         MFEM_ABORT("No need to compute V_i at cell centers");
+         MFEM_ABORT("No need to compute V_i at cell centers or faces.\n");
       }
       default:
       {
@@ -1821,8 +1848,8 @@ void LagrangianLOOperator<dim, problem>::compute_geo_V(const int &node, Vector &
 
       temp = 0.;
       RT_nodal_velocity(row_el, node, temp);
-      // cout << "velocity computed on cell " << row_el << " for node: " << node << endl;
-      // temp.Print(cout);
+      cout << "velocity computed on cell " << row_el << " for node: " << node << endl;
+      temp.Print(cout);
       res.Add(1., temp);
    }
 
@@ -1875,14 +1902,9 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
          break;
       }
       case 1: // face
-      {
-         // cout << "face node\n";
-         face_element->GetRow(EDof, row);
-         break;
-      }
       case 2: // cell
       {
-         MFEM_ABORT("No need to compute C_i at cell centers");
+         MFEM_ABORT("No need to compute C_i at faces or cell centers.\n");
       }
       default:
       {
@@ -1903,14 +1925,16 @@ void LagrangianLOOperator<dim, problem>::compute_geo_C(const int &node, DenseMat
       RT_int_grad(row_el, dm_temp);
       // res.Add(1., dm_temp);
       res.Add(cell_vol, dm_temp);
-      // cout << "int_grad for row el: " << row_el << endl;
-      // dm_temp.Print(cout);
+      cout << "cell_vol: " << cell_vol << endl;
+      cout << "int_grad for row el: " << row_el << endl;
+      dm_temp.Print(cout);
    }
 
-   // cout << "denom: " << denom << endl;
+   cout << "denom: " << denom << endl;
+   cout << "res before dividing: \n";
+   res.Print(cout);
    res *= 1./denom;
-
-   cout << "\t\tCi for node: " << node << endl;
+   cout << "res after dividing: \n";
    res.Print(cout);
 }
 
@@ -1926,10 +1950,19 @@ void LagrangianLOOperator<dim, problem>::
    // cout << "Compute node velocities\n";
    Vector vertex_v(dim);
 
+   bool is_dt_changed = false;
    // Iterate over vertices
    for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
    {
-      compute_node_velocity_RT(vertex, dt, vertex_v);
+      compute_node_velocity_RT(vertex, dt, vertex_v, is_dt_changed);
+
+      // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
+      if (is_dt_changed)
+      {
+         vertex = 0;
+         is_dt_changed = false;
+         cout << "Restarting vertex iterator\n";
+      }
 
       if (vertex_v[0] != vertex_v[0] || vertex_v[1] != vertex_v[1])
       {
@@ -2283,7 +2316,6 @@ void LagrangianLOOperator<dim, problem>::
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
    Array<int> verts;
-   Vector face_x(dim);
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
       // Get center node dof
@@ -2309,19 +2341,46 @@ void LagrangianLOOperator<dim, problem>::
             MFEM_ABORT("Incorrect dim value provided.\n");
          }
       }
-
-      get_node_position(S, cell_vdof, face_x);
       
-      GetCellStateVector(S, ci, Uc);
-      Vc = ProblemDescription<dim,problem>::velocity(Uc);
-      Vc = 0.; // TODO: Huh?
-      pmesh->GetElementVertices(ci, verts);
-      for (int j = 0; j < verts.Size(); j++)
+      // GetCellStateVector(S, ci, Uc);
+      // Vc = ProblemDescription<dim,problem>::velocity(Uc);
+      Vc = 0.;
+      if (dim == 1)
       {
-         get_node_velocity(S, verts[j], node_v);
-         Vc += node_v;
+         pmesh->GetElementVertices(ci, verts);
+         for (int j = 0; j < verts.Size(); j++)
+         {
+            get_node_velocity(S, verts[j], node_v);
+            Vc += node_v;
+         }
+         Vc /= verts.Size();
       }
-      Vc /= verts.Size();
+      else if (dim == 2)
+      {
+         Array<int> element_face_row, element_face_oris;
+         pmesh->GetElementEdges(ci, element_face_row, element_face_oris);
+         for (int face_it = 0; face_it < element_face_row.Size(); face_it++)
+         {
+            int face = element_face_row[face_it];
+            cout << "cell: " << ci << ", face: " << face << ", face_it: " << face_it << endl;
+
+            // Get intermediate face velocities corresponding to faces
+            // get_intermediate_face_velocity(face, node_v);
+            get_node_velocity(S, face + NVDofs_H1, node_v);
+            if (face_it%2 == 0)
+            {
+               cout << "adjusting the y vel\n";
+               Vc[1] = Vc[1] + node_v[1];
+            }
+            else
+            {
+               cout << "adjusting the x vel\n";
+               Vc[0] = Vc[0] + node_v[0];
+            }
+         }
+
+         Vc /= 2.;
+      }
 
       // Update the velocity for the center node
       if (Vc[0] != Vc[0] || Vc[1] != Vc[1])

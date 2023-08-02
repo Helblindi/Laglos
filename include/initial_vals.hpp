@@ -209,6 +209,23 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
          }
          break;
       }
+      case 11:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= -0.35)
+            {
+               return 0.9932;
+            }
+            else
+            {
+               return 0.9500;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation 
+         }
+         break;
+      }
       default: 
       {
          MFEM_ABORT("Bad number given for problem id!"); 
@@ -344,7 +361,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
             }
          }
          else {
-            v[0] = 14.; // TODO: Exact representation of sie0
+            v[0] = 14.;
             return; 
          }
          break;
@@ -358,8 +375,27 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
             return;
          }
          else {
-            v[0] = 0.; // TODO: Exact representation of sie0
+            v[0] = 0.;
             return; 
+         }
+         break;
+      }
+      case 11:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= -0.35)
+            {
+               v[0] = 3.;
+               return;
+            }
+            else
+            {
+               v[0] = -3.;
+               return;
+            }
+         }
+         else {
+            return;
          }
          break;
       }
@@ -444,6 +480,23 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
             {
                assert(x[0]<=1.);
                return 0.05341878811326526;
+            }
+         }
+         else {
+            return 0.5; // TODO: Exact representation 
+         }
+         break;
+      }
+      case 11:
+      {
+         if (t < 1.e-16) {
+            if (x[0] <= -0.35)
+            {
+               return 0.029143658477667977;
+            }
+            else
+            {
+               return 6.688157894736825;
             }
          }
          else {

@@ -114,6 +114,7 @@ double ProblemDescription<dim, problem>::pressure(const Vector & U)
       case 8:  // vdw
       case 9:  // vdw
       case 10: // vdw
+      case 11: // vdw
       {
          // Use van der Waals
          double rho = 1. / U[0];
@@ -157,7 +158,8 @@ double ProblemDescription<dim, problem>::sound_speed(const Vector &U)
       case 7: MFEM_ABORT("Case not implemented.\n");
       case 8:
       case 9:
-      case 10: {
+      case 10: 
+      case 11: {
          double _pressure = pressure(U);
          double density = 1. / U[0];
          double gamma = gamma_func();
@@ -221,7 +223,8 @@ double ProblemDescription<dim, problem>::gamma_func(const int shocktube)
       case 7: return 5./3.;
       case 8: 
       case 9: 
-      case 10: return 1.02;
+      case 10: 
+      case 11: return 1.02;
       default:
       {
          MFEM_ABORT("Bad number given for problem id!"); 

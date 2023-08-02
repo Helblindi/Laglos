@@ -2,9 +2,9 @@
 def main():
    a = 1.
    b = 1.
-   rho = 4.9e-5
+   rho = 0.95
    gamma = 1.02
-   pressure = 5.e-8
+   pressure = 2.
    sie = vdw_sie(gamma, rho, pressure, a, b)
 
    print("sie: ", sie)

@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
    d += test_flux();
    d += test_CSV_getter_setter();
 
-   test_vel_field_1();
+   d += test_vel_field_1();
 
    cout << "Must return 0 for test to pass.  d = " << d << endl;
 

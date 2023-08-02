@@ -1214,7 +1214,7 @@ Purpose:
    This function tests a the RT computation of a continuous velocity field from a prescribed 
    velocity field that is linear in the first component and constant in the second.
 
-   v_exact = | 1 0 | |x| + |1|
+   v_exact = | 5 0 | |x| + |1|
              | 0 0 | |y|   |1|
 */
 void test_vel_field_1()

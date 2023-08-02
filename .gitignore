@@ -20,7 +20,4 @@ saved/
 Fortran/arbitrary_eos_lagrangian_lambda_module.mod
 Fortran/main.f90
 Fortran/makefile
-Fortran/output_ref
-Fortran/data
-Fortran/data_c
 Fortran/a.exe

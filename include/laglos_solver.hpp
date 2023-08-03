@@ -117,8 +117,6 @@ public:
 
    void Orthogonal(Vector &v);
 
-   Vector GetIntDerRefShapeFunctions();
-
    /* Mesh movement */
    void compute_intermediate_face_velocities(const Vector &S, 
                                              const double t,
@@ -152,7 +150,8 @@ public:
 
    void EnforceBoundaryConditions(Vector &S);
 
-   void ComputeMeshVelocities(Vector &S, const double & t, double & dt);
+   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string flag="NA", 
+                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);

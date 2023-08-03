@@ -34,7 +34,7 @@ double tol = 1e-12;
 const char *mesh_file_location = "/data/ref-square.mesh";
 std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
 const char* mesh_file = result.c_str();
-int mesh_refinements = 4;
+int mesh_refinements = 2;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = false;          // Doesn't matter
 double CFL = 0.5;          // Doesn't matter
@@ -690,14 +690,14 @@ int test_RT_int_grad_quadratic()
       true_grad(0,1) = 3.*cell_x[1] + 4.;
       true_grad(1,0) = 5.*cell_x[0] + 8.;
       true_grad(1,1) = 7.*cell_x[1] + 9.;
-      // Output exact gradient
-      cout << "The true gradient matrix should be: \n";
-      true_grad.Print(cout);
 
       // Compute approximate gradient
       hydro.RT_int_grad(cell_it, dm);
       cout << "Dense Matrix for cell: " << cell_it << endl;
       dm.Print(cout);
+      // Output exact gradient
+      cout << "The true gradient matrix should be: \n";
+      true_grad.Print(cout);
       // assert(false);
 
       Add(dm, true_grad, -1., grad_error);

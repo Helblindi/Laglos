@@ -33,7 +33,7 @@
 * ./Laglos -m data/ref-segment-c0.mesh -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis [problem = 8, dim = 1]
 * ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis [problem = 9, dim = 1]
 * ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis [problem = 10, dim = 1]
-* ./Laglos -m data/segment-n1p7-1.mesh -cfl 0.5 -tf 0.004 -ot -mm -visc -rs 8 -vis
+* ./Laglos -m data/segment-n1p7-1.mesh -cfl 0.05 -tf 0.005 -ot -mm -visc -rs 8 -vis [problem = 11, dim = 1]
 *
 * -------------- 2D ----------
 * ./Laglos -m data/ref-square.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 4 -vis -so [problem = 1, dim = 2] // Sod in 2D
@@ -830,6 +830,7 @@ int main(int argc, char *argv[]) {
          case 8: /* Plot pressure-specific volume diagram for vdw */
          case 9:
          case 10:
+         case 11:
          {
             // Form pressure gf
             ParGridFunction press_gf(&L2FESpace);
@@ -963,6 +964,7 @@ int main(int argc, char *argv[]) {
          
          break;
       }
+      case 11:
       case 10:
       case 9:
       case 8:

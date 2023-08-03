@@ -20,7 +20,7 @@
 *     Case 8: (6.1) from 2022 Clayton et al with van der Walls eos, 1D
 *     Case 9: (6.4) from 2022 Clayton et al with van der Walls eos, 1D
 *     Case 10: (6.5) from 2022 Clayton et al with van der Walls eos, 1D
-*     Case 11: (6.6) from 2022 Clayton et al with van der Walls eos, 1D ---TODO---
+*     Case 11: (6.6) from 2022 Clayton et al with van der Walls eos, 1D 
 */
 
 #include "mfem.hpp"
@@ -194,7 +194,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       case 10:
       {
          if (t < 1.e-16) {
-            if (x[0] <= 0.25)
+            if (x[0] <= 0.)
             {
                return 0.25;
             }
@@ -212,7 +212,7 @@ inline double InitialValues<dim, problem>::rho0(const Vector &x, const double & 
       case 11:
       {
          if (t < 1.e-16) {
-            if (x[0] <= -0.35)
+            if (x[0] <= 0.)
             {
                return 0.9932;
             }
@@ -383,7 +383,7 @@ inline void InitialValues<dim, problem>::v0(const Vector &x, const double & t, V
       case 11:
       {
          if (t < 1.e-16) {
-            if (x[0] <= -0.35)
+            if (x[0] <= 0.)
             {
                v[0] = 3.;
                return;
@@ -472,7 +472,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
       case 10:
       {
          if (t < 1.e-16) {
-            if (x[0] <= 0.25)
+            if (x[0] <= 0.)
             {
                return 13.624999999999986;
             }
@@ -490,7 +490,7 @@ inline double InitialValues<dim, problem>::sie0(const Vector &x, const double & 
       case 11:
       {
          if (t < 1.e-16) {
-            if (x[0] <= -0.35)
+            if (x[0] <= 0.)
             {
                return 0.029143658477667977;
             }

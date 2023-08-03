@@ -169,7 +169,7 @@ double ProblemDescription<dim, problem>::sound_speed(const Vector &U)
          double _b = 1.;
 
          double val = gamma * (_pressure + _a * pow(density,2)) / (density * (1. - _b * density));
-         val -= 2 * _a * density;
+         val -= 2. * _a * density;
          val = pow(val, 0.5);
          return val;
       }

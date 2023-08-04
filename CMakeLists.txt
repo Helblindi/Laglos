@@ -117,7 +117,8 @@ set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}/")
 configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 
 # Add Fortran library
-add_library(comp_lambda STATIC "${PROJECT_SOURCE_DIR}/Fortran/Lagrangian_arbitrary_eos.f90")
+add_library(comp_lambda_lagrangian STATIC "${PROJECT_SOURCE_DIR}/Fortran/lagrangian-mws/lagrangian_arbitrary_eos.f90")
+add_library(comp_lambda_eulerian STATIC "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/eulerian_arbitrary_eos.f90")
 
 ### Include Directories
 INCLUDE_DIRECTORIES(include)

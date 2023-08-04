@@ -17,7 +17,8 @@ results/mesh-*
 saved/
 
 # Fortran
-Fortran/arbitrary_eos_lagrangian_lambda_module.mod
-Fortran/main.f90
-Fortran/makefile
-Fortran/a.exe
+Fortran/*/*.mod
+Fortran/*/*.o
+Fortran/*/lambda
+Fortran/*/README.md
+Fortran/old

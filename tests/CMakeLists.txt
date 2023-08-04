@@ -6,28 +6,33 @@ include_directories(${TEST_SRC_DIR}/src
 
 # TESTING
 add_executable(TestInstantiator EXCLUDE_FROM_ALL testing.cpp "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestInstantiator PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_link_libraries(TestInstantiator PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 target_include_directories(TestInstantiator PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestInstantiator COMMAND TestInstantiator)
 
 add_executable(TestRTvel EXCLUDE_FROM_ALL test_RT_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 target_include_directories(TestRTvel PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestRTvel COMMAND TestRTvel)
 
 add_executable(Test1D EXCLUDE_FROM_ALL test_1D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 target_include_directories(Test1D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test1D COMMAND Test1D)
 
 add_executable(Test2D EXCLUDE_FROM_ALL test_2D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda)
+target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 target_include_directories(Test2D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test2D COMMAND Test2D)
+
+add_executable(TestFortran EXCLUDE_FROM_ALL test_fortran_module.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestFortran PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
+target_include_directories(TestFortran PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
+add_test(NAME TestFortran COMMAND TestFortran)
 
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestInstantiator TestRTvel Test1D Test2D)
+add_dependencies(build_tests TestInstantiator TestRTvel Test1D Test2D TestFortran)

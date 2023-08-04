@@ -1,9 +1,9 @@
 !===Authors: Bennett Clayton, Jean-Luc Guermond, and Bojan Popov, Texas A&M, April 5, 2021
-!===Revised September 1, 2022 for Lagrangian coortdinates
 MODULE arbitrary_eos_lambda_module
   IMPLICIT NONE
-  PUBLIC               :: Lagrangian_lambda_arbitrary_eos !===Main function
+  PUBLIC               :: lambda_arbitrary_eos !===Main function
   PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
+  REAL(KIND=8), PUBLIC :: b_covolume = 0.0d0   !===Covolume constant, if known
   PRIVATE
   INTEGER, PARAMETER:: NUMBER = KIND(1.d0)
   REAL(KIND=NUMBER), PARAMETER :: zero = 0
@@ -22,24 +22,18 @@ MODULE arbitrary_eos_lambda_module
   CHARACTER(LEN=1)  :: gamma_min_index, gamma_lm_index
 
 CONTAINS
-  !===Inputs: in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter
-  !===Outputs: lambda_maxl_out,lambda_maxr_out,pstar,vstar,k
-  !===use no_iter=.true. if one does not want iterative line search. Then the parameter ``in_tol'' is useless.
-  !===use no_iter=.false. to enable the line search with ``in_tol'' tolerance. Then ``k'' is the numer of iterations used.
+
   SUBROUTINE lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
-       lambda_maxl_out,lambda_maxr_out,pstar,vstar,k, b_covolume)
+       lambda_maxl_out,lambda_maxr_out,pstar,k)
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
     REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
     LOGICAL,      INTENT(IN) :: no_iter
-    REAL(KIND=8), INTENT(IN) :: b_covolume
     REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
-    REAL(KIND=8), INTENT(INOUT):: vstar
     INTEGER,      INTENT(OUT):: k
     REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
     LOGICAL                  :: check
     !===Initialization
-   !  WRITE(*,*) "Computing lambda max in fortran"
     rhol= in_rhol
     ul = in_ul
     pl = in_pl
@@ -49,8 +43,8 @@ CONTAINS
     pr = in_pr
     er = in_er
     k = 0
-    CALL init(rhol,el,pl,b_covolume,gammal,al,alphal,capAl,capBl,capCl,expol)
-    CALL init(rhor,er,pr,b_covolume,gammar,ar,alphar,capAr,capBr,capCr,expor)
+    CALL init(rhol,el,pl,gammal,al,alphal,capAl,capBl,capCl,expol)
+    CALL init(rhor,er,pr,gammar,ar,alphar,capAr,capBr,capCr,expor)
     IF (pl.LE.pr) THEN
        p_min     = pl
        rho_min   = rhol
@@ -96,35 +90,31 @@ CONTAINS
     phi_pmax = (p_max-p_min)*SQRT(capA_min/(p_max+capB_min))+ur-ul
 
     !===Initialize p1 and p2
-   !  WRITE(*,*) "F: Initializing p1 and p2"
     CALL initialize_p1_p2(p1,p2)
 
     IF (no_iter) THEN
        pstar = p2
-      !  WRITE(*,*) "F: No iter"
-       CALL no_iter_update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p2,lambda_maxl_out,lambda_maxr_out)
+       CALL no_iter_update_lambda(ul,pl,al,gammal,ur,pr,ar,gammar,p2,lambda_maxl_out,lambda_maxr_out)
        RETURN
     ELSE
        !===Iterations
-      ! WRITE(*,*) "F: iter"
        p1 = MAX(p1,p2-phi(p2)/phi_prime(p2))
        DO WHILE(.TRUE.)
-          CALL update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p1,p2,in_tol,&
+          CALL update_lambda(ul,pl,al,gammal,ur,pr,ar,gammar,p1,p2,in_tol,&
                lambda_maxl_out,lambda_maxr_out,check)
           pstar = p2
-          IF (check) EXIT !RETURN
+          IF (check) RETURN
           phi1 =  phi(p1)
           phi11 = phi_prime(p1)
           phi2 =  phi(p2)
           phi22 = phi_prime(p2)
           IF (phi1>zero) THEN
-             lambda_maxl_out = lambdaz(rhol,pl,al,gammal,p1,-1)
-             lambda_maxr_out = lambdaz(rhor,pr,ar,gammar,p1, 1)
+             lambda_maxl_out = lambdaz(ul,pl,al,gammal,p1,-1)
+             lambda_maxr_out = lambdaz(ur,pr,ar,gammar,p1, 1)
              pstar = p1
-             EXIT
-            !  RETURN
+             RETURN
           END IF
-          IF (phi2<zero) EXIT!RETURN
+          IF (phi2<zero) RETURN
           phi12 = (phi2-phi1)/(p2-p1) 
           phi112 = (phi12-phi11)/(p2-p1)
           phi221 = (phi22-phi12)/(p2-p1)
@@ -133,28 +123,15 @@ CONTAINS
           k = k+1
        END DO
     END IF
-    ! Madison's contribution to compute vstar
-    vstar = ustar(pstar)
-   !  WRITE(*,*) "In Fortran, vstar is: ", vstar
-  END SUBROUTINE Lagrangian_lambda_arbitrary_eos
+  END SUBROUTINE lambda_arbitrary_eos
 
-
-  SUBROUTINE init(rho,e,p,b_covolume,gamma,a,alpha,capA,capB,capC,expo)
+  SUBROUTINE init(rho,e,p,gamma,a,alpha,capA,capB,capC,expo)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN)  :: rho, e, p, b_covolume
+    REAL(KIND=NUMBER), INTENT(IN)  :: rho, e, p
     REAL(KIND=NUMBER), INTENT(OUT) :: gamma, a, alpha, capA, capB, capC, expo
     REAL(KIND=NUMBER) :: x
-
     x = 1-b_covolume*rho
     gamma = 1 + p*x/(rho*e)
-    
-   !  WRITE(*,*) "b_covolume: ", b_covolume
-   !  WRITE(*,*) "p: ", p
-   !  WRITE(*,*) "x: ", x
-   !  WRITE(*,*) "rho: ", rho
-   !  WRITE(*,*) "e: ", e
-   !  write(*,*) "gamma: ", gamma
-
     a = SQRT(gamma*p/(rho*x))
     capC = 2*a*x/(gamma-1)
     alpha = cc(gamma)*capC
@@ -168,7 +145,6 @@ CONTAINS
       REAL(KIND=NUMBER)             :: vv
       IF (gamma.LE.1) THEN
          WRITE(*,*) "BUG: gamma .LE. 1"
-         WRITE(*,*) "Gamma = ", gamma
          STOP
       ELSE IF (gamma .LE. five_third) THEN
          vv = one 
@@ -218,39 +194,39 @@ CONTAINS
     END IF
   END SUBROUTINE initialize_p1_p2
 
-  SUBROUTINE no_iter_update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p2,lambda_maxl,lambda_maxr)
+  SUBROUTINE no_iter_update_lambda(ul,pl,al,gammal,ur,pr,ar,gammar,p2,lambda_maxl,lambda_maxr)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN)  :: rhol, pl, al, gammal, rhor, pr, ar, gammar, p2
+    REAL(KIND=NUMBER), INTENT(IN)  :: ul, pl, al, gammal, ur, pr, ar, gammar, p2
     REAL(KIND=NUMBER), INTENT(OUT) :: lambda_maxl, lambda_maxr
     REAL(KIND=NUMBER) :: v11, v32, lambda_max
-    v11 = lambdaz(rhol,pl,al,gammal,p2,-1)
-    v32 = lambdaz(rhor,pr,ar,gammar,p2,1)
+    v11 = lambdaz(ul,pl,al,gammal,p2,-1)
+    v32 = lambdaz(ur,pr,ar,gammar,p2,1)
     lambda_maxl = MAX(-v11,zero)
     lambda_maxr = MAX(v32,zero)
     lambda_max = MAX(lambda_maxl,lambda_maxr)
   END SUBROUTINE no_iter_update_lambda
 
-  FUNCTION lambdaz(rhoz,pz,az,gammaz,pstar,z) RESULT(vv)
+  FUNCTION lambdaz(uz,pz,az,gammaz,pstar,z) RESULT(vv)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN) :: rhoz,pz,az,gammaz,pstar
+    REAL(KIND=NUMBER), INTENT(IN) :: uz,pz,az,gammaz,pstar
     INTEGER,           INTENT(IN) :: z
     REAL(KIND=NUMBER)             :: vv
-    vv = z*az*rhoz*SQRT(1+MAX((pstar-pz)/pz,zero)*(gammaz+1)/(2*gammaz))
+    vv = uz + z*az*SQRT(1+MAX((pstar-pz)/pz,zero)*(gammaz+1)/(2*gammaz))
   END FUNCTION lambdaz
   !===end of code if no iteration
 
   !=== code below is needed for iterative solver
-  SUBROUTINE update_lambda(rhol,pl,al,gammal,rhor,pr,ar,gammar,p1,p2,tol,lambda_maxl,lambda_maxr,check)
+  SUBROUTINE update_lambda(ul,pl,al,gammal,ur,pr,ar,gammar,p1,p2,tol,lambda_maxl,lambda_maxr,check)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN)  :: rhol, pl, al, gammal, rhor, pr, ar, gammar
+    REAL(KIND=NUMBER), INTENT(IN)  :: ul, pl, al, gammal, ur, pr, ar, gammar
     REAL(KIND=NUMBER), INTENT(IN)  :: p1, p2, tol
     REAL(KIND=NUMBER), INTENT(OUT) :: lambda_maxl, lambda_maxr
     LOGICAL,           INTENT(OUT) :: check
     REAL(KIND=NUMBER) :: v11, v12, v31, v32, lambda_max, err1, err3
-    v11 = lambdaz(rhol,pl,al,gammal,p2,-1)
-    v12 = lambdaz(rhol,pl,al,gammal,p1,-1)
-    v31 = lambdaz(rhor,pr,ar,gammar,p1,1)
-    v32 = lambdaz(rhor,pr,ar,gammar,p2,1)
+    v11 = lambdaz(ul,pl,al,gammal,p2,-1)
+    v12 = lambdaz(ul,pl,al,gammal,p1,-1)
+    v31 = lambdaz(ur,pr,ar,gammar,p1,1)
+    v32 = lambdaz(ur,pr,ar,gammar,p2,1)
     lambda_maxl = MAX(-v11,zero)
     lambda_maxr = MAX(v32,zero)
     lambda_max = MAX(lambda_maxl,lambda_maxr)
@@ -302,12 +278,12 @@ CONTAINS
     IMPLICIT NONE
     REAL(KIND=NUMBER), INTENT(IN) :: pstar
     REAL(KIND=NUMBER)             :: vv
-    vv = half*(ul-f(pstar,pl,capAl,capBl,capCl,expol)+ur+f(pstar,pr,capAr,capBr,capCr,expor))
+    vv = half*(ul+f(pstar,pl,capAl,capBl,capCl,expol)+ur+f(pstar,pr,capAr,capBr,capCr,expor))
   END FUNCTION ustar
 
-  FUNCTION rhostar(pstar,rhoz,pz,gammaz,b_covolume) RESULT(vv)
+  FUNCTION rhostar(pstar,rhoz,pz,gammaz) RESULT(vv)
     IMPLICIT NONE
-    REAL(KIND=NUMBER), INTENT(IN) :: pstar, rhoz, pz, gammaz, b_covolume
+    REAL(KIND=NUMBER), INTENT(IN) :: pstar, rhoz, pz, gammaz
     REAL(KIND=NUMBER)             :: vv
     IF (pstar.LE.pz) THEN
        vv = rhoz /(b_covolume*rhoz+(1-b_covolume*rhoz)*(pz/pstar)**(1/gammaz))
@@ -318,4 +294,4 @@ CONTAINS
     END IF
   END FUNCTION rhostar
 
-END MODULE arbitrary_eos_Lagrangian_lambda_module
+END MODULE arbitrary_eos_lambda_module

@@ -332,10 +332,10 @@ int test_vel_field_1()
    pmesh->SetNodalGridFunction(&x_gf);
    x_gf.SyncAliasMemory(S);
 
-   Vector one(dim);
-   one = 1.;
-   VectorConstantCoefficient one_coeff(one);
-   mv_gf.ProjectCoefficient(one_coeff);
+   Vector zero(dim);
+   zero = 0.;
+   VectorConstantCoefficient zero_coeff(zero);
+   mv_gf.ProjectCoefficient(zero_coeff);
    mv_gf.SyncAliasMemory(S);
 
    // Initialize specific volume, velocity, and specific total energy
@@ -343,7 +343,7 @@ int test_vel_field_1()
    sv_gf.ProjectCoefficient(one_const_coeff);
    sv_gf.SyncAliasMemory(S);
 
-   v_gf.ProjectCoefficient(one_coeff);
+   v_gf.ProjectCoefficient(v_exact_coeff);
    v_gf.SyncAliasMemory(S);
 
    ste_gf.ProjectCoefficient(one_const_coeff);

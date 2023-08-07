@@ -4,7 +4,7 @@
 using namespace mfem;
 using namespace std;
 
-// Fortran subroutine from Eulerian code
+// Fortran subroutine from Lagrangian code
 extern "C" {
    void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
       double *in_taul, double *in_ul, double *in_el, double *in_pl,
@@ -13,7 +13,7 @@ extern "C" {
       double *lambda_maxr_out, double *pstar, int *k);
 }
 
-// Fortran subroutine from Lagrangian code
+// Fortran subroutine from Eulerian code
 // extern "C" {
 //    void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
 //       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
@@ -268,12 +268,12 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
       in_pr = pressure(U_j);
    }
 
-   double in_tol = 0.0000000000001,
+   double in_tol = 10.e-15,
           lambda_maxl_out = 0.,
           lambda_maxr_out = 0.,
           pstar = 0.,
           vstar = 0.;
-   bool no_iter = true; // Had to change for test case to run
+   bool no_iter = false; 
    int k = 0; // Tells you how many iterations were needed for convergence
 
    // cout << "CLM pre fortran function.\n";
@@ -295,6 +295,12 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
       cout << "in_taur: " << in_taur << ", ur: " << in_ur << ", er: " << in_er << ", pr: " << in_pr << endl;
       MFEM_ABORT("NaN values returned by lambda max computation!\n");
    }
+
+   cout << "nij:\n";
+   n_ij.Print(cout);
+   cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << endl;
+   cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << endl;
+   cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
    return d;
    // return 1.;

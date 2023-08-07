@@ -194,7 +194,6 @@ void LagrangianLOOperator<dim, problem>::SetCFL(const double &_CFL)
 template<int dim, int problem>
 void LagrangianLOOperator<dim, problem>::CalculateTimestep(const Vector &S)
 {
-   /* TODO: Fix, issue with both timestep dependence on d and d dependence on timestep */
    // int n = m_hpv->Size(); // NDofs_L2
    double t_min = 1.;
    double t_temp = 0;
@@ -1151,6 +1150,7 @@ void LagrangianLOOperator<dim, problem>::
             c_vec /= 2.;
             double c_norm = c_vec.Norml2();
             // cout << "c_norm: " << c_norm << endl;
+            // assert(false);
 
             // cout << "(mm)\tn:\n";
             // n_vec.Print(cout);

@@ -9,8 +9,8 @@ class CompileTimeVals
 {
 public:
    /* See initial_vals.hpp for test problems */
-   const static int problem = 1;
-   const static int dim = 2;
+   const static int problem = 11;
+   const static int dim = 1;
    
    /* Various parameters */
    const static bool distort_mesh = false; // Relevant in problems 7

@@ -24,16 +24,20 @@ MODULE arbitrary_eos_lambda_module
 CONTAINS
 
   SUBROUTINE lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
-       lambda_maxl_out,lambda_maxr_out,pstar,k)
+       lambda_maxl_out,lambda_maxr_out,pstar,k, b_covolume_in)
+    use iso_c_binding
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
     REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
-    LOGICAL,      INTENT(IN) :: no_iter
+    !The only way to be able to set this submodule variable from c++ implementation
+    REAL(KIND=8), INTENT(IN) :: b_covolume_in 
+    LOGICAL(c_bool),      INTENT(IN) :: no_iter
     REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
     INTEGER,      INTENT(OUT):: k
     REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
     LOGICAL                  :: check
     !===Initialization
+    b_covolume = b_covolume_in
     rhol= in_rhol
     ul = in_ul
     pl = in_pl
@@ -43,8 +47,10 @@ CONTAINS
     pr = in_pr
     er = in_er
     k = 0
+
     CALL init(rhol,el,pl,gammal,al,alphal,capAl,capBl,capCl,expol)
     CALL init(rhor,er,pr,gammar,ar,alphar,capAr,capBr,capCr,expor)
+
     IF (pl.LE.pr) THEN
        p_min     = pl
        rho_min   = rhol

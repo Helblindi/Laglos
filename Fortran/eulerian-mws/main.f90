@@ -10,6 +10,7 @@ PROGRAM riemann
   CHARACTER(LEN=3)  :: case_nb
   CHARACTER(LEN=11) :: header
   LOGICAL           :: okay
+  LOGICAL(1)        :: no_iter
   
   OPEN(UNIT = unit, FILE = 'data', FORM = 'formatted', STATUS = 'unknown')
   CALL find_string(unit, '===Number of cases', okay)
@@ -35,10 +36,12 @@ PROGRAM riemann
      el = gamma_law_internal(rhol,pl,gamma)
      er = gamma_law_internal(rhor,pr,gamma)
 
+     no_iter = .false.
+
      CALL CPU_TIME(t1)
      DO n = 1, 1 !1000000 
-        CALL lambda_arbitrary_eos(rhol,ul,el,pl,rhor,ur,er,pr,tol,.false.,&
-             lambda_maxl,lambda_maxr,pstar,k)
+        CALL lambda_arbitrary_eos(rhol,ul,el,pl,rhor,ur,er,pr,tol,no_iter,&
+             lambda_maxl,lambda_maxr,pstar,k,b_covolume)
      END DO
      CALL CPU_TIME(t2)
      write(*,*) header

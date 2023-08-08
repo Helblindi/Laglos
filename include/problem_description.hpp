@@ -14,13 +14,13 @@ extern "C" {
 }
 
 // Fortran subroutine from Eulerian code
-// extern "C" {
-//    void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
-//       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
-//       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
-//       double *in_tol, bool *no_iter,double *lambda_maxl_out,
-//       double *lambda_maxr_out, double *pstar, double *vstar, int *k, double *b_covolume);
-// }
+extern "C" {
+   void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+      double *in_rhol, double *in_ul, double *in_el, double *in_pl,
+      double *in_rhor, double *in_ur, double *in_er, double *in_pr,
+      double *in_tol, bool *no_iter,double *lambda_maxl_out,
+      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume);
+}
 
 namespace mfem
 {
@@ -240,7 +240,7 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
    const Vector & n_ij,
    const string flag) // default is 'NA'
 {
-   double in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr;
+   double in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_rhol, in_rhor;
    if (flag == "testing")
    {
       in_taul = U_i[0];
@@ -268,6 +268,9 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
       in_pr = pressure(U_j);
    }
 
+   in_rhol = 1. / in_taul;
+   in_rhor = 1. / in_taur;
+
    double in_tol = 10.e-15,
           lambda_maxl_out = 0.,
           lambda_maxr_out = 0.,
@@ -275,11 +278,17 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
           vstar = 0.;
    bool no_iter = false; 
    int k = 0; // Tells you how many iterations were needed for convergence
+   double b_covolume = .1 / max(in_rhol, in_rhor);
+   b_covolume = 1.;
 
    // cout << "CLM pre fortran function.\n";
-   __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-      &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
-      &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
+   // __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+   //    &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
+   //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
+
+   __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+      &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+      &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k, &b_covolume);
 
    double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
 
@@ -296,11 +305,11 @@ double ProblemDescription<dim, problem>::compute_lambda_max(
       MFEM_ABORT("NaN values returned by lambda max computation!\n");
    }
 
-   cout << "nij:\n";
-   n_ij.Print(cout);
-   cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << endl;
-   cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << endl;
-   cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
+   // cout << "nij:\n";
+   // n_ij.Print(cout);
+   // cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << endl;
+   // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << endl;
+   // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
    return d;
    // return 1.;

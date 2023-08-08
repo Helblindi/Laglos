@@ -23,16 +23,19 @@ MODULE arbitrary_eos_lagrangian_lambda_module
 CONTAINS
 
    SUBROUTINE lagrangian_lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
-                                   WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k)
+                                   WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k, b_covolume_in)
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: in_taul, in_el, in_taur, in_er, in_tol
       REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
+      !The only way to be able to set this submodule variable from c++ implementation
+      REAL(KIND=8), INTENT(IN) :: b_covolume_in 
       LOGICAL, INTENT(IN) :: WANT_ITERATION
       REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
       INTEGER, INTENT(OUT):: k
       REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
       LOGICAL                  :: check
       !===Initialization
+      b_covolume = b_covolume_in
       taul = in_taul
       ul = in_ul
       pl = in_pl

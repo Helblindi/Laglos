@@ -150,6 +150,7 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN) :: gamma
       REAL(KIND=NUMBER)             :: vv
       IF (gamma.LE.1) THEN
+         WRITE(*,*) "Gamma: ", gamma
          WRITE(*,*) "BUG: gamma .LE. 1"
          STOP
       ELSE IF (gamma .LE. five_third) THEN

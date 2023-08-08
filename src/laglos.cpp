@@ -33,7 +33,7 @@
 * ./Laglos -m data/ref-segment-c0.mesh -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis [problem = 8, dim = 1]
 * ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis [problem = 9, dim = 1]
 * ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis [problem = 10, dim = 1]
-* ./Laglos -m data/segment-n1p7-1.mesh -cfl 0.05 -tf 0.005 -ot -mm -visc -rs 8 -vis [problem = 11, dim = 1]
+* ./Laglos -m data/segment-n1p7-1.mesh -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis [problem = 11, dim = 1]
 *
 * -------------- 2D ----------
 * ./Laglos -m data/ref-square.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 4 -vis -so [problem = 1, dim = 2] // Sod in 2D
@@ -845,7 +845,6 @@ int main(int argc, char *argv[]) {
                press_gf[i] = pressure;
                // Form python arrays
                press_gf_py[i] = pressure;
-               sv_gf_py[i] = U[0];
                rho_gf_py[i] = 1./U[0];
                ss_gf_py[i] = ProblemDescription<dim, problem>::sound_speed(U);
 
@@ -854,14 +853,9 @@ int main(int argc, char *argv[]) {
             } 
             
             /* --- Plot stuff --- */
-            // Set the size of output image = 1200x780 pixels
-            plt::figure_size(1500, 1080);
+            plt::figure_size(1800, 600);
 
-            // Plot line from given x and y data. Color is selected automatically.
-            // plt::scatter(xgf_py, mv_y_py);
-            // plt::scatter(rho_x_py, rho_py);
-
-            const long nrows=2, ncols=2;
+            const long nrows=1, ncols=3;
             long row = 0, col = 0;
             plt::subplot2grid(nrows, ncols, row, col);
             plt::scatter(x_gf_py, rho_gf_py);
@@ -877,19 +871,12 @@ int main(int argc, char *argv[]) {
             plt::ylabel("Pressure $p$");
 
 
-            row = 1, col = 0;
+            col = 2;
             plt::subplot2grid(nrows, ncols, row, col);
             plt::scatter(x_gf_py, ss_gf_py);
             plt::title("Sound Speed");
             plt::xlabel("$x$");
             plt::ylabel("Sound Speed $c$");
-
-            col = 1;
-            plt::subplot2grid(nrows, ncols, row, col);
-            plt::scatter(sv_gf_py, press_gf_py);
-            plt::title("Pressure-Specific Volume Diagram");
-            plt::xlabel("Specific Volume");
-            plt::ylabel("Pressure $p$");
 
             plt::show();
 

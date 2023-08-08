@@ -25,14 +25,28 @@ target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian 
 target_include_directories(Test2D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test2D COMMAND Test2D)
 
-add_executable(TestFortran EXCLUDE_FROM_ALL test_fortran_module.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestFortran PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-target_include_directories(TestFortran PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
-add_test(NAME TestFortran COMMAND TestFortran)
+add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
+add_test(NAME TestEulerianMWS
+         COMMAND TestEulerianMWS "${PROJECT_SOURCE_DIR}/build/tests/eulerian-mws-output.txt")
+add_test(NAME EulerMWSCompare
+         COMMAND ${CMAKE_COMMAND} -E compare_files
+               "${PROJECT_SOURCE_DIR}/build/tests/eulerian-mws-output.txt"
+               "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/output_ref_c")
+
+add_executable(TestLagrangianMWS EXCLUDE_FROM_ALL test_fortran_lagrangian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestLagrangianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian)
+add_test(NAME TestLagrangianMWS
+         COMMAND TestLagrangianMWS "${PROJECT_SOURCE_DIR}/build/tests/lagrangian-mws-output.txt")
+add_test(NAME LagrangeMWSCompare
+         COMMAND ${CMAKE_COMMAND} -E compare_files
+               "${PROJECT_SOURCE_DIR}/build/tests/lagrangian-mws-output.txt"
+               "${PROJECT_SOURCE_DIR}/Fortran/lagrangian-mws/output_ref_c")
+
 
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestInstantiator TestRTvel Test1D Test2D TestFortran)
+add_dependencies(build_tests TestInstantiator TestRTvel Test1D Test2D TestEulerianMWS TestLagrangianMWS)

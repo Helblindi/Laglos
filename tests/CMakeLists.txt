@@ -21,6 +21,7 @@ add_executable(Test2D EXCLUDE_FROM_ALL test_2D.cpp "${MFEM_DIR}" "${PROJECT_SOUR
 target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 add_test(NAME Test2D COMMAND Test2D)
 
+# Validate Fortran Max Wave Speed calculations
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
 add_test(NAME TestEulerianMWS
@@ -30,6 +31,7 @@ add_test(NAME EulerMWSCompare
                "${PROJECT_SOURCE_DIR}/build/tests/eulerian-mws-output.txt"
                "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/output_ref_c")
 
+# TODO: Lagrangian Fortran Subroutine still does not return correct values
 add_executable(TestLagrangianMWS EXCLUDE_FROM_ALL test_fortran_lagrangian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(TestLagrangianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian)
 add_test(NAME TestLagrangianMWS

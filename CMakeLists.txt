@@ -121,7 +121,7 @@ add_library(comp_lambda_lagrangian STATIC "${PROJECT_SOURCE_DIR}/Fortran/lagrang
 add_library(comp_lambda_eulerian STATIC "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/eulerian_arbitrary_eos.f90")
 
 ### Include Directories
-INCLUDE_DIRECTORIES(include)
+INCLUDE_DIRECTORIES(include problems)
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 
 # populate matplotlib repository

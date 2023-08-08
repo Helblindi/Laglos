@@ -7,22 +7,18 @@ include_directories(${TEST_SRC_DIR}/src
 # TESTING
 add_executable(TestInstantiator EXCLUDE_FROM_ALL testing.cpp "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(TestInstantiator PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-target_include_directories(TestInstantiator PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestInstantiator COMMAND TestInstantiator)
 
 add_executable(TestRTvel EXCLUDE_FROM_ALL test_RT_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-target_include_directories(TestRTvel PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME TestRTvel COMMAND TestRTvel)
 
 add_executable(Test1D EXCLUDE_FROM_ALL test_1D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-target_include_directories(Test1D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test1D COMMAND Test1D)
 
 add_executable(Test2D EXCLUDE_FROM_ALL test_2D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-target_include_directories(Test2D PUBLIC "${MFEM_DIR}" "${MFEM_INCLUDE_DIRS}")
 add_test(NAME Test2D COMMAND Test2D)
 
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")

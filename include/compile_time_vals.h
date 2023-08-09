@@ -13,7 +13,6 @@ public:
    const static int dim = 1;
    
    /* Various parameters */
-   const static bool distort_mesh = false; // Relevant in problems 7
    const static int shocktube = 1; // 1 - Sod, 2 - Lax, 3 - Leblanc
    constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity
 

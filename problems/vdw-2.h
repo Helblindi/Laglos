@@ -23,15 +23,15 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class SodProblem: public ProblemBase<dim>
+class VdwTest2: public ProblemBase<dim>
 {
 public:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 1.4;
+   double a = 1.;     
+   double b = 1.;
+   double gamma = 1.02;
    bool distort_mesh = false;
    bool known_exact_solution = false;
 
@@ -43,43 +43,60 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U) override
+   virtual double pressure(const Vector &U) override
    {
-      // Initial
-      // _pL = 1.0;
-      // _pR= 0.1;
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
+      // Use van der Waals
+      double rho = 1. / U[0];
+      double sie = this->specific_internal_energy(U);
+
+      // _a and _b are constants depending on the nature of the fluid
+      double _a = 1.;
+      double _b = 1.;
+
+      double val = (gamma - 1.) * (rho * sie + _a * pow(rho, 2)) / (1. - _b * rho) - _a * pow(rho,2);
+      return val;
    }
 
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   double rho0(const Vector &x, const double & t) override
+   virtual double rho0(const Vector &x, const double & t) override
    {
-      switch (dim)
-      {
-         case 1:
-         case 2:
+      if (t < 1.e-16) {
+         if (x[0] <= 0.)
          {
-            return (x(0) < 0.5) ? 1.0 : 0.125;
+            return 0.2450;
          }
-         default:
+         else
          {
-            MFEM_ABORT("Invalid dimension provided.\n");
+            assert(x[0] <= 1.);
+            return 0.1225;
          }
       }
-      return 1.;
+      else {
+         return 0.5; // TODO: Exact representation of sie0
+      }
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       v = 0.;
-      return;
    }
-
-   double sie0(const Vector &x, const double & t) override
+   virtual double sie0(const Vector &x, const double & t) override
    {
-      return (x(0) < 0.5) ? 1.0 / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
-                        : 0.1 / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      if (t < 1.e-16) {
+         if (x[0] <= 0.)
+         {
+            return 13.49120718802014;
+         }
+         else
+         {
+            assert(x[0]<=1.);
+            return 12.661115131212163;
+         }
+      }
+      else {
+         return .5; // TODO: Exact representation of sie0
+      }
    }
 
 }; // End class

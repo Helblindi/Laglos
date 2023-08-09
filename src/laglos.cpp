@@ -29,16 +29,22 @@
 * -------------- 1D ----------
 * ./Laglos -m data/ref-segment.mesh -tf 6 -cfl 0.5 -ot -visc -mm -rs 10 [problem = 0, dim = 1] // Smooth 1D wave 2nd order IDP 2018 paper
 * ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1] // Sod
-*   --- vdw ---
-* ./Laglos -m data/ref-segment-c0.mesh -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis [problem = 8, dim = 1]
-* ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis [problem = 9, dim = 1]
-* ./Laglos -m data/segment-nhalf-1.mesh -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis [problem = 10, dim = 1]
-* ./Laglos -m data/segment-n1p7-1.mesh -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis [problem = 11, dim = 1]
 *
 * -------------- 2D ----------
 * ./Laglos -m data/ref-square.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 4 -vis -so [problem = 1, dim = 2] // Sod in 2D
 * ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
 * ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2] // Isentropic Vortex, stationary center
+*
+*
+* ========================================= New .h based problem runs =========================================
+* ----- 1D -----
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8
+* --- vdw ---
+* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis
+* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis
+* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis
+* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
+*
 */
 
 #include "mfem.hpp"
@@ -47,6 +53,10 @@
 #include "laglos_solver.hpp"
 #include "problem_template.h"
 #include "sod.h"
+#include "vdw-1.h"
+#include "vdw-2.h"
+#include "vdw-3.h"
+#include "vdw-4.h"
 // #include "initial_vals.hpp"
 #include "riemann1D.hpp"
 #include <iostream>
@@ -171,6 +181,32 @@ int main(int argc, char *argv[]) {
          problem_class = new SodProblem<dim>();
          break;
       }
+      case 8:
+      {
+         problem_class = new VdwTest1<dim>();
+         break;
+      }
+      case 9:
+      {
+         problem_class = new VdwTest2<dim>();
+         break;
+      }
+      case 10:
+      {
+         problem_class = new VdwTest3<dim>();
+         break;
+      }
+      case 11:
+      {
+         problem_class = new VdwTest4<dim>();
+         break;
+      }
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7: MFEM_ABORT("Case not implemented.\n");
       default:
       {
          problem_class = new ProblemTemplate<dim>();

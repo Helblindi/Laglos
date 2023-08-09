@@ -40,6 +40,10 @@ public:
    bool known_exact_solution = false;
    string indicator = ""; // Possible: saltzman
    // TODO: BC specifier
+   
+   virtual double get_a() { return a; }
+   virtual double get_b() { return b; }
+   virtual double get_gamma() { return gamma; }
 
    // ProblemDescription
    static double internal_energy(const Vector &U)
@@ -105,7 +109,7 @@ public:
       in_rhol = 1. / in_taul;
       in_rhor = 1. / in_taur;
 
-      double in_tol = 10.e-15,
+      double in_tol = 1.e-15,
             lambda_maxl_out = 0.,
             lambda_maxr_out = 0.,
             pstar = 0.,
@@ -140,8 +144,9 @@ public:
 
       // cout << "nij:\n";
       // n_ij.Print(cout);
-      // cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << endl;
-      // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << endl;
+      // cout << "b: " << b_covolume << endl;
+      // cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << ", p: " << in_pl << endl;
+      // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << ", p: " << in_pl << endl;
       // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
       return d;
@@ -176,20 +181,12 @@ public:
    {
       double _pressure = pressure(U);
       double density = 1. / U[0];
-      double gamma = gamma_func();
 
-      // _a and _b are constants depending on the nature of the fluid
-      double _a = 1.;
-      double _b = 1.;
-
-      double val = gamma * (_pressure + _a * pow(density,2)) / (density * (1. - _b * density));
-      val -= 2. * _a * density;
+      double val = this->get_gamma() * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
+      val -= 2. * this->get_a() * density;
       val = pow(val, 0.5);
       return val;
    }
-
-   double b_covolume() { return b;     }
-   double gamma_func() { return gamma; }
 
    /*****
     * Functions to be overwritten

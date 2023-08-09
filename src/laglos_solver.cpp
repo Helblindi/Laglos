@@ -276,10 +276,9 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
             // viscosity contribution
             // cout << "\t---n:\n";
             // n.Print(cout);
-            double b_covolume = pb->b_covolume();
             double pl = pb->pressure(U_i);
             double pr = pb->pressure(U_j);
-            d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, b_covolume) * c_norm; 
+            d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
 
             temp_sum += d;
          }
@@ -627,10 +626,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             /* viscosity contribution */
             if (use_viscosity)
             {
-               double b_covolume = pb->b_covolume();
                double pl = pb->pressure(U_i);
                double pr = pb->pressure(U_j);
-               d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, b_covolume) * c_norm; 
+               d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
                // cout << "viscosity: " << d << endl;
                Vector z = U_j;
                z -= U_i;
@@ -1154,10 +1152,9 @@ void LagrangianLOOperator<dim>::
             // cout << "(mm)\tn:\n";
             // n_vec.Print(cout);
             // d = pb->compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
-            double b_covolume = pb->b_covolume();
             double pl = pb->pressure(Uc);
             double pr = pb->pressure(Ucp);
-            d = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume) * c_norm; 
+            d = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b()) * c_norm; 
 
             Vf = pb->velocity(Uc);
             Vf += pb->velocity(Ucp);

@@ -1,8 +1,30 @@
+#ifndef PROBLEM_BASE
+#define PROBLEM_BASE
+
 #include "mfem.hpp"
 #include <cmath>
+#include <string>
 
 using namespace mfem;
 using namespace std;
+
+// Fortran subroutine from Lagrangian code
+extern "C" {
+   void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+      double *in_taul, double *in_ul, double *in_el, double *in_pl,
+      double *in_taur, double *in_ur, double *in_er, double *in_pr,
+      double *in_tol, bool *no_iter,double *lambda_maxl_out,
+      double *lambda_maxr_out, double *pstar, int *k);
+}
+
+// Fortran subroutine from Eulerian code
+extern "C" {
+   void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+      double *in_rhol, double *in_ul, double *in_el, const double *in_pl,
+      double *in_rhor, double *in_ur, double *in_er, const double *in_pr,
+      double *in_tol, bool *no_iter,double *lambda_maxl_out,
+      double *lambda_maxr_out, double *pstar, int *k, const double *b_covolume);
+}
 
 namespace mfem
 {
@@ -16,47 +38,208 @@ public:
    double a = 0., b = 0., gamma = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
+   string indicator = ""; // Possible: saltzman
    // TODO: BC specifier
 
    // ProblemDescription
-   double internal_energy(const Vector &U)
+   static double internal_energy(const Vector &U)
    {
       const double &rho = 1./U[0];
       const double &e = specific_internal_energy(U);
       return rho * e;
    }
 
-   virtual double specific_internal_energy(const Vector &U)
+   static double specific_internal_energy(const Vector &U)
    {
-      const Vector  v   = velocity(U);
+      const Vector v = velocity(U);
       const double &E   = U[dim + 1]; // specific total energy
       return E - 0.5 * pow(v.Norml2(), 2);
    }
 
+   static inline Vector velocity(const Vector & U)
+   {
+      Vector v;
+      v.SetSize(dim);
+      Array<int> dofs;
+      for (int i = 0; i < dim; i++)
+      {
+         dofs.Append(i + 1);
+      }
+      U.GetSubVector(dofs, v);
+
+      return v;
+   }
+
+   static inline double compute_lambda_max(const Vector & U_i,
+                                           const Vector & U_j,
+                                           const Vector & n_ij,
+                                           const double &in_pl,
+                                           const double &in_pr,
+                                           const double & b_covolume,
+                                           const string flag="NA")
+   {
+      double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
+      if (flag == "testing")
+      {
+         in_taul = U_i[0];
+         in_ul = U_i[1];
+         in_el = U_i[3];
+
+         in_taur = U_j[0]; 
+         in_ur = U_j[1];
+         in_er = U_j[3];
+      }
+      else 
+      {
+         assert(flag == "NA");
+
+         in_taul = U_i[0];
+         in_ul = velocity(U_i) * n_ij; 
+         in_el = specific_internal_energy(U_i);
+
+         in_taur = U_j[0]; 
+         in_ur = velocity(U_j) * n_ij; 
+         in_er = specific_internal_energy(U_j);
+      }
+
+      in_rhol = 1. / in_taul;
+      in_rhor = 1. / in_taur;
+
+      double in_tol = 10.e-15,
+            lambda_maxl_out = 0.,
+            lambda_maxr_out = 0.,
+            pstar = 0.,
+            vstar = 0.;
+      bool no_iter = false; 
+      int k = 0; // Tells you how many iterations were needed for convergence
+      // b_covolume = .1 / max(in_rhol, in_rhor);
+
+      // cout << "CLM pre fortran function.\n";
+      // __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+      //    &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
+      //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
+
+      __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+         &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+         &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k, &b_covolume);
+
+      double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
+
+      if (isnan(d))
+      {
+         cout << "nij:\n";
+         n_ij.Print(cout);
+         cout << "Ui:\n";
+         U_i.Print(cout);
+         cout << "Uj:\n";
+         U_j.Print(cout);
+         cout << "in_taul: " << in_taul << ", ul: " << in_ul << ", el: " << in_el << ", pl: " << in_pl << endl;
+         cout << "in_taur: " << in_taur << ", ur: " << in_ur << ", er: " << in_er << ", pr: " << in_pr << endl;
+         MFEM_ABORT("NaN values returned by lambda max computation!\n");
+      }
+
+      // cout << "nij:\n";
+      // n_ij.Print(cout);
+      // cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << endl;
+      // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << endl;
+      // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
+
+      return d;
+   }
+
+   inline DenseMatrix flux(const Vector &U)
+   {
+      DenseMatrix result(dim+2, dim);
+
+      const Vector v = velocity(U);
+      const double p = pressure(U);
+
+      // * is not overridden for Vector class, but *= is
+      Vector v_neg = v, vp = v;
+      v_neg *= -1.;
+      vp *= p;
+
+      // Set f(U) according to (2.1c)
+      result.SetRow(0,v_neg);
+
+      for (int i = 0; i < dim; i++)
+      {
+         result(i+1, i) = p;
+      }
+
+      result.SetRow(dim+1, vp);
+
+      return result;
+   }
+
+   inline double sound_speed(const Vector &U)
+   {
+      double _pressure = pressure(U);
+      double density = 1. / U[0];
+      double gamma = gamma_func();
+
+      // _a and _b are constants depending on the nature of the fluid
+      double _a = 1.;
+      double _b = 1.;
+
+      double val = gamma * (_pressure + _a * pow(density,2)) / (density * (1. - _b * density));
+      val -= 2. * _a * density;
+      val = pow(val, 0.5);
+      return val;
+   }
+
+   double b_covolume() { return b;     }
    double gamma_func() { return gamma; }
 
-   virtual double pressure(const Vector &U) = 0; // virtual function, must be overridden
+   /*****
+    * Functions to be overwritten
+    ****/
+   virtual double pressure(const Vector &U)
+   {
+      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+      return 1.;
+   } // virtual function, must be overridden
 
-   // InitialState
-   virtual void sv0(const Vector &x, const double & t)
+   /*********************************************
+    * Functions describing the initial state
+    ********************************************/
+   double sv0(const Vector &x, const double & t)
    {
       double val = rho0(x,t);
       assert(val != 0.);
       return 1./val;
    }
 
-   virtual void ste0(const Vector &x, const double & t)
+   double ste0(const Vector &x, const double & t)
    {
       Vector v(dim);
       v0(x,t,v);
       return sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
    }
 
-   virtual double rho0(const Vector &x, const double & t) = 0; // virtual function, must be overridden
-   virtual void v0(const Vector &x, const double & t, Vector &v) = 0; // virtual function, must be overridden
-   virtual void sie0(const Vector &x, const double & t) = 0; // virtual function, must be overridden
+   /*****
+    * Functions to be overwritten
+    ****/
+   virtual double rho0(const Vector &x, const double & t)
+   {
+      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+      return 1.;
+   } // virtual function, must be overridden
+   virtual void v0(const Vector &x, const double & t, Vector &v)
+   {
+      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+      return;
+   } // virtual function, must be overridden
+   virtual double sie0(const Vector &x, const double & t)
+   {
+      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+      return 0.;
+   } // virtual function, must be overridden
    
 }; // End ProblemBase
 
+
 } // ns hydrodynamics
 } // ns mfem
+
+#endif // PROBLEM_BASE

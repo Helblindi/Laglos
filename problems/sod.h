@@ -23,7 +23,7 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class ProblemTemplate: public ProblemBase<dim>
+class SodProblem: public ProblemBase<dim>
 {
 public:
    /*********************************************************
@@ -31,44 +31,50 @@ public:
     *********************************************************/
    double a = 0.;     
    double b = 0.;
-   double gamma = 0.;
+   double gamma = 1.4;
    bool distort_mesh = false;
    bool known_exact_solution = false;
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U)
+   double pressure(const Vector &U) override
    {
-      /*
-      Must Override
-      */
-      return 0.;
+      // Initial
+      // _pL = 1.0;
+      // _pR= 0.1;
+      return (gamma - 1.) * this->internal_energy(U);
    }
 
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   double rho0(const Vector &x, const double & t)
+   double rho0(const Vector &x, const double & t) override
    {
-      /*
-      Must Override
-      */
-      return 0.;
+      switch (dim)
+      {
+         case 1:
+         case 2:
+         {
+            return (x(0) < 0.5) ? 1.0 : 0.125;
+         }
+         default:
+         {
+            MFEM_ABORT("Invalid dimension provided.\n");
+         }
+      }
+      return 1.;
    }
-   void v0(const Vector &x, const double & t, Vector &v)
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
-      /*
-      Must Override
-      */
+      v = 0.;
       return;
    }
-   double sie0(const Vector &x, const double & t)
+
+   double sie0(const Vector &x, const double & t) override
    {
-      /*
-      Must Override
-      */
-      return 0.;
+      return (x(0) < 0.5) ? 1.0 / this->rho0(x, t) / (gamma - 1.0) // Sod
+                        : 0.1 / this->rho0(x, t) / (gamma - 1.0);
    }
 
 }; // End class

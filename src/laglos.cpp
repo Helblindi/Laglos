@@ -45,6 +45,8 @@
 #include "var-config.h"
 #include "compile_time_vals.h"
 #include "laglos_solver.hpp"
+#include "problem_template.h"
+#include "sod.h"
 // #include "initial_vals.hpp"
 #include "riemann1D.hpp"
 #include <iostream>
@@ -73,10 +75,10 @@ int main(int argc, char *argv[]) {
    // Hypre::Init();
 
    const int dim = CompileTimeVals::dim;
-   const int problem = CompileTimeVals::problem;
 
    // Parse command line options
    const char *mesh_file_location = "default";
+   int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
    int order_mv = 2;  // Order of mesh movement approximation space
@@ -96,6 +98,7 @@ int main(int argc, char *argv[]) {
 
    OptionsParser args(argc, argv);
 
+   args.AddOption(&problem, "-p", "--problem", "Test problem to run.");
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
@@ -152,6 +155,27 @@ int main(int argc, char *argv[]) {
    {
       cout << "Cannot both optimize the timestep and set the timestep for convergence testing.\n";
       return -1;
+   }
+
+   // Set up problem
+   ProblemBase<dim> * problem_class = NULL;
+   switch (problem)
+   {
+      case 0:
+      {
+         problem_class = new ProblemTemplate<dim>();
+         break;
+      }
+      case 1:
+      {
+         problem_class = new SodProblem<dim>();
+         break;
+      }
+      default:
+      {
+         problem_class = new ProblemTemplate<dim>();
+         break;
+      }
    }
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
@@ -401,25 +425,37 @@ int main(int argc, char *argv[]) {
    // Sync the data location of mv_gf with its base, S
    mv_gf.SyncAliasMemory(S);
 
+   // Change class variables into static std::functions since virtual static member functions are not an option
+   // and Coefficient class requires std::function arguments
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> sv0_static = 
+      std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<void(const Vector &, const double, Vector &)> v0_static = 
+      std::bind(&ProblemBase<dim>::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+   std::function<double(const Vector &,const double)> ste0_static = 
+      std::bind(&ProblemBase<dim>::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> rho0_static = 
+      std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+
    // Initialize specific volume, velocity, and specific total energy
-   FunctionCoefficient sv_coeff(InitialValues<dim, problem>::sv0);
+   FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(0.);
    sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
-   VectorFunctionCoefficient v_coeff(dim, InitialValues<dim, problem>::v0);
+   VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(0.);
    v_gf.ProjectCoefficient(v_coeff);
    // Sync the data location of v_gf with its base, S
    v_gf.SyncAliasMemory(S);
 
-   FunctionCoefficient ste_coeff(InitialValues<dim, problem>::ste0);
+   FunctionCoefficient ste_coeff(ste0_static);
    ste_coeff.SetTime(0.);
    ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
-   FunctionCoefficient rho_coeff(InitialValues<dim, problem>::rho0); 
+   FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(0.);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
@@ -430,7 +466,7 @@ int main(int argc, char *argv[]) {
    S.Print(cout);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
    cout << "Solver created.\n";
 
    /* Set up visualiztion object */
@@ -786,7 +822,7 @@ int main(int argc, char *argv[]) {
                   Vector _x(dim);
                   _x = 0.;
                   _x[0] = rho_x_exact_py[i];
-                  rho_exact_py[i] = InitialValues<dim, problem>::rho0(_x, t);
+                  rho_exact_py[i] = problem_class->rho0(_x, t);
                }
 
                
@@ -841,12 +877,12 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < sv_gf.Size(); i++)
             {
                hydro.GetCellStateVector(S, i, U);
-               double pressure = ProblemDescription<dim, problem>::pressure(U);
+               double pressure = problem_class->pressure(U);
                press_gf[i] = pressure;
                // Form python arrays
                press_gf_py[i] = pressure;
                rho_gf_py[i] = 1./U[0];
-               ss_gf_py[i] = ProblemDescription<dim, problem>::sound_speed(U);
+               ss_gf_py[i] = problem_class->sound_speed(U);
 
                pmesh->GetElementCenter(i, center);
                x_gf_py[i] = center[0];

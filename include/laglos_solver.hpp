@@ -2,8 +2,8 @@
 #define LAGLOS_SOLVER
 
 #include "mfem.hpp"
-#include "problem_description.hpp"
-#include "initial_vals.hpp"
+// #include "initial_vals.hpp"
+#include "problem_base.h"
 #include <iostream>
 #include <cassert>
 #include <string>
@@ -25,7 +25,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
                     bool vec = false);
 
 //
-template <int dim, int problem>
+template <int dim>
 class LagrangianLOOperator
 {
 protected:
@@ -34,6 +34,9 @@ protected:
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
+
+   // Problem specific
+   ProblemBase<dim> * pb;
 
    // FE spaces local and global sizes
    const int Vsize_H1;
@@ -79,6 +82,7 @@ public:
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
                         ParLinearForm *m,
+                        ProblemBase<dim> *_pb,
                         bool use_viscosity,
                         bool mm,
                         double CFL);

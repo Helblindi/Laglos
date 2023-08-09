@@ -49,11 +49,8 @@ public:
       double rho = 1. / U[0];
       double sie = this->specific_internal_energy(U);
 
-      // _a and _b are constants depending on the nature of the fluid
-      double _a = 1.;
-      double _b = 1.;
+      double val = (this->get_gamma() - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
 
-      double val = (gamma - 1.) * (rho * sie + _a * pow(rho, 2)) / (1. - _b * rho) - _a * pow(rho,2);
       return val;
    }
 

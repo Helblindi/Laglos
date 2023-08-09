@@ -391,57 +391,45 @@ int main(int argc, char *argv[]) {
    x_gf.SyncAliasMemory(S);
 
    /* Distort Mesh for Saltzman Problem */
-   if (CompileTimeVals::distort_mesh)
+   if (problem_class->get_distort_mesh())
    {
-      cout << "distorting mesh\n";
-      switch (problem)
+      Array<double> coords(dim);
+      for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
       {
-         case 7: // Saltzman problem
+         for (int i = 0; i < dim; i++)
          {
-            Array<double> coords(dim);
-            for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
-            {
-               for (int i = 0; i < dim; i++)
-               {
-                  int index = vertex + i * H1FESpace.GetNDofs();
-                  coords[i] = x_gf[index];
-               }
-               // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
-               double x_new = coords[0] + (0.1 - coords[1]) * sin(M_PI * coords[0]); // 
-
-               x_gf[vertex] = x_new;
-            }
+            int index = vertex + i * H1FESpace.GetNDofs();
+            coords[i] = x_gf[index];
          }
+         // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
+         double x_new = coords[0] + (0.1 - coords[1]) * sin(M_PI * coords[0]); // 
 
-         //    // Adjust all face nodes to be averages of their adjacent corners
-         //    mfem::Mesh::FaceInformation FI;
-         //    for (int face = 0; face < pmesh->GetNumFaces(); face++)
-         //    {
-         //       cout << "Iterating on face: " << face << endl;
-         //       FI = pmesh->GetFaceInformation(face);
-         //       Array<int> face_dof_row;
-         //       H1FESpace.GetFaceDofs(face, face_dof_row);
-
-         //       cout << "Face dof row for face: " << face << ":\n";
-         //       face_dof_row.Print(cout);
-
-         //       int face_dof = face_dof_row[2];
-         //       int index0 = face_dof_row[0];
-         //       int index1 = face_dof_row[1];
-         //       for (int i = 0; i < dim; i++)
-         //       {
-         //          int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
-         //          int node0_index = index0 + i * H1FESpace.GetNDofs();
-         //          int node1_index = index1 + i * H1FESpace.GetNDofs();
-         //          x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
-         //       }
-               
-         //    }
-         // }
-         default: // do nothing for all other problems
-         {
-         }
+         x_gf[vertex] = x_new;
       }
+
+      // // Adjust all face nodes to be averages of their adjacent corners
+      // mfem::Mesh::FaceInformation FI;
+      // for (int face = 0; face < pmesh->GetNumFaces(); face++)
+      // {
+      //    cout << "Iterating on face: " << face << endl;
+      //    FI = pmesh->GetFaceInformation(face);
+      //    Array<int> face_dof_row;
+      //    H1FESpace.GetFaceDofs(face, face_dof_row);
+
+      //    cout << "Face dof row for face: " << face << ":\n";
+      //    face_dof_row.Print(cout);
+
+      //    int face_dof = face_dof_row[2];
+      //    int index0 = face_dof_row[0];
+      //    int index1 = face_dof_row[1];
+      //    for (int i = 0; i < dim; i++)
+      //    {
+      //       int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
+      //       int node0_index = index0 + i * H1FESpace.GetNDofs();
+      //       int node1_index = index1 + i * H1FESpace.GetNDofs();
+      //       x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
+      //    }
+      // }
       cout << "Mesh distorted\n";
    }
 
@@ -556,61 +544,47 @@ int main(int argc, char *argv[]) {
       ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
       ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
 
-      switch(problem)
+      if (problem_class->has_exact_solution())
       {
-         case 11:
-         case 10:
-         case 9:
-         case 8:
-         case 7:
-         case 6:
-         case 5:
-         case 4: // Noh Problem
-         case 3:
-         case 2:
-         case 1:
-         case 0:
-         {
-            rho_ex->ProjectCoefficient(rho_coeff);
-            vel_ex->ProjectCoefficient(v_coeff);
-            ste_ex->ProjectCoefficient(ste_coeff);
+         rho_ex->ProjectCoefficient(rho_coeff);
+         vel_ex->ProjectCoefficient(v_coeff);
+         ste_ex->ProjectCoefficient(ste_coeff);
 
-            ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-            rho_err -= *rho_ex;
-            vel_err -= *vel_ex;
-            ste_err -= *ste_ex;
+         ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+         rho_err -= *rho_ex;
+         vel_err -= *vel_ex;
+         ste_err -= *ste_ex;
 
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
-                           "Exact: Density", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
-                           "Exact: Velocity", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
-                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-            Wx = 0;
-            Wy += offy;
+         // Visualize difference between exact and approx
+         VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+                        "Exact: Density", Wx, Wy, Ww, Wh);
+         
+         Wx += offx;
+         VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+                        "Exact: Velocity", Wx, Wy, Ww, Wh);
+         
+         Wx += offx;
+         VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+                        "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+         Wx = 0;
+         Wy += offy;
 
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_err, vishost, visport, rho_err,
-                           "Error: Density", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_v_err, vishost, visport, vel_err,
-                           "Error: Velocity", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_ste_err, vishost, visport, ste_err,
-                           "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
-
-            delete rho_ex;
-            delete vel_ex;
-            delete ste_ex;
-         }
+         // Visualize difference between exact and approx
+         VisualizeField(vis_rho_err, vishost, visport, rho_err,
+                        "Error: Density", Wx, Wy, Ww, Wh);
+         
+         Wx += offx;
+         VisualizeField(vis_v_err, vishost, visport, vel_err,
+                        "Error: Velocity", Wx, Wy, Ww, Wh);
+         
+         Wx += offx;
+         VisualizeField(vis_ste_err, vishost, visport, ste_err,
+                        "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
       }
+
+      delete rho_ex;
+      delete vel_ex;
+      delete ste_ex;
    }
 
    // Perform the time-integration by looping over time iterations
@@ -737,9 +711,9 @@ int main(int argc, char *argv[]) {
             ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
             ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
 
-            switch(problem)
+            if (problem_class->has_exact_solution())
             {
-               case 1: // Sod
+               if (problem == 1) // Sod
                {
                   riemann1D::ExactDensityCoefficient rho_coeff_r;
                   rho_coeff_r.SetTime(t);
@@ -751,20 +725,8 @@ int main(int argc, char *argv[]) {
                   rho_ex->ProjectCoefficient(rho_coeff_r);
                   vel_ex->ProjectCoefficient(v_coeff_r);
                   ste_ex->ProjectCoefficient(ste_coeff_r);
-
-                  break;
                }
-               case 11:
-               case 10:
-               case 9:
-               case 8:
-               case 7:
-               case 6:
-               case 5:
-               case 4: // Noh Problem
-               case 3:
-               case 2:
-               case 0:
+               else
                {
                   rho_coeff.SetTime(t);
                   v_coeff.SetTime(t);
@@ -773,43 +735,41 @@ int main(int argc, char *argv[]) {
                   rho_ex->ProjectCoefficient(rho_coeff);
                   vel_ex->ProjectCoefficient(v_coeff);
                   ste_ex->ProjectCoefficient(ste_coeff);
-                  
-                  break;
                }
+
+               ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
+               rho_err -= *rho_ex;
+               vel_err -= *vel_ex;
+               ste_err -= *ste_ex;
+
+               // Visualize difference between exact and approx
+               VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+                              "Exact: Density", Wx, Wy, Ww, Wh);
+               
+               Wx += offx;
+               VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+                              "Exact: Velocity", Wx, Wy, Ww, Wh);
+               
+               Wx += offx;
+               VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+                              "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+               Wx = 0;
+               Wy += offy;
+
+
+               // Visualize difference between exact and approx
+               VisualizeField(vis_rho_err, vishost, visport, rho_err,
+                              "Error: Density", Wx, Wy, Ww, Wh);
+               
+               Wx += offx;
+               VisualizeField(vis_v_err, vishost, visport, vel_err,
+                              "Error: Velocity", Wx, Wy, Ww, Wh);
+               
+               Wx += offx;
+
+               VisualizeField(vis_ste_err, vishost, visport, ste_err,
+                              "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
             }
-
-            ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-            rho_err -= *rho_ex;
-            vel_err -= *vel_ex;
-            ste_err -= *ste_ex;
-
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
-                           "Exact: Density", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
-                           "Exact: Velocity", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
-                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-            Wx = 0;
-            Wy += offy;
-
-
-            // Visualize difference between exact and approx
-            VisualizeField(vis_rho_err, vishost, visport, rho_err,
-                           "Error: Density", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-            VisualizeField(vis_v_err, vishost, visport, vel_err,
-                           "Error: Velocity", Wx, Wy, Ww, Wh);
-            
-            Wx += offx;
-
-            VisualizeField(vis_ste_err, vishost, visport, ste_err,
-                           "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
 
             delete rho_ex;
             delete vel_ex;
@@ -977,25 +937,25 @@ int main(int argc, char *argv[]) {
    } 
 
    /* When the exact solution is known, print out an error file */
-   // Compute errors
-   ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-   ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-   ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
-
-   /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
-   double rho_L1_error_n = 0.,
-          vel_L1_error_n = 0.,
-          ste_L1_error_n = 0.,
-          rho_L2_error_n = 0.,
-          vel_L2_error_n = 0.,
-          ste_L2_error_n = 0.,
-          rho_Max_error_n = 0.,
-          vel_Max_error_n = 0.,
-          ste_Max_error_n = 0.;
-
-   switch(problem)
+   if (problem_class->has_exact_solution())
    {
-      case 1: // Sod
+      // Compute errors
+      ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
+      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+
+      /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
+      double rho_L1_error_n = 0.,
+            vel_L1_error_n = 0.,
+            ste_L1_error_n = 0.,
+            rho_L2_error_n = 0.,
+            vel_L2_error_n = 0.,
+            ste_L2_error_n = 0.,
+            rho_Max_error_n = 0.,
+            vel_Max_error_n = 0.,
+            ste_Max_error_n = 0.;
+
+      if (problem == 1) // Sod
       {
          riemann1D::ExactVelocityCoefficient v_coeff_r;
          v_coeff_r.SetTime(t);
@@ -1020,20 +980,8 @@ int main(int argc, char *argv[]) {
          rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff_r) / rho_ex->ComputeMaxError(zero);
          vel_Max_error_n = v_gf.ComputeMaxError(v_coeff_r) / vel_ex->ComputeMaxError(zero);
          ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff_r) / ste_ex->ComputeMaxError(zero);
-         
-         break;
       }
-      case 11:
-      case 10:
-      case 9:
-      case 8:
-      case 7:
-      case 6:
-      case 5:
-      case 4: // Noh problem
-      case 3:
-      case 2:
-      case 0:
+      else
       {
          rho_coeff.SetTime(t);
          v_coeff.SetTime(t);
@@ -1055,74 +1003,67 @@ int main(int argc, char *argv[]) {
          rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex->ComputeMaxError(zero);
          vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
          ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
+      }
+      /* Get composite errors values */
+      const double L1_error = rho_L1_error_n + vel_L1_error_n + ste_L1_error_n;
+      const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;
+      const double Max_error = rho_Max_error_n + vel_Max_error_n + ste_Max_error_n;
 
-         break;
-      }
-      default: // do nothing for all other problems
+      // if (L1_error < 1e-12 || L2_error < 1e-12 || Max_error < 1e-12)
+      // {
+      //    MFEM_ABORT("There is no way you are that perfect!\n");
+      // }
+
+      if (Mpi::Root())
       {
+         ostringstream convergence_filename;
+         convergence_filename << "./results/convergence/temp_output/np" << num_procs;
+
+         if (rs_levels != 0) {
+            convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
+         }
+         if (rp_levels != 0) {
+            convergence_filename << "_p" << setfill('0') << setw(2) << rp_levels;
+         }
+         convergence_filename << "_refinement_"
+                              << setfill('0') << setw(2)
+                              << to_string(rp_levels + rs_levels)
+                              << ".out";
+         ofstream convergence_file(convergence_filename.str().c_str());
+         convergence_file.precision(precision);
+         convergence_file << "Processor_Runtime " << "1." << "\n"
+                           << "n_processes " << num_procs << "\n"
+                           << "n_refinements "
+                           << to_string(rp_levels + rs_levels) << "\n"
+                           << "n_Dofs " << global_vSize << "\n"
+                           << "h " << hmin << "\n"
+                           // rho
+                           << "rho_L1_Error " << rho_L1_error_n << "\n"
+                           << "rho_L2_Error " << rho_L2_error_n << "\n"
+                           << "rho_Linf_Error " << rho_Max_error_n << "\n"
+                           // vel
+                           << "vel_L1_Error " << vel_L1_error_n << "\n"
+                           << "vel_L2_Error " << vel_L2_error_n << "\n"
+                           << "vel_Linf_Error " << vel_Max_error_n << "\n"
+                           // ste
+                           << "ste_L1_Error " << ste_L1_error_n << "\n"
+                           << "ste_L2_Error " << ste_L2_error_n << "\n"
+                           << "ste_Linf_Error " << ste_Max_error_n << "\n"
+                           // total
+                           << "L1_Error " << L1_error << "\n"
+                           << "L2_Error " << L2_error << "\n"
+                           << "Linf_Error " << Max_error << "\n"
+                           << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                           << "dt " << dt << "\n"
+                           << "Endtime " << t << "\n";
+                     
+         convergence_file.close();
       }
+         delete rho_ex;
+         delete vel_ex;
+         delete ste_ex;
    }   
    
-   /* Get composite errors values */
-   const double L1_error = rho_L1_error_n + vel_L1_error_n + ste_L1_error_n;
-   const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;
-   const double Max_error = rho_Max_error_n + vel_Max_error_n + ste_Max_error_n;
-
-   // if (L1_error < 1e-12 || L2_error < 1e-12 || Max_error < 1e-12)
-   // {
-   //    MFEM_ABORT("There is no way you are that perfect!\n");
-   // }
-
-   if (Mpi::Root())
-   {
-      ostringstream convergence_filename;
-      convergence_filename << "./results/convergence/temp_output/np" << num_procs;
-
-      if (rs_levels != 0) {
-         convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
-      }
-      if (rp_levels != 0) {
-         convergence_filename << "_p" << setfill('0') << setw(2) << rp_levels;
-      }
-      convergence_filename << "_refinement_"
-                           << setfill('0') << setw(2)
-                           << to_string(rp_levels + rs_levels)
-                           << ".out";
-      ofstream convergence_file(convergence_filename.str().c_str());
-      convergence_file.precision(precision);
-      convergence_file << "Processor_Runtime " << "1." << "\n"
-                        << "n_processes " << num_procs << "\n"
-                        << "n_refinements "
-                        << to_string(rp_levels + rs_levels) << "\n"
-                        << "n_Dofs " << global_vSize << "\n"
-                        << "h " << hmin << "\n"
-                        // rho
-                        << "rho_L1_Error " << rho_L1_error_n << "\n"
-                        << "rho_L2_Error " << rho_L2_error_n << "\n"
-                        << "rho_Linf_Error " << rho_Max_error_n << "\n"
-                        // vel
-                        << "vel_L1_Error " << vel_L1_error_n << "\n"
-                        << "vel_L2_Error " << vel_L2_error_n << "\n"
-                        << "vel_Linf_Error " << vel_Max_error_n << "\n"
-                        // ste
-                        << "ste_L1_Error " << ste_L1_error_n << "\n"
-                        << "ste_L2_Error " << ste_L2_error_n << "\n"
-                        << "ste_Linf_Error " << ste_Max_error_n << "\n"
-                        // total
-                        << "L1_Error " << L1_error << "\n"
-                        << "L2_Error " << L2_error << "\n"
-                        << "Linf_Error " << Max_error << "\n"
-                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
-                        << "dt " << dt << "\n"
-                        << "Endtime " << t << "\n";
-                  
-      convergence_file.close();
-
-      delete rho_ex;
-      delete vel_ex;
-      delete ste_ex;
-   }
-
    if (suppress_output)
    {
       // restore cout stream buffer

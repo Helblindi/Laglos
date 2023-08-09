@@ -39,6 +39,8 @@ public:
    virtual double get_a() override { return a; }
    virtual double get_b() override { return b; }
    virtual double get_gamma() override { return gamma; }
+   virtual bool get_distort_mesh() override { return distort_mesh; }
+   virtual bool has_exact_solution() override { return known_exact_solution; }
 
    /*********************************************************
     * Problem Description functions

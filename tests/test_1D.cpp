@@ -1,6 +1,7 @@
 #include "mfem.hpp"
 #include "var-config.h"
 #include "laglos_solver.hpp"
+#include "sod.h"
 #include <cassert>
 #include <fstream>
 #include <sstream>
@@ -9,6 +10,7 @@
 
 using namespace std;
 using namespace mfem;
+using namespace hydrodynamics;
 namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
@@ -47,7 +49,6 @@ int test_flux();
 int test_1d_mesh();
 int test_CSV_getter_setter();
 int test_vel_field_1();
-int test_lambda_max();
 
 
 int main(int argc, char *argv[])
@@ -73,14 +74,12 @@ int main(int argc, char *argv[])
                   "Upper bound for refinements for table creation.");
    args.Parse();
 
-   int d = test_lambda_max();
+   int d = test_1d_mesh();
 
-   // int d = test_1d_mesh();
+   d += test_flux();
+   d += test_CSV_getter_setter();
 
-   // d += test_flux();
-   // d += test_CSV_getter_setter();
-
-   // d += test_vel_field_1();
+   d += test_vel_field_1();
 
    cout << "Must return 0 for test to pass.  d = " << d << endl;
 
@@ -209,7 +208,9 @@ int test_flux()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    double _error = 0.;
 
@@ -219,7 +220,7 @@ int test_flux()
    U[2] = 3.;
 
    DenseMatrix dm(dim+2, dim), dm_exact(dim+2, dim), dm_error(dim+2, dim);
-   dm = mfem::hydrodynamics::ProblemDescription<dim, problem>::flux(U);
+   dm = problem_class->flux(U);
    dm_exact(0,0) = -2.;
    dm_exact(1,0) = 1.;
    dm_exact(2,0) = 2.;
@@ -330,7 +331,9 @@ int test_1d_mesh()
    m->AddDomainIntegrator(new DomainLFIntegrator(one));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "x_gf:\n";
    x_gf.Print(cout);
@@ -350,7 +353,7 @@ int test_1d_mesh()
       assert(k >= 0.);
    }
 
-   hydrodynamics::LagrangianLOOperator<dim, problem>::DofEntity _dof_entity;
+   hydrodynamics::LagrangianLOOperator<dim>::DofEntity _dof_entity;
    int edof;
    for (int dof = 0; dof < H1FESpace.GetNDofs(); dof++)
    {      
@@ -464,7 +467,9 @@ int test_vel_field_1()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
    double t = 0., dt = 1.;
@@ -642,7 +647,9 @@ int test_CSV_getter_setter()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);
@@ -676,21 +683,4 @@ int test_CSV_getter_setter()
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
-}
-
-int test_lambda_max()
-{
-   Vector Ui(dim + 2), Uj(dim + 2);
-   Ui[0] = 1./.9932;
-   Ui[1] = 3.;
-   Ui[2] = 0.029143658477667977 + 0.5 * 9.;
-   Uj[0] = 1./.95;
-   Uj[1] = -3.;
-   Uj[2] = 6.688157894736825 + 0.5 * 9.;
-   Vector nij(dim);
-   nij = 1.;
-   double lambda_max = mfem::hydrodynamics::ProblemDescription<dim, problem>::compute_lambda_max(Ui, Uj, nij);
-   cout << "lambda max: " << lambda_max << endl;
-
-   return 0;
 }

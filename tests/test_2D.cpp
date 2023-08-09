@@ -1,5 +1,6 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
+#include "sod.h"
 #include "var-config.h"
 #include <cassert>
 #include <fstream>
@@ -207,7 +208,9 @@ int test_flux()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    double _error = 0.;
 
@@ -218,7 +221,7 @@ int test_flux()
    U[3] = 1.;
 
    DenseMatrix dm(dim+2, dim), dm_exact(dim+2, dim), dm_error(dim+2, dim);
-   dm = ProblemDescription<dim, problem>::flux(U);
+   dm = problem_class->flux(U);
    dm_exact(0,0) = -.3, dm_exact(0,1) = -.4;
    dm_exact(1,0) = .875, dm_exact(1,1) = 0.;
    dm_exact(2,0) = 0., dm_exact(2,1) = .875;
@@ -238,8 +241,8 @@ int test_flux()
       test_vel(0) = .3;
       test_vel(1) = .4;
       cout << "norm: " << test_vel.Norml2() << endl;
-      cout << "pressure: " << ProblemDescription<dim, problem>::pressure(U) << endl;
-      cout << "sie: " << ProblemDescription<dim, problem>::specific_internal_energy(U) << endl;
+      cout << "pressure: " << problem_class->pressure(U) << endl;
+      cout << "sie: " << problem_class->specific_internal_energy(U) << endl;
       cout << "For the flux we have:\n";
       dm.Print(cout);
       cout << "We should have:\n";
@@ -354,7 +357,11 @@ int test_vel_field_1()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+
+
    cout << "Done constructing hydro op\n";
 
    Vector _vel(dim), vec_res(dim);
@@ -523,7 +530,9 @@ int test_CSV_getter_setter()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim, problem> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, use_viscosity, _mm, CFL);
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);

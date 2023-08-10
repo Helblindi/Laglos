@@ -22,3 +22,6 @@ Fortran/*/*.o
 Fortran/*/lambda
 Fortran/*/README.md
 Fortran/old
+Fortran/vdw/fort*
+Fortran/vdw/vdw.o
+Fortran/vdw/vdw.mod

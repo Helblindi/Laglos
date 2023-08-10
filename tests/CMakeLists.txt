@@ -17,6 +17,10 @@ add_executable(Test2D EXCLUDE_FROM_ALL test_2D.cpp "${MFEM_DIR}" "${PROJECT_SOUR
 target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 add_test(NAME Test2D COMMAND Test2D)
 
+add_executable(TestFortran EXCLUDE_FROM_ALL test_fortran.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestFortran PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
+add_test(NAME TestFortran COMMAND TestFortran)
+
 # Validate Fortran Max Wave Speed calculations
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
@@ -43,4 +47,4 @@ add_test(NAME LagrangeMWSCompare
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestRTvel Test1D Test2D TestEulerianMWS TestLagrangianMWS)
+add_dependencies(build_tests TestRTvel Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)

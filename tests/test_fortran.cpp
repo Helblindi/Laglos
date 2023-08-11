@@ -31,7 +31,14 @@ bool create_table = false;
 int lower_refinement = 2;
 int upper_refinement = 7;
 
+void vdw1_arrays();
+
 int main()
+{
+   vdw1_arrays();
+}
+
+void vdw1_arrays()
 {
    // Initialize MPI.
    Mpi::Init();

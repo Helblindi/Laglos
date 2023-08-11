@@ -5,6 +5,7 @@
 // #include "initial_vals.hpp"
 #include "problem_base.h"
 #include <iostream>
+#include <fstream>
 #include <cassert>
 #include <string>
 
@@ -160,6 +161,9 @@ public:
 
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);
+
+   // Various print functions
+   void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
 };
 
 } // end ns hydrodynamics

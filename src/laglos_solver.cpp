@@ -1273,8 +1273,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    if (dim > 1)
    {
       // Don't need to fill face velocities with average in dim=1
-      fill_face_velocities_with_average(S);
-      // compute_corrective_face_velocities(S, t, dt);
+      // fill_face_velocities_with_average(S);
+      compute_corrective_face_velocities(S, t, dt);
       // S.Print(cout);
 
       // Construct ti, face normals
@@ -1388,10 +1388,6 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
    cout << "trace: " << trace << ", det: " << det << endl;
 
    double a = 1.;
-   // double b = -1. * (1. + (dt / 2.) * (C(0,0) + C(1,1)));
-   // double c = (pow(dt, 2) / 4.) * ((C(0,0) * C(1,1)) - (C(0,1) * C(1,0)));
-   // cout << "Ci:\n";
-   // C.Print(cout);
    double b = -1. * (1. + (dt / 2.) * trace);
    double c = (pow(dt, 2) / 4.) * det;
 
@@ -1408,14 +1404,12 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
    d2 /= (2. * a);
 
    d = std::max(d1, d2);
+
    if (d <= 0.)
    {
       cout << "d1: " << d1 << ", d2: " << d2 << endl;
       MFEM_ABORT("Alpha_i should be positive.\n");
    }
-
-   if (d2 > 0.) { d = d2; }
-   else { d = d1; }
 
    cout << "d1: " << d1 << endl;
    cout << "d2: " << d2 << endl;
@@ -1464,7 +1458,6 @@ void LagrangianLOOperator<dim>::
             if (det <= 1.e-12)
             {
                cout << "Negative determinant.\n";
-               assert(false);
                double _c = abs(Ci(0,0));
                _c += 1.;
                if (dt > 2. / _c)
@@ -2517,6 +2510,58 @@ void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & n
       // cout << "i: " << i << ", val: " << x_gf[index] << endl;
       x[i] = x_gf[index];
    }
+}
+
+template<int dim>
+void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix)
+{
+   // Get gfs
+   ParGridFunction rho_gf, sv_gf, v_gf, ste_gf;
+   Vector* sptr = const_cast<Vector*>(&S);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
+   ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
+
+   Vector center(dim);
+
+   // Fill density
+
+   // Form filenames and ofstream objects
+   std::string sv_file = output_file_prefix + "sv_" + output_file_suffix;
+   std::ofstream fstream_sv(sv_file.c_str());
+   fstream_sv << "x,rho,v\n";
+
+   
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      pmesh->GetElementCenter(i, center);
+
+      fstream_sv << center[0] << ","
+                 << 1./sv_gf[i] << ","
+                 << v_gf[i] << "\n";
+   }
+
+   // fstream_v.close();
+
+   // const int nqp = ir.GetNPoints();
+   // Vector pos(dim);
+   // for (int e = 0; e < NE; e++)
+   // {
+   //    ElementTransformation &Tr = *L2.GetElementTransformation(e);
+   //    for (int q = 0; q < nqp; q++)
+   //    {
+   //       const IntegrationPoint &ip = ir.IntPoint(q);
+   //       Tr.SetIntPoint(&ip);
+   //       Tr.Transform(ip, pos);
+
+   //       double r = sqrt(pos(0)*pos(0) + pos(1)*pos(1));
+
+   //       double rho = qdata.rho0DetJ0w(e*nqp + q) / Tr.Weight() / ip.weight;
+   //       fstream_rho << r << " " << rho << "\n";
+   //       fstream_rho.flush();
+   //    }
+   // }
+   // fstream_rho.close();
 }
 
 /* Explicit n_vectantiation */

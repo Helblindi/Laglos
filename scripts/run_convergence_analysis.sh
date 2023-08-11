@@ -1,11 +1,13 @@
 #! /bin/bash
 
 # This is a script to run convergence analysis on Laglos using Release version
-laglos_dir="/Users/sheridan7/Workspace/Laglos"
+laglos_dir="/Users/madisonsheridan/Workspace/Laglos"
 scripts_dir="${laglos_dir}/scripts"
 bin_dir="${laglos_dir}/build"
 create_convergence="${scripts_dir}/create_convergence_table.py"
+create_refinement="${scripts_dir}/create_refinement_plot.py"
 temp_output="${bin_dir}/results/convergence/temp_output/"
+state_vectors="${bin_dir}/results/state_vectors/"
 convergence_dir="${bin_dir}/results/convergence/"
 
 
@@ -14,6 +16,8 @@ rm *.out
 rm *.txt
 
 cd $temp_output
+rm -rf *
+cd $state_vectors
 rm -rf *
 
 cd $bin_dir
@@ -32,7 +36,7 @@ options="-m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 
 # ./Laglos -rs 4 $options
 # ./Laglos -rs 5 $options
 # ./Laglos -rs 6 $options
-# ./Laglos -rs 7 $options
+./Laglos -rs 7 $options
 ./Laglos -rs 8 $options
 ./Laglos -rs 9 $options
 ./Laglos -rs 10 $options
@@ -42,3 +46,4 @@ cd $scripts_dir
 
 # python stuff for iterating over files to build convergence table
 python3 $create_convergence $temp_output
+python3 $create_refinement $state_vectors 2

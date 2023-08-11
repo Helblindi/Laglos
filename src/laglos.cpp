@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
+   string sv_output_prefix=std::string(LAGLOS_DIR) + "build/results/state_vectors/";
 
    OptionsParser args(argc, argv);
 
@@ -923,6 +924,17 @@ int main(int argc, char *argv[]) {
       }
    }
 
+   // Print grid functions to files
+   ostringstream sv_filename_suffix;
+   sv_filename_suffix << setfill('0') << setw(2)
+                      << to_string(rp_levels + rs_levels)
+                      << ".out";
+   
+   hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
+
+   
+
+
    // Print moved mesh
    // Can be visualized with glvis -np # -m mesh-test-moved
    {
@@ -1013,10 +1025,6 @@ int main(int argc, char *argv[]) {
       const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;
       const double Max_error = rho_Max_error_n + vel_Max_error_n + ste_Max_error_n;
 
-      // if (L1_error < 1e-12 || L2_error < 1e-12 || Max_error < 1e-12)
-      // {
-      //    MFEM_ABORT("There is no way you are that perfect!\n");
-      // }
 
       if (Mpi::Root())
       {

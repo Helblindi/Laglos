@@ -57,6 +57,7 @@ void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_Vi_geo();
 int test_Ci_geo();
 int test_RT_int_grad();
+int test_RT_int_grad2();
 int test_RT_int_grad_quadratic();
 int test_determinant();
 void plot_velocities();
@@ -84,10 +85,13 @@ int main(int argc, char *argv[])
    d += test_Vi_geo();
    d += test_Ci_geo();
    d += test_RT_int_grad();
+   d += test_RT_int_grad2();
    d += test_RT_int_grad_quadratic();
    d += test_determinant();
    // plot_velocities();
-   test_vel_field_2();
+   // test_vel_field_1();
+   // test_vel_field_2();
+
    return d;
 }
 
@@ -439,7 +443,6 @@ int test_Ci_geo()
       _error += C_error.FNorm();
 
       cout << "--- Ci on node: " << node_it << " ---\n";
-      cout << "geo C: ";
       Cgeo.Print(cout);
    }
 
@@ -582,6 +585,138 @@ int test_RT_int_grad()
    else 
    {
       cout << "failed test_RT_int_grad\n";
+      cout << "error: " << _error << endl;
+      return 1; // Test failed
+   }
+}
+
+/*
+Purpose:
+   Test the integral of the gradient of the RT velocity function given an integration rule.
+   This test case uses a linear prescribed velocity.   
+*/
+int test_RT_int_grad2()
+{
+   cout << "Testing RT_int_grad function\n";
+   // Ensure there is no quadratic component to the velocity field
+   aq = 0., bq = 0., dq = 0., eq = 0.;
+   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
+
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction v_cr_gf(&CRFESpace);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   Vector one(dim);
+   one = 1.;
+
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+   mv_gf.ProjectCoefficient(v_exact_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   // Initialize specific volume, velocity, and specific total energy
+   ConstantCoefficient one_const_coeff(1.0);
+   sv_gf.ProjectCoefficient(one_const_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   VectorConstantCoefficient one_coeff(one);
+   v_gf.ProjectCoefficient(one_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   ste_gf.ProjectCoefficient(one_const_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+   m->Assemble();
+
+   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+
+   // Necessary parameters
+   DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
+   true_grad(0,0) = a;
+   true_grad(0,1) = b;
+   true_grad(1,0) = d;
+   true_grad(1,1) = e;;
+   double _error = 0.;
+   double dt = 1., t = 0.;
+
+   // Output exact gradient
+   cout << "The true gradient matrix should be: \n";
+   true_grad.Print(cout);
+
+   // Must compute the intermediate face velocities before computing geometric velocity
+   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+
+   for (int cell_it = 0; cell_it < L2FESpace.GetNE(); cell_it++)
+   {
+      hydro.RT_int_grad(cell_it, dm);
+      cout << "Dense Matrix for cell: " << cell_it << endl;
+      dm.Print(cout);
+      // assert(false);
+
+      Add(dm, true_grad, -1., grad_error);
+      _error += grad_error.FNorm();
+   }
+   
+   if (abs(_error) < 1e-10)
+   {
+      return 0; // Test passed
+   }
+   else 
+   {
+      cout << "failed test_RT_int_grad2\n";
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
@@ -862,7 +997,7 @@ int test_determinant()
 
    d = 0.;
    hydro.compute_determinant(C, dt, d);
-   if (d != 2.)
+   if (d != 3.)
    {
       cout << "Failed 4th determinant test.\n";
       return 1;
@@ -1232,7 +1367,7 @@ Purpose:
 */
 void test_vel_field_1()
 {
-   a = 5., b = 0., c = 1., d = 0., e = 0., f = 1.;
+   a = 5., b = 0., c = 1., d = 0., e = 3., f = 1.;
    aq = 0., bq = 0., dq = 0., eq = 0.;
 
    double t = 0., dt = 0.0001;

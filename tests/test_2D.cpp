@@ -368,13 +368,14 @@ int test_vel_field_1()
    double t = 0., dt = 1;
    DenseMatrix dm(dim);
 
-   hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
+   // hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
+   hydro.ComputeMeshVelocities(S, t, dt);
    cout << "Done computing mesh velocities\n";
 
    /* ************************
    Displace Velocities
    *************************** */ 
-   socketstream vis_vh, vis_vexact;
+   socketstream vis_vh, vis_vexact, vis_vcrgf, vis_ifv_exact;
    char vishost[] = "localhost";
    int visport = 19916;
 
@@ -384,12 +385,23 @@ int test_vel_field_1()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-
    hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
    hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D: Exact Velocity", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+   ParGridFunction v_CR_gf(&CRFESpace);
+   hydro.get_vcrgf(v_CR_gf);
+
+   hydrodynamics::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D: v_CR_gf", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+
+   ParGridFunction ifv_exact(&CRFESpace);
+   ifv_exact.ProjectCoefficient(v_exact_coeff);
+   hydrodynamics::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D: ifv_exact", Wx, Wy, Ww, Wh);
 
 
    /* ************************

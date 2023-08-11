@@ -1162,7 +1162,7 @@ void LagrangianLOOperator<dim>::
             // cout << "averaged cell velocities:\n";
             // Vf.Print(cout);
             double coeff = d * (Ucp[0] - Uc[0]) / F;
-            // cout << "coeff: " << coeff << endl;
+            cout << "ifv::coeff: " << coeff << endl;
             Vf.Add(coeff, n_vec);
             // cout << "n_vec:\n";
             // n_vec.Print(cout);
@@ -1256,10 +1256,10 @@ void LagrangianLOOperator<dim>::get_intermediate_face_velocity(const int & face,
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, 
-                                                               const double & t, 
-                                                               double & dt,
-                                                               const string flag, // Default NA
-                                                               void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL)
+                                                      const double & t, 
+                                                      double & dt,
+                                                      const string flag, // Default NA
+                                                      void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL)
 {
    // cout << "Compute mesh velocities\n";
    // Vector* sptr = const_cast<Vector*>(&S);
@@ -1273,8 +1273,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    if (dim > 1)
    {
       // Don't need to fill face velocities with average in dim=1
-      // fill_face_velocities_with_average(S);
-      compute_corrective_face_velocities(S, t, dt);
+      fill_face_velocities_with_average(S);
+      // compute_corrective_face_velocities(S, t, dt);
       // S.Print(cout);
 
       // Construct ti, face normals
@@ -1407,9 +1407,6 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
    double d2 = -1. * b - pm;
    d2 /= (2. * a);
 
-   cout << "d1: " << d1 << endl;
-   cout << "d2: " << d2 << endl;
-
    d = std::max(d1, d2);
    if (d <= 0.)
    {
@@ -1419,6 +1416,10 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
 
    if (d2 > 0.) { d = d2; }
    else { d = d1; }
+
+   cout << "d1: " << d1 << endl;
+   cout << "d2: " << d2 << endl;
+   cout << "d: " << d << endl;
 }
 
 
@@ -1462,6 +1463,8 @@ void LagrangianLOOperator<dim>::
             double det = Ci.Det();
             if (det <= 1.e-12)
             {
+               cout << "Negative determinant.\n";
+               assert(false);
                double _c = abs(Ci(0,0));
                _c += 1.;
                if (dt > 2. / _c)
@@ -1479,8 +1482,7 @@ void LagrangianLOOperator<dim>::
 
             cout << "trace: " << trace << ", det: " << det << ", z1: " << zero1 << ", z2: " << zero2 << endl;
 
-            // cout << "Printing Ci:\n";
-            // Ci.Print(cout);
+            /* old timestep restriction */
             if (zero1 <= 0.)
             {
                if (zero2 > 0.) // z1 0 z2
@@ -1505,6 +1507,48 @@ void LagrangianLOOperator<dim>::
                   is_dt_changed = true;
                }
             }
+
+            /* new timestep restriction */
+            // No time restriction if b < 0
+            // a = trace, b = determinant
+            // if (det >= 0.)
+            // {
+            //    if (pow(trace,2) - 4 * det > 0.)
+            //    {
+            //       // if (trace > 0) -> no timestep restriction
+            //       if (trace <= 0.)
+            //       {
+            //          if (dt > 2. * zero1)
+            //          {
+            //             cout << "timestep restricted (1)\n";
+            //             is_dt_changed = true;
+            //             dt = 2. * zero1;
+            //          }
+            //       }
+            //    }
+            //    else if (pow(trace,2) - 4 * det < 0.)
+            //    {
+            //       if (dt > 2. * zero2)
+            //       {
+            //          cout << "timestep restricted (2)\n";
+            //          is_dt_changed = true;
+            //          dt = 2. * zero2;
+            //       }
+            //    }
+            //    else
+            //    {
+            //       assert (pow(trace,2) - 4 * det == 0.);
+            //       if (trace < 0)
+            //       {
+            //          if (dt > -1. / trace)
+            //          {
+            //             cout << "timestep restricted (2)\n";
+            //             is_dt_changed = true;
+            //             dt = -1. / trace;
+            //          }
+            //       }
+            //    }
+            // }
          }
 
          compute_geo_V(node, Vgeo);
@@ -1532,7 +1576,7 @@ void LagrangianLOOperator<dim>::
          _mat.Mult(Vgeo, node_v);
          cout << "V geo: ";
          Vgeo.Print(cout);
-         cout << "node_v: ";
+         cout << "node_v for node " << node << ": ";
          node_v.Print(cout);
          break;
       }
@@ -1609,6 +1653,7 @@ void LagrangianLOOperator<dim>::RT_nodal_velocity(const int & cell, const int & 
       case 0: // corner
       {
          cout << "working on a corner entity\n";
+         cout << "cell: " << cell << endl;
          cout << "node: " << node << endl;
          // Get integration point corresponding to node location
          Array<int> verts;
@@ -2338,19 +2383,16 @@ void LagrangianLOOperator<dim>::
          for (int face_it = 0; face_it < element_face_row.Size(); face_it++)
          {
             int face = element_face_row[face_it];
-            cout << "cell: " << ci << ", face: " << face << ", face_it: " << face_it << endl;
 
             // Get intermediate face velocities corresponding to faces
             // get_intermediate_face_velocity(face, node_v);
             get_node_velocity(S, face + NVDofs_H1, node_v);
             if (face_it%2 == 0)
             {
-               cout << "adjusting the y vel\n";
                Vc[1] = Vc[1] + node_v[1];
             }
             else
             {
-               cout << "adjusting the x vel\n";
                Vc[0] = Vc[0] + node_v[0];
             }
          }

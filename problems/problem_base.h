@@ -59,7 +59,7 @@ public:
    static double specific_internal_energy(const Vector &U)
    {
       const Vector v = velocity(U);
-      const double &E   = U[dim + 1]; // specific total energy
+      const double E = U[dim + 1]; // specific total energy
       return E - 0.5 * pow(v.Norml2(), 2);
    }
 
@@ -70,9 +70,8 @@ public:
       Array<int> dofs;
       for (int i = 0; i < dim; i++)
       {
-         dofs.Append(i + 1);
+         v[i] = U[i+1];
       }
-      U.GetSubVector(dofs, v);
 
       return v;
    }
@@ -90,11 +89,11 @@ public:
       {
          in_taul = U_i[0];
          in_ul = U_i[1];
-         in_el = U_i[3];
+         in_el = U_i[dim+1];
 
          in_taur = U_j[0]; 
          in_ur = U_j[1];
-         in_er = U_j[3];
+         in_er = U_j[dim+1];
       }
       else 
       {

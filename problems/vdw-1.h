@@ -45,6 +45,9 @@ public:
    double vL = -0.475504638574729, vR = -0.121375781741349;
    double pL = 0.022084258693080, pR = 0.039073167077590;
    double sieL = 14.337916411885988, sieR = 14.560722040683306;
+   double * x_gf_sorted, * rho_d, *v_d, *p_d;
+   int vec_size = 0;
+
 
    /* Override getters */
    virtual double get_a() override { return a; }
@@ -52,6 +55,10 @@ public:
    virtual double get_gamma() override { return gamma; }
    virtual bool get_distort_mesh() override { return distort_mesh; }
    virtual bool has_exact_solution() override { return known_exact_solution; }
+   virtual void update(Vector & x_gf, double t = 0.) override {
+      cout << "Vdw!::update()\n";
+      compute_vdw_arrays(x_gf);
+   }
 
    /*********************************************************
     * Problem Description functions
@@ -83,7 +90,10 @@ public:
          }
       }
       else {
-         return 0.5; // TODO: Exact representation of sie0
+         double * result = std::find(x_gf_sorted, x_gf_sorted + vec_size, x[0]);
+         int index = std::distance(x_gf_sorted, result);
+         cout << "index: " << index << endl;
+         return rho_d[index];
       }
    }
    virtual void v0(const Vector &x, const double & t, Vector &v) override
@@ -126,27 +136,43 @@ public:
 
    void compute_vdw_arrays(Vector & x_gf)
    {
-      cout << "compute_vdw_arrays\n";
-      double in_state[2] = {rhoL, rhoR};
-      double in_data[3] = {this->get_a(), this->get_b(), this->get_gamma()};
-      double out_state[4];
-      // in_state[1] = rhoL, in_state[2] = rhoR;
-      // in_data[1] = this->get_a(), in_data[2] = this->get_b(), in_data[3] = this->get_gamma();
-      int vec_size = x_gf.Size();
-      Vector rho(vec_size), v(vec_size), p(vec_size);
-      // double _long = .15, xinit = -.5 * _long;
-      // double dx = _long / (vec_size -1);
-      // xx[0] = xinit;
-      // for (int i = 1; i < vec_size; i++)
-      // {
-      //    xx[i] = xinit + (i-1) * dx;
-      // }
-      
-      __vdw_MOD_initialize_vdw(&rhop, in_state, in_data, out_state);
-      __vdw_MOD_rho_v_p_vdw(&x0, &vec_size, x_gf.GetData(), rho.GetData(), v.GetData(), p.GetData());
-      
-      rho.Print(cout);
+      cout << "Vdw1::compute_vdw_arrays()\n";
+      // First sort x_gf
+      vec_size = x_gf.Size();
+      x_gf_sorted = x_gf.GetData();
 
+      std::sort(x_gf_sorted, x_gf_sorted + vec_size);
+
+      for (int i = 0; i < vec_size; i++)
+      {
+         cout << "x: " << x_gf_sorted[i] << endl;
+      }
+
+      // double in_state[2] = {rhoL, rhoR};
+      // double in_data[3] = {this->get_a(), this->get_b(), this->get_gamma()};
+      // double out_state[4];
+
+      Vector in_state(2), in_data(3), out_state(4);
+      in_state[0] = rhoL, in_state[1] = rhoR;
+      in_data[0] = this->get_a();
+      in_data[1] = this->get_b();
+      in_data[2] = this->get_gamma();
+      
+      Vector rho(vec_size), v(vec_size), p(vec_size);
+      
+      // Run Fortran code to compute exact solution
+      cout << "pre fortran calls\n";
+      // __vdw_MOD_initialize_vdw(&rhop, in_state, in_data, out_state);
+      __vdw_MOD_initialize_vdw(&rhop, in_state.GetData(), in_data.GetData(), out_state.GetData());
+      cout << "vdw initialized\n";
+      __vdw_MOD_rho_v_p_vdw(&x0, &vec_size, x_gf_sorted, rho.GetData(), v.GetData(), p.GetData());
+      cout << "post fortran calls\n";
+
+      // Stuff Fortran results into class to be accessed
+      rho_d = rho.GetData();
+      v_d = rho.GetData();
+      p_d = rho.GetData();
+      cout << "Done computing vdw arrays\n";
    }
 
 // private:

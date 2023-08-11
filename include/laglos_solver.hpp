@@ -135,6 +135,7 @@ public:
    void RT_int_grad(const int cell, DenseMatrix & res);
    void compute_geo_V(const int & node, Vector & res);
    void compute_geo_C(const int & node, DenseMatrix & res);
+   void get_vcrgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
    
    // Functions representing development on April 2023
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);

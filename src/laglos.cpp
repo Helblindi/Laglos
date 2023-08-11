@@ -546,6 +546,8 @@ int main(int argc, char *argv[]) {
 
       if (problem_class->has_exact_solution())
       {
+         // problem_class->update(x_gf);
+
          rho_ex->ProjectCoefficient(rho_coeff);
          vel_ex->ProjectCoefficient(v_coeff);
          ste_ex->ProjectCoefficient(ste_coeff);
@@ -713,6 +715,7 @@ int main(int argc, char *argv[]) {
 
             if (problem_class->has_exact_solution())
             {
+               problem_class->update(x_gf, t);
                if (problem == 1) // Sod
                {
                   riemann1D::ExactDensityCoefficient rho_coeff_r;
@@ -939,6 +942,7 @@ int main(int argc, char *argv[]) {
    /* When the exact solution is known, print out an error file */
    if (problem_class->has_exact_solution())
    {
+      problem_class->update(x_gf, t);
       // Compute errors
       ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
       ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());

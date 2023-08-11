@@ -46,6 +46,7 @@ public:
    virtual double get_gamma() { return gamma; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
+   virtual void update(Vector & x_gf, double t = 0.) {};
 
    // ProblemDescription
    static double internal_energy(const Vector &U)

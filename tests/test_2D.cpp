@@ -36,7 +36,7 @@ double tol = 1e-12;
 const char *mesh_file_location = "/data/ref-square.mesh";
 std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
 const char* mesh_file = result.c_str();
-int mesh_refinements = 1;
+int mesh_refinements = 5;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = false;          // Doesn't matter
 double CFL = 0.5;          // Doesn't matter
@@ -48,11 +48,6 @@ int lower_refinement = 2;
 int upper_refinement = 7;
 /* ---------------- End Parameters ---------------- */
 
-// void RT_int_grad(ParGridFunction & CR_v_gf, 
-//                  ParMesh * pmesh,   
-//                  const IntegrationRule * ir, 
-//                  const int cell, 
-//                  DenseMatrix & res);
 void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_flux();
 int test_vel_field_1();

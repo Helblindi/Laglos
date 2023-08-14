@@ -31,7 +31,7 @@ public:
     *********************************************************/
    double a = 0.;     
    double b = 0.;
-   double gamma = 0.;
+   double gamma = 7/5.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
 

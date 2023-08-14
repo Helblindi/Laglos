@@ -84,13 +84,13 @@ int main(int argc, char *argv[])
    args.Parse();
 
    int d = 0;
-   // d += test_Vi_geo();
-   // d += test_Ci_geo();
+   d += test_Vi_geo();
+   d += test_Ci_geo();
    d += test_RT_vel();
-   // d += test_RT_int_grad();
-   // d += test_RT_int_grad2();
-   // d += test_RT_int_grad_quadratic();
-   // d += test_determinant();
+   d += test_RT_int_grad();
+   d += test_RT_int_grad2();
+   d += test_RT_int_grad_quadratic();
+   d += test_determinant();
    // plot_velocities();
    // test_vel_field_1();
    // test_vel_field_2();
@@ -474,7 +474,7 @@ int test_RT_vel()
 {
    cout << "test_RT_vel\n";
    aq = 0., bq = 0., dq = 0., eq = 0.;
-   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
+   a = 1., b = 2., c = 3., d = -4., e = -5., f = -6.;
    // Initialize mesh
    mfem::Mesh *mesh;
    mesh = new mfem::Mesh(mesh_file, true, true);
@@ -488,6 +488,17 @@ int test_RT_vel()
    // Construct parmesh object
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
    delete mesh;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-TestRTvel." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
@@ -556,77 +567,131 @@ int test_RT_vel()
    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Compute intermediate face velocities
-   double t = 0.;
-   // hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.compute_intermediate_face_velocities(S, t);
-   ParGridFunction v_CR_gf(&CRFESpace), v_CR_gf_int(&CRFESpace);
+   double t = 0., error = 0.;
+   int num_exact = 0;
+
+   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   // hydro.compute_intermediate_face_velocities(S, t);
+   ParGridFunction v_CR_gf(&CRFESpace), v_CR_gf_int_el1(&CRFESpace);
    hydro.get_vcrgf(v_CR_gf);
 
    // Set integration rule for face
    cout << "setting integration rule\n";
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
    IntegrationRule IR_face = IntRules.Get(CRFESpace.GetFaceElement(0)->GetGeomType(), 2);
+   cout << "face geometry type: " << CRFESpace.GetFaceElement(0)->GetGeomType() << endl;
    cout << "num Q points: " << IR_face.GetNPoints() << endl;
    cout << "finished setting integration rule\n";
    mfem::Mesh::FaceInformation FI;
-   Vector n_int(dim), n_vec(dim), Vf(dim), val(dim), int_vel(dim), cell_int_vel(dim);
+   Vector n_int(dim), n_vec(dim), Vf(dim), val(dim), int_vel(dim), el1_int_vel(dim), el2_int_vel(dim);
+   Vector el1_error(dim), el2_error(dim);
 
    // Iterate over faces
    for (int face = 0; face < L2FESpace.GetNF(); face++) // face iterator
    {
       cout << "---face--- " << face << endl;
-      int_vel = 0.;
+      el1_int_vel = 0.;
+      el2_int_vel = 0.;
       FI = pmesh->GetFaceInformation(face);
+      hydro.CalcOutwardNormalInt(S, FI.element[0].index, face, n_int);
+      n_vec = n_int;
+      double F = n_vec.Norml2();
+
+      hydro.get_intermediate_face_velocity(face, Vf);
+      FaceElementTransformations * FEtrans = pmesh->GetFaceElementTransformations(face);
+      ElementTransformation & trans_el1 = FEtrans->GetElement1Transformation();
+
       if (FI.IsInterior()) { 
          cout << "interior face\n"; 
-         double F = n_vec.Norml2();
-         for (int i = 0; i < 2; i++)
-         {
-            cell_int_vel = 0.;
-            int cell = FI.element[i].index;
-            cout << "--cell-- " << cell << endl;
-            hydro.CalcOutwardNormalInt(S, cell, face, n_int);
-            n_vec = n_int;
-            
-            hydro.get_intermediate_face_velocity(face, Vf);
-            ElementTransformation * trans = pmesh->GetElementTransformation(cell);
-            // int cell = FI.element[0].index;
-            // Iterate over quadrature
-            for (int i = 0; i < IR_face.GetNPoints(); i++)
-            {
-               const IntegrationPoint &ip = IR_face.IntPoint(i);
-               trans->SetIntPoint(&ip);
+         
+         ElementTransformation & trans_el2 = FEtrans->GetElement2Transformation();
 
-               v_CR_gf.GetVectorValue(*trans, ip, val);
-
-               cell_int_vel.Add(ip.weight, val);
-            }
-            cout << "cell_int_vel: ";
-            cell_int_vel.Print(cout);
-            int_vel.Add(1., cell_int_vel);
-            // int_vel /= F;
-         }
-         int_vel /= 2.;
-         cout << "LHS: ";
-         int_vel.Print();
-         cout << "Vf: ";
-         Vf.Print(cout);
-         // Put face velocity into object
-         for (int i = 0; i < dim; i++)
+         // Iterate over quadrature
+         for (int j = 0; j < IR_face.GetNPoints(); j++)
          {
-            int index = face + i * pmesh->GetNumFaces();
-            v_CR_gf_int[index] = int_vel[i];
+            const IntegrationPoint &ip_f = IR_face.IntPoint(j);
+            FEtrans->SetAllIntPoints(&ip_f);
+
+            const IntegrationPoint &ip_el1 = FEtrans->GetElement1IntPoint();
+            const IntegrationPoint &ip_el2 = FEtrans->GetElement2IntPoint();
+
+            v_CR_gf.GetVectorValue(trans_el1, ip_el1, val);
+            el1_int_vel.Add(ip_f.weight, val);
+
+            v_CR_gf.GetVectorValue(trans_el2, ip_el2, val);
+            el2_int_vel.Add(ip_f.weight, val);            
          }
+         
+         // Compute face contribution to error
+         subtract(el1_int_vel, Vf, el1_error);
+         subtract(el1_int_vel, Vf, el2_error);
+         double e1 = el1_error.Norml2();
+         double e2 = el2_error.Norml2();
+
+         if (e1 < tol && e2 < tol)
+         {
+            num_exact += 1;
+         }
+         else
+         {
+            cout << "Unequal velocities:\n";
+            cout << "el1_int_vel corresponding to cell " << FI.element[0].index << ": ";
+            el1_int_vel.Print(cout);
+            cout << "el2_int_vel corresponding to cell " << FI.element[1].index << ": ";
+            el2_int_vel.Print(cout);
+            cout << "Vf: ";
+            Vf.Print(cout);
+         }
+         error += e1;
+         error += e2;
       } 
       else { 
          cout << "boundary face\n"; 
+
+         // Iterate over quadrature
+         for (int j = 0; j < IR_face.GetNPoints(); j++)
+         {
+            const IntegrationPoint &ip_f = IR_face.IntPoint(j);
+            FEtrans->SetAllIntPoints(&ip_f);
+
+            const IntegrationPoint &ip_el1 = FEtrans->GetElement1IntPoint();
+
+            v_CR_gf.GetVectorValue(trans_el1, ip_el1, val);
+            el1_int_vel.Add(ip_f.weight, val);
+         }
+         
+         // Compute face contribution to error
+         subtract(el1_int_vel, Vf, el1_error);
+         double e1 = el1_error.Norml2();
+         
+         if (e1 < tol)
+         {
+            num_exact += 1;
+         }
+         else
+         {
+            cout << "Unequal velocities:\n";
+            cout << "cell_int_velocities: ";
+            el1_int_vel.Print(cout);
+            cout << "Vf: ";
+            Vf.Print(cout);
+         }
+
+         error += e1;
       }
    }
-   Vector CR_error(v_CR_gf.Size());
-   subtract(v_CR_gf, v_CR_gf_int, CR_error);
-   cout << "norm of error: " << CR_error.Norml2() << endl;
 
-   return 0;
+   double percent_exact = (double)num_exact / (double)L2FESpace.GetNF();
+   cout << "norm of error: " << error << endl;
+   cout << "percent exact: " << percent_exact << endl;
+   if (percent_exact < 1.)
+   {
+      return 1;
+   }
+   else
+   {
+      return 0;
+   }
 }
 
 /*

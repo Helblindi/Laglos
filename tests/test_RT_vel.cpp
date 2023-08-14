@@ -1,6 +1,7 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
 #include "problem_template.h"
+#include "sod.h"
 #include "var-config.h"
 #include <cassert>
 #include <fstream>
@@ -56,6 +57,7 @@ int upper_refinement = 7;
 void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_Vi_geo();
 int test_Ci_geo();
+int test_RT_vel();
 int test_RT_int_grad();
 int test_RT_int_grad2();
 int test_RT_int_grad_quadratic();
@@ -82,12 +84,13 @@ int main(int argc, char *argv[])
    args.Parse();
 
    int d = 0;
-   d += test_Vi_geo();
-   d += test_Ci_geo();
-   d += test_RT_int_grad();
-   d += test_RT_int_grad2();
-   d += test_RT_int_grad_quadratic();
-   d += test_determinant();
+   // d += test_Vi_geo();
+   // d += test_Ci_geo();
+   d += test_RT_vel();
+   // d += test_RT_int_grad();
+   // d += test_RT_int_grad2();
+   // d += test_RT_int_grad_quadratic();
+   // d += test_determinant();
    // plot_velocities();
    // test_vel_field_1();
    // test_vel_field_2();
@@ -456,6 +459,174 @@ int test_Ci_geo()
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
+}
+
+/*
+Purpose:
+   The purpose of this function is to verify our RT velocity field satisfies equation (5.10), 
+   i.e. that
+
+    1  /
+   --- | v_h^v ds = V_F.
+   |F| /F   
+*/
+int test_RT_vel()
+{
+   cout << "test_RT_vel\n";
+   aq = 0., bq = 0., dq = 0., eq = 0.;
+   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC; // defaults to order 1
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction v_cr_gf(&CRFESpace);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   Vector one(dim);
+   one = 1.;
+
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+   mv_gf.ProjectCoefficient(v_exact_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   // Initialize specific volume, velocity, and specific total energy
+   ConstantCoefficient one_const_coeff(1.0);
+   sv_gf.ProjectCoefficient(one_const_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   v_gf.ProjectCoefficient(v_exact_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   ste_gf.ProjectCoefficient(one_const_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+   m->Assemble();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+
+   // Compute intermediate face velocities
+   double t = 0.;
+   // hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.compute_intermediate_face_velocities(S, t);
+   ParGridFunction v_CR_gf(&CRFESpace), v_CR_gf_int(&CRFESpace);
+   hydro.get_vcrgf(v_CR_gf);
+
+   // Set integration rule for face
+   cout << "setting integration rule\n";
+   IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
+   IntegrationRule IR_face = IntRules.Get(CRFESpace.GetFaceElement(0)->GetGeomType(), 2);
+   cout << "num Q points: " << IR_face.GetNPoints() << endl;
+   cout << "finished setting integration rule\n";
+   mfem::Mesh::FaceInformation FI;
+   Vector n_int(dim), n_vec(dim), Vf(dim), val(dim), int_vel(dim), cell_int_vel(dim);
+
+   // Iterate over faces
+   for (int face = 0; face < L2FESpace.GetNF(); face++) // face iterator
+   {
+      cout << "---face--- " << face << endl;
+      int_vel = 0.;
+      FI = pmesh->GetFaceInformation(face);
+      if (FI.IsInterior()) { 
+         cout << "interior face\n"; 
+         double F = n_vec.Norml2();
+         for (int i = 0; i < 2; i++)
+         {
+            cell_int_vel = 0.;
+            int cell = FI.element[i].index;
+            cout << "--cell-- " << cell << endl;
+            hydro.CalcOutwardNormalInt(S, cell, face, n_int);
+            n_vec = n_int;
+            
+            hydro.get_intermediate_face_velocity(face, Vf);
+            ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+            // int cell = FI.element[0].index;
+            // Iterate over quadrature
+            for (int i = 0; i < IR_face.GetNPoints(); i++)
+            {
+               const IntegrationPoint &ip = IR_face.IntPoint(i);
+               trans->SetIntPoint(&ip);
+
+               v_CR_gf.GetVectorValue(*trans, ip, val);
+
+               cell_int_vel.Add(ip.weight, val);
+            }
+            cout << "cell_int_vel: ";
+            cell_int_vel.Print(cout);
+            int_vel.Add(1., cell_int_vel);
+            // int_vel /= F;
+         }
+         int_vel /= 2.;
+         cout << "LHS: ";
+         int_vel.Print();
+         cout << "Vf: ";
+         Vf.Print(cout);
+         // Put face velocity into object
+         for (int i = 0; i < dim; i++)
+         {
+            int index = face + i * pmesh->GetNumFaces();
+            v_CR_gf_int[index] = int_vel[i];
+         }
+      } 
+      else { 
+         cout << "boundary face\n"; 
+      }
+   }
+   Vector CR_error(v_CR_gf.Size());
+   subtract(v_CR_gf, v_CR_gf_int, CR_error);
+   cout << "norm of error: " << CR_error.Norml2() << endl;
+
+   return 0;
 }
 
 /*

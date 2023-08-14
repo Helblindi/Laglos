@@ -39,11 +39,15 @@
 * ========================================= New .h based problem runs =========================================
 * ----- 1D -----
 * ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8
-* --- vdw ---
+*
+* * --- vdw ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis
 * ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis
 * ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis
 * ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
+*
+* ----- 2D -----
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4
 *
 */
 
@@ -52,6 +56,7 @@
 #include "compile_time_vals.h"
 #include "laglos_solver.hpp"
 #include "problem_template.h"
+#include "smooth-1d.h"
 #include "sod.h"
 #include "vdw-1.h"
 #include "vdw-2.h"
@@ -174,7 +179,7 @@ int main(int argc, char *argv[]) {
    {
       case 0:
       {
-         problem_class = new ProblemTemplate<dim>();
+         problem_class = new Smooth1D<dim>();
          break;
       }
       case 1:
@@ -962,14 +967,14 @@ int main(int argc, char *argv[]) {
 
       /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
       double rho_L1_error_n = 0.,
-            vel_L1_error_n = 0.,
-            ste_L1_error_n = 0.,
-            rho_L2_error_n = 0.,
-            vel_L2_error_n = 0.,
-            ste_L2_error_n = 0.,
-            rho_Max_error_n = 0.,
-            vel_Max_error_n = 0.,
-            ste_Max_error_n = 0.;
+             vel_L1_error_n = 0.,
+             ste_L1_error_n = 0.,
+             rho_L2_error_n = 0.,
+             vel_L2_error_n = 0.,
+             ste_L2_error_n = 0.,
+             rho_Max_error_n = 0.,
+             vel_Max_error_n = 0.,
+             ste_Max_error_n = 0.;
 
       if (problem == 1) // Sod
       {

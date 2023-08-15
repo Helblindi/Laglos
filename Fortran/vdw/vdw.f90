@@ -1,5 +1,5 @@
 MODULE vdw
-  PUBLIC :: rho_v_p_vdw, initialize_vdw, pressure_vdw
+  PUBLIC :: rho_v_p_vdw, initialize_vdw, pressure_vdw, f_add, f_test
   REAL(KIND=8), PUBLIC :: avdw, bvdw, gamma_vdw
   PUBLIC :: rhominus, c, vZ
   PRIVATE
@@ -7,21 +7,36 @@ MODULE vdw
   REAL(KIND=8) :: rhoL, vL, pL, SL, xL, rhoR, vR, pR, SR, xR
   REAL(KIND=8) :: rho_minus, p_minus, p_plus, v_minus, v_plus
 CONTAINS
+  SUBROUTINE f_test()
+    use iso_c_binding
+    write(*,*) "testing in fortran"
+  END SUBROUTINE f_test
 
-  SUBROUTINE initialize_vdw(rhop, in_state, in_data, out_state)
+  SUBROUTINE f_add(xxx,xxy,xxz) 
+    use iso_c_binding
+    real(c_double), INTENT(in) :: xxx, xxy
+    real(c_double), INTENT(out) :: xxz
+    write(*,*) "adding in fortran"
+    xxz = xxx + xxy
+  END SUBROUTINE f_add
+
+  SUBROUTINE initialize_vdw(rhop, in_a, in_b, in_gamma, in_rhoL, in_rhoR, out_vL, out_vR, out_pL, out_pR)
    !  IMPLICIT NONE
     use iso_c_binding
-    real(c_double), INTENT(in) :: rhop
-    real(c_double), INTENT(in) :: in_state(*), in_data(*)
-    real(c_double), INTENT(out) :: out_state(*)
-
+    real(KIND=8), INTENT(in) :: rhop
+    real(KIND=8), INTENT(in) :: in_a, in_b, in_gamma !in_data
+    real(KIND=8), INTENT(in) :: in_rhoL, in_rhoR !in_state
+    real(KIND=8), INTENT(out) :: out_vL, out_vR, out_pL, out_pR !out_state
+   !  real(c_double), INTENT(in) :: in_state(*), in_data(*)
+   !  real(c_double), INTENT(out) :: out_state(*)
+    write(*,*) "initialize_vdw call"
     rho_plus = rhop
-    avdw      = in_data(1)
-    bvdw      = in_data(2)
-    gamma_vdw = in_data(3)
+    avdw      = in_a
+    bvdw      = in_b
+    gamma_vdw = in_gamma
 
-    rhoL = in_state(1)
-    rhoR = in_state(2)
+    rhoL = in_rhoL
+    rhoR = in_rhoR
 
     rho_minus=rhominus(rho_plus)
     p_minus = p_pm(rho_minus)
@@ -32,14 +47,14 @@ CONTAINS
     pR = SR*(rhoR/(1-bvdw*rhoR))**gamma_vdw - avdw*rhoR**2
     v_minus = -c(rho_minus,SL)
     v_plus  = -c(rho_plus,SR)
-    VL = vZ(v_minus, rho_minus, in_state(1), SL)
-    VR = vZ(v_plus, rho_plus, in_state(2), SR)
+    VL = vZ(v_minus, rho_minus, in_rhoL, SL)
+    VR = vZ(v_plus, rho_plus, in_rhoR, SR)
     xL = vL + c(rhoL,SL)
     xR = vR + c(rhoR,SR)
-    out_state(1) = vL
-    out_state(2) = vR
-    out_state(3) = pL
-    out_state(4) = pR
+    out_vL = vL
+    out_vR = vR
+    out_pL = pL
+    out_pR = pR
     WRITE(*,*) 'avdw, bvdw, gamma_vdw', avdw, bvdw, gamma_vdw
     WRITE(*,*) 'rhominus, SL, SR', rho_minus, SL, SR
     WRITE(*,*) 'p_minus, p_plus, v_minus, v_plus', p_minus, p_plus, v_minus, v_plus

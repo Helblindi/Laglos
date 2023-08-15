@@ -116,11 +116,6 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}/")
 configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 
-# Add Fortran library
-add_library(comp_lambda_lagrangian STATIC "${PROJECT_SOURCE_DIR}/Fortran/lagrangian-mws/lagrangian_arbitrary_eos.f90")
-add_library(comp_lambda_eulerian STATIC "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/eulerian_arbitrary_eos.f90")
-add_library(vdw_fortran STATIC "${PROJECT_SOURCE_DIR}/Fortran/vdw/vdw.f90")
-
 ### Include Directories
 INCLUDE_DIRECTORIES(include problems)
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
@@ -138,10 +133,11 @@ if(NOT matplotlib_POPULATED)
 endif()
 include_directories(SYSTEM ${matplotlib_SOURCE_DIR})
 
+add_subdirectory(Fortran)
+add_subdirectory(src)
 add_subdirectory(results)
 add_subdirectory(results/convergence)
 add_subdirectory(results/convergence/temp_output)
-add_subdirectory(src)
 
 # Enable testing
 # https://cmake.org/cmake/help/latest/command/add_test.html

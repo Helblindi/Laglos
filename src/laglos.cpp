@@ -16,7 +16,7 @@
 // discretization and forward euler time-stepping.
 
 /*
-* Example run time parameters:  [Remember to change the problem in compile-time-vals.h]
+* Example run time parameters:
 *
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
 * ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
@@ -25,13 +25,8 @@
 * ./Laglos -m data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 * ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
-* 
-* -------------- 1D ----------
-* ./Laglos -m data/ref-segment.mesh -tf 6 -cfl 0.5 -ot -visc -mm -rs 10 [problem = 0, dim = 1] // Smooth 1D wave 2nd order IDP 2018 paper
-* ./Laglos -m data/ref-segment.mesh -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8 [problem = 1, dim = 1] // Sod
 *
 * -------------- 2D ----------
-* ./Laglos -m data/ref-square.mesh -tf 0.225 -cfl 0.5 -ot -mm -visc -rs 4 -vis -so [problem = 1, dim = 2] // Sod in 2D
 * ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
 * ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2] // Isentropic Vortex, stationary center
 *
@@ -492,8 +487,6 @@ int main(int argc, char *argv[]) {
    m->Assemble();
 
    cout << "GridFunctions initiated.\n";
-
-   S.Print(cout);
 
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);

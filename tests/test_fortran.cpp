@@ -98,8 +98,6 @@ void vdw1_arrays()
    pmesh->SetNodalGridFunction(&x_gf);
    x_gf.SyncAliasMemory(S);
 
-   x_gf.Print(cout);
-
-   VdwTest1<dim> * problem_class = new VdwTest1<dim>();
-   problem_class->compute_vdw_arrays(x_gf);
+   ProblemBase<dim> * problem_class = new VdwTest1<dim>();
+   problem_class->update(x_gf);
 }

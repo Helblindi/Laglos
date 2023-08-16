@@ -1,6 +1,8 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
+#include "problem_base.h"
 #include "sod.h"
+#include "smooth-1d.h"
 #include "var-config.h"
 #include <cassert>
 #include <fstream>
@@ -38,7 +40,7 @@ std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
 const char* mesh_file = result.c_str();
 int mesh_refinements = 5;
 bool use_viscosity = true; // Doesn't matter
-bool _mm = false;          // Doesn't matter
+bool _mm = true;          // Doesn't matter
 double CFL = 0.5;          // Doesn't matter
 static int num_procs = 0;
 static int myid = -1;
@@ -52,6 +54,7 @@ void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_flux();
 int test_vel_field_1();
 int test_CSV_getter_setter(); // LagrangianLOOperator::GetCellStateVector tester
+int test_sod();
 
 int main(int argc, char *argv[])
 {
@@ -74,6 +77,7 @@ int main(int argc, char *argv[])
    d += test_flux();
    d += test_vel_field_1();
    d += test_CSV_getter_setter();
+   int e = test_sod();
    return d;
 }
 
@@ -252,15 +256,15 @@ int test_flux()
 Purpose:
    To test Remark 5.3.
    This function tests a the RT computation of a continuous velocity field from a prescribed 
-   velocity field that is linear in the first component and constant in the second.
+   velocity field that is linear in the first component and 0 in the second.
 
-   v_exact = | 1 0 | |x| + |1|
-             | 0 0 | |y|   |1|
+   v_exact = | 1 0 | |x| + |0|
+             | 0 0 | |y|   |0|
 */
 int test_vel_field_1()
 {
    cout << "Test2D::test_vel_field_1\n";
-   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
+   a = 1., b = 0., c = 0., d = 0., e = 0., f = 0.;
 
    // Initialize mesh
    mfem::Mesh *mesh;
@@ -356,15 +360,18 @@ int test_vel_field_1()
 
    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
-
    cout << "Done constructing hydro op\n";
 
    Vector _vel(dim), vec_res(dim);
-   double t = 0., dt = 1;
+   double t = 0., dt = .0000001;
    DenseMatrix dm(dim);
 
-   // hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
-   hydro.ComputeMeshVelocities(S, t, dt);
+   hydro.CalculateTimestep(S);
+   dt = hydro.GetTimestep();
+   cout << "dt: " << dt << endl;
+
+   hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
+   // hydro.ComputeMeshVelocities(S, t, dt);
    cout << "Done computing mesh velocities\n";
 
    /* ************************
@@ -427,6 +434,8 @@ int test_vel_field_1()
 
    if (abs(_error) < tol)
    {
+      cout << "error: " << _error << endl;
+      cout << "passed Test2D::test_vel_field_1\n";
       return 0; // Test passed
    }
    else 
@@ -442,14 +451,13 @@ int test_vel_field_1()
 int test_CSV_getter_setter()
 {
    a = 1., b = 1., c = 1., d = 1., e = -1., f = 1.;
-   mesh_refinements = 3;
 
    // Initialize mesh
    mfem::Mesh *mesh;
    mesh = new mfem::Mesh(mesh_file, true, true);
 
    // Refine the mesh
-   for (int lev = 0; lev < mesh_refinements; lev++)
+   for (int lev = 0; lev < 3; lev++)
    {
       mesh->UniformRefinement();
    }
@@ -570,6 +578,216 @@ int test_CSV_getter_setter()
    else 
    {
       cout << "error: " << _error << endl;
+      return 1; // Test failed
+   }
+}
+
+/*
+Purpose: To understand why the Sod 2d problem is bubbling from the 2d velocity reconstruction
+*/
+int test_sod()
+{
+   cout << "Test2D::test_sod\n";
+
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-sod." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   Vector zero(dim);
+   zero = 0.;
+   VectorConstantCoefficient zero_coeff(zero);
+   mv_gf.ProjectCoefficient(zero_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   double t = 0., dt = .0000001;
+
+   // Initialize specific volume, velocity, and specific total energy
+   // Change class variables into static std::functions since virtual static member functions are not an option
+   // and Coefficient class requires std::function arguments
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> sv0_static = 
+      std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<void(const Vector &, const double, Vector &)> v0_static = 
+      std::bind(&ProblemBase<dim>::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+   std::function<double(const Vector &,const double)> ste0_static = 
+      std::bind(&ProblemBase<dim>::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> rho0_static = 
+      std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+
+   VectorFunctionCoefficient v_exact_coeff(dim, v0_static);
+
+   // Initialize specific volume, velocity, and specific total energy
+   FunctionCoefficient sv_coeff(sv0_static);
+   sv_coeff.SetTime(t);
+   sv_gf.ProjectCoefficient(sv_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   v_exact_coeff.SetTime(t);
+   v_gf.ProjectCoefficient(v_exact_coeff);
+   // Sync the data location of v_gf with its base, S
+   v_gf.SyncAliasMemory(S);
+
+   FunctionCoefficient ste_coeff(ste0_static);
+   ste_coeff.SetTime(t);
+   ste_gf.ProjectCoefficient(ste_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // PLF to build mass vector
+   FunctionCoefficient rho_coeff(rho0_static); 
+   rho_coeff.SetTime(t);
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->Assemble();
+
+   cout << "gridFunctions initiated.\n";
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+
+   cout << "Done constructing hydro op\n";
+
+   Vector _vel(dim), vec_res(dim);
+   DenseMatrix dm(dim);
+
+   hydro.CalculateTimestep(S);
+   dt = hydro.GetTimestep();
+   cout << "dt: " << dt << endl;
+
+   hydro.ComputeMeshVelocities(S, t, dt);
+   cout << "Done computing mesh velocities\n";
+
+   /* ************************
+   Displace Velocities
+   *************************** */ 
+   socketstream vis_vh, vis_vexact, vis_vcrgf, vis_ifv_exact;
+   char vishost[] = "localhost";
+   int visport = 19916;
+
+   MPI_Barrier(pmesh->GetComm());
+
+   int Wx = 0, Wy = 0;
+   const int Ww = 350, Wh = 350;
+   int offx = Ww+10, offy = Wh+45;
+
+   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D-Sod: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+
+   ParGridFunction v_exact_gf(&H1FESpace);
+   v_exact_coeff.SetTime(dt);
+   v_exact_gf.ProjectCoefficient(v_exact_coeff);
+   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D-Sod: Exact Velocity", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+   ParGridFunction v_CR_gf(&CRFESpace);
+   hydro.get_vcrgf(v_CR_gf);
+
+   hydrodynamics::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D-Sod: v_CR_gf", Wx, Wy, Ww, Wh);
+
+   Wx += offx;
+
+   ParGridFunction ifv_exact(&CRFESpace);
+   ifv_exact.ProjectCoefficient(v_exact_coeff);
+   hydrodynamics::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D-Sod: ifv_exact", Wx, Wy, Ww, Wh);
+
+
+   /* ************************
+   Move the mesh according to previously computed nodal velocities
+   *************************** */ 
+   add(x_gf, dt, mv_gf, x_gf);
+   pmesh->NewNodes(x_gf, false);
+   t += dt;
+   if (!suppress_test_output)
+   {
+      cout << "Done moving mesh.\n";
+   }
+
+
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-sod-moved." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   // Since we prescribe the exact velocity on the faces, mv_gf should be the same as v_exact
+   Vector vel_err(mv_gf.Size());
+   subtract(mv_gf, v_exact_gf, vel_err);
+   double _error = vel_err.Norml2();
+
+   if (abs(_error) < tol)
+   {
+      cout << "error: " << _error << endl;
+      cout << "passed Test2D::test_sod\n";
+      return 0; // Test passed
+   }
+   else 
+   {
+      cout << "error: " << _error << endl;
+      cout << "Failed test_sod\n";
+      cout << "error gf:\n";
+      vel_err.Print(cout);
       return 1; // Test failed
    }
 }

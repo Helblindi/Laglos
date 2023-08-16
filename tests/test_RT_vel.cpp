@@ -309,12 +309,13 @@ int test_Vi_geo()
 
    // Must compute the intermediate face velocities before computing geometric velocity
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.compute_geo_V();
 
    // Iterate across all nodes and verify exact velocity and Vigeo is the same at all the 
    // geometric vertices.
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      hydro.compute_geo_V(node_it, Vgeo);
+      hydro.get_vi_geo(node_it, Vgeo);
       hydro.get_node_velocity(S, node_it, V_ex);
 
       cout << "--- Velocities on node: " << node_it << " ---\n";
@@ -1304,7 +1305,7 @@ void plot_velocities()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction v_cr_gf(&CRFESpace);
+   
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    mv_gf.MakeRef(&H1FESpace, S, offset[1]);
    sv_gf.MakeRef(&L2FESpace, S, offset[2]);
@@ -1344,14 +1345,16 @@ void plot_velocities()
    double t = 0.;
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.compute_geo_V();
+   
+   ParGridFunction v_cr_gf(&CRFESpace);
+   ParGridFunction v_geo_gf(&H1FESpace);
+   hydro.get_vcrgf(v_cr_gf);
+   hydro.get_vgeogf(v_geo_gf);
 
-   VectorFunctionCoefficient v_CR_coeff(dim, &velocity_exact);
-   v_cr_gf.ProjectCoefficient(v_CR_coeff);
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
    ParGridFunction v_exact_gf(&H1FESpace);
-   v_exact_gf.ProjectCoefficient(v_CR_coeff);
-
-   cout << "Printing v_cr_gf:\n";
-   v_cr_gf.Print(cout);
+   v_exact_gf.ProjectCoefficient(v_exact_coeff);
 
    // Set int rule
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
@@ -1371,7 +1374,6 @@ void plot_velocities()
    ParFiniteElementSpace CRc(CRFESpace.GetParMesh(), CRFESpace.FEColl(), 1);
    const int size = CRc.GetVSize();
    cout << "Size: " << size << endl;
-   ParGridFunction vgeo_gf(&H1FESpace);
 
    cout << "Diagnostics:\n";
    cout << "CRFESpace.GetVSize(): " << CRFESpace.GetVSize() << endl;
@@ -1408,14 +1410,6 @@ void plot_velocities()
       hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
       hydro.update_node_velocity(S, node_it, vec_res);
 
-      // Also store for plotting simple the averaged geometric V
-      hydro.compute_geo_V(node_it, vec_res);
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node_it + i*H1FESpace.GetNDofs();
-         vgeo_gf[index] = vec_res[i];
-      }
-
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
       {
@@ -1434,15 +1428,15 @@ void plot_velocities()
       for (int j = 0; j < verts.Size(); j++)
       {
          int index = verts[j];
-         vel_center_x += vgeo_gf[index];
+         vel_center_x += v_geo_gf[index];
          index = verts[j] + H1FESpace.GetNDofs();
-         vel_center_y += vgeo_gf[index];
+         vel_center_y += v_geo_gf[index];
       }
       vel_center_x *= 1. / verts.Size();
       vel_center_y *= 1. / verts.Size();
 
-      vgeo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
-      vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
+      v_geo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
+      v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
    // hydro.compute_corrective_face_velocities(S, t, dt);
@@ -1572,7 +1566,7 @@ void plot_velocities()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, vgeo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
+   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, v_geo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
@@ -1664,7 +1658,7 @@ void test_vel_field_1()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction vgeo_gf(&H1FESpace);
+   ParGridFunction v_geo_gf(&H1FESpace);
    ParGridFunction v_cr_gf(&CRFESpace);
 
    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
@@ -1711,6 +1705,9 @@ void test_vel_field_1()
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
    // hydro.compute_intermediate_face_velocities(S, t);
+   hydro.compute_geo_V();
+   hydro.get_vgeogf(v_geo_gf);
+
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
@@ -1723,15 +1720,6 @@ void test_vel_field_1()
       cout << "RT v: ";
       vec_res.Print(cout);
       hydro.update_node_velocity(S, node_it, vec_res);
-
-      // Also store for plotting simple the averaged geometric V
-      hydro.compute_geo_V(node_it, vec_res);
-
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node_it + i*H1FESpace.GetNDofs();
-         vgeo_gf[index] = vec_res[i];
-      }
 
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
@@ -1751,15 +1739,15 @@ void test_vel_field_1()
       for (int j = 0; j < verts.Size(); j++)
       {
          int index = verts[j];
-         vel_center_x += vgeo_gf[index];
+         vel_center_x += v_geo_gf[index];
          index = verts[j] + H1FESpace.GetNDofs();
-         vel_center_y += vgeo_gf[index];
+         vel_center_y += v_geo_gf[index];
       }
       vel_center_x *= 1. / verts.Size();
       vel_center_y *= 1. / verts.Size();
 
-      vgeo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
-      vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
+      v_geo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
+      v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
    hydro.compute_corrective_face_velocities(S, t, dt);
@@ -1780,7 +1768,7 @@ void test_vel_field_1()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, vgeo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
+   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, v_geo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
@@ -1883,7 +1871,7 @@ void test_vel_field_2()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction vgeo_gf(&H1FESpace);
+   ParGridFunction v_geo_gf(&H1FESpace);
    ParGridFunction v_cr_gf(&CRFESpace);
 
    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
@@ -1929,6 +1917,9 @@ void test_vel_field_2()
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.compute_geo_V();
+   hydro.get_vgeogf(v_geo_gf);
+
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
@@ -1941,16 +1932,6 @@ void test_vel_field_2()
       cout << "RT v: ";
       vec_res.Print(cout);
       hydro.update_node_velocity(S, node_it, vec_res);
-
-      // Also store for plotting simple the averaged geometric V
-      hydro.compute_geo_V(node_it, vec_res);
-      cout << "Vgeo: ";
-      vec_res.Print(cout);
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node_it + i*H1FESpace.GetNDofs();
-         vgeo_gf[index] = vec_res[i];
-      }
 
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
@@ -1970,15 +1951,15 @@ void test_vel_field_2()
       for (int j = 0; j < verts.Size(); j++)
       {
          int index = verts[j];
-         vel_center_x += vgeo_gf[index];
+         vel_center_x += v_geo_gf[index];
          index = verts[j] + H1FESpace.GetNDofs();
-         vel_center_y += vgeo_gf[index];
+         vel_center_y += v_geo_gf[index];
       }
       vel_center_x *= 1. / verts.Size();
       vel_center_y *= 1. / verts.Size();
 
-      vgeo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
-      vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
+      v_geo_gf[H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_x;
+      v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
    // hydro.compute_corrective_face_velocities(S, t, dt);
@@ -1999,7 +1980,7 @@ void test_vel_field_2()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, vgeo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
+   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, v_geo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
@@ -2097,7 +2078,7 @@ void test_RT_nodal_vel()
    // Pair with corresponding gridfunctions
    // Only need position and velocity for testing
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction vgeo_gf(&H1FESpace);
+   ParGridFunction v_geo_gf(&H1FESpace);
    ParGridFunction v_cr_gf(&CRFESpace);
 
    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
@@ -2145,8 +2126,10 @@ void test_RT_nodal_vel()
    int node = 8;
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.compute_geo_V();
+   // hydro.get_vgeogf(v_geo_gf);
 
-   hydro.compute_geo_V(node, _vel);
+   hydro.get_vi_geo(node, _vel);
    hydro.compute_geo_C(node, dm);
    hydro.compute_determinant(dm, dt, d);
 

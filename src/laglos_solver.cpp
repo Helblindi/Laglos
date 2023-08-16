@@ -77,20 +77,21 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 
 template<int dim>
 LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
-                                                         ParFiniteElementSpace &l2,
-                                                         ParFiniteElementSpace &l2v,
-                                                         ParFiniteElementSpace &cr,
-                                                         ParLinearForm *m,
-                                                         ProblemBase<dim> *_pb,
-                                                         bool use_viscosity,
-                                                         bool mm, 
-                                                         double CFL) :
+                                                ParFiniteElementSpace &l2,
+                                                ParFiniteElementSpace &l2v,
+                                                ParFiniteElementSpace &cr,
+                                                ParLinearForm *m,
+                                                ProblemBase<dim> *_pb,
+                                                bool use_viscosity,
+                                                bool mm, 
+                                                double CFL) :
    H1(h1),
    L2(l2),
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
    v_CR_gf(&CR),
+   v_geo_gf(&h1),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -1284,7 +1285,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
-   compute_intermediate_face_velocities(S, t, flag, test_vel);         
+   compute_intermediate_face_velocities(S, t, flag, test_vel);  
+
+   // Compute v_geo_gf
+   compute_geo_V();
 
    compute_node_velocities(S, t, dt);
    if (dim > 1)
@@ -1560,8 +1564,7 @@ void LagrangianLOOperator<dim>::
             //    }
             // }
          }
-
-         compute_geo_V(node, Vgeo);
+         get_vi_geo(node, Vgeo);
          cout << "cnv_RT Vgeo: ";
          Vgeo.Print(cout);
 
@@ -1591,158 +1594,6 @@ void LagrangianLOOperator<dim>::
          cout << "node_v for node " << node << ": ";
          node_v.Print(cout);
          break;
-      }
-   }
-}
-
-
-/***********************************************************************************************************
-Function: RT_nodal_velocity
-Parameters:
-   cell - index corrseponding to the cell (K_c)
-   node - global index of the node to calculate the velocity on (node < H1.GetNDofs)
-   vel  - returned velocity v_h^v_K(x_i)
-Purpose:
-   The purpose of this function is to compute the Rannacher-Turek constructed velocity of a given cell
-   at a given node in the mesh.  If that node is not contained in the cell, this function will throw
-   an error.
-
-   NOTE: This function assumes dim > 1.
-   NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
-   has already been called.  If this function has not been called, then the returned velocity will be 0.
-***********************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::RT_nodal_velocity(const int & cell, const int & node, Vector &vel)
-{
-   assert(node < NDofs_H1); // "Invalid nodal index"
-   assert(cell < NDofs_L2); // "Invalid cell index"
-
-   DofEntity entity;
-   int EDof;
-   GetEntityDof(node, entity, EDof);
-
-   // Get DoFs corresponding to cell
-   Array<int> element_face_row, element_face_oris;
-   switch (dim)
-   {
-      case 1:
-      {
-         pmesh->GetElementVertices(cell, element_face_row);
-         // In 1D, "face" refers to vertex
-         break;
-      }
-      case 2: 
-      {
-         pmesh->GetElementEdges(cell, element_face_row, element_face_oris);
-         // In 2D, "face" refers to edge
-         break;
-      }
-      case 3:
-      {
-         MFEM_ABORT("3D not implemented.\n");
-         // In 3D, "face" refers to face
-         // pmesh->GetElementFaces(cell, element_face_row, element_face_oris);
-         break;
-      }
-      default:
-      {
-         MFEM_ABORT("Improper value provided.\n");
-      }
-   }
-   // element_face.GetRow(cell, element_face_row);
-   
-   int row_length = element_face_row.Size();
-
-   // cout << "element faces for cell " << cell << ": ";
-   // element_face_row.Print(cout);
-   // cout << "looking for EDof: " << EDof << endl;
-
-   // Reset velocity
-   vel = 0.;
-
-   switch (entity)
-   {
-      case 0: // corner
-      {
-         cout << "working on a corner entity\n";
-         cout << "cell: " << cell << endl;
-         cout << "node: " << node << endl;
-         // Get integration point corresponding to node location
-         Array<int> verts;
-         pmesh->GetElementVertices(cell, verts);
-
-         cout << "cell: " << cell << ", verts: \n";
-         verts.Print(cout);
-
-         IntegrationPoint test_ip;
-         if (node == verts[0]) {
-            test_ip.Set2(0., 0.);
-         } else if (node == verts[1]) {
-            test_ip.Set2(1., 0.);
-         } else if (node == verts[2]) {
-            test_ip.Set2(1., 1.);
-         } else if (node == verts[3]) {
-            test_ip.Set2(0., 1.);
-         } else { 
-            // Invalid if node is not contained in cell
-            MFEM_ABORT("Incorrect node provided.\n"); 
-         }
-
-         // Evaluate reference shape functions at integration point
-         Vector shapes(4);
-         const FiniteElement * fe = CR.GetFE(cell);
-         fe->CalcShape(test_ip, shapes);
-         cout << "shapes: ";
-         shapes.Print(cout);
-
-         // Sum over faces evaluating local velocity at vertex
-         Vector Ci(dim);
-         Ci = 0.;
-         Vector face_vel(dim);
-
-         for (int face_it = 0; face_it < row_length; face_it++)
-         {
-            int face = element_face_row[face_it];
-
-            // Get intermediate face velocities corresponding to faces
-            get_intermediate_face_velocity(face, face_vel);
-            cout << "face vel on face: " << face << endl;
-            face_vel.Print(cout);
-            cout << "shapes at face_it: " << shapes[face_it] << endl;
-            vel.Add(shapes[face_it], face_vel);
-         }
-         break;
-      }
-      case 1: // face
-      {
-         bool face_is_part_of_cell = false;
-         // Check is face is part of the provided cell
-         for (int face_it = 0; face_it < row_length; face_it++)
-         {
-            if (EDof == element_face_row[face_it])
-            {
-               face_is_part_of_cell = true;
-            }
-         }
-
-         if (!face_is_part_of_cell)
-         {
-            cout << "cell: " << cell << ", node " << node << endl;
-            MFEM_ABORT("Provided face is not adjacent to cell");
-         }
-
-         // Simply return the intermediate face velocity
-         get_intermediate_face_velocity(EDof, vel);
-         break;
-      }
-      case 2: // cell
-      {
-         MFEM_ABORT("No need to RT_Nodal velocity at cell centers.\n");
-         break;
-      }
-      default:
-      {
-         MFEM_ABORT("Invalid entity value.\n");
       }
    }
 }
@@ -1813,80 +1664,7 @@ void LagrangianLOOperator<dim>::RT_int_grad(const int cell, DenseMatrix & res)
    //    cout << "Resulting nonzero matrix:\n";
    //    res.Print(cout);
    //    assert(false);
-   // }
-   
-}
-
-/***********************************************************************************************************
-Function: compute_geo_V
-Parameters:
-   node - Index corresponding to the global node index, to include face nodes and cell center nodes.  
-          Note that we should not be computing any sort of averaged velocity at the cell centers.
-   res  - Averaged Vector resulting from the average value of the cell wise velocities of all
-          adjacent cells at the node
-Purpose:
-   Part of the process to reconstructing the continuous geometric velocity field from the discontinuous
-   RT representation.  The exact equation to be solved is given by equation (5.11).
-
-   NOTE: This function assumes dim > 1.
-
-   NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
-   has already been called.  If this function has not been called, then the returned velocity will be 0.
-***********************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::compute_geo_V(const int &node, Vector & res)
-{
-   cout << "computing Vgeo for node: " << node << endl;
-   assert(node < NDofs_H1); // "Invalid nodal index"
-   res.SetSize(dim);
-   res = 0.;
-
-   Vector temp(dim);
-   mfem::Array<int> row;
-
-   DofEntity entity;
-   int EDof;
-   GetEntityDof(node, entity, EDof);
-
-   switch (entity)
-   {
-      case 0: // corner
-      {
-         vertex_element->GetRow(EDof, row);
-         break;
-      }
-      case 1: // face
-      {
-         face_element->GetRow(EDof, row);
-         break;
-      }
-      case 2: // cell
-      {
-         MFEM_ABORT("No need to compute V_i at cell centers.\n");
-      }
-      default:
-      {
-         MFEM_ABORT("Invalid entity\n");
-      }
-   }
-
-   int row_length = row.Size();
-   for (int row_it = 0; row_it < row_length; row_it++)
-   {
-      int row_el = row[row_it];
-
-      temp = 0.;
-      RT_nodal_velocity(row_el, node, temp);
-      cout << "velocity computed on cell " << row_el << " for node " << node << ": ";
-      temp.Print(cout);
-      res.Add(1., temp);
-   }
-
-   // cout << "denom: " << denom << endl;
-   res *= 1./row_length;
-
-   cout << "resulting velocity: ";
-   res.Print(cout);
+   // }  
 }
 
 /***********************************************************************************************************
@@ -1970,6 +1748,22 @@ void LagrangianLOOperator<dim>::compute_geo_C(const int &node, DenseMatrix & res
    res *= 1./denom;
    cout << "res after dividing: \n";
    res.Print(cout);
+}
+
+/***********************************************************************************************************
+Function: compute_geo_V
+Purpose:
+   Reconstruct and average RT velocity field.  This projects the discontinuous GF from the 
+   Crouzeix-Raviart FE space onto the H1 space, filling the valies into v_geo_gf. (5.11)
+
+   NOTE: This function assumes that the function LagrangianLOOperator:compute_intermediate_face_velocities()
+   has already been called.  If this function has not been called, then the returned velocity will be 0.
+***********************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::compute_geo_V()
+{
+   VectorGridFunctionCoefficient vcr_coeff(&v_CR_gf);
+   v_geo_gf.ProjectDiscCoefficient(vcr_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);  
 }
 
 
@@ -2512,6 +2306,16 @@ void LagrangianLOOperator<dim>::get_node_velocity(const Vector &S, const int & n
       vel[i] = mv_gf[index];
    }
 }  
+
+template<int dim>
+void LagrangianLOOperator<dim>::get_vi_geo(const int & node, Vector & vel)
+{
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NDofs_H1;
+      vel[i] = v_geo_gf[index];
+   }
+}
 
 template<int dim>
 void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & node, Vector & x)

@@ -32,6 +32,7 @@ class LagrangianLOOperator
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParGridFunction v_CR_gf; // 5.7(b)
+   ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -132,11 +133,12 @@ public:
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
 
    void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
-   void RT_nodal_velocity(const int & cell, const int & node, Vector &vel);
    void RT_int_grad(const int cell, DenseMatrix & res);
-   void compute_geo_V(const int & node, Vector & res);
+   void compute_geo_V();
+   void get_vi_geo(const int & node, Vector & vel);
    void compute_geo_C(const int & node, DenseMatrix & res);
    void get_vcrgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
+   void get_vgeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    
    // Functions representing development on April 2023
    void compute_determinant(const DenseMatrix &C, const double &dt, double & d);

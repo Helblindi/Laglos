@@ -196,11 +196,12 @@ void LagrangianLOOperator<dim>::SetCFL(const double &_CFL)
 template<int dim>
 void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 {
+   cout << "CalculateTimestep\n";
    // int n = m_hpv->Size(); // NDofs_L2
    double t_min = 1.;
    double t_temp = 0;
    double mi = 0;
-   int ci = 0, cj = 0;
+   int cj = 0;
 
    Array<int> fids, oris;
    Vector c(dim), n(dim), n_int(dim);;
@@ -209,14 +210,14 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
    mfem::Mesh::FaceInformation FI;
 
-   for (; ci < NDofs_L2; ci++) // Cell iterator
+   for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
+      cout << "cell: " << ci << endl;
       temp_sum = 0.;
       mi = m_hpv->Elem(ci); // TODO
 
       GetCellStateVector(S, ci, U_i);
-      // cout << "cell state vector: \n";
-      // U_i.Print(cout);
+
       assert(mi > 0); // Assumption, equation (3.6)
 
       H1.ExchangeFaceNbrData();
@@ -241,6 +242,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
+         cout << "cell: " << ci << ", face: " << fids[j] << endl;
          CalcOutwardNormalInt(S, ci, fids[j], n_int);
          c = n_int;
          c /= 2.;
@@ -263,6 +265,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
          if (FI.IsInterior())
          {
+            cout << "interior face: " << fids[j] << endl;
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -274,11 +277,18 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
             GetCellStateVector(S, cj, U_j);
 
             // viscosity contribution
-            // cout << "\t---n:\n";
-            // n.Print(cout);
+            cout << "getting pressure\n";
             double pl = pb->pressure(U_i);
             double pr = pb->pressure(U_j);
+            cout << "pl: " << pl << ", pr: " << pr << endl;
+            cout << "Ul: ";
+            U_i.Print(cout);
+            cout << "Ur: ";
+            U_j.Print(cout);
+            cout << "computing lambda max\n";
             d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
+
+            cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
 
             temp_sum += d;
          }
@@ -286,7 +296,9 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
       
       t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
-      if (t_temp < t_min && t_temp > 1e-12) { t_min = t_temp; }
+      if (t_temp < t_min && t_temp > 1e-12) { 
+         cout << "t_min: " << t_min << ", t_temp: " << t_temp << endl;
+         t_min = t_temp; }
    } // End cell iterator
 
    this->timestep = t_min;
@@ -648,63 +660,62 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             y_temp_bdry = 0.;
 
             /* Enforce Boundary Conditions */
-            if (pb->indicator == "noh")
-            {
-               // Since we will enforce Dirichlet conditions on all boundary cells, 
-               // this enforcement will be done after the face iterator
-            }
-            else if (pb->indicator == "saltzman")
-            {
-               // Check bdry flag
-               int BdrElIndex = BdrElementIndexingArray[fids[j]];
-               int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+            // if (pb->indicator == "noh")
+            // {
+            //    // Since we will enforce Dirichlet conditions on all boundary cells, 
+            //    // this enforcement will be done after the face iterator
+            // }
+            // else if (pb->indicator == "saltzman")
+            // {
+            //    // Check bdry flag
+            //    int BdrElIndex = BdrElementIndexingArray[fids[j]];
+            //    int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
 
-               if (bdr_attribute == 1) // Dirichlet (star states "ghost")
-               {
-                  double _rho = 3.9992502342988532;
-                  double _p = 1.3334833281256551;
-                  Vector _v(dim);
-                  _v = 0.;
-                  _v[0] = 1.; //e_x
-                  Vector _v_neg = _v, _vp = _v;
-                  _v_neg *= -1.;
-                  _vp *= _p;
+            //    if (bdr_attribute == 1) // Dirichlet (star states "ghost")
+            //    {
+            //       double _rho = 3.9992502342988532;
+            //       double _p = 1.3334833281256551;
+            //       Vector _v(dim);
+            //       _v = 0.;
+            //       _v[0] = 1.; //e_x
+            //       Vector _v_neg = _v, _vp = _v;
+            //       _v_neg *= -1.;
+            //       _vp *= _p;
 
-                  DenseMatrix F_i_bdry(dim+2, dim);
-                  F_i_bdry.SetRow(0, _v_neg);
-                  for (int i = 0; i < dim; i++)
-                  {
-                     F_i_bdry(i+1, i) = _p;
-                  }
-                  F_i_bdry.SetRow(dim+1, _vp);
+            //       DenseMatrix F_i_bdry(dim+2, dim);
+            //       F_i_bdry.SetRow(0, _v_neg);
+            //       for (int i = 0; i < dim; i++)
+            //       {
+            //          F_i_bdry(i+1, i) = _p;
+            //       }
+            //       F_i_bdry.SetRow(dim+1, _vp);
 
-                  F_i_bdry.Mult(c, y_temp_bdry);
-               }
+            //       F_i_bdry.Mult(c, y_temp_bdry);
+            //    }
 
-               else if (bdr_attribute == 2) // slip
-               {
-                  // Negate velocity
-                  for (int _it = 0; _it < dim; _it++)
-                  {
-                     U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
-                  }
-                  DenseMatrix F_i_slip = pb->flux(U_i_bdry);
-                  F_i_slip.Mult(c, y_temp_bdry);
-               }
-               else
-               {
-                  cout << "invalid boundary attribute: " << bdr_attribute << endl;
-                  cout << "cell : " << ci << endl;
-                  cout << "face: " << fids[j] << endl;  
-                  y_temp *= 2.; 
-               }
+            //    else if (bdr_attribute == 2) // slip
+            //    {
+            //       // Negate velocity
+            //       for (int _it = 0; _it < dim; _it++)
+            //       {
+            //          U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
+            //       }
+            //       DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+            //       F_i_slip.Mult(c, y_temp_bdry);
+            //    }
+            //    else
+            //    {
+            //       cout << "invalid boundary attribute: " << bdr_attribute << endl;
+            //       cout << "cell : " << ci << endl;
+            //       cout << "face: " << fids[j] << endl;  
+            //       y_temp *= 2.; 
+            //    }
 
-               y_temp += y_temp_bdry;
-            }
-            else
-            {
-               y_temp *= 2.;
-            }
+            //    y_temp += y_temp_bdry;
+            // }
+            
+            y_temp *= 2.;
+            
 
             // Add in boundary contribution
             sums -= y_temp;
@@ -713,58 +724,58 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       } // End Face iterator
 
       // Enforce exact condition on boundary for Noh
-      if (pb->indicator == "noh" && is_boundary_cell)
-      {
-         // Compute cell center and corresponding velocity at this location
-         // Get center node dof
-         int cell_vdof;
-         Vector cell_x(dim);
+      // if (pb->indicator == "noh" && is_boundary_cell)
+      // {
+      //    // Compute cell center and corresponding velocity at this location
+      //    // Get center node dof
+      //    int cell_vdof;
+      //    Vector cell_x(dim);
       
-         switch (dim)
-         {
-            case 1:
-            {
-               cell_vdof = num_faces + ci;
-               break;
-            }
-            case 2:
-            {
-               cell_vdof = NVDofs_H1 + num_faces + ci;
-               break;
-            }
-            case 3:
-            {
-               MFEM_ABORT("3D not implemented.\n");
-            }
-            default:
-            {
-               MFEM_ABORT("Incorrect dim value provided.\n");
-            }
-         }
+      //    switch (dim)
+      //    {
+      //       case 1:
+      //       {
+      //          cell_vdof = num_faces + ci;
+      //          break;
+      //       }
+      //       case 2:
+      //       {
+      //          cell_vdof = NVDofs_H1 + num_faces + ci;
+      //          break;
+      //       }
+      //       case 3:
+      //       {
+      //          MFEM_ABORT("3D not implemented.\n");
+      //       }
+      //       default:
+      //       {
+      //          MFEM_ABORT("Incorrect dim value provided.\n");
+      //       }
+      //    }
 
-         get_node_position(S, cell_vdof, cell_x);
+      //    get_node_position(S, cell_vdof, cell_x);
 
-         // TODO: Fill in val with exact solution
-         val[0] = pb->rho0(cell_x, t+dt); // Is this t or t + dt?
-         Vector v_exact(dim);
-         pb->v0(cell_x, t+dt, v_exact);
-         for (int i = 0; i < dim; i++)
-         {
-            val[1 + i] = v_exact[i];
-         }
-         val[dim + 1] = pb->ste0(cell_x, t+dt);
-      }
-      else
-      {
-         // Do the normal thing
-         assert(sum_validation.Norml2() < 1e-12);
+      //    // TODO: Fill in val with exact solution
+      //    val[0] = pb->rho0(cell_x, t+dt); // Is this t or t + dt?
+      //    Vector v_exact(dim);
+      //    pb->v0(cell_x, t+dt, v_exact);
+      //    for (int i = 0; i < dim; i++)
+      //    {
+      //       val[1 + i] = v_exact[i];
+      //    }
+      //    val[dim + 1] = pb->ste0(cell_x, t+dt);
+      // }
+      // else
+      // {
+      // Do the normal thing
+      assert(sum_validation.Norml2() < 1e-12);
 
-         sums *= dt;
-         double k = pmesh->GetElementVolume(ci);
-         double _mass = k / U_i[0];
-         sums /= _mass;
-         val += sums;
-      }
+      sums *= dt;
+      double k = pmesh->GetElementVolume(ci);
+      double _mass = k / U_i[0];
+      sums /= _mass;
+      val += sums;
+      // }
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);
@@ -875,9 +886,9 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S_new,
 template<int dim>
 void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res)
 {
-   // cout << "=======================================\n"
-   //      << "  Calculating outward normal integral  \n"
-   //      << "=======================================\n";
+   cout << "=======================================\n"
+        << "  Calculating outward normal integral  \n"
+        << "=======================================\n";
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
@@ -946,8 +957,9 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
                res *= -1.;
             }
          }
-         // cout << "int n: ";
-         // res.Print(cout);
+
+         cout << "cell: " << cell << ", face: " << face << ", outwardnormint: ";
+         res.Print(cout);
 
          break;
       }
@@ -1116,6 +1128,7 @@ void LagrangianLOOperator<dim>::
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
+      cout << "ifv for face: " << face << endl;
       Vf = 0.;
       FI = pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
@@ -1127,47 +1140,51 @@ void LagrangianLOOperator<dim>::
       {
          if (FI.IsInterior())
          {
-            // cout << "\tface: " << face << ", inside cell: " << c << endl;
-            // this vector is only needed for interior faces
             GetCellStateVector(S, cp, Ucp);
 
             // Get normal, d, and |F|
             CalcOutwardNormalInt(S, c, face, n_int);
             n_vec = n_int;
-
             double F = n_vec.Norml2();
-            // cout << "n_int:";
-            // n_int.Print(cout);
-            // cout << "F: " << F << endl;
             n_vec /= F;
-            // cout << "n_vec: ";
-            // n_vec.Print(cout);
+
             assert(1. - n_vec.Norml2() < 1e-12);
             c_vec = n_int;
             c_vec /= 2.;
             double c_norm = c_vec.Norml2();
-            // cout << "c_norm: " << c_norm << endl;
-            // assert(false);
 
-            // cout << "(mm)\tn:\n";
-            // n_vec.Print(cout);
-            // d = pb->compute_lambda_max(Uc, Ucp, n_vec) * c_norm;
+            // Compute max wave speed
             double pl = pb->pressure(Uc);
             double pr = pb->pressure(Ucp);
-            d = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b()) * c_norm; 
+            double val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
+            d = val * c_norm; 
 
+            // Compute intermediate face velocity
             Vf = pb->velocity(Uc);
             Vf += pb->velocity(Ucp);
             Vf *= 0.5;
-            // cout << "averaged cell velocities:\n";
-            // Vf.Print(cout);
+
             double coeff = d * (Ucp[0] - Uc[0]) / F;
-            cout << "ifv::coeff: " << coeff << endl;
             Vf.Add(coeff, n_vec);
-            // cout << "n_vec:\n";
-            // n_vec.Print(cout);
-            // cout << "final face velocity:\n";
-            // Vf.Print(cout);
+
+            double coeff2 = val / 2.;
+            coeff2 *= (Ucp[0] - Uc[0]);
+            cout << "coeff: " << coeff << ", coeff2: " << coeff2 << endl;
+            
+            // Debugging purposes
+            if (coeff != 0.)
+            {
+               cout << "ifv::coeff: " << coeff << endl;
+               cout << "cell 1: " << c << ", pressure: " << pb->pressure(Uc) << ", density: " <<  1./Uc[0] << ", sv: " << Uc[0] << endl;
+               cout << "cell 2: " << cp << ", pressure: " << pb->pressure(Ucp) << ", density: " <<  1./Ucp[0] << ", sv: " << Ucp[0] << endl;
+               cout << "mws: " << val << ", d: " << d << endl;
+
+               cout << "F: " << F << endl;
+               cout << "n_vec:\n";
+               n_vec.Print(cout);
+               cout << "final face velocity:\n";
+               Vf.Print(cout);
+            } 
          }
          else 
          {
@@ -1261,7 +1278,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
                                                       const string flag, // Default NA
                                                       void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL)
 {
-   // cout << "Compute mesh velocities\n";
+   cout << "Compute mesh velocities\n";
    // Vector* sptr = const_cast<Vector*>(&S);
    // ParGridFunction x_gf, mv_gf;
    // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -1274,7 +1291,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    {
       // Don't need to fill face velocities with average in dim=1
       // fill_face_velocities_with_average(S);
-      compute_corrective_face_velocities(S, t, dt);
+      compute_corrective_face_velocities(S, t, dt, flag, test_vel);
       // S.Print(cout);
 
       // Construct ti, face normals
@@ -1393,7 +1410,7 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
 
    cout << "tau: " << dt / 2. << ", a: " << a << ", b: " << b << ", c: " << c << endl;
 
-   // cout << "discriminant: " << pow(b,2) - 4. * a * c << endl;
+   cout << "discriminant: " << pow(b,2) - 4. * a * c << endl;
    double pm = sqrt(pow(b,2) - 4. * a * c);
    cout << "pm: " << pm << endl;
 
@@ -1545,6 +1562,8 @@ void LagrangianLOOperator<dim>::
          }
 
          compute_geo_V(node, Vgeo);
+         cout << "cnv_RT Vgeo: ";
+         Vgeo.Print(cout);
 
          compute_determinant(Ci, dt, d);
 
@@ -1567,7 +1586,7 @@ void LagrangianLOOperator<dim>::
          _mat.Print(cout);
 
          _mat.Mult(Vgeo, node_v);
-         cout << "V geo: ";
+         cout << "cnv_RT post mult V geo: ";
          Vgeo.Print(cout);
          cout << "node_v for node " << node << ": ";
          node_v.Print(cout);
@@ -1817,6 +1836,7 @@ Purpose:
 template<int dim>
 void LagrangianLOOperator<dim>::compute_geo_V(const int &node, Vector & res)
 {
+   cout << "computing Vgeo for node: " << node << endl;
    assert(node < NDofs_H1); // "Invalid nodal index"
    res.SetSize(dim);
    res = 0.;
@@ -1857,7 +1877,7 @@ void LagrangianLOOperator<dim>::compute_geo_V(const int &node, Vector & res)
 
       temp = 0.;
       RT_nodal_velocity(row_el, node, temp);
-      cout << "velocity computed on cell " << row_el << " for node: " << node << endl;
+      cout << "velocity computed on cell " << row_el << " for node " << node << ": ";
       temp.Print(cout);
       res.Add(1., temp);
    }
@@ -1865,8 +1885,8 @@ void LagrangianLOOperator<dim>::compute_geo_V(const int &node, Vector & res)
    // cout << "denom: " << denom << endl;
    res *= 1./row_length;
 
-   // cout << "resulting velocity: ";
-   // res.Print(cout);
+   cout << "resulting velocity: ";
+   res.Print(cout);
 }
 
 /***********************************************************************************************************
@@ -2269,24 +2289,24 @@ void LagrangianLOOperator<dim>::
             MFEM_ABORT("vectors are not orthogonal!\n");
          }
 
-         // if (flag == "testing")
-         // {
-            // cout << "The coordinate location of this face is: \n";
-            // face_x.Print(cout);
-            // cout << "The computed velocity on this face is: \n";
-            // face_velocity.Print(cout);
-            // cout << "Since we shouldn't have any correction on the faces, the exact face velocity should be: \n";
-            // Vector face_v_exact(dim);
-            // test_vel(face_x, 0., face_v_exact);
-            // face_v_exact.Print(cout);
-            // Vector temp_vel(dim);
+         if (flag == "testing")
+         {
+            cout << "The coordinate location of face " << face << " is: ";
+            face_x.Print(cout);
+            cout << "The computed velocity on this face is: ";
+            face_velocity.Print(cout);
+            cout << "The exact face velocity is: ";
+            Vector face_v_exact(dim);
+            test_vel(face_x, 0., face_v_exact);
+            face_v_exact.Print(cout);
+            Vector temp_vel(dim);
             // subtract(face_v_exact, face_velocity, temp_vel);
 
             // if (temp_vel.Norml2() > 10e-6)
             // {
             //    MFEM_ABORT("Incorrect face velocity.\n");
             // }
-         // }
+         }
       } // End interior face
 
       // On the boundary, we just need the average of the adjacent 

@@ -715,29 +715,29 @@ int main(int argc, char *argv[]) {
             if (problem_class->has_exact_solution())
             {
                problem_class->update(x_gf, t);
-               if (problem == 1) // Sod
-               {
-                  riemann1D::ExactDensityCoefficient rho_coeff_r;
-                  rho_coeff_r.SetTime(t);
-                  riemann1D::ExactVelocityCoefficient v_coeff_r;
-                  v_coeff_r.SetTime(t);
-                  riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
-                  ste_coeff_r.SetTime(t);
+               // if (problem == 1) // Sod
+               // {
+               //    riemann1D::ExactDensityCoefficient rho_coeff_r;
+               //    rho_coeff_r.SetTime(t);
+               //    riemann1D::ExactVelocityCoefficient v_coeff_r;
+               //    v_coeff_r.SetTime(t);
+               //    riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
+               //    ste_coeff_r.SetTime(t);
 
-                  rho_ex->ProjectCoefficient(rho_coeff_r);
-                  vel_ex->ProjectCoefficient(v_coeff_r);
-                  ste_ex->ProjectCoefficient(ste_coeff_r);
-               }
-               else
-               {
-                  rho_coeff.SetTime(t);
-                  v_coeff.SetTime(t);
-                  ste_coeff.SetTime(t);
+               //    rho_ex->ProjectCoefficient(rho_coeff_r);
+               //    vel_ex->ProjectCoefficient(v_coeff_r);
+               //    ste_ex->ProjectCoefficient(ste_coeff_r);
+               // }
+               // else
+               // {
+               rho_coeff.SetTime(t);
+               v_coeff.SetTime(t);
+               ste_coeff.SetTime(t);
 
-                  rho_ex->ProjectCoefficient(rho_coeff);
-                  vel_ex->ProjectCoefficient(v_coeff);
-                  ste_ex->ProjectCoefficient(ste_coeff);
-               }
+               rho_ex->ProjectCoefficient(rho_coeff);
+               vel_ex->ProjectCoefficient(v_coeff);
+               ste_ex->ProjectCoefficient(ste_coeff);
+               // }
 
                ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
                rho_err -= *rho_ex;
@@ -969,55 +969,55 @@ int main(int argc, char *argv[]) {
              vel_Max_error_n = 0.,
              ste_Max_error_n = 0.;
 
-      if (problem == 1) // Sod
-      {
-         riemann1D::ExactVelocityCoefficient v_coeff_r;
-         v_coeff_r.SetTime(t);
-         riemann1D::ExactDensityCoefficient rho_coeff_r;
-         rho_coeff_r.SetTime(t);
-         riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
-         ste_coeff_r.SetTime(t);
+      // if (problem == 1) // Sod
+      // {
+      //    riemann1D::ExactVelocityCoefficient v_coeff_r;
+      //    v_coeff_r.SetTime(t);
+      //    riemann1D::ExactDensityCoefficient rho_coeff_r;
+      //    rho_coeff_r.SetTime(t);
+      //    riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
+      //    ste_coeff_r.SetTime(t);
 
-         rho_ex->ProjectCoefficient(rho_coeff_r);
-         vel_ex->ProjectCoefficient(v_coeff_r);
-         ste_ex->ProjectCoefficient(ste_coeff_r);
+      //    rho_ex->ProjectCoefficient(rho_coeff_r);
+      //    vel_ex->ProjectCoefficient(v_coeff_r);
+      //    ste_ex->ProjectCoefficient(ste_coeff_r);
 
-         /* Compute relative errors */
-         rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff_r) / rho_ex->ComputeL1Error(zero);
-         vel_L1_error_n = v_gf.ComputeL1Error(v_coeff_r) / vel_ex->ComputeL1Error(zero);
-         ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff_r) / ste_ex->ComputeL1Error(zero);
+      //    /* Compute relative errors */
+      //    rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff_r) / rho_ex->ComputeL1Error(zero);
+      //    vel_L1_error_n = v_gf.ComputeL1Error(v_coeff_r) / vel_ex->ComputeL1Error(zero);
+      //    ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff_r) / ste_ex->ComputeL1Error(zero);
 
-         rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff_r) / rho_ex->ComputeL2Error(zero);
-         vel_L2_error_n = v_gf.ComputeL2Error(v_coeff_r) / vel_ex->ComputeL2Error(zero);
-         ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff_r) / ste_ex->ComputeL2Error(zero);
+      //    rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff_r) / rho_ex->ComputeL2Error(zero);
+      //    vel_L2_error_n = v_gf.ComputeL2Error(v_coeff_r) / vel_ex->ComputeL2Error(zero);
+      //    ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff_r) / ste_ex->ComputeL2Error(zero);
 
-         rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff_r) / rho_ex->ComputeMaxError(zero);
-         vel_Max_error_n = v_gf.ComputeMaxError(v_coeff_r) / vel_ex->ComputeMaxError(zero);
-         ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff_r) / ste_ex->ComputeMaxError(zero);
-      }
-      else
-      {
-         rho_coeff.SetTime(t);
-         v_coeff.SetTime(t);
-         ste_coeff.SetTime(t);
+      //    rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff_r) / rho_ex->ComputeMaxError(zero);
+      //    vel_Max_error_n = v_gf.ComputeMaxError(v_coeff_r) / vel_ex->ComputeMaxError(zero);
+      //    ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff_r) / ste_ex->ComputeMaxError(zero);
+      // }
+      // else
+      // {
+      rho_coeff.SetTime(t);
+      v_coeff.SetTime(t);
+      ste_coeff.SetTime(t);
 
-         rho_ex->ProjectCoefficient(rho_coeff);
-         vel_ex->ProjectCoefficient(v_coeff);
-         ste_ex->ProjectCoefficient(ste_coeff);
+      rho_ex->ProjectCoefficient(rho_coeff);
+      vel_ex->ProjectCoefficient(v_coeff);
+      ste_ex->ProjectCoefficient(ste_coeff);
 
-         /* Compute relative errors */
-         rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff) / rho_ex->ComputeL1Error(zero);
-         vel_L1_error_n = v_gf.ComputeL1Error(v_coeff) / vel_ex->ComputeL1Error(zero);
-         ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff) / ste_ex->ComputeL1Error(zero);
+      /* Compute relative errors */
+      rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff) / rho_ex->ComputeL1Error(zero);
+      vel_L1_error_n = v_gf.ComputeL1Error(v_coeff) / vel_ex->ComputeL1Error(zero);
+      ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff) / ste_ex->ComputeL1Error(zero);
 
-         rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff) / rho_ex->ComputeL2Error(zero);
-         vel_L2_error_n = v_gf.ComputeL2Error(v_coeff) / vel_ex->ComputeL2Error(zero);
-         ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff) / ste_ex->ComputeL2Error(zero);
+      rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff) / rho_ex->ComputeL2Error(zero);
+      vel_L2_error_n = v_gf.ComputeL2Error(v_coeff) / vel_ex->ComputeL2Error(zero);
+      ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff) / ste_ex->ComputeL2Error(zero);
 
-         rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex->ComputeMaxError(zero);
-         vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
-         ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
-      }
+      rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex->ComputeMaxError(zero);
+      vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
+      ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
+      // }
       /* Get composite errors values */
       const double L1_error = rho_L1_error_n + vel_L1_error_n + ste_L1_error_n;
       const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;

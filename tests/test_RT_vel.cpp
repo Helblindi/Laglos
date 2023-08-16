@@ -65,6 +65,7 @@ int test_determinant();
 void plot_velocities();
 void test_vel_field_1();
 void test_vel_field_2();
+void test_RT_nodal_vel(); // Testing
 
 int main(int argc, char *argv[])
 {
@@ -92,8 +93,9 @@ int main(int argc, char *argv[])
    d += test_RT_int_grad_quadratic();
    d += test_determinant();
    // plot_velocities();
-   // test_vel_field_1();
+   test_vel_field_1();
    // test_vel_field_2();
+   test_RT_nodal_vel();
 
    return d;
 }
@@ -436,8 +438,7 @@ int test_Ci_geo()
    // Must compute the intermediate face velocities before computing geometric velocity
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
 
-   // Iterate across all nodes and verify exact velocity and Vigeo is the same at all the 
-   // geometric vertices.
+   // Iterate across all nodes and verify Cigeo is the same at all the geometric vertices.
    hydro.compute_geo_C(0, Cgeo_0);
    for (int node_it = 1; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
@@ -445,6 +446,7 @@ int test_Ci_geo()
       Add(Cgeo, Cgeo_0, -1., C_error);
       _error += C_error.FNorm();
 
+      cout << "error on node: " << _error << endl;
       cout << "--- Ci on node: " << node_it << " ---\n";
       Cgeo.Print(cout);
    }
@@ -833,7 +835,7 @@ Purpose:
 */
 int test_RT_int_grad2()
 {
-   cout << "Testing RT_int_grad function\n";
+   cout << "Testing RT_int_grad2 function\n";
    // Ensure there is no quadratic component to the velocity field
    aq = 0., bq = 0., dq = 0., eq = 0.;
    a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
@@ -1395,7 +1397,7 @@ void plot_velocities()
    DenseMatrix res(dim);
 
    Vector x(dim), vec_res(dim);
-   double dt = 1.;
+   double dt = .001;
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
@@ -1603,7 +1605,7 @@ Purpose:
 */
 void test_vel_field_1()
 {
-   a = 5., b = 0., c = 1., d = 0., e = 3., f = 1.;
+   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
    aq = 0., bq = 0., dq = 0., eq = 0.;
 
    double t = 0., dt = 0.0001;
@@ -1689,7 +1691,7 @@ void test_vel_field_1()
    sv_gf.ProjectCoefficient(one_const_coeff);
    sv_gf.SyncAliasMemory(S);
 
-   v_gf.ProjectCoefficient(one_coeff);
+   v_gf.ProjectCoefficient(v_exact_coeff);
    v_gf.SyncAliasMemory(S);
 
    ste_gf.ProjectCoefficient(one_const_coeff);
@@ -1700,7 +1702,7 @@ void test_vel_field_1()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
@@ -1708,6 +1710,7 @@ void test_vel_field_1()
    DenseMatrix dm(dim);
 
    hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   // hydro.compute_intermediate_face_velocities(S, t);
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
@@ -1723,8 +1726,7 @@ void test_vel_field_1()
 
       // Also store for plotting simple the averaged geometric V
       hydro.compute_geo_V(node_it, vec_res);
-      cout << "Vgeo: ";
-      vec_res.Print(cout);
+
       for (int i = 0; i < dim; i++)
       {
          int index = node_it + i*H1FESpace.GetNDofs();
@@ -1760,8 +1762,8 @@ void test_vel_field_1()
       vgeo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
-   // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.fill_face_velocities_with_average(S);
+   hydro.compute_corrective_face_velocities(S, t, dt);
+   // hydro.fill_face_velocities_with_average(S);
    hydro.fill_center_velocities_with_average(S);
 
    /* ************************
@@ -2028,4 +2030,148 @@ void test_vel_field_2()
       omesh.precision(precision);
       pmesh->Print(omesh);
    }
+}
+
+/*
+RT velocity construction test space.  Has no bearing on if the CTest fails or not.
+*/
+void test_RT_nodal_vel()
+{
+   cout << "Testing RT nodal vel\n";
+   aq = 0., bq = 0., dq = 0., eq = 0.;
+   a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
+
+   double t = 0.;
+
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-TestVel1." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction vgeo_gf(&H1FESpace);
+   ParGridFunction v_cr_gf(&CRFESpace);
+
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+   ParGridFunction v_exact_gf(&H1FESpace);
+   v_exact_gf.ProjectCoefficient(v_exact_coeff);
+
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   Vector one(dim);
+   one = 1.;
+   VectorConstantCoefficient one_coeff(one);
+   mv_gf.ProjectCoefficient(one_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   // Initialize specific volume, velocity, and specific total energy
+   ConstantCoefficient one_const_coeff(1.0);
+   sv_gf.ProjectCoefficient(one_const_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   v_gf.ProjectCoefficient(v_exact_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   ste_gf.ProjectCoefficient(one_const_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+   m->Assemble();
+
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+
+   Vector _vel(dim), vec_res(dim), node_v(dim);
+   DenseMatrix dm(dim);
+   double d = 0, dt = .0001;
+   int node = 8;
+
+   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+
+   hydro.compute_geo_V(node, _vel);
+   hydro.compute_geo_C(node, dm);
+   hydro.compute_determinant(dm, dt, d);
+
+   // Compute V_i^n
+   DenseMatrix _mat(dm);
+   _mat *= - dt / 2.;
+   for (int i = 0; i < dim; i++)
+   {
+      _mat(i,i) += d;
+   }
+
+   cout << "det: " << d << endl;
+   cout << "Ci: ";
+   dm.Print(cout);
+   cout << "Pre inverse: \n";
+   _mat.Print(cout);
+
+   _mat.Invert();
+   cout << "Inverse: \n";
+   _mat.Print(cout);
+
+   _mat.Mult(_vel, node_v);
+   cout << "V geo: ";
+   _vel.Print(cout);
+   cout << "node_v for node " << node << ": ";
+   node_v.Print(cout);
+
 }

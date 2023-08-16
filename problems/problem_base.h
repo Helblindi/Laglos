@@ -125,6 +125,9 @@ public:
       //    &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
       //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
 
+      cout << "ProblemBase: pre fortran call:\n";
+      cout << "in_rhol: " << in_rhol << ", in_ul: " << in_ul << ", in_el: " << in_el << ", in_pl: " << in_pl << endl;
+      cout << "in_rhor: " << in_rhor << ", in_ur: " << in_ur << ", in_er: " << in_er << ", in_pr: " << in_pr << endl;
       __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
          &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k, &b_covolume);
@@ -144,12 +147,12 @@ public:
          MFEM_ABORT("NaN values returned by lambda max computation!\n");
       }
 
-      // cout << "nij:\n";
-      // n_ij.Print(cout);
-      // cout << "b: " << b_covolume << endl;
-      // cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[2] << ", p: " << in_pl << endl;
-      // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[2] << ", p: " << in_pl << endl;
-      // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
+      cout << "nij:\n";
+      n_ij.Print(cout);
+      cout << "b: " << b_covolume << endl;
+      cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[dim+1] << ", p: " << in_pl << endl;
+      cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[dim+1] << ", p: " << in_pr << endl;
+      cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
       return d;
    }

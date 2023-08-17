@@ -1322,7 +1322,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
             temp_sum += n[0] * Vf[0];
          }
          val += (dt / k) * temp_sum;
-         // cout << "val: " << val << endl;
          assert(val > 0.);
       }
    }
@@ -1746,7 +1745,7 @@ void LagrangianLOOperator<dim>::compute_geo_C(const int &node, DenseMatrix & res
    cout << "res before dividing: \n";
    res.Print(cout);
    res *= 1./denom;
-   cout << "res after dividing: \n";
+   cout << "Ci for node " << node << ": \n";
    res.Print(cout);
 }
 

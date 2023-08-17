@@ -64,17 +64,27 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
    while (connection_failed);
 }
 
-// TODO: Create basic object instantiation
-// template<int dim>
-// LagrangianLOOperator<dim>::LagrangianLOOperator() :
-//    H1(new FiniteElementSpace()),
-//    use_viscosity(true),
-//    mm(true),
-//    CFL(1.)
-// {
 
-// }
-
+/****************************************************************************************************
+* Function: Constructor
+* Parameters:
+*  h1            - ParFiniteElementSpace to be used for the mesh motion.  The node corresponding to
+*                  the cell center is an averaged valued computed in fill_center_velocities_with_average
+*  l2            - ParFiniteElementSpace to be used for the hydrodynamics variables.  We use a DG0
+*                  approximation in this code.
+*  l2v           - ParFiniteElementSpace for the velocity component.
+*  cr            - ParFiniteElementSpace to assist with the mesh velocity reconstruction.  This object
+*                  holds the intermediate face velocity object computed in equation (5.7) of the paper.
+*  m             - ParLinearForm containing the initial density of each cell to be used to compute the
+*                  initial cell mass, which is guaranteed to be conserved locally.
+*  _pb           - ProblemBase class containing problem specific functions and quantities.
+* Options:
+*  use_viscosity - Boolean for the optional addition of viscosity to ensure our method is IDP.
+*  mm            - Boolean to allow for mesh motion to guarantee local conservation of mass.
+*  CFL           - Double representing our time step restriction.
+*
+* Purpose: Instantiate LagrangianLOOperator class.
+****************************************************************************************************/
 template<int dim>
 LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                 ParFiniteElementSpace &l2,
@@ -141,8 +151,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
-   // cout << "Initial mass vector:\n";
-   // m_hpv->Vector::Print(std::cout);
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
@@ -182,18 +190,19 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
    // delete pmesh, m_lf, m_hpv;
 }
 
-template<int dim>
-double LagrangianLOOperator<dim>::GetCFL()
-{
-   return this->CFL;
-}
 
-template<int dim>
-void LagrangianLOOperator<dim>::SetCFL(const double &_CFL)
-{
-   this->CFL = _CFL;
-}
-
+/****************************************************************************************************
+* Function: CalculateTimestep
+* Parameters:
+*  S - BlockVector that stores mesh information, mesh velocity, and state variables.
+*
+* Purpose:
+*  Computes the maximum time step that can be taken under the CFL condition given in section 4.4:
+*           dt * Sum_{c' \in J^*(c)} \frac{d_cc'}{mcrho} \leq \frac{CFL}{2} \forall c.
+*
+*  This is accomplished by iterative over each cell and computing the corresponding max dt, then 
+*  a minimum of the current dt, and the computed restriction.
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 {
@@ -305,18 +314,6 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
    this->timestep = t_min;
 }
 
-template<int dim>
-double LagrangianLOOperator<dim>::GetTimestep()
-{
-   return timestep;
-}
-
-template<int dim>
-double LagrangianLOOperator<dim>::GetTimeStepEstimate(const Vector &S)
-{
-   // Todo: implement parallelized time step estimator here.
-   return 0.001;
-}
 
 /****************************************************************************************************
 * Function: GetEntityDof
@@ -385,47 +382,15 @@ void LagrangianLOOperator<dim>::GetEntityDof(const int GDof, DofEntity & entity,
    }
 }
 
-template<int dim>
-void LagrangianLOOperator<dim>::IterateOverCells()
-{
-   cout << "-----Iterating over cells-----\n";
-   Array<int> fids, fids2, oris, oris2;
-   Array<int> verts;
 
-   int ci = 0, cj = 0;
-   double d = 0., c_norm = 0.;
-
-   mfem::Mesh::FaceInformation FI;
-
-   /* Preliminary info */
-   cout << "GetNE: " << pmesh->GetNE() << endl;
-   cout << "GetNBE: " << pmesh->GetNBE() << endl;
-   cout << "GetNEdges: " << pmesh->GetNEdges() << endl;
-   cout << "GetNumFaces: " << pmesh->GetNumFaces() << endl;
-   
-   for (; ci < NDofs_L2; ci++) // cell iterator
-   {
-      cout << "We are on cell: " << ci << endl;
-
-      pmesh->GetElementEdges(ci, fids, oris);
-
-      // iterate over first fids
-      for (int j=0; j < fids.Size(); j++)
-      {
-         cout << "############ fids(" << j << "): " << fids[j] << endl;
-         pmesh->GetEdgeVertices(fids[j], verts);
-         for (int k=0; k < verts.Size(); k++)
-         {
-            cout << "Verts(" << k << "): " << verts[k] << endl;
-         }
-      }
-      // for (int j=0; j < fids2.Size(); j++)
-      // {
-      //    cout << "############ fids2(" << j << "): " << fids2[j] << endl;
-      // }
-   }
-}
-
+/****************************************************************************************************
+* Function: CreateBdrElementIndexingArray
+*  
+* Purpose: 
+*  To fill the Vector BdrElementIndexingArray of size NumFaces. If a face is a boundary face, then
+*  BdrElementIndexingArray[face] = 1, and if the face is an interior face, then we will have
+*  BdrElementIndexingArray[face] = -1.
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 {
@@ -438,12 +403,19 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
    }
 }
 
+
+/****************************************************************************************************
+* Function: CreateBdrVertexIndexingArray
+*
+* Purpose: 
+*  To fill the Vector CreateBdrVertexIndexingArray of size Numvertices. If a vertex is a boundary vertex, 
+*  then CreateBdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
+*  have CreateBdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
+*  grab edges, and fill in the corresponding boundary attribute for the adjacent vertices
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 {
-   // cout << "Creating boundary vertex indexing array.\n";
-   // Iterate over boundary elements, grab edges, and fill in the corresponding
-   // boundary attribute for the adjacent vertices
    // 3DTODO: Will need to modify this for faces instead of edges
    Array<int> fids, oris;
    Array<int> verts;
@@ -483,6 +455,13 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
    } // end boundary elements
 }
 
+
+/****************************************************************************************************
+* Function: IsBdrVertex
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 bool LagrangianLOOperator<dim>::IsBdrVertex(const int & node)
 {
@@ -786,6 +765,12 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, 
                                               const int cell, 
@@ -823,6 +808,13 @@ void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S,
    U[dim+1] = ste_gf.Elem(cell);
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S_new,
                                               const int cell,
@@ -976,9 +968,8 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 }
 
 
-/*
+/****************************************************************************************************
 * Function: Orthogonal
-*
 * Parameters:
 *     v - Vector to be rotated
 *
@@ -987,7 +978,7 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 *
 * Example:
 *  (0,-1) ---> (1,0)
-*/
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
 {
@@ -1111,6 +1102,13 @@ void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
 //    }
 // }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
    compute_intermediate_face_velocities(const Vector &S,
@@ -1240,6 +1238,12 @@ void LagrangianLOOperator<dim>::
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_intermediate_face_velocity(const int & face, Vector & vel)
 {
@@ -1329,6 +1333,12 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 {
@@ -1349,6 +1359,13 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
    return num / denom;
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
 {
@@ -1380,6 +1397,12 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)
 {
@@ -1394,6 +1417,12 @@ void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, Den
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 // Assumes dt, not dt/2 is passed in
 template<int dim>
 void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
@@ -1437,13 +1466,13 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
 }
 
 
-/*
-Function: compute_node_velocity_RT
-Parameters:
-   dt       - Timestep
-Purpose:
-
-*/
+/****************************************************************************************************
+* Function: compute_node_velocity_RT
+* Parameters:
+*  dt - timestep
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
    compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
@@ -1803,7 +1832,7 @@ void LagrangianLOOperator<dim>::
 }
 
 
-/*
+/***********************************************************************************************************
 Function: compute_corrective_face_velocities
 Parameters:
    S        - BlockVector representing FiniteElement information
@@ -1815,7 +1844,7 @@ Purpose:
    This function computes the node velocities on the faces which
    are designed to bubble in the direction of the normal vector 
    to conserve mass locally.
-*/
+***********************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
    compute_corrective_face_velocities(Vector &S, const double & t, const double & dt,
@@ -2133,6 +2162,12 @@ void LagrangianLOOperator<dim>::
 }
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
    fill_center_velocities_with_average(Vector &S,
@@ -2215,6 +2250,13 @@ void LagrangianLOOperator<dim>::
    }
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::fill_face_velocities_with_average(Vector &S, const string flag, void (*test_vel)(const Vector&, const double&, Vector&))
 {
@@ -2292,6 +2334,13 @@ void LagrangianLOOperator<dim>::update_node_velocity(Vector &S, const int & node
    }
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_node_velocity(const Vector &S, const int & node, Vector & vel)
 {
@@ -2306,6 +2355,13 @@ void LagrangianLOOperator<dim>::get_node_velocity(const Vector &S, const int & n
    }
 }  
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_vi_geo(const int & node, Vector & vel)
 {
@@ -2316,6 +2372,13 @@ void LagrangianLOOperator<dim>::get_vi_geo(const int & node, Vector & vel)
    }
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & node, Vector & x)
 {
@@ -2335,6 +2398,13 @@ void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & n
    }
 }
 
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix)
 {
@@ -2395,6 +2465,12 @@ template class LagrangianLOOperator<3>;
 } // end ns hydrodynamics
 
 
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
 double fRand(double fMin, double fMax)
 {
     double f = (double)rand() / RAND_MAX;
@@ -2402,11 +2478,12 @@ double fRand(double fMin, double fMax)
 }
 
 
-/*
+/****************************************************************************************************
+* Function: 
+* Parameters:
 *
-* Initial Conditions
-*
-*/
+* Purpose:
+****************************************************************************************************/
 void random_mesh_v(const Vector &x, Vector &res)
 {
    const double r_max = 1.;

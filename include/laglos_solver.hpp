@@ -90,13 +90,11 @@ public:
                         double CFL);
    ~LagrangianLOOperator();
 
-   double GetCFL();
+   double GetCFL() { return this->CFL; }
+   double GetTimestep() { return timestep; }
+   void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
-
-   void SetCFL(const double &_CFL); // STOPPED HERE.
-
-   void IterateOverCells(); // TODO: Delete
 
    void CreateBdrElementIndexingArray();
 
@@ -108,11 +106,7 @@ public:
 
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
-   double GetTimeStepEstimate(const Vector &S);
-
    void CalculateTimestep(const Vector &S);
-
-   double GetTimestep();
 
    void GetCellStateVector(const Vector &S, const int cell, Vector &U);
 

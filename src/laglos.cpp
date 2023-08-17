@@ -293,7 +293,6 @@ int main(int argc, char *argv[]) {
    // - L2 (Q0, discontinuous) for state variables
    // - CR/RT for mesh reconstruction at nodes
    H1_FECollection H1FEC(order_mv, dim);
-   // H1Ser_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 

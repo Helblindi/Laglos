@@ -45,6 +45,7 @@
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4
 *
 */
+#include "lambda_max_lagrange.h"
 
 #include "mfem.hpp"
 #include "var-config.h"

@@ -33,7 +33,10 @@
 *
 * ========================================= New .h based problem runs =========================================
 * ----- 1D -----
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 8
+* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 8     ## Smooth
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.25 -ot -visc -mm -vis -rs 8  ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -vis -rs 8    ## Lax
+# ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
 *
 * * --- vdw ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis
@@ -42,6 +45,7 @@
 * ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
 *
 * ----- 2D -----
+* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4
 *
 */
@@ -167,12 +171,21 @@ int main(int argc, char *argv[]) {
    {
       case 0:
       {
-         problem_class = new Smooth1D<dim>();
+         problem_class = new SmoothWave<dim>();
          break;
       }
       case 1:
       {
          problem_class = new SodProblem<dim>();
+         break;
+      }
+      case 2: // Lax
+      {
+         problem_class = new LaxProblem<dim>();
+         break;
+      }
+      case 3: // Leblanc
+      {
          break;
       }
       case 8:
@@ -195,8 +208,6 @@ int main(int argc, char *argv[]) {
          problem_class = new VdwTest4<dim>();
          break;
       }
-      case 2:
-      case 3:
       case 4:
       case 5:
       case 6:

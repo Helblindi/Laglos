@@ -6,7 +6,8 @@
 *  2) Modify problem specific constants a, b, gamma
 *  3) Override pressure function
 *  4) Specify initial conditions given by rho0, v0, and sie0
-*  5) Add corresponding problem option to laglos.cpp #TODO WIP
+*  5) Add corresponding problem option to laglos.cpp
+*  6) Add to include header file problems/test_problems_include.h
 *********************************************************/
 
 

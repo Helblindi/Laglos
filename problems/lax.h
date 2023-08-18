@@ -6,13 +6,13 @@
 *  2) Modify problem specific constants a, b, gamma
 *  3) Override pressure function
 *  4) Specify initial conditions given by rho0, v0, and sie0
-*  5) Add corresponding problem option to laglos.cpp #TODO WIP
+*  5) Add corresponding problem option to laglos.cpp 
+*  6) Add to include header file problems/test_problems_include.h
 *********************************************************/
 
 
 #include "mfem.hpp"
 #include "problem_base.h"
-#include "riemann1D.hpp"
 #include <cmath>
 
 using namespace mfem;
@@ -24,7 +24,7 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class SodProblem: public ProblemBase<dim>
+class LaxProblem: public ProblemBase<dim>
 {
 public:
    /*********************************************************
@@ -36,7 +36,7 @@ public:
    bool distort_mesh = false;
    bool known_exact_solution = true;
 
-   double rhoL = 1.0, rhoR = 0.125, pL = 1.0, pR = 0.1, vL = 0., vR = 0.;
+   double rhoL = 0.445, rhoR = 0.5, pL = 3.528, pR = 0.571, vL = 0.698, vR = 0.;
    double x_center = 0.5;
 
    /* Override getters */
@@ -49,17 +49,11 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U) override
+   virtual double pressure(const Vector &U) override
    {
-      // Initial
-      // _pL = 1.0;
-      // _pR= 0.1;
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
 
-   /*********************************************************
-    * Problem Description functions
-    *********************************************************/
    double pressure(const Vector &x, const double & t)
    {
       if (t < 1e-12)
@@ -71,7 +65,7 @@ public:
          double params[8];
          params[0] = rhoL; params[3] = rhoR; // rho
          params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
+         params[2] = vL; params[5] = vR;         // u
          params[6] = this->get_gamma();      // gamma
          params[7] = x_center;               // x_center
          riemann1D::init(params);
@@ -85,7 +79,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   double rho0(const Vector &x, const double & t) override
+   virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1e-12)
       {
@@ -107,7 +101,7 @@ public:
          double params[8];
          params[0] = rhoL; params[3] = rhoR; // rho
          params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
+         params[2] = vL; params[5] = vR;         // u
          params[6] = this->get_gamma();      // gamma
          params[7] = x_center;               // x_center
          riemann1D::init(params);
@@ -117,18 +111,24 @@ public:
          return riemann1D::rho(p);
       }
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       if (t < 1e-12)
       {
-         v = vL;
+         
+         if (x(0) < x_center){
+            v[0] = vL;
+         } else
+         {
+            v[0] = vR;
+         }
       }
       else
       {
          double params[8];
          params[0] = rhoL; params[3] = rhoR; // rho
          params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
+         params[2] = vL; params[5] = vR;         // u
          params[6] = this->get_gamma();      // gamma
          params[7] = x_center;               // x_center
          riemann1D::init(params);
@@ -139,8 +139,7 @@ public:
       }
       return;
    }
-
-   double sie0(const Vector &x, const double & t) override
+   virtual double sie0(const Vector &x, const double & t) override
    {
       return (x(0) < x_center) ? pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
                         : pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);

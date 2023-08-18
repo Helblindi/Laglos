@@ -36,7 +36,7 @@
 * ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 8     ## Smooth
 * ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.25 -ot -visc -mm -vis -rs 8  ## Sod
 * ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -vis -rs 8    ## Lax
-# ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
+# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
 *
 * * --- vdw ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis
@@ -186,6 +186,7 @@ int main(int argc, char *argv[]) {
       }
       case 3: // Leblanc
       {
+         problem_class = new LeblancProblem<dim>();
          break;
       }
       case 8:
@@ -657,7 +658,7 @@ int main(int argc, char *argv[]) {
             // restore cout stream buffer
             cout.rdbuf(strm_buffer);
          }
-         cout << "Current time: " << t << endl;
+
          double lnorm = ste_gf * ste_gf, norm;
          MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
  

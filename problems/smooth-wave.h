@@ -22,7 +22,7 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class Smooth1D: public ProblemBase<dim>
+class SmoothWave: public ProblemBase<dim>
 {
 public:
    /*********************************************************
@@ -55,7 +55,6 @@ public:
     *********************************************************/
    virtual double rho0(const Vector &x, const double & t) override
    {
-      assert(dim == 1);
       double x0 = 0.1, x1 = 0.3;
       if (x0 <= x[0] - t && x[0] - t < x1)
       {
@@ -69,8 +68,7 @@ public:
    }
    virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
-      assert(dim==1);
-      v = 1.;
+      v[0] = 1.;
       return;
    }
    virtual double sie0(const Vector &x, const double & t) override

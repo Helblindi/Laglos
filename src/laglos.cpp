@@ -46,19 +46,11 @@
 *
 */
 #include "lambda_max_lagrange.h"
-
 #include "mfem.hpp"
 #include "var-config.h"
 #include "compile_time_vals.h"
 #include "laglos_solver.hpp"
-#include "problem_template.h"
-#include "smooth-1d.h"
-#include "sod.h"
-#include "vdw-1.h"
-#include "vdw-2.h"
-#include "vdw-3.h"
-#include "vdw-4.h"
-// #include "initial_vals.hpp"
+#include "test_problems_include.h"
 #include "riemann1D.hpp"
 #include <iostream>
 #include <fstream>

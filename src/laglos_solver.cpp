@@ -5,9 +5,6 @@
 namespace mfem
 {
 
-double fRand(double fMin, double fMax);
-void random_mesh_v(const Vector &x, Vector &res);
-
 namespace hydrodynamics
 {
 
@@ -457,23 +454,6 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 
 
 /****************************************************************************************************
-* Function: IsBdrVertex
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
-template<int dim>
-bool LagrangianLOOperator<dim>::IsBdrVertex(const int & node)
-{
-   if (BdrVertexIndexingArray[node] == -1)
-   {
-      return false;
-   }
-   return true;
-}
-
-
-/****************************************************************************************************
 * Function: MakeTimeStep
 * Parameters:
 *     S  - BlockVector that stores mesh information, mesh velocity, and state variables.
@@ -483,8 +463,7 @@ bool LagrangianLOOperator<dim>::IsBdrVertex(const int & node)
 * Purpose:
 *     This function first computes the new state variables at the (n+1)th timestep, then
 *     computes the mesh motion and moves the mesh accordingly.  Finally, we check mass
-*     conservation to ensure this is preserved locally.
-*     
+*     conservation to ensure this is preserved locally.   
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double & dt)
@@ -766,15 +745,18 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
 
 /****************************************************************************************************
-* Function: 
+* Function: GetCellStateVector
 * Parameters:
+*  S    - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  cell - Index representing the cell
+*  U    - Returned vector contained the hydrodynamic state variables
 *
 * Purpose:
+*  Given a cell, return the hydrodynamic state variables of that cell, i.e. in vector for get
+*  (specific volume, velocity, specific total energy)
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, 
-                                              const int cell, 
-                                              Vector &U)
+void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, const int cell, Vector &U)
 {
    U.SetSize(dim + 2);
 
@@ -810,15 +792,18 @@ void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S,
 
 
 /****************************************************************************************************
-* Function: 
+* Function: SetCellStateVector
 * Parameters:
+*  S    - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  cell - Index representing the cell
+*  U    - Vector containing state variables to be put into BlockVector object S.
 *
 * Purpose:
+*  This function is used to update the BlockVector S with the newly computed hydrodynamic state
+*  variables on the given cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S_new,
-                                              const int cell,
-                                              const Vector &U)
+void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S, const int cell, const Vector &U)
 {
    Array<int> dofs;
    Array<int> sub_dofs;
@@ -826,7 +811,7 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S_new,
    sub_dofs.Append(1);
 
    // Get current state grid functions
-   Vector* sptr = const_cast<Vector*>(&S_new);
+   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, v_gf, ste_gf;
    sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
    v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
@@ -847,16 +832,12 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S_new,
    v_gf.SetSubVector(dofs, vel);
 
    // Sync update gridfunctions
-   sv_gf.SyncAliasMemory(S_new);
-   v_gf.SyncAliasMemory(S_new);
-   ste_gf.SyncAliasMemory(S_new);
+   sv_gf.SyncAliasMemory(S);
+   v_gf.SyncAliasMemory(S);
+   ste_gf.SyncAliasMemory(S);
 }
 
-/*
-*
-* cij computation
-*
-*/
+
 /****************************************************************************************************
 * Function: CalcOutwardNormalInt
 * Parameters:
@@ -990,124 +971,19 @@ void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
    }
 }
 
-/*
-*
-* Enforce Boundary Conditions
-*  Enforces on v_gf
-*
-*/
-// template<int dim>
-// void LagrangianLOOperator<dim>::EnforceBoundaryConditions(Vector &S)
-// {
-//    cout << "enforcing BCs\n";
-//    switch (problem)
-//    {
-//       case 7: // Saltzman
-//       {
-//          // v = e_x on left boundary (bdr_marker = 1)
-//          // v.n = 0 elsewhere (bdr_marker = 2)
-
-//          Vector* sptr = const_cast<Vector*>(&S);
-//          ParGridFunction v_gf;
-//          v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
-
-//          Array<int> left_cells;
- 
-//          /* iterate over boundary elements */
-//          for (int bdr_el = 0; bdr_el < pmesh->GetNBE(); bdr_el +=1)
-//          {
-//             int el = -1;
-//             int _info = -1;
-//             int bdr_attribute = pmesh->GetBdrAttribute(bdr_el);
-//             pmesh->GetBdrElementAdjacentElement(bdr_el, el, _info);
-
-//             // cout << "bdr_el: " << bdr_el << endl;
-//             // cout << "bdr attr: " << pmesh->GetBdrAttribute(bdr_el) << endl;
-//             // cout << "Adjacent element: " << el << endl;
-//             if (bdr_attribute == 2)
-//             {
-//                // Get outward normal vector
-//                Vector n(dim);
-//                CalcOutwardNormalInt(S, el, bdr_el, n);
-//                n /= n.Norml2();
-
-//                // Get velocity for cell el
-//                Vector vel(dim);
-//                for (int i = 0; i < dim; i++)
-//                {
-//                   int index = el + i*NDofs_L2V;
-//                   vel[i] = v_gf.Elem(index);
-//                }
-//                // cout << "Printing old velocity for cell: " << el << endl;
-//                // vel.Print(cout);
-
-//                // cout << "Printing normal for cell: " << el << endl;
-//                // n.Print(cout);
-
-//                // Compute tangentional velocity
-//                double mag = vel * n;
-//                Vector norm_comp = n;
-//                norm_comp *= mag;
-//                Vector tan_comp(2);
-//                subtract(vel, norm_comp, tan_comp);
-
-//                double _result = tan_comp * n;
-//                if (_result > pow(10.,-12))
-//                {
-//                   cout << "Printing new velocity for cell: " << el << endl;
-//                   vel.Print(cout);
-//                   cout << "Should be 0: " << _result << endl;
-//                }
-
-//                // Set velocity to tangentional velocity
-//                // for (int i = 0; i < dim; i++)
-//                // {
-//                //    int index = el + i*NDofs_L2V;
-//                //    v_gf.Elem(index) = tan_comp[i];
-//                // }
-//             }
-//             else
-//             {
-//                assert(bdr_attribute == 1);
-//                cout << "Element " << el << " has boundary marker 1.\n";
-//                left_cells.Append(el);
-//             }
-//          }
-
-//          // Handle leftmost boundary last to avoid issues with top left 
-//          // and bottom left corner cells which have both a boundary marked 
-//          // 1 and boundary marked 2
-//          for (int i = 0; i < left_cells.Size(); i++)
-//          {
-//             int cell = left_cells[i];
-//             cout << "Setting leftmost BC for element: " << cell << endl;
-//             for (int j = 0; j < dim; j++)
-//             {
-//                int index = cell + j*NDofs_L2V;
-//                if (j == 0)
-//                {
-//                   v_gf.Elem(index) = 1.;
-//                }
-//                else
-//                {
-//                   v_gf.Elem(index) = 0.;
-//                }
-//             }
-//          }
-//       }
-//       default:
-//       {
-//          return;
-//       }
-//    }
-// }
-
 
 /****************************************************************************************************
-* Function: 
+* Function: compute_intermediate_face_velocities
 * Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  t        - Current time
+*  flag     - Flag used to indicate testing, can be "testing" or "NA"
+*  test_vel - Velocity used for testing
 *
 * Purpose:
+*  This function computes the intermediate face velocities as outlined in equation (5.7).  If
+*  the flag is set to "testing" and a test_vel function is passed in, the velocity at the faces
+*  will be the pointwise evaluation of the test_vel function.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
@@ -1239,10 +1115,14 @@ void LagrangianLOOperator<dim>::
 
 
 /****************************************************************************************************
-* Function: 
+* Function: get_intermediate_face_velocity
 * Parameters:
+*  face - Face index
+*  vel  - V_{F_m^n} corresponding to the given face
 *
 * Purpose:
+*  Return intermediate face velocity corresponding to the given face.
+*  NOTE: This function requires that compute_intermediate_face_velocities has been run.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_intermediate_face_velocity(const int & face, Vector & vel)
@@ -1259,22 +1139,19 @@ void LagrangianLOOperator<dim>::get_intermediate_face_velocity(const int & face,
 /****************************************************************************************************
 * Function: ComputeMeshVelocities
 * Parameters:
-*     S         - BlockVector corresponding to nth timestep that stores mesh information, 
-*                 mesh velocity, and state variables.
-*     x_gf      - ParGridFunction representing the mesh that references BlockVector at 
-                  (n+1)th timestep
-*     mv_gf_new - ParGridFunction representing the mesh velocity that references 
-                  BlockVector at (n+1)th timestep
-*     t         - Current time
-*     dt        - Current timestep
+*  S        - BlockVector corresponding to nth timestep that stores mesh information, 
+*             mesh velocity, and state variables.
+*  t        - Current time
+*  dt       - Current timestep
+*  flag     - Flag used to indicate testing, can be "testing" or "NA"
+*  test_vel - Velocity used for testing
 *
 * Purpose:
 *     This function accomplishes the following steps:
 *        1) Constructs intermediate face velocity objects for all faces at the nth timestep.
 *        2) Computes corrected node velocities on the corner vertices.
-*        3) Fills unnecessary node at cell center with the average velocity of the corner nodes.
-*        4) Computes the corrective face velocities.
-*        5) Modify x_gf to represent the moved nodes (Computes the (n+1)th mesh location).
+*        3) Computes the corrective face velocities.
+*        4) Fills unnecessary node at cell center with the average velocity of the corner nodes.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, 
@@ -1334,10 +1211,14 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
 
 
 /****************************************************************************************************
-* Function: 
+* Function: CalcMassLoss
 * Parameters:
+*  S - BlockVector corresponding to nth timestep that stores mesh information, mesh velocity, 
+*      and state variables.
 *
 * Purpose:
+*  This function is used when computing values for the convergence tables.  It does this by computing
+*  the sum of the local mass loss at each element.
 ****************************************************************************************************/
 template<int dim>
 double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
@@ -1361,10 +1242,13 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 
 
 /****************************************************************************************************
-* Function: 
+* Function: CheckMassConservation
 * Parameters:
+*  S - BlockVector corresponding to nth timestep that stores mesh information, mesh velocity, 
+*      and state variables.
 *
 * Purpose:
+*  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
@@ -1398,34 +1282,19 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
 
 
 /****************************************************************************************************
-* Function: 
+* Function: compute_determinant
 * Parameters:
+*  C     - Dense matrix representing C_i^geo from section 5.
+*  dt    - Timestep (assumes full timestep is given, not half step)
+*  alpha - Smallest postivie value satisfying equation (5.12) in [1]
 *
 * Purpose:
+*  This function computes the quantity given by equation (5.12) in [1].  Specifically, this function
+*  computes the largest positive value alpha_i satisfying
+*        det(alpha_i\mathbb{I} - \frac{dt}{2}C_i) = alpha_i^{d-1}
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)
-{
-   const int v1_len = v1.Size(), v2_len = v2.Size();
-   for (int i = 0; i < v1_len; i++)
-   {
-      for (int j = 0; j < v2_len; j++)
-      {
-         dm.Elem(i,j) = v1[i] * v2[j];
-      }
-   }
-}
-
-
-/****************************************************************************************************
-* Function: 
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
-// Assumes dt, not dt/2 is passed in
-template<int dim>
-void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const double &dt, double & d)
+void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const double &dt, double & alpha)
 {
    cout << "=====================\n";
    cout << "Computing determinant\n";
@@ -1446,32 +1315,40 @@ void LagrangianLOOperator<dim>::compute_determinant(const DenseMatrix &C, const 
    double pm = sqrt(pow(b,2) - 4. * a * c);
    cout << "pm: " << pm << endl;
 
-   double d1 = -1. * b + pm;
-   d1 /= (2. * a);
+   double alpha1 = -1. * b + pm;
+   alpha1 /= (2. * a);
 
-   double d2 = -1. * b - pm;
-   d2 /= (2. * a);
+   double alpha2 = -1. * b - pm;
+   alpha2 /= (2. * a);
 
-   d = std::max(d1, d2);
+   alpha = std::max(alpha1, alpha2);
 
-   if (d <= 0.)
+   if (alpha <= 0.)
    {
-      cout << "d1: " << d1 << ", d2: " << d2 << endl;
+      cout << "d1: " << alpha1 << ", d2: " << alpha2 << endl;
       MFEM_ABORT("Alpha_i should be positive.\n");
    }
 
-   cout << "d1: " << d1 << endl;
-   cout << "d2: " << d2 << endl;
-   cout << "d: " << d << endl;
+   cout << "alpha1: " << alpha1 << endl;
+   cout << "alpha2: " << alpha2 << endl;
+   cout << "alpha: " << alpha << endl;
 }
 
 
 /****************************************************************************************************
 * Function: compute_node_velocity_RT
 * Parameters:
-*  dt - timestep
+*  node          - global index of node to compute velocity at
+*  dt            - timestep
+*  node_v        - computed velocity at node
+*  is_dt_changed - Boolean representing if the timestep must be changed to accomodate for the
+*                  values computed at this node.  If is_dt_changed is set to true, the loop 
+*                  that computes the nodal velocities at the corner nodes must restart to 
+*                  ensure the node velocities are in sync.
 *
 * Purpose:
+*  This function computes the nodal velocity as explained in section 5 of [1].  This function 
+*  also enforces the corresponding time step restriction imposed by the given node.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
@@ -1795,6 +1672,19 @@ void LagrangianLOOperator<dim>::compute_geo_V()
 }
 
 
+/***********************************************************************************************************
+* Function: compute_node_velocities
+* Parameters:
+*   S        - BlockVector representing FiniteElement information
+*   t        - Current time
+*   dt       - Timestep
+*   flag     - Flag used to indicate testing
+*   test_vel - Velocity used for testing
+*
+* Purpose: 
+*  This function computes the velocities on the corner nodes of the mesh via the process outlined in
+*  section 5 of the Lagrangian paper.
+***********************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
    compute_node_velocities(Vector &S, 
@@ -1833,17 +1723,17 @@ void LagrangianLOOperator<dim>::
 
 
 /***********************************************************************************************************
-Function: compute_corrective_face_velocities
-Parameters:
-   S        - BlockVector representing FiniteElement information
-   t        - Current time
-   dt       - Timestep
-   flag     - Flag used to indicate testing
-   test_vel - Velocity used for testing
-Purpose:
-   This function computes the node velocities on the faces which
-   are designed to bubble in the direction of the normal vector 
-   to conserve mass locally.
+* Function: compute_corrective_face_velocities
+* Parameters:
+*   S        - BlockVector representing FiniteElement information
+*   t        - Current time
+*   dt       - Timestep
+*   flag     - Flag used to indicate testing
+*   test_vel - Velocity used for testing
+* Purpose:
+*   This function computes the node velocities on the faces which
+*   are designed to bubble in the direction of the normal vector 
+*   to conserve mass locally.
 ***********************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::
@@ -2163,16 +2053,18 @@ void LagrangianLOOperator<dim>::
 
 
 /****************************************************************************************************
-* Function: 
+* Function: fill_center_velocities_with_average
 * Parameters:
+*   S        - BlockVector representing FiniteElement information
 *
 * Purpose:
+*  This function is only needed since we are not able to implement the Serendipity finite elements.
+*  Since the mesh motion does not depends on a value for the node corresponding to the center of the 
+*  element, we need to fill this with a velocity which will ensure the center node remains inside the
+*  cell.  This is done by average the values at the four corner nodes of the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::
-   fill_center_velocities_with_average(Vector &S,
-                                       const string flag, 
-                                       void (*test_vel)(const Vector&, const double&, Vector&))
+void LagrangianLOOperator<dim>::fill_center_velocities_with_average(Vector &S)
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
@@ -2252,10 +2144,15 @@ void LagrangianLOOperator<dim>::
 
 
 /****************************************************************************************************
-* Function: 
+* Function: fill_face_velocities_with_average
 * Parameters:
+*   S        - BlockVector representing FiniteElement information
+*   flag     - Flag used to indicate testing
+*   test_vel - Velocity used for testing
 *
 * Purpose:
+*  This function is merely for testing purposes and should not be implemented in the full program
+*  as the purpose of moving the face nodes is to ensure local mass conservation.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::fill_face_velocities_with_average(Vector &S, const string flag, void (*test_vel)(const Vector&, const double&, Vector&))
@@ -2304,17 +2201,15 @@ void LagrangianLOOperator<dim>::fill_face_velocities_with_average(Vector &S, con
    }
 }
 
-/*
-Function: update_node_velocity
-Parameters:
-   S        - BlockVector representing FiniteElement information
-   node     - 
-   test_vel - Velocity used for testing
-Purpose:
-   This function computes the node velocities on the faces which
-   are designed to bubble in the direction of the normal vector 
-   to conserve mass locally.
-*/
+/****************************************************************************************************
+* Function: update_node_velocity
+* Parameters:
+*   S    - BlockVector representing FiniteElement information
+*   node - Global index of node in question.
+*   vel  - Velocity computed at node to be used to move the mesh
+* Purpose:
+*   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
+****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::update_node_velocity(Vector &S, const int & node, const Vector & vel)
 {
@@ -2336,10 +2231,14 @@ void LagrangianLOOperator<dim>::update_node_velocity(Vector &S, const int & node
 
 
 /****************************************************************************************************
-* Function: 
+* Function: get_node_velocity
 * Parameters:
+*   S    - BlockVector representing FiniteElement information
+*   node - Global index of node in question.
+*   vel  - Velocity at given node
 *
 * Purpose:
+*  This function returns the velocity at the given global node.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_node_velocity(const Vector &S, const int & node, Vector & vel)
@@ -2357,10 +2256,14 @@ void LagrangianLOOperator<dim>::get_node_velocity(const Vector &S, const int & n
 
 
 /****************************************************************************************************
-* Function: 
+* Function: get_vi_deo
 * Parameters:
+*   node - Global index of node in question.
+*   vel  - Velocity Vi^geo at given node
 *
 * Purpose:
+*  This function returns Vi_geo.
+*  NOTE: Function LagrangianLOOperator::compute_geo_V must be called first.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_vi_geo(const int & node, Vector & vel)
@@ -2374,10 +2277,14 @@ void LagrangianLOOperator<dim>::get_vi_geo(const int & node, Vector & vel)
 
 
 /****************************************************************************************************
-* Function: 
+* Function: get_node_position
 * Parameters:
+*   S    - BlockVector representing FiniteElement information
+*   node - Global index of node in question.
+*   x    - Coordinate position at given node.
 *
 * Purpose:
+*  This function returns the cartesian location corresponding to a global node.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & node, Vector & x)
@@ -2400,13 +2307,19 @@ void LagrangianLOOperator<dim>::get_node_position(const Vector &S, const int & n
 
 
 /****************************************************************************************************
-* Function: 
+* Function: SaveStateVecsToFile
 * Parameters:
+*  S                  - BlockVector representing FiniteElement information
+*  output_file_prefix - Parameters used to define output file location
+*  output_file_suffix - See above.
 *
 * Purpose:
+*  The results of this program can be used to plot the same problem at multiple refinements.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix)
+void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S, 
+                                                    const string &output_file_prefix, 
+                                                    const string &output_file_suffix)
 {
    // Get gfs
    ParGridFunction rho_gf, sv_gf, v_gf, ste_gf;
@@ -2463,33 +2376,5 @@ template class LagrangianLOOperator<2>;
 template class LagrangianLOOperator<3>;
 
 } // end ns hydrodynamics
-
-
-/****************************************************************************************************
-* Function: 
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
-double fRand(double fMin, double fMax)
-{
-    double f = (double)rand() / RAND_MAX;
-    return fMin + f * (fMax - fMin);
-}
-
-
-/****************************************************************************************************
-* Function: 
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
-void random_mesh_v(const Vector &x, Vector &res)
-{
-   const double r_max = 1.;
-   res[0] = fRand(0, r_max);
-   res[1] = fRand(0, r_max);
-   return;
-}
 
 } // end ns mfem

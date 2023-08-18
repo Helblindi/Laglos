@@ -100,7 +100,7 @@ public:
 
    void CreateBdrVertexIndexingArray();
 
-   bool IsBdrVertex(const int & node);
+   bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
    void MakeTimeStep(Vector &S, const double & t, double & dt);
 
@@ -124,8 +124,6 @@ public:
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void get_intermediate_face_velocity(const int & face, Vector & vel);
 
-   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
-
    void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void RT_int_grad(const int cell, DenseMatrix & res);
    void compute_geo_V();
@@ -141,7 +139,7 @@ public:
    
    void compute_corrective_face_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void fill_center_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void fill_center_velocities_with_average(Vector &S);
    void fill_face_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void update_node_velocity(Vector &S, const int & node, const Vector & vel);
@@ -149,8 +147,6 @@ public:
    void get_node_velocity(const Vector &S, const int & node, Vector & vel);
 
    void get_node_position(const Vector &S, const int & node, Vector & x);
-
-   void EnforceBoundaryConditions(Vector &S);
 
    void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string flag="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);

@@ -342,7 +342,7 @@ int test_1d_mesh()
    const double dt = 0.;
    Array<double> cell_areas(L2FESpace.GetNE());
    Array<double> bmn_sum_cells(L2FESpace.GetNE());
-   // hydro.compute_intermediate_face_velocities(S, t,"NA", &velocity_exact);
+   // hydro.ComputeIntermediateFaceVelocities(S, t,"NA", &velocity_exact);
 
    // Store initial mass of cells
    for (int ci = 0; ci < L2FESpace.GetNE(); ci++)
@@ -475,12 +475,12 @@ int test_vel_field_1()
    double t = 0., dt = 1.;
    DenseMatrix dm(dim);
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
-      hydro.update_node_velocity(S, node_it, vec_res);
+      hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
+      hydro.UpdateNodeVelocity(S, node_it, vec_res);
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
       {
@@ -490,7 +490,7 @@ int test_vel_field_1()
    }
 
    // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.fill_center_velocities_with_average(S);
+   hydro.FillCenterVelocitiesWithAvg(S);
 
    /* ************************
    Displace Velocities

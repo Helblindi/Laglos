@@ -49,7 +49,7 @@ int lower_refinement = 2;
 int upper_refinement = 7;
 /* ---------------- End Parameters ---------------- */
 
-// void RT_int_grad(ParGridFunction & CR_v_gf, 
+// void IntGradRT(ParGridFunction & CR_v_gf, 
 //                  ParMesh * pmesh,   
 //                  const IntegrationRule * ir, 
 //                  const int cell, 
@@ -58,9 +58,9 @@ void velocity_exact(const Vector &x, const double & t, Vector &v);
 int test_Vi_geo();
 int test_Ci_geo();
 int test_RT_vel();
-int test_RT_int_grad();
-int test_RT_int_grad2();
-int test_RT_int_grad_quadratic();
+int test_IntGradRT();
+int test_IntGradRT2();
+int test_IntGradRT_quadratic();
 int test_determinant();
 void plot_velocities();
 void test_vel_field_1();
@@ -88,9 +88,9 @@ int main(int argc, char *argv[])
    d += test_Vi_geo();
    d += test_Ci_geo();
    d += test_RT_vel();
-   d += test_RT_int_grad();
-   d += test_RT_int_grad2();
-   d += test_RT_int_grad_quadratic();
+   d += test_IntGradRT();
+   d += test_IntGradRT2();
+   d += test_IntGradRT_quadratic();
    d += test_determinant();
    // plot_velocities();
    test_vel_field_1();
@@ -308,15 +308,15 @@ int test_Vi_geo()
    double dt = 1., t = 0.;
 
    // Must compute the intermediate face velocities before computing geometric velocity
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.compute_geo_V();
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeGeoV();
 
    // Iterate across all nodes and verify exact velocity and Vigeo is the same at all the 
    // geometric vertices.
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      hydro.get_vi_geo(node_it, Vgeo);
-      hydro.get_node_velocity(S, node_it, V_ex);
+      hydro.GetViGeo(node_it, Vgeo);
+      hydro.GetNodeVelocity(S, node_it, V_ex);
 
       cout << "--- Velocities on node: " << node_it << " ---\n";
       cout << "geo V: ";
@@ -437,13 +437,13 @@ int test_Ci_geo()
    double dt = 1., t = 0.;
 
    // Must compute the intermediate face velocities before computing geometric velocity
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
 
    // Iterate across all nodes and verify Cigeo is the same at all the geometric vertices.
-   hydro.compute_geo_C(0, Cgeo_0);
+   hydro.ComputeCiGeo(0, Cgeo_0);
    for (int node_it = 1; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      hydro.compute_geo_C(node_it, Cgeo);
+      hydro.ComputeCiGeo(node_it, Cgeo);
       Add(Cgeo, Cgeo_0, -1., C_error);
       _error += C_error.FNorm();
 
@@ -573,10 +573,10 @@ int test_RT_vel()
    double t = 0., error = 0.;
    int num_exact = 0;
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   // hydro.compute_intermediate_face_velocities(S, t);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   // hydro.ComputeIntermediateFaceVelocities(S, t);
    ParGridFunction v_CR_gf(&CRFESpace), v_CR_gf_int_el1(&CRFESpace);
-   hydro.get_vcrgf(v_CR_gf);
+   hydro.GetVCRgf(v_CR_gf);
 
    // Set integration rule for face
    cout << "setting integration rule\n";
@@ -600,7 +600,7 @@ int test_RT_vel()
       n_vec = n_int;
       double F = n_vec.Norml2();
 
-      hydro.get_intermediate_face_velocity(face, Vf);
+      hydro.GetIntermediateFaceVelocity(face, Vf);
       FaceElementTransformations * FEtrans = pmesh->GetFaceElementTransformations(face);
       ElementTransformation & trans_el1 = FEtrans->GetElement1Transformation();
 
@@ -702,9 +702,9 @@ Purpose:
    Test the integral of the gradient of the RT velocity function given an integration rule.
    This test case uses a linear prescribed velocity.   
 */
-int test_RT_int_grad()
+int test_IntGradRT()
 {
-   cout << "Testing RT_int_grad function\n";
+   cout << "Testing IntGradRT function\n";
    // Ensure there is no quadratic component to the velocity field
    aq = 0., bq = 0., dq = 0., eq = 0.;
    a = 1., b = 2., c = 3., d = 4., e = 5., f = 6.;
@@ -804,11 +804,11 @@ int test_RT_int_grad()
    true_grad.Print(cout);
 
    // Must compute the intermediate face velocities before computing geometric velocity
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
 
    for (int cell_it = 0; cell_it < L2FESpace.GetNE(); cell_it++)
    {
-      hydro.RT_int_grad(cell_it, dm);
+      hydro.IntGradRT(cell_it, dm);
       cout << "Dense Matrix for cell: " << cell_it << endl;
       dm.Print(cout);
       // assert(false);
@@ -823,7 +823,7 @@ int test_RT_int_grad()
    }
    else 
    {
-      cout << "failed test_RT_int_grad\n";
+      cout << "failed test_IntGradRT\n";
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
@@ -834,9 +834,9 @@ Purpose:
    Test the integral of the gradient of the RT velocity function given an integration rule.
    This test case uses a linear prescribed velocity.   
 */
-int test_RT_int_grad2()
+int test_IntGradRT2()
 {
-   cout << "Testing RT_int_grad2 function\n";
+   cout << "Testing IntGradRT2 function\n";
    // Ensure there is no quadratic component to the velocity field
    aq = 0., bq = 0., dq = 0., eq = 0.;
    a = 1., b = 0., c = 0., d = 0., e = 1., f = 0.;
@@ -936,11 +936,11 @@ int test_RT_int_grad2()
    true_grad.Print(cout);
 
    // Must compute the intermediate face velocities before computing geometric velocity
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
 
    for (int cell_it = 0; cell_it < L2FESpace.GetNE(); cell_it++)
    {
-      hydro.RT_int_grad(cell_it, dm);
+      hydro.IntGradRT(cell_it, dm);
       cout << "Dense Matrix for cell: " << cell_it << endl;
       dm.Print(cout);
       // assert(false);
@@ -955,7 +955,7 @@ int test_RT_int_grad2()
    }
    else 
    {
-      cout << "failed test_RT_int_grad2\n";
+      cout << "failed test_IntGradRT2\n";
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
@@ -969,9 +969,9 @@ Purpose:
    True grad = | x+2   3y+4  |
                | 5x+8  7y+9 |
 */
-int test_RT_int_grad_quadratic()
+int test_IntGradRT_quadratic()
 {
-   cout << "Testing RT_int_grad_quadratic function\n";
+   cout << "Testing IntGradRT_quadratic function\n";
    // Ensure there is no quadratic component to the velocity field
    aq = 1./2., bq = 3./2., dq = 5./2., eq = 7./2.;
    a = 2., b = 4., c = 6., d = 8., e = 9., f = 10.;
@@ -1063,20 +1063,20 @@ int test_RT_int_grad_quadratic()
    double dt = 1., t = 0.;
 
    // Must compute the intermediate face velocities before computing geometric velocity
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
    Vector cell_x(dim);
    for (int cell_it = 0; cell_it < L2FESpace.GetNE(); cell_it++)
    {
       // Compute true gradient as it will not be constant across mesh
       int cell_vdof = cell_it + H1FESpace.GetNVDofs() + L2FESpace.GetNF();
-      hydro.get_node_position(S, cell_vdof, cell_x);
+      hydro.GetNodePosition(S, cell_vdof, cell_x);
       true_grad(0,0) = cell_x[0] + 2.;
       true_grad(0,1) = 3.*cell_x[1] + 4.;
       true_grad(1,0) = 5.*cell_x[0] + 8.;
       true_grad(1,1) = 7.*cell_x[1] + 9.;
 
       // Compute approximate gradient
-      hydro.RT_int_grad(cell_it, dm);
+      hydro.IntGradRT(cell_it, dm);
       cout << "Dense Matrix for cell: " << cell_it << endl;
       dm.Print(cout);
       // Output exact gradient
@@ -1094,7 +1094,7 @@ int test_RT_int_grad_quadratic()
    }
    else 
    {
-      cout << "failed test_RT_int_grad_quadratic\n";
+      cout << "failed test_IntGradRT_quadratic\n";
       cout << "error: " << _error << endl;
       return 1; // Test failed
    }
@@ -1105,7 +1105,7 @@ int test_determinant()
 {
    cout << "test_determinant\n";
 
-   // Since compute_determinant is not a static member function, I will instantiate a baseline hydro operator
+   // Since ComputeDeterminant is not a static member function, I will instantiate a baseline hydro operator
    // Initialize mesh
    mfem::Mesh *mesh;
    mesh = new mfem::Mesh(mesh_file, true, true);
@@ -1194,7 +1194,7 @@ int test_determinant()
    double dt = 1.;
    double d = 0.;
 
-   hydro.compute_determinant(C, dt, d);
+   hydro.ComputeDeterminant(C, dt, d);
    if (d != 2.)
    {
       cout << "Failed 1st determinant test.\n";
@@ -1206,7 +1206,7 @@ int test_determinant()
    C = 0.;
    C(0,0) = 1.;
    d = 0.;
-   hydro.compute_determinant(C, dt, d);
+   hydro.ComputeDeterminant(C, dt, d);
    if (d != 1.5)
    {
       cout << "Failed 2nd determinant test.\n";
@@ -1219,7 +1219,7 @@ int test_determinant()
    C(0,1) = 5.;
    C(1,0) = 1.;
    d = 0.;
-   hydro.compute_determinant(C, dt, d);
+   hydro.ComputeDeterminant(C, dt, d);
    if (d != 1.)
    {
       cout << "Failed 3rd determinant test.\n";
@@ -1235,7 +1235,7 @@ int test_determinant()
    C(1,1) = 4.;
 
    d = 0.;
-   hydro.compute_determinant(C, dt, d);
+   hydro.ComputeDeterminant(C, dt, d);
    if (d != 3.)
    {
       cout << "Failed 4th determinant test.\n";
@@ -1344,13 +1344,13 @@ void plot_velocities()
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.compute_geo_V();
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeGeoV();
    
    ParGridFunction v_cr_gf(&CRFESpace);
    ParGridFunction v_geo_gf(&H1FESpace);
-   hydro.get_vcrgf(v_cr_gf);
-   hydro.get_vgeogf(v_geo_gf);
+   hydro.GetVCRgf(v_cr_gf);
+   hydro.GetVGeogf(v_geo_gf);
 
    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
    ParGridFunction v_exact_gf(&H1FESpace);
@@ -1403,12 +1403,12 @@ void plot_velocities()
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      // hydro.get_node_position(S, node_it, x);
+      // hydro.GetNodePosition(S, node_it, x);
       // cout << "node position for node: " << node << endl;
       // x.Print(cout);
 
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
-      hydro.update_node_velocity(S, node_it, vec_res);
+      hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
+      hydro.UpdateNodeVelocity(S, node_it, vec_res);
 
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
@@ -1439,9 +1439,9 @@ void plot_velocities()
       v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
-   // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.fill_face_velocities_with_average(S);
-   hydro.fill_center_velocities_with_average(S);
+   // hydro.ComputeCorrectiveFaceVelocities(S, t, dt);
+   hydro.FillFaceVelocitiesWithAvg(S);
+   hydro.FillCenterVelocitiesWithAvg(S);
 
    Array<int> fids, oris, row;
    mfem::Mesh::FaceInformation FI;
@@ -1469,9 +1469,9 @@ void plot_velocities()
 
    //       H1FESpace.GetFaceDofs(fids[j], row);
    //       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
-   //       hydro.get_node_position(S, face_vdof1, vdof1_x);
-   //       hydro.get_node_position(S, face_vdof2, vdof2_x);
-   //       hydro.get_node_position(S, face_dof, face_x);
+   //       hydro.GetNodePosition(S, face_vdof1, vdof1_x);
+   //       hydro.GetNodePosition(S, face_vdof2, vdof2_x);
+   //       hydro.GetNodePosition(S, face_dof, face_x);
          
    //       velocity_exact(face_x, t, Vf);
 
@@ -1703,23 +1703,23 @@ void test_vel_field_1()
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   // hydro.compute_intermediate_face_velocities(S, t);
-   hydro.compute_geo_V();
-   hydro.get_vgeogf(v_geo_gf);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   // hydro.ComputeIntermediateFaceVelocities(S, t);
+   hydro.ComputeGeoV();
+   hydro.GetVGeogf(v_geo_gf);
 
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
       cout << "\nnode: " << node_it << endl;
-      hydro.compute_geo_C(node_it, dm);
+      hydro.ComputeCiGeo(node_it, dm);
       cout << "Ci:\n";
       dm.Print(cout);
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
-      // hydro.get_intermediate_face_velocity(node_it, vec_res);
+      hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
+      // hydro.GetIntermediateFaceVelocity(node_it, vec_res);
       cout << "RT v: ";
       vec_res.Print(cout);
-      hydro.update_node_velocity(S, node_it, vec_res);
+      hydro.UpdateNodeVelocity(S, node_it, vec_res);
 
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
@@ -1750,9 +1750,9 @@ void test_vel_field_1()
       v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
-   hydro.compute_corrective_face_velocities(S, t, dt);
-   // hydro.fill_face_velocities_with_average(S);
-   hydro.fill_center_velocities_with_average(S);
+   hydro.ComputeCorrectiveFaceVelocities(S, t, dt);
+   // hydro.FillFaceVelocitiesWithAvg(S);
+   hydro.FillCenterVelocitiesWithAvg(S);
 
    /* ************************
    Displace Velocities
@@ -1916,22 +1916,22 @@ void test_vel_field_2()
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.compute_geo_V();
-   hydro.get_vgeogf(v_geo_gf);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeGeoV();
+   hydro.GetVGeogf(v_geo_gf);
 
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
       cout << "\nnode: " << node_it << endl;
-      hydro.compute_geo_C(node_it, dm);
+      hydro.ComputeCiGeo(node_it, dm);
       cout << "Ci:\n";
       dm.Print(cout);
-      hydro.compute_node_velocity_RT(node_it, dt, vec_res, is_dt_changed);
-      // hydro.get_intermediate_face_velocity(node_it, vec_res);
+      hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
+      // hydro.GetIntermediateFaceVelocity(node_it, vec_res);
       cout << "RT v: ";
       vec_res.Print(cout);
-      hydro.update_node_velocity(S, node_it, vec_res);
+      hydro.UpdateNodeVelocity(S, node_it, vec_res);
 
       // restart nodal velocity computation if the timestep has been restricted
       if (is_dt_changed)
@@ -1962,9 +1962,9 @@ void test_vel_field_2()
       v_geo_gf[2 * H1FESpace.GetNDofs() - L2FESpace.GetNDofs() + ci] = vel_center_y;
    }
 
-   // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.fill_face_velocities_with_average(S);
-   hydro.fill_center_velocities_with_average(S);
+   // hydro.ComputeCorrectiveFaceVelocities(S, t, dt);
+   hydro.FillFaceVelocitiesWithAvg(S);
+   hydro.FillCenterVelocitiesWithAvg(S);
 
    /* ************************
    Displace Velocities
@@ -2125,13 +2125,13 @@ void test_RT_nodal_vel()
    double d = 0, dt = .0001;
    int node = 8;
 
-   hydro.compute_intermediate_face_velocities(S, t, "testing", &velocity_exact);
-   hydro.compute_geo_V();
-   // hydro.get_vgeogf(v_geo_gf);
+   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+   hydro.ComputeGeoV();
+   // hydro.GetVGeogf(v_geo_gf);
 
-   hydro.get_vi_geo(node, _vel);
-   hydro.compute_geo_C(node, dm);
-   hydro.compute_determinant(dm, dt, d);
+   hydro.GetViGeo(node, _vel);
+   hydro.ComputeCiGeo(node, dm);
+   hydro.ComputeDeterminant(dm, dt, d);
 
    // Compute V_i^n
    DenseMatrix _mat(dm);

@@ -118,37 +118,37 @@ public:
    void Orthogonal(Vector &v);
 
    /* Mesh movement */
-   void compute_intermediate_face_velocities(const Vector &S, 
+   void ComputeIntermediateFaceVelocities(const Vector &S, 
                                              const double t,
-                                             const string flag="NA", 
+                                             const string ="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void get_intermediate_face_velocity(const int & face, Vector & vel);
+   void GetIntermediateFaceVelocity(const int & face, Vector & vel);
 
-   void compute_node_velocity_RT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
-   void RT_int_grad(const int cell, DenseMatrix & res);
-   void compute_geo_V();
-   void get_vi_geo(const int & node, Vector & vel);
-   void compute_geo_C(const int & node, DenseMatrix & res);
-   void get_vcrgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
-   void get_vgeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
+   void ComputeNodeVelocityRT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
+   void IntGradRT(const int cell, DenseMatrix & res);
+   void ComputeGeoV();
+   void GetViGeo(const int & node, Vector & vel);
+   void ComputeCiGeo(const int & node, DenseMatrix & res);
+   void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
+   void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    
    // Functions representing development on April 2023
-   void compute_determinant(const DenseMatrix &C, const double &dt, double & d);
+   void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
 
-   void compute_node_velocities(Vector &S, const double & t, double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeNodeVelocities(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    
-   void compute_corrective_face_velocities(Vector &S, const double & t, const double & dt, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void fill_center_velocities_with_average(Vector &S);
-   void fill_face_velocities_with_average(Vector &S, const string flag="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void FillCenterVelocitiesWithAvg(Vector &S);
+   void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
-   void update_node_velocity(Vector &S, const int & node, const Vector & vel);
+   void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
 
-   void get_node_velocity(const Vector &S, const int & node, Vector & vel);
+   void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
 
-   void get_node_position(const Vector &S, const int & node, Vector & x);
+   void GetNodePosition(const Vector &S, const int & node, Vector & x);
 
-   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string flag="NA", 
+   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string ="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    double CalcMassLoss(const Vector &S);

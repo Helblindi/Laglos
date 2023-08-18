@@ -395,7 +395,7 @@ int test_vel_field_1()
 
    Wx += offx;
    ParGridFunction v_CR_gf(&CRFESpace);
-   hydro.get_vcrgf(v_CR_gf);
+   hydro.GetVCRgf(v_CR_gf);
 
    hydrodynamics::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D: v_CR_gf", Wx, Wy, Ww, Wh);
 

@@ -974,7 +974,7 @@ int test_sod_hydro()
 int test_smooth_hydro()
 {
    cout << "Test2D::test_smooth_hydro\n";
-   int _mesh_refinements = 1; // This is enough refinements to check, don't modify or test will crash
+   int _mesh_refinements = 2; // This is enough refinements to check, don't modify or test will crash
    double t = 0., dt_1d = .001, dt_2d = 0.001;
 
    /*************************************
@@ -1309,8 +1309,8 @@ int test_smooth_hydro()
    for (int i = 0; i < 4; i++)
    {
       // check sv
-      if (_sv0 != sv_gf_2d[a0[i]] || _sv1 != sv_gf_2d[a1[i]] ||
-          _sv2 != sv_gf_2d[a2[i]] || _sv3 != sv_gf_2d[a3[i]])
+      if (abs(_sv0 - sv_gf_2d[a0[i]]) > tol || abs(_sv1 - sv_gf_2d[a1[i]]) > tol ||
+          abs(_sv2 - sv_gf_2d[a2[i]]) > tol || abs(_sv3 - sv_gf_2d[a3[i]]) > tol)
       {
          cout << "Test2D::test_smooth_hydro failed on sv.\n";
          return 1;

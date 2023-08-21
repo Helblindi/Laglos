@@ -23,9 +23,10 @@ rm -rf *
 cd $bin_dir
 
 # Dim = 1 cases
-options="-m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100" # Sod
 # options="-m data/ref-segment.mesh -visc -mm -tf 0.6 -ot -cfl 1 -so -vs 100" # 1D Smooth Wave 2nd Order IDP Paper
-# options="-m data/ref-segment.mesh -visc -mm -tf 0.225 -ot -cfl 0.25 -so -vs 100" # Shocktube testing, no rotation
+# options="-m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.25 -ot -visc -mm -so -vs 100" # Sod
+options="-m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -so -vs 100"   ## Lax
+
 
 # Dim = 2 cases
 

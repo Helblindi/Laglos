@@ -1,8 +1,6 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
-#include "problem_base.h"
-#include "sod.h"
-#include "smooth-1d.h"
+#include "test_problems_include.h"
 #include "var-config.h"
 #include <cassert>
 #include <fstream>
@@ -56,6 +54,8 @@ int test_vel_field_1();
 int test_CSV_getter_setter(); // LagrangianLOOperator::GetCellStateVector tester
 int test_sod_hydro();
 
+int test_smooth_hydro();
+
 int main(int argc, char *argv[])
 {
    // Initialize MPI.
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
    d += test_vel_field_1();
    d += test_CSV_getter_setter();
    d += test_sod_hydro();
-   return d;
+   return test_smooth_hydro();
 }
 
 
@@ -960,6 +960,382 @@ int test_sod_hydro()
           _ste2 != ste_gf_2d[a2[i]] || _ste3 != ste_gf_2d[a3[i]]) 
       {
          cout << "Test2D::test_sod_hydro failed on ste.\n"; 
+         return 1; 
+      }
+   }
+
+   return 0;
+}
+
+/**
+ * This function provides the same functionality as the above Sod problem, but with the smooth 
+ * wave.
+*/
+int test_smooth_hydro()
+{
+   cout << "Test2D::test_smooth_hydro\n";
+   int _mesh_refinements = 1; // This is enough refinements to check, don't modify or test will crash
+   double t = 0., dt_1d = .001, dt_2d = 0.001;
+
+   /*************************************
+    * RUN 1D first
+   **************************************/
+
+   // Initialize 1D mesh
+   const int dim_1d = 1;
+   std::string result_1d = std::string(LAGLOS_DIR) + "/data/ref-segment.mesh";
+   const char* mesh_file_1d = result_1d.c_str();
+   mfem::Mesh *mesh_1d = new mfem::Mesh(mesh_file_1d, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < _mesh_refinements; lev++)
+   {
+      mesh_1d->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh_1d = new ParMesh(MPI_COMM_WORLD, *mesh_1d);            
+   delete mesh_1d;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-smooth_1d." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh_1d->Print(omesh);
+   }
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC_1d(order_mv, dim_1d);
+   L2_FECollection L2FEC_1d(order_u, dim_1d, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC_1d;
+
+   ParFiniteElementSpace H1FESpace_1d(pmesh_1d, &H1FEC_1d, dim_1d);
+   ParFiniteElementSpace L2FESpace_1d(pmesh_1d, &L2FEC_1d);
+   ParFiniteElementSpace L2VFESpace_1d(pmesh_1d, &L2FEC_1d, dim_1d);
+   ParFiniteElementSpace CRFESpace_1d(pmesh_1d, &CRFEC_1d, dim_1d);
+
+   // Output information
+   pmesh_1d->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2_1d = L2FESpace_1d.GetVSize();
+   const int Vsize_l2v_1d = L2VFESpace_1d.GetVSize();
+   const int Vsize_h1_1d = H1FESpace_1d.GetVSize();
+   Array<int> offset_1d(6);
+   offset_1d[0] = 0;
+   offset_1d[1] = offset_1d[0] + Vsize_h1_1d;
+   offset_1d[2] = offset_1d[1] + Vsize_h1_1d;
+   offset_1d[3] = offset_1d[2] + Vsize_l2_1d;
+   offset_1d[4] = offset_1d[3] + Vsize_l2v_1d;
+   offset_1d[5] = offset_1d[4] + Vsize_l2_1d;
+   BlockVector S_1d(offset_1d, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf_1d, mv_gf_1d, sv_gf_1d, v_gf_1d, ste_gf_1d;
+   x_gf_1d.MakeRef(&H1FESpace_1d, S_1d, offset_1d[0]);
+   mv_gf_1d.MakeRef(&H1FESpace_1d, S_1d, offset_1d[1]);
+   sv_gf_1d.MakeRef(&L2FESpace_1d, S_1d, offset_1d[2]);
+   v_gf_1d.MakeRef(&L2VFESpace_1d, S_1d, offset_1d[3]);
+   ste_gf_1d.MakeRef(&L2FESpace_1d, S_1d, offset_1d[4]);
+
+   Vector zero_1d(dim_1d);
+   zero_1d = 0.;
+   VectorConstantCoefficient zero_coeff_1d(zero_1d);
+   mv_gf_1d.ProjectCoefficient(zero_coeff_1d);
+   mv_gf_1d.SyncAliasMemory(S_1d);
+
+   pmesh_1d->SetNodalGridFunction(&x_gf_1d);
+   x_gf_1d.SyncAliasMemory(S_1d);
+
+   // Initialize specific volume, velocity, and specific total energy
+   // Change class variables into static std::functions since virtual static member functions are not an option
+   // and Coefficient class requires std::function arguments
+   ProblemBase<dim_1d> * problem_class_1d = new SmoothWave<dim_1d>();
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> sv0_static_1d = 
+      std::bind(&ProblemBase<dim_1d>::sv0, problem_class_1d, std::placeholders::_1, std::placeholders::_2);
+   std::function<void(const Vector &, const double, Vector &)> v0_static_1d = 
+      std::bind(&ProblemBase<dim_1d>::v0, problem_class_1d, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+   std::function<double(const Vector &,const double)> ste0_static_1d = 
+      std::bind(&ProblemBase<dim_1d>::ste0, problem_class_1d, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> rho0_static_1d = 
+      std::bind(&ProblemBase<dim_1d>::rho0, problem_class_1d, std::placeholders::_1, std::placeholders::_2);
+
+   VectorFunctionCoefficient v_exact_coeff_1d(dim_1d, v0_static_1d);
+
+   // Initialize specific volume, velocity, and specific total energy
+   FunctionCoefficient sv_coeff_1d(sv0_static_1d);
+   sv_coeff_1d.SetTime(t);
+   sv_gf_1d.ProjectCoefficient(sv_coeff_1d);
+   sv_gf_1d.SyncAliasMemory(S_1d);
+
+   v_exact_coeff_1d.SetTime(t);
+   v_gf_1d.ProjectCoefficient(v_exact_coeff_1d);
+   // Sync the data location of v_gf with its base, S
+   v_gf_1d.SyncAliasMemory(S_1d);
+
+   FunctionCoefficient ste_coeff_1d(ste0_static_1d);
+   ste_coeff_1d.SetTime(t);
+   ste_gf_1d.ProjectCoefficient(ste_coeff_1d);
+   ste_gf_1d.SyncAliasMemory(S_1d);
+
+   // PLF to build mass vector
+   FunctionCoefficient rho_coeff_1d(rho0_static_1d); 
+   rho_coeff_1d.SetTime(t);
+   ParLinearForm *m_1d = new ParLinearForm(&L2FESpace_1d);
+   m_1d->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff_1d));
+   m_1d->Assemble();
+
+   cout << "gridFunctions initiated.\n";
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
+
+   cout << "Done constructing hydro op\n";
+
+   // Verify hardcoded timestep is small enough
+   hydro_1d.CalculateTimestep(S_1d);
+   if (dt_1d > hydro_1d.GetTimestep()) 
+   {
+      MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+   }
+
+   hydro_1d.MakeTimeStep(S_1d, t, dt_1d);
+
+   // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
+   // data in S. This operation simply updates the Memory validity flags of
+   // the sub-vectors to match those of S.
+   x_gf_1d.SyncAliasMemory(S_1d);
+   mv_gf_1d.SyncAliasMemory(S_1d);
+   sv_gf_1d.SyncAliasMemory(S_1d);
+   v_gf_1d.SyncAliasMemory(S_1d);
+   ste_gf_1d.SyncAliasMemory(S_1d);
+
+   // Make sure that the mesh corresponds to the new solution state. This is
+   // needed, because some time integrators use different S-type vectors
+   // and the oper object might have redirected the mesh positions to those.
+   pmesh_1d->NewNodes(x_gf_1d, false);
+
+   hydro_1d.CheckMassConservation(S_1d);
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-smooth_1d-moved." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh_1d->Print(omesh);
+   }
+
+
+   /*************************************
+    * Run 2D now
+   **************************************/
+   const int dim_2d = 2;
+   std::string result_2d = std::string(LAGLOS_DIR) + "/data/ref-square.mesh";
+   const char* mesh_file_2d = result_2d.c_str();
+   mfem::Mesh *mesh_2d = new mfem::Mesh(mesh_file_2d, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < _mesh_refinements; lev++)
+   {
+      mesh_2d->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh_2d = new ParMesh(MPI_COMM_WORLD, *mesh_2d);            
+   delete mesh_2d;
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-smooth_2d." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh_2d->Print(omesh);
+   }
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC_2d(order_mv, dim_2d);
+   L2_FECollection L2FEC_2d(order_u, dim_2d, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC_2d;
+
+   ParFiniteElementSpace H1FESpace_2d(pmesh_2d, &H1FEC_2d, dim_2d);
+   ParFiniteElementSpace L2FESpace_2d(pmesh_2d, &L2FEC_2d);
+   ParFiniteElementSpace L2VFESpace_2d(pmesh_2d, &L2FEC_2d, dim_2d);
+   ParFiniteElementSpace CRFESpace_2d(pmesh_2d, &CRFEC_2d, dim_2d);
+
+   // Output information
+   pmesh_2d->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2_2d = L2FESpace_2d.GetVSize();
+   const int Vsize_l2v_2d = L2VFESpace_2d.GetVSize();
+   const int Vsize_h1_2d = H1FESpace_2d.GetVSize();
+   Array<int> offset_2d(6);
+   offset_2d[0] = 0;
+   offset_2d[1] = offset_2d[0] + Vsize_h1_2d;
+   offset_2d[2] = offset_2d[1] + Vsize_h1_2d;
+   offset_2d[3] = offset_2d[2] + Vsize_l2_2d;
+   offset_2d[4] = offset_2d[3] + Vsize_l2v_2d;
+   offset_2d[5] = offset_2d[4] + Vsize_l2_2d;
+   BlockVector S_2d(offset_2d, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf_2d, mv_gf_2d, sv_gf_2d, v_gf_2d, ste_gf_2d;
+   x_gf_2d.MakeRef(&H1FESpace_2d, S_2d, offset_2d[0]);
+   mv_gf_2d.MakeRef(&H1FESpace_2d, S_2d, offset_2d[1]);
+   sv_gf_2d.MakeRef(&L2FESpace_2d, S_2d, offset_2d[2]);
+   v_gf_2d.MakeRef(&L2VFESpace_2d, S_2d, offset_2d[3]);
+   ste_gf_2d.MakeRef(&L2FESpace_2d, S_2d, offset_2d[4]);
+
+   Vector zero_2d(dim_2d);
+   zero_2d = 0.;
+   VectorConstantCoefficient zero_coeff_2d(zero_2d);
+   mv_gf_2d.ProjectCoefficient(zero_coeff_2d);
+   mv_gf_2d.SyncAliasMemory(S_2d);
+
+   pmesh_2d->SetNodalGridFunction(&x_gf_2d);
+   x_gf_2d.SyncAliasMemory(S_2d);
+
+   t = 0.;
+
+   // Initialize specific volume, velocity, and specific total energy
+   // Change class variables into static std::functions since virtual static member functions are not an option
+   // and Coefficient class requires std::function arguments
+   ProblemBase<dim_2d> * problem_class_2d = new SmoothWave<dim_2d>();
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> sv0_static_2d = 
+      std::bind(&ProblemBase<dim_2d>::sv0, problem_class_2d, std::placeholders::_1, std::placeholders::_2);
+   std::function<void(const Vector &, const double, Vector &)> v0_static_2d = 
+      std::bind(&ProblemBase<dim_2d>::v0, problem_class_2d, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+   std::function<double(const Vector &,const double)> ste0_static_2d = 
+      std::bind(&ProblemBase<dim_2d>::ste0, problem_class_2d, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> rho0_static_2d = 
+      std::bind(&ProblemBase<dim_2d>::rho0, problem_class_2d, std::placeholders::_1, std::placeholders::_2);
+
+   VectorFunctionCoefficient v_exact_coeff_2d(dim_2d, v0_static_2d);
+
+   // Initialize specific volume, velocity, and specific total energy
+   FunctionCoefficient sv_coeff_2d(sv0_static_2d);
+   sv_coeff_2d.SetTime(t);
+   sv_gf_2d.ProjectCoefficient(sv_coeff_2d);
+   sv_gf_2d.SyncAliasMemory(S_2d);
+
+   v_exact_coeff_2d.SetTime(t);
+   v_gf_2d.ProjectCoefficient(v_exact_coeff_2d);
+   // Sync the data location of v_gf with its base, S
+   v_gf_2d.SyncAliasMemory(S_2d);
+
+   FunctionCoefficient ste_coeff_2d(ste0_static_2d);
+   ste_coeff_2d.SetTime(t);
+   ste_gf_2d.ProjectCoefficient(ste_coeff_2d);
+   ste_gf_2d.SyncAliasMemory(S_2d);
+
+   // PLF to build mass vector
+   FunctionCoefficient rho_coeff_2d(rho0_static_2d); 
+   rho_coeff_2d.SetTime(t);
+   ParLinearForm *m_2d = new ParLinearForm(&L2FESpace_2d);
+   m_2d->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff_2d));
+   m_2d->Assemble();
+
+   cout << "gridFunctions initiated.\n";
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
+
+   cout << "Done constructing hydro op\n";
+
+   // Verify hardcoded timestep is small enough
+   hydro_2d.CalculateTimestep(S_2d);
+   if (dt_2d > hydro_2d.GetTimestep()) 
+   {
+      MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+   }
+
+   hydro_2d.MakeTimeStep(S_2d, t, dt_2d);
+
+   // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
+   // data in S. This operation simply updates the Memory validity flags of
+   // the sub-vectors to match those of S.
+   x_gf_2d.SyncAliasMemory(S_2d);
+   mv_gf_2d.SyncAliasMemory(S_2d);
+   sv_gf_2d.SyncAliasMemory(S_2d);
+   v_gf_2d.SyncAliasMemory(S_2d);
+   ste_gf_2d.SyncAliasMemory(S_2d);
+
+   // Make sure that the mesh corresponds to the new solution state. This is
+   // needed, because some time integrators use different S-type vectors
+   // and the oper object might have redirected the mesh positions to those.
+   pmesh_2d->NewNodes(x_gf_2d, false);
+
+   hydro_2d.CheckMassConservation(S_2d);
+
+   // Output mesh to be visualized
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      int precision = 12;
+      ostringstream mesh_name;
+      mesh_name << "../results/mesh-Test2D-smooth_2d-moved." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh_2d->Print(omesh);
+   }
+
+   cout << "mv_1d:\n";
+   mv_gf_1d.Print(cout);
+
+   cout << "mv_2d:\n";
+   mv_gf_2d.Print(cout);
+
+   // Verify that columns of 2d sim match columns of 1d sim
+   int a0[4] = {0, 3, 12, 15};
+   int a1[4] = {4, 7, 8, 11};
+   int a2[4] = {1, 2, 13, 14};
+   int a3[4] = {5, 6, 9, 10};
+
+   double _sv0 = sv_gf_1d[0], _sv1 = sv_gf_1d[1], _sv2 = sv_gf_1d[2], _sv3 = sv_gf_1d[3];
+   double _v0 = v_gf_1d[0], _v1 = v_gf_1d[1], _v2 = v_gf_1d[2], _v3 = v_gf_1d[3];
+   double _ste0 = ste_gf_1d[0], _ste1 = ste_gf_1d[1], _ste2 = ste_gf_1d[2], _ste3 = ste_gf_1d[3];
+
+   for (int i = 0; i < 4; i++)
+   {
+      // check sv
+      if (_sv0 != sv_gf_2d[a0[i]] || _sv1 != sv_gf_2d[a1[i]] ||
+          _sv2 != sv_gf_2d[a2[i]] || _sv3 != sv_gf_2d[a3[i]])
+      {
+         cout << "Test2D::test_smooth_hydro failed on sv.\n";
+         return 1;
+      }
+      
+      // check v
+      if (abs(_v0 - v_gf_2d[a0[i]]) > tol || abs(_v1 - v_gf_2d[a1[i]]) > tol ||
+          abs(_v2 - v_gf_2d[a2[i]]) > tol || abs(_v3 - v_gf_2d[a3[i]]) > tol) 
+      {
+         cout << "Test2D::test_smooth_hydro failed on v.\n"; 
+
+         cout << "i: " << i << endl;
+         cout << _v0 << ", " << v_gf_2d[a0[i]] << endl;
+         cout << _v1 << ", " << v_gf_2d[a1[i]] << endl;
+         cout << _v2 << ", " << v_gf_2d[a2[i]] << endl;
+         cout << _v3 << ", " << v_gf_2d[a3[i]] << endl;
+
+         return 1; 
+      }
+
+      // check ste
+      if (_ste0 != ste_gf_2d[a0[i]] || _ste1 != ste_gf_2d[a1[i]] ||
+          _ste2 != ste_gf_2d[a2[i]] || _ste3 != ste_gf_2d[a3[i]]) 
+      {
+         cout << "Test2D::test_smooth_hydro failed on ste.\n"; 
          return 1; 
       }
    }

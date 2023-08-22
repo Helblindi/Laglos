@@ -38,15 +38,15 @@ public:
    double a = 0., b = 0., gamma = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
+   bool bcs = false; // Indicator for boundary conditions
    string indicator = ""; // Possible: saltzman
-   // TODO: BC specifier
    
    virtual double get_a() { return a; }
    virtual double get_b() { return b; }
    virtual double get_gamma() { return gamma; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
-   virtual void update(Vector x_gf, double t = 0.) {};
+   virtual bool has_boundary_conditions() { return bcs; }
 
    // ProblemDescription
    static double internal_energy(const Vector &U)
@@ -193,15 +193,6 @@ public:
       return val;
    }
 
-   /*****
-    * Functions to be overwritten
-    ****/
-   virtual double pressure(const Vector &U)
-   {
-      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
-      return 1.;
-   } // virtual function, must be overridden
-
    /*********************************************
     * Functions describing the initial state
     ********************************************/
@@ -219,24 +210,31 @@ public:
       return sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
    }
 
-   /*****
-    * Functions to be overwritten
-    ****/
-   virtual double rho0(const Vector &x, const double & t)
-   {
+   /*********************************************
+    * Functions to be overridden
+    ********************************************/
+   virtual double pressure(const Vector &U) {
+      MFEM_ABORT("Must override pressure in ProblemBase class.\n");
+      return 1.;
+   } // virtual function, must be overridden
+   virtual double rho0(const Vector &x, const double & t) {
       MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
       return 1.;
    } // virtual function, must be overridden
-   virtual void v0(const Vector &x, const double & t, Vector &v)
-   {
-      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+   virtual void v0(const Vector &x, const double & t, Vector &v) {
+      MFEM_ABORT("Must override v0 in ProblemBase class.\n");
       return;
    } // virtual function, must be overridden
-   virtual double sie0(const Vector &x, const double & t)
-   {
-      MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
+   virtual double sie0(const Vector &x, const double & t) {
+      MFEM_ABORT("Must override sie0 in ProblemBase class.\n");
       return 0.;
    } // virtual function, must be overridden
+   virtual void update(Vector x_gf, double t = 0.) {
+      MFEM_ABORT("Must override update in ProblemBase class.\n");
+   };
+   virtual void enforce_bcs(Vector &S, Array<int> BdrElementIndexingArray) {
+      MFEM_ABORT("Must override enforce_bcs in ProblemBase class.\n");
+   }
    
 }; // End ProblemBase
 

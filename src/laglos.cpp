@@ -189,6 +189,11 @@ int main(int argc, char *argv[]) {
          problem_class = new LeblancProblem<dim>();
          break;
       }
+      case 5: // Isentropic Vortex, stationary center
+      {
+         problem_class = new IsentropicVortex<dim>();
+         break;
+      }
       case 8:
       {
          problem_class = new VdwTest1<dim>();
@@ -209,9 +214,8 @@ int main(int argc, char *argv[]) {
          problem_class = new VdwTest4<dim>();
          break;
       }
-      case 4:
-      case 5:
-      case 6:
+      case 4: // Noh
+      case 6: // Open
       case 7: MFEM_ABORT("Case not implemented.\n");
       default:
       {

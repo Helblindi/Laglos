@@ -682,65 +682,91 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
       } // End Face iterator
 
-      // Enforce exact condition on boundary for Noh
-      // if (pb->indicator == "noh" && is_boundary_cell)
-      // {
-      //    // Compute cell center and corresponding velocity at this location
-      //    // Get center node dof
-      //    int cell_vdof;
-      //    Vector cell_x(dim);
-      
-      //    switch (dim)
-      //    {
-      //       case 1:
-      //       {
-      //          cell_vdof = num_faces + ci;
-      //          break;
-      //       }
-      //       case 2:
-      //       {
-      //          cell_vdof = NVDofs_H1 + num_faces + ci;
-      //          break;
-      //       }
-      //       case 3:
-      //       {
-      //          MFEM_ABORT("3D not implemented.\n");
-      //       }
-      //       default:
-      //       {
-      //          MFEM_ABORT("Incorrect dim value provided.\n");
-      //       }
-      //    }
+      // Enforce exact condition on boundary for Noh and Isentropic Vortex
+      if (pb->has_boundary_conditions() && is_boundary_cell)
+      {
+         if (pb->get_indicator() == "IsentropicVortex" || pb->get_indicator() == "Noh")
+         {
+            EnforceExactBCOnCell(S, ci, t, dt, val);
+         }
+         
+      }
+      else
+      {
+         // Do the normal thing
+         assert(sum_validation.Norml2() < 1e-12);
 
-      //    GetNodePosition(S, cell_vdof, cell_x);
-
-      //    // TODO: Fill in val with exact solution
-      //    val[0] = pb->rho0(cell_x, t+dt); // Is this t or t + dt?
-      //    Vector v_exact(dim);
-      //    pb->v0(cell_x, t+dt, v_exact);
-      //    for (int i = 0; i < dim; i++)
-      //    {
-      //       val[1 + i] = v_exact[i];
-      //    }
-      //    val[dim + 1] = pb->ste0(cell_x, t+dt);
-      // }
-      // else
-      // {
-      // Do the normal thing
-      assert(sum_validation.Norml2() < 1e-12);
-
-      sums *= dt;
-      double k = pmesh->GetElementVolume(ci);
-      double _mass = k / U_i[0];
-      sums /= _mass;
-      val += sums;
-      // }
+         sums *= dt;
+         double k = pmesh->GetElementVolume(ci);
+         double _mass = k / U_i[0];
+         sums /= _mass;
+         val += sums;
+      }
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);
-      
    } // End cell iterator
+
+   // Finally, update S
    S = S_new;
+}
+
+
+/****************************************************************************************************
+* Function: EnforceExactBCOnCell
+* Parameters:
+*  cell      - Index representing the cell
+*  state_val - Returned vector containing the exacthydrodynamic state variables
+*
+* Purpose:
+*  Given a cell, return the exact hydrodynamic state variables of that cell.
+*  This function is used to enforce the exact solution on the boundary at a
+*  particular cell.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
+                                                     const double &dt, Vector & state_val)
+{
+   cout << "EnforceExactBCOnCell\n";
+
+   // Compute cell center and corresponding velocity at this location
+   // Get center node dof
+   int cell_vdof;
+   Vector cell_x(dim);
+
+   switch (dim)
+   {
+      case 1:
+      {
+         cell_vdof = num_faces + cell;
+         break;
+      }
+      case 2:
+      {
+         cell_vdof = NVDofs_H1 + num_faces + cell;
+         break;
+      }
+      case 3:
+      {
+         MFEM_ABORT("3D not implemented.\n");
+      }
+      default:
+      {
+         MFEM_ABORT("Incorrect dim value provided.\n");
+      }
+   }
+
+   GetNodePosition(S, cell_vdof, cell_x);
+
+   // TODO: Fill in val with exact solution
+   state_val[0] = pb->sv0(cell_x, t+dt); // Is this t or t + dt?
+   Vector v_exact(dim);
+   pb->v0(cell_x, t+dt, v_exact);
+   for (int i = 0; i < dim; i++)
+   {
+      state_val[1 + i] = v_exact[i];
+   }
+   state_val[dim + 1] = pb->ste0(cell_x, t+dt);
 }
 
 

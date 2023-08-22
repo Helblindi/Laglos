@@ -132,25 +132,22 @@ public:
    void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    
-   // Functions representing development on April 2023
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
-
    void ComputeNodeVelocities(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    void FillCenterVelocitiesWithAvg(Vector &S);
    void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
+   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string ="NA", 
+                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
-
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
-
    void GetNodePosition(const Vector &S, const int & node, Vector & x);
 
-   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string ="NA", 
-                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-
+   void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
+                             const double &dt, Vector & state_val);
+   
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S);
 

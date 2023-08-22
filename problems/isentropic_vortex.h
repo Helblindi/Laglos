@@ -34,6 +34,8 @@ public:
    double gamma = 7./5.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
+   bool bcs = true;
+   string indicator = "IsentropicVortex"; // Possible: saltzman
 
    // Free steam conditions
    const double rho_inf = 1., p_inf = 1., T_inf = 1.;
@@ -46,8 +48,10 @@ public:
    virtual double get_a() override { return a; }
    virtual double get_b() override { return b; }
    virtual double get_gamma() override { return gamma; }
+   virtual string get_indicator() override { return indicator; }
    virtual bool get_distort_mesh() override { return distort_mesh; }
    virtual bool has_exact_solution() override { return known_exact_solution; }
+   virtual bool has_boundary_conditions() override { return bcs; }
 
    /*********************************************************
     * Problem Description functions

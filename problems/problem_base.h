@@ -44,6 +44,7 @@ public:
    virtual double get_a() { return a; }
    virtual double get_b() { return b; }
    virtual double get_gamma() { return gamma; }
+   virtual string get_indicator() { return indicator; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
    virtual bool has_boundary_conditions() { return bcs; }
@@ -230,11 +231,8 @@ public:
       return 0.;
    } // virtual function, must be overridden
    virtual void update(Vector x_gf, double t = 0.) {
-      MFEM_ABORT("Must override update in ProblemBase class.\n");
+      // MFEM_ABORT("Must override update in ProblemBase class.\n");
    };
-   virtual void enforce_bcs(Vector &S, Array<int> BdrElementIndexingArray) {
-      MFEM_ABORT("Must override enforce_bcs in ProblemBase class.\n");
-   }
    
 }; // End ProblemBase
 

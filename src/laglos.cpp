@@ -18,11 +18,6 @@
 /*
 * Example run time parameters:
 *
-* ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 2, dim = 2] Isentropic vortex, stationary center
-* ./Laglos -m data/ref-square-c0.mesh -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 5 [problem =3, dim=2]
-* 
-* ./Laglos -m data/shocktube.mesh -tf 0.225 -cfl 0.1 -ot -visc -mm -vis -rs 3 [problem = 6, dim = 2, shocktube = 1] // Sod
-* ./Laglos -m data/ref-square-tube.mesh -tf 0.67 -cfl 0.2 -ot -visc -mm -vis -rs 5 [problem = 6, dim = 2, shocktube = 3]
 * ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 * ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 *
@@ -45,8 +40,9 @@
 * ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
 *
 * ----- 2D -----
-* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4
+* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4     ## Smooth wave in 2D
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4   ## Sod in 2D
+* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 ## Isentropic Vortex
 *
 */
 #include "lambda_max_lagrange.h"

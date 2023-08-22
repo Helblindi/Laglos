@@ -8,6 +8,7 @@
 *  4) Specify initial conditions given by rho0, v0, and sie0
 *  5) Add corresponding problem option to laglos.cpp
 *  6) Add to include header file problems/test_problems_include.h
+*  7) Enforce boundary conditions in laglos_solver.cpp
 *********************************************************/
 
 

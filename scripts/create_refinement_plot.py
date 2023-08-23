@@ -24,13 +24,8 @@ def main():
       f = os.path.join(directory, filename)
       refinements = filename[3:5]
       print('refinements: ', refinements)
-      # rec_arr = np.genfromtxt(f, delimiter = ",", names=True, dtype=None)
       df = pd.read_csv(f, dtype=float).sort_values(by=['x'])
-      # print(df)
-      # print(df.dtypes)
-      # df = df.sort_values(by=['x'])
-      # print('sorted df')
-      # print(df)
+
       for i, col in enumerate(df.columns):
          if (i == 0): continue # Skip first column
          axs[i-1].set_xlabel(df.columns[0])
@@ -39,6 +34,14 @@ def main():
             axs[i-1].plot(df[df.columns[0]], df[col], 'k--', label=refinements)
          else:
             axs[i-1].plot(df[df.columns[0]], df[col], '-', label=refinements)
+
+      # plt.xlabel(df.columns[0])
+      # plt.ylabel(df.columns[1])
+      # plt.title("Sod Shocktube")
+      # if (refinements == "ex"):
+      #    plt.plot(df[df.columns[0]], df[df.columns[1]], 'k--', label=refinements)
+      # else:
+      #    plt.plot(df[df.columns[0]], df[df.columns[1]], '-', label=refinements)
    
    plt.legend()
    plt.show()

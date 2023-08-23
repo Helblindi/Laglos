@@ -728,21 +728,7 @@ int main(int argc, char *argv[]) {
             if (problem_class->has_exact_solution())
             {
                problem_class->update(x_gf, t);
-               // if (problem == 1) // Sod
-               // {
-               //    riemann1D::ExactDensityCoefficient rho_coeff_r;
-               //    rho_coeff_r.SetTime(t);
-               //    riemann1D::ExactVelocityCoefficient v_coeff_r;
-               //    v_coeff_r.SetTime(t);
-               //    riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
-               //    ste_coeff_r.SetTime(t);
 
-               //    rho_ex->ProjectCoefficient(rho_coeff_r);
-               //    vel_ex->ProjectCoefficient(v_coeff_r);
-               //    ste_ex->ProjectCoefficient(ste_coeff_r);
-               // }
-               // else
-               // {
                rho_coeff.SetTime(t);
                v_coeff.SetTime(t);
                ste_coeff.SetTime(t);
@@ -943,8 +929,47 @@ int main(int argc, char *argv[]) {
    
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
 
-   
+   if (problem_class->has_exact_solution())
+   {
+      // Compute errors
+      ParGridFunction *sv_ex = new ParGridFunction(sv_gf.ParFESpace());
+      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
+      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
 
+      // Save exact to file as well
+      BlockVector S_exact(offset, Device::GetMemoryType());
+
+      x_gf.MakeRef(&H1FESpace, S_exact, offset[0]);
+      mv_gf.MakeRef(&H1FESpace, S_exact, offset[1]);
+      sv_ex->MakeRef(&L2FESpace, S_exact, offset[2]);
+      vel_ex->MakeRef(&L2VFESpace, S_exact, offset[3]);
+      ste_ex->MakeRef(&L2FESpace, S_exact, offset[4]);
+
+      // Project exact solution
+      problem_class->update(x_gf, t);
+
+      sv_coeff.SetTime(t);
+      v_coeff.SetTime(t);
+      ste_coeff.SetTime(t);
+
+      sv_ex->ProjectCoefficient(sv_coeff);
+      sv_ex->SyncAliasMemory(S_exact);
+
+      vel_ex->ProjectCoefficient(v_coeff);
+      vel_ex->SyncAliasMemory(S_exact);
+
+      ste_ex->ProjectCoefficient(ste_coeff);
+      ste_ex->SyncAliasMemory(S_exact);
+
+      // Print grid functions to files
+      ostringstream sv_ex_filename_suffix;
+      sv_ex_filename_suffix << setfill('0') << setw(2)
+                        << "exact"
+                        << ".out";
+      
+      hydro.SaveStateVecsToFile(S_exact, sv_output_prefix, sv_ex_filename_suffix.str());
+   }
+   
 
    // Print moved mesh
    // Can be visualized with glvis -np # -m mesh-test-moved

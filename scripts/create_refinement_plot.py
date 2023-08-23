@@ -35,7 +35,10 @@ def main():
          if (i == 0): continue # Skip first column
          axs[i-1].set_xlabel(df.columns[0])
          axs[i-1].set_ylabel(col)
-         axs[i-1].plot(df[df.columns[0]], df[col], label=refinements)
+         if (refinements == "ex"):
+            axs[i-1].plot(df[df.columns[0]], df[col], 'k--', label=refinements)
+         else:
+            axs[i-1].plot(df[df.columns[0]], df[col], '-', label=refinements)
    
    plt.legend()
    plt.show()

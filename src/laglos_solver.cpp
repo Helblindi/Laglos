@@ -1277,7 +1277,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 *  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
+void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFunction & mc_gf)
 {
    Vector U_i(dim + 2);
    int counter = 0;
@@ -1299,6 +1299,14 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S)
          // cout << "m: " << m << endl;
          // cout << "K/T: " << k / U_i[0] << endl;
          // cout << endl;
+         
+         // Fill corresponding cell to indicate graphically mass was broken
+         mc_gf[ci] = 1.;
+      }
+      else
+      {
+         // Fill corresponding cell to indicate graphically mass was not broken
+         mc_gf[ci] = 0.;
       }
    }
    double cell_ratio = (double)counter / (double)NDofs_L2;

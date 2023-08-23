@@ -412,29 +412,29 @@ int main(int argc, char *argv[]) {
          x_gf[vertex] = x_new;
       }
 
-      // // Adjust all face nodes to be averages of their adjacent corners
-      // mfem::Mesh::FaceInformation FI;
-      // for (int face = 0; face < pmesh->GetNumFaces(); face++)
-      // {
-      //    cout << "Iterating on face: " << face << endl;
-      //    FI = pmesh->GetFaceInformation(face);
-      //    Array<int> face_dof_row;
-      //    H1FESpace.GetFaceDofs(face, face_dof_row);
+      // Adjust all face nodes to be averages of their adjacent corners
+      mfem::Mesh::FaceInformation FI;
+      for (int face = 0; face < pmesh->GetNumFaces(); face++)
+      {
+         cout << "Iterating on face: " << face << endl;
+         FI = pmesh->GetFaceInformation(face);
+         Array<int> face_dof_row;
+         H1FESpace.GetFaceDofs(face, face_dof_row);
 
-      //    cout << "Face dof row for face: " << face << ":\n";
-      //    face_dof_row.Print(cout);
+         cout << "Face dof row for face: " << face << ":\n";
+         face_dof_row.Print(cout);
 
-      //    int face_dof = face_dof_row[2];
-      //    int index0 = face_dof_row[0];
-      //    int index1 = face_dof_row[1];
-      //    for (int i = 0; i < dim; i++)
-      //    {
-      //       int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
-      //       int node0_index = index0 + i * H1FESpace.GetNDofs();
-      //       int node1_index = index1 + i * H1FESpace.GetNDofs();
-      //       x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
-      //    }
-      // }
+         int face_dof = face_dof_row[2];
+         int index0 = face_dof_row[0];
+         int index1 = face_dof_row[1];
+         for (int i = 0; i < dim; i++)
+         {
+            int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
+            int node0_index = index0 + i * H1FESpace.GetNDofs();
+            int node1_index = index1 + i * H1FESpace.GetNDofs();
+            x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
+         }
+      }
       cout << "Mesh distorted\n";
    }
 
@@ -497,11 +497,13 @@ int main(int argc, char *argv[]) {
    cout << "Solver created.\n";
 
    /* Set up visualiztion object */
-   socketstream vis_rho, vis_v, vis_ste, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
+   socketstream vis_rho, vis_v, vis_ste, vis_mc, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
    char vishost[] = "localhost";
    int  visport   = 19916;
 
    ParGridFunction rho_gf(&L2FESpace);
+   ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
+   mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
    if (visualization)
    {
@@ -526,6 +528,8 @@ int main(int argc, char *argv[]) {
       vis_rho_err.precision(8);
       vis_v_err.precision(8);
       vis_ste_err.precision(8);
+
+      vis_mc.precision(8);
 
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
@@ -675,7 +679,7 @@ int main(int argc, char *argv[]) {
                  << endl;
          }
          // Output mass conservation information
-         hydro.CheckMassConservation(S);
+         hydro.CheckMassConservation(S, mc_gf);
 
          // Turn back on suppression
          if (suppress_output)
@@ -707,6 +711,11 @@ int main(int argc, char *argv[]) {
             VisualizeField(vis_ste, vishost, visport, ste_gf,
                            "Specific Total Energy",
                            Wx, Wy, Ww,Wh);
+            Wx += offx;
+
+            VisualizeField(vis_mc, vishost, visport, mc_gf,
+                           "Mass Conservation",
+                           Wx, Wy, Ww, Wh);
             
             Wx = 0;
             Wy += offy;

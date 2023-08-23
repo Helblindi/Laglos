@@ -149,7 +149,7 @@ public:
                              const double &dt, Vector & state_val);
    
    double CalcMassLoss(const Vector &S);
-   void CheckMassConservation(const Vector &S);
+   void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
 
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);

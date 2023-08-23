@@ -749,7 +749,8 @@ int test_sod_hydro()
    // and the oper object might have redirected the mesh positions to those.
    pmesh_1d->NewNodes(x_gf_1d, false);
 
-   hydro_1d.CheckMassConservation(S_1d);
+   ParGridFunction mc_gf_1d(&L2FESpace_1d);
+   hydro_1d.CheckMassConservation(S_1d, mc_gf_1d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -906,7 +907,8 @@ int test_sod_hydro()
    // and the oper object might have redirected the mesh positions to those.
    pmesh_2d->NewNodes(x_gf_2d, false);
 
-   hydro_2d.CheckMassConservation(S_2d);
+   ParGridFunction mc_gf_2d(&L2FESpace_2d);
+   hydro_2d.CheckMassConservation(S_2d, mc_gf_2d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -1125,7 +1127,8 @@ int test_smooth_hydro()
    // and the oper object might have redirected the mesh positions to those.
    pmesh_1d->NewNodes(x_gf_1d, false);
 
-   hydro_1d.CheckMassConservation(S_1d);
+   ParGridFunction mc_gf_1d(&L2FESpace_1d);
+   hydro_1d.CheckMassConservation(S_1d, mc_gf_1d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -1282,7 +1285,8 @@ int test_smooth_hydro()
    // and the oper object might have redirected the mesh positions to those.
    pmesh_2d->NewNodes(x_gf_2d, false);
 
-   hydro_2d.CheckMassConservation(S_2d);
+   ParGridFunction mc_gf_2d(&L2FESpace_2d);
+   hydro_2d.CheckMassConservation(S_2d, mc_gf_2d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved

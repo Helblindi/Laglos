@@ -33,6 +33,7 @@ int main(int argc, char **argv)
    std::string ind;
    int num_cases = 0, case_num = 0, k = 0;
    double rhoL, rhoR, uL, uR, pL, pR, tol;
+   double tauL, tauR;
    double b_covolume, gamma, eL, eR;
    double lambdaL, lambdaR, pstar, vstar;
 
@@ -66,6 +67,9 @@ int main(int argc, char **argv)
              >> pL
              >> pR;            
 
+         tauL = 1./rhoL;
+         tauR = 1./rhoR;
+
          next_initial_data = false;
          next_tol = true;
       }
@@ -82,14 +86,15 @@ int main(int argc, char **argv)
          eL = gamma_law_internal(b_covolume, rhoL, pL, gamma);
          eR = gamma_law_internal(b_covolume, rhoR, pR, gamma);
          __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
-            &rhoL, &uL, &eL, &pL, &rhoR, &uR, &eR, &pR, &tol, 
+            &tauL, &uL, &eL, &pL, &tauR, &uR, &eR, &pR, &tol, 
             &no_iter, &lambdaL, &lambdaR, &pstar, &k, &b_covolume);
          
          next_tol = false;
 
          // Output
-         out << "===Case " << case_num << endl
-         << "lambda_max=" << max(abs(lambdaL), abs(lambdaR)) << ", pstar=" << pstar << " k=" << k << endl;
+         out << "===Case " << case_num << endl;
+         out << "rhoL: " << rhoL << ", rhoR: " << rhoR << ", uL: " << uL << ", uR: " << uR << ", pL: " << pL << ", pR: " << pR << endl;
+         out << "lambda_max=" << max(abs(lambdaL), abs(lambdaR)) << ", pstar=" << pstar << " k=" << k << endl;
       }
 
       /* Set indicators for next line */

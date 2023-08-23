@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # This is a script to run convergence analysis on Laglos using Release version
-laglos_dir="/Users/madisonsheridan/Workspace/Laglos"
+laglos_dir="/Users/sheridan7/Workspace/Laglos"
 scripts_dir="${laglos_dir}/scripts"
 bin_dir="${laglos_dir}/build"
 create_convergence="${scripts_dir}/create_convergence_table.py"
@@ -26,19 +26,20 @@ cd $bin_dir
 # options="-m data/ref-segment.mesh -visc -mm -tf 0.6 -ot -cfl 1 -so -vs 100" # 1D Smooth Wave 2nd Order IDP Paper
 # options="-m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.25 -ot -visc -mm -so -vs 100" # Sod
 # options="-m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -so -vs 100"   ## Lax
-options="-m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -so -vs 100"    ## Leblanc
+# options="-m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -so -vs 100"    ## Leblanc
 
 
 # Dim = 2 cases
+options="-m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -so -vs 100" ## Isentropic Vortex
 
 # ./Laglos -rs 0 $options
 # ./Laglos -rs 1 $options
 # ./Laglos -rs 2 $options
-# ./Laglos -rs 3 $options
+./Laglos -rs 3 $options
 ./Laglos -rs 4 $options
 ./Laglos -rs 5 $options
 ./Laglos -rs 6 $options
-./Laglos -rs 7 $options
+# ./Laglos -rs 7 $options
 # ./Laglos -rs 8 $options
 # ./Laglos -rs 9 $options
 # ./Laglos -rs 10 $options

@@ -4,7 +4,8 @@ PROGRAM riemann
    INTEGER, PARAMETER           :: NUMBER = KIND(1.d0)
    REAL(KIND=NUMBER), PARAMETER :: gamma_ideal=1.4d0
    REAL(KIND=NUMBER), PARAMETER :: gamma_vdw=1.02d0, a_vdw=1.d0, b_vdw=1.d0
-   REAL(KIND=NUMBER)            :: rhol, taul, el, rhor, taur, er
+   REAL(KIND=NUMBER)            :: rhol, el, rhor, er
+   REAL(KIND=NUMBER)            :: taul, taur
    REAL(KIND=NUMBER)            :: ul, pl, ur, pr
    REAL(KIND=NUMBER)            :: lambda_maxl, lambda_maxr, pstar, tol, t1, t2
    INTEGER                      :: k, n, num_cases, it, unit = 21
@@ -41,8 +42,10 @@ PROGRAM riemann
    !===Read in the number of test cases
    READ (unit, *) num_cases
 
+   WRITE(*,*) "Starting main loop"
    !===Main loop for computing the test problems
    DO it = 1, num_cases
+      WRITE(*,*) "Iteration: ", it
       WRITE (case_number, '(I3)') it
       header = '===Case '//TRIM(ADJUSTL(case_number))
       CALL find_string(unit, header, OKAY)
@@ -52,28 +55,26 @@ PROGRAM riemann
       END IF
       READ (21, *) rhol, rhor, ul, ur, pl, pr
       READ (21, *) tol
-      !===covolume EOS
-      b_covolume = 0.1/max(rhol,rhor)
 
-      taul = 1.d0 / rhol
-      taur = 1.d0 / rhor
-      
-      !===The cases 15 an onwards use the van der Waals EOS
       IF (it < 15) THEN 
-          el = gamma_law_internal(rhol, pl)
-          er = gamma_law_internal(rhor, pr)
+            el = gamma_law_internal(rhol, pl)
+            er = gamma_law_internal(rhor, pr)
       ELSE
-          el = van_der_waals_internal(rhol, pl)
-          er = van_der_waals_internal(rhor, pr)
+            el = van_der_waals_internal(rhol, pl)
+            er = van_der_waals_internal(rhor, pr)
       END IF 
+
+      taul = 1.d0/rhol
+      taur = 1.d0/rhor
 
       CALL CPU_TIME(t1)
       DO n = 1, 1 !1000000
-         CALL lagrangian_lambda_arbitrary_eos(rhol, ul, el, pl, rhor, ur, er, pr, tol, WANT_ITER, &
-                                   lambda_maxl, lambda_maxr, pstar, k, b_covolume)
+         CALL lambda_arbitrary_eos(taul, ul, el, pl, taur, ur, er, pr, tol, WANT_ITER, &
+                                   lambda_maxl, lambda_maxr, pstar, k)
       END DO
       CALL CPU_TIME(t2)
       WRITE (*, *) header
+      WRITE(*,*) "rhol: ", rhol, ", rhor: ", rhor
       !WRITE(*,'(A,e23.17)') 'CPU ', t2-t1
       WRITE (*, '(2(A,e23.17,x),A,I1)') ' lambda_max=', &
          MAX(ABS(lambda_maxl), ABS(lambda_maxr)), 'pstar=', pstar, 'k=', k

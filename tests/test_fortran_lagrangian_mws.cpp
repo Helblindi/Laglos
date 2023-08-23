@@ -11,7 +11,7 @@ using namespace std;
 
 // Fortran subroutine from Lagrangian code
 extern "C" {
-   void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+   void __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
       double *in_taul, double *in_ul, double *in_el, double *in_pl,
       double *in_taur, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *no_iter,double *lambda_maxl_out,

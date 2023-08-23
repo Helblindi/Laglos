@@ -1,5 +1,17 @@
 ===Number of cases
-18
+20
+
+===Shock/shock near max compressibility (Section 6.2 Equation 6.6)
+===Case 1
+0.9932d0 0.945d0 3.d0 -3.d0 2.d0 2.d0
+1.d-15
+
+
+===Fast shock (Section 5.2, Case 1)
+===Case 1
+1.d0 1.d0 10.d0 10.d0 1000.d0 0.01d0
+1.d-15
+
 
 ===Leblanc
 ===Case 1
@@ -93,7 +105,7 @@
 
 ===Shock/shock near max compressibility (Section 6.2 Equation 6.6)
 ===Case 18
-0.9932d0 0.95d0 3.d0 -3.d0 2.d0 2.d0
+0.9932d0 0.945d0 3.d0 -3.d0 2.d0 2.d0
 1.d-15
 
 

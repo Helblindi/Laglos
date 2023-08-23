@@ -1,11 +1,11 @@
 !===Authors: Bennett Clayton, Jean-Luc Guermond, and Bojan Popov, Texas A&M, April 5, 2021
 MODULE arbitrary_eos_lagrangian_lambda_module
    IMPLICIT NONE
-   PUBLIC               :: lagrangian_lambda_arbitrary_eos !===Main function
+   PUBLIC               :: lambda_arbitrary_eos !===Main function
    PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
-   REAL(KIND=8), PUBLIC :: b_covolume = 0.d0   !===Covolume constant, if known
-   REAL(KIND=8), PUBLIC :: p_infty = 0.d0      !===Reference pressure
-   REAL(KIND=8), PUBLIC :: q = 0.d0            !===Reference specific internal energy
+   REAL(KIND=8), PARAMETER, PUBLIC :: b_covolume = 0.d0   !===Covolume constant, if known
+   REAL(KIND=8), PARAMETER, PUBLIC :: p_infty = 0.d0      !===Reference pressure
+   REAL(KIND=8), PARAMETER, PUBLIC :: q = 0.d0            !===Reference specific internal energy
    PRIVATE
    INTEGER, PARAMETER:: NUMBER = KIND(1.d0)
    REAL(KIND=NUMBER), PARAMETER :: five_third = 5.d0/3.d0
@@ -22,20 +22,17 @@ MODULE arbitrary_eos_lagrangian_lambda_module
 
 CONTAINS
 
-   SUBROUTINE lagrangian_lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
-                                   WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k, b_covolume_in)
+   SUBROUTINE lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
+                                   WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: in_taul, in_el, in_taur, in_er, in_tol
+      REAL(KIND=8), INTENT(IN) :: in_taul, in_taur, in_el, in_er, in_tol
       REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
-      !The only way to be able to set this submodule variable from c++ implementation
-      REAL(KIND=8), INTENT(IN) :: b_covolume_in 
       LOGICAL, INTENT(IN) :: WANT_ITERATION
       REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
       INTEGER, INTENT(OUT):: k
       REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
       LOGICAL                  :: check
       !===Initialization
-      b_covolume = b_covolume_in
       taul = in_taul
       ul = in_ul
       pl = in_pl
@@ -88,8 +85,8 @@ CONTAINS
       expo_max = (gamma_max - 1.d0)/(2.d0*gamma_max)
       numerator = alphal + alphar - ur + ul
       vacuum = capCl + capCr + ul - ur
-      phi_pmin = capC_max*((p_min/p_max)**expo_max - 1.d0) + ur - ul
-      phi_pmax = (p_max - p_min)*SQRT(capA_min/(p_max + capB_min)) + ur - ul
+      phi_pmin = capC_max*(((p_min + p_infty)/(p_max + p_infty))**expo_max - 1.d0) + ur - ul
+      phi_pmax = (p_max - p_min)*SQRT(capA_min/(p_max + p_infty + capB_min)) + ur - ul
 
       !===Initialize p1 and p2 where p1 <= pstar <= p2
       CALL initialize_p1_p2(p1, p2)
@@ -125,7 +122,7 @@ CONTAINS
             k = k + 1
          END DO
       END IF
-   END SUBROUTINE lagrangian_lambda_arbitrary_eos
+   END SUBROUTINE lambda_arbitrary_eos
 
    SUBROUTINE init(tau, e, p, gamma, a, alpha, capA, capB, capC, expo)
       IMPLICIT NONE
@@ -138,7 +135,7 @@ CONTAINS
       !===local sound speed (a_Z)
       a = tau*SQRT(gamma*(p + p_infty)/x)
       !===other relevant constants
-      capC = 2.d0*a*x/(gamma - 1.d0)
+      capC = 2.d0*a*x/(tau*(gamma - 1.d0))
       alpha = cc(gamma)*capC
       capA = 2.d0*x/(gamma + 1.d0)
       capB = (gamma - 1.d0)/(gamma + 1.d0)*(p + p_infty)
@@ -266,9 +263,9 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN) :: p, pz, capAz, capBz, capCz, expoz
       REAL(KIND=NUMBER)             :: ff
       IF (p <= pz) THEN
-         ff = capCz*((p/pz)**expoz - 1)
+         ff = capCz*(((p + p_infty)/(pz + p_infty))**expoz - 1.d0)
       ELSE
-         ff = (p - pz)*SQRT(capAz/(p + capBz))
+         ff = (p - pz)*SQRT(capAz/(p + p_infty + capBz))
       END IF
    END FUNCTION f
 
@@ -282,9 +279,9 @@ CONTAINS
          REAL(KIND=NUMBER), INTENT(IN) :: p_var, pz, capAz, capBz, capCz, expoz
          REAL(KIND=NUMBER)             :: val_f
          IF (p_var <= pz) THEN
-            val_f = capCz*expoz*((p_var + p_infty)/(pz + p_infty))**(expoz - 1)/pz
+            val_f = capCz*expoz*((p_var + p_infty)/(pz + p_infty))**(expoz - 1.d0)/(pz + p_infty)
          ELSE
-            val_f = SQRT(capAz/(p_var + p_infty + capBz))*(1 - (p_var - pz)/(2.d0*(p_var + p_infty + capBz)))
+            val_f = SQRT(capAz/(p_var + p_infty + capBz))*(1.d0 - (p_var - pz)/(2.d0*(p_var + p_infty + capBz)))
          END IF
       END FUNCTION f_prime
    END FUNCTION phi_prime

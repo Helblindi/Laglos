@@ -135,7 +135,6 @@ include_directories(SYSTEM ${matplotlib_SOURCE_DIR})
 
 add_subdirectory(Fortran)
 add_subdirectory(src)
-add_subdirectory(results)
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/convergence/temp_output")
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/state_vectors")
 

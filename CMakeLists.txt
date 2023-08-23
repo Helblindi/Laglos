@@ -136,8 +136,8 @@ include_directories(SYSTEM ${matplotlib_SOURCE_DIR})
 add_subdirectory(Fortran)
 add_subdirectory(src)
 add_subdirectory(results)
-add_subdirectory(results/convergence)
-add_subdirectory(results/convergence/temp_output)
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/convergence/temp_output")
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/state_vectors")
 
 # Enable testing
 # https://cmake.org/cmake/help/latest/command/add_test.html

@@ -10,7 +10,7 @@ using namespace std;
 
 // Fortran subroutine from Lagrangian code
 extern "C" {
-   void __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+   void __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
       double *in_taul, double *in_ul, double *in_el, double *in_pl,
       double *in_taur, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *no_iter,double *lambda_maxl_out,
@@ -122,7 +122,7 @@ public:
       // b_covolume = .1 / max(in_rhol, in_rhor);
 
       // cout << "CLM pre fortran function.\n";
-      // __arbitrary_eos_lagrangian_lambda_module_MOD_lagrangian_lambda_arbitrary_eos(
+      // __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
       //    &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
       //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
 

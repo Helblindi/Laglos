@@ -22,10 +22,10 @@ MODULE arbitrary_eos_lagrangian_lambda_module
 
 CONTAINS
 
-   SUBROUTINE lambda_arbitrary_eos(in_taul, in_ul, in_el, in_pl, in_taur, in_ur, in_er, in_pr, in_tol, &
+   SUBROUTINE lambda_arbitrary_eos(in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr, in_tol, &
                                    WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: in_taul, in_taur, in_el, in_er, in_tol
+      REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
       REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
       LOGICAL, INTENT(IN) :: WANT_ITERATION
       REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
@@ -33,11 +33,11 @@ CONTAINS
       REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
       LOGICAL                  :: check
       !===Initialization
-      taul = in_taul
+      taul = 1.d0/in_rhol
       ul = in_ul
       pl = in_pl
       el = in_el
-      taur = in_taur
+      taur = 1.d0/in_rhor
       ur = in_ur
       pr = in_pr
       er = in_er

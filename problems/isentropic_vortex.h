@@ -35,7 +35,7 @@ public:
    bool distort_mesh = false;
    bool known_exact_solution = true;
    bool bcs = true;
-   string indicator = "IsentropicVortex"; // Possible: saltzman
+   string indicator = "IsentropicVortex"; // Possible: saltzmann
 
    // Free steam conditions
    const double rho_inf = 1., p_inf = 1., T_inf = 1.;

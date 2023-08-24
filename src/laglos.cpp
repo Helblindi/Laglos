@@ -18,7 +18,7 @@
 /*
 * Example run time parameters:
 *
-* ./Laglos -m data/rectangle_saltzman.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
+* ./Laglos -m data/rectangle_saltzmann.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 * ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
 *
 * -------------- 2D ----------
@@ -190,6 +190,11 @@ int main(int argc, char *argv[]) {
          problem_class = new IsentropicVortex<dim>();
          break;
       }
+      case 7:
+      {
+         problem_class = new SaltzmannProblem<dim>();
+         break;
+      }
       case 8:
       {
          problem_class = new VdwTest1<dim>();
@@ -211,8 +216,7 @@ int main(int argc, char *argv[]) {
          break;
       }
       case 4: // Noh
-      case 6: // Open
-      case 7: MFEM_ABORT("Case not implemented.\n");
+      case 6: MFEM_ABORT("Case not implemented.\n");
       default:
       {
          problem_class = new ProblemTemplate<dim>();

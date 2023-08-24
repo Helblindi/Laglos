@@ -431,7 +431,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
          {
             int index = verts[k];
             // cout << "vert index: " << index << endl;
-            if (pb->indicator == "saltzman")
+            if (pb->get_indicator() == "saltzmann")
             {
                // Replace the bdr attribute in the array as long as it is not
                // the dirichlet condition (For Saltzman Problem)
@@ -619,63 +619,64 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             y_temp_bdry = 0.;
 
             /* Enforce Boundary Conditions */
-            // if (pb->indicator == "noh")
-            // {
-            //    // Since we will enforce Dirichlet conditions on all boundary cells, 
-            //    // this enforcement will be done after the face iterator
-            // }
-            // else if (pb->indicator == "saltzman")
-            // {
-            //    // Check bdry flag
-            //    int BdrElIndex = BdrElementIndexingArray[fids[j]];
-            //    int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+            if (pb->get_indicator() == "noh")
+            {
+               // Since we will enforce Dirichlet conditions on all boundary cells, 
+               // this enforcement will be done after the face iterator
+            }
+            else if (pb->get_indicator() == "saltzmann")
+            {
+               // Check bdry flag
+               int BdrElIndex = BdrElementIndexingArray[fids[j]];
+               int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
 
-            //    if (bdr_attribute == 1) // Dirichlet (star states "ghost")
-            //    {
-            //       double _rho = 3.9992502342988532;
-            //       double _p = 1.3334833281256551;
-            //       Vector _v(dim);
-            //       _v = 0.;
-            //       _v[0] = 1.; //e_x
-            //       Vector _v_neg = _v, _vp = _v;
-            //       _v_neg *= -1.;
-            //       _vp *= _p;
+               if (bdr_attribute == 1) // Dirichlet (star states "ghost")
+               {
+                  double _rho = 3.9992502342988532;
+                  double _p = 1.3334833281256551;
+                  Vector _v(dim);
+                  _v = 0.;
+                  _v[0] = 1.; //e_x
+                  Vector _v_neg = _v, _vp = _v;
+                  _v_neg *= -1.;
+                  _vp *= _p;
 
-            //       DenseMatrix F_i_bdry(dim+2, dim);
-            //       F_i_bdry.SetRow(0, _v_neg);
-            //       for (int i = 0; i < dim; i++)
-            //       {
-            //          F_i_bdry(i+1, i) = _p;
-            //       }
-            //       F_i_bdry.SetRow(dim+1, _vp);
+                  DenseMatrix F_i_bdry(dim+2, dim);
+                  F_i_bdry.SetRow(0, _v_neg);
+                  for (int i = 0; i < dim; i++)
+                  {
+                     F_i_bdry(i+1, i) = _p;
+                  }
+                  F_i_bdry.SetRow(dim+1, _vp);
 
-            //       F_i_bdry.Mult(c, y_temp_bdry);
-            //    }
+                  F_i_bdry.Mult(c, y_temp_bdry);
+               }
 
-            //    else if (bdr_attribute == 2) // slip
-            //    {
-            //       // Negate velocity
-            //       for (int _it = 0; _it < dim; _it++)
-            //       {
-            //          U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
-            //       }
-            //       DenseMatrix F_i_slip = pb->flux(U_i_bdry);
-            //       F_i_slip.Mult(c, y_temp_bdry);
-            //    }
-            //    else
-            //    {
-            //       cout << "invalid boundary attribute: " << bdr_attribute << endl;
-            //       cout << "cell : " << ci << endl;
-            //       cout << "face: " << fids[j] << endl;  
-            //       y_temp *= 2.; 
-            //    }
+               else if (bdr_attribute == 2) // slip
+               {
+                  // Negate velocity
+                  for (int _it = 0; _it < dim; _it++)
+                  {
+                     U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
+                  }
+                  DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+                  F_i_slip.Mult(c, y_temp_bdry);
+               }
+               else
+               {
+                  cout << "invalid boundary attribute: " << bdr_attribute << endl;
+                  cout << "cell : " << ci << endl;
+                  cout << "face: " << fids[j] << endl;  
+                  y_temp *= 2.; 
+               }
 
-            //    y_temp += y_temp_bdry;
-            // }
+               y_temp += y_temp_bdry;
+            }
+            else
+            {
+               y_temp *= 2.;
+            }
             
-            y_temp *= 2.;
-            
-
             // Add in boundary contribution
             sums -= y_temp;
          } // End boundary face        
@@ -767,6 +768,62 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
       state_val[1 + i] = v_exact[i];
    }
    state_val[dim + 1] = pb->ste0(cell_x, t+dt);
+}
+
+
+/****************************************************************************************************
+* Function: EnforceMVBoundaryConditions
+* Parameters:
+*     S_new - BlockVector that stores mesh information, mesh velocity, and state variables.
+*     t     - Current time
+*     dt    - Current timestep
+*
+* Purpose:
+*  Enforces boundary conditions on the mesh velocities according to the problem indicator.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt)
+{
+   cout << "Enforcing MV Boundary Conditions\n";
+
+   if (pb->get_indicator() == "saltzmann")
+   {
+      // Enforce
+      Vector* sptr = const_cast<Vector*>(&S);
+      ParGridFunction x_gf, mv_gf;
+      mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+
+      Vector ex(dim);
+      ex = 0.;
+      /* Ramping up to ex */
+      // if (timestep_first == 0.)
+      // {
+      //    timestep_first = timestep;
+      // }
+      // double _xi = t / (2*timestep_first);
+      // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+      // ex[0] = 1. * _psi;
+      ex[0] = 1.;
+
+      VectorConstantCoefficient left_wall_coeff(ex);
+      Array<int> left_wall_attr(1);
+      left_wall_attr[0] = 1;
+
+      mv_gf.ProjectBdrCoefficient(left_wall_coeff, left_wall_attr);
+
+      /* TODO: Vladimir 
+         How to enforce v.n=0 on rest of boundary?
+      */
+      Vector vZero(dim);
+      vZero = 0.;
+      VectorConstantCoefficient zero(vZero);
+      Array<int> other_bdr_attr(1);
+      other_bdr_attr[0] = 2;
+
+      mv_gf.ProjectBdrCoefficientNormal(zero, other_bdr_attr);
+
+      mv_gf.SyncAliasMemory(S);
+   }
 }
 
 
@@ -1187,10 +1244,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
                                                       void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL)
 {
    cout << "Compute mesh velocities\n";
-   // Vector* sptr = const_cast<Vector*>(&S);
-   // ParGridFunction x_gf, mv_gf;
-   // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    ComputeIntermediateFaceVelocities(S, t, flag, test_vel);  
 
@@ -1198,6 +1251,9 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    ComputeGeoV();
 
    ComputeNodeVelocities(S, t, dt);
+
+   EnforceMVBoundaryConditions(S, t, dt);
+
    if (dim > 1)
    {
       // Don't need to fill face velocities with average in dim=1
@@ -1232,6 +1288,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
          assert(val > 0.);
       }
    }
+
    FillCenterVelocitiesWithAvg(S);
 }
 
@@ -1752,7 +1809,8 @@ void LagrangianLOOperator<dim>::
          cout << "Restarting vertex iterator\n";
       }
    } // End Vertex iterator
-   // assert(false);
+
+   // Enforce bounndary conditions on mesh velocity
 }
 
 

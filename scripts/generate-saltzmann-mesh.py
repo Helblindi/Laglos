@@ -8,7 +8,7 @@ def main():
    x_arr = np.linspace(0,1,nx_gridpoints)
    y_arr = np.linspace(0,0.1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/rectangle_saltzman.mesh"
+   filename = home_dir + "data/rectangle_saltzmann.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file

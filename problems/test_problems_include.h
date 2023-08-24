@@ -8,6 +8,7 @@
 #include "lax.h"
 #include "leblanc.h"
 #include "isentropic_vortex.h"
+#include "saltzmann.h"
 #include "vdw-1.h"
 #include "vdw-2.h"
 #include "vdw-3.h"

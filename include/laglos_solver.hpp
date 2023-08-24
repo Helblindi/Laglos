@@ -148,6 +148,8 @@ public:
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                              const double &dt, Vector & state_val);
    
+   void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
+   
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
 

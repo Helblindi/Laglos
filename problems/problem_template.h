@@ -15,6 +15,7 @@
 #include "mfem.hpp"
 #include "problem_base.h"
 #include <cmath>
+#include <string>
 
 using namespace mfem;
 using namespace std;
@@ -31,11 +32,11 @@ public:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 7/5.;
+   double a = 0., b = 0., gamma = 7/5.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
+   bool bcs = false; // Indicator for boundary conditions
+   string indicator = ""; // Possible: saltzmann
 
    /* Override getters */
    virtual double get_a() override { return a; }

@@ -39,7 +39,7 @@ public:
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
-   string indicator = ""; // Possible: saltzman
+   string indicator = ""; // Possible: saltzmann
    
    virtual double get_a() { return a; }
    virtual double get_b() { return b; }

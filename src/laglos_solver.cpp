@@ -814,13 +814,13 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       /* TODO: Vladimir 
          How to enforce v.n=0 on rest of boundary?
       */
-      Vector vZero(dim);
-      vZero = 0.;
-      VectorConstantCoefficient zero(vZero);
-      Array<int> other_bdr_attr(1);
-      other_bdr_attr[0] = 2;
+      // Vector vZero(dim);
+      // vZero = 0.;
+      // VectorConstantCoefficient zero(vZero);
+      // Array<int> other_bdr_attr(1);
+      // other_bdr_attr[0] = 2;
 
-      mv_gf.ProjectBdrCoefficientNormal(zero, other_bdr_attr);
+      // mv_gf.ProjectBdrCoefficientNormal(zero, other_bdr_attr);
 
       mv_gf.SyncAliasMemory(S);
    }
@@ -1655,12 +1655,6 @@ void LagrangianLOOperator<dim>::IntGradRT(const int cell, DenseMatrix & res)
          res.SetRow(j, row);
       }
    }
-   // if (res.FNorm() > 0.)
-   // {
-   //    cout << "Resulting nonzero matrix:\n";
-   //    res.Print(cout);
-   //    assert(false);
-   // }  
 }
 
 /***********************************************************************************************************
@@ -2123,7 +2117,6 @@ void LagrangianLOOperator<dim>::
          // cout << "Boundary face~~\n";
          assert(FI.IsBoundary());
          // TODO: Add in boundary conditions similar to corner vertex bcs
-         // TODO: Add testing validation step here
          for (int j = 0; j < dim; j++)
          {
             face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2.;
@@ -2139,8 +2132,6 @@ void LagrangianLOOperator<dim>::
       }
       UpdateNodeVelocity(S, face_dof, face_velocity);
    }
-
-   // assert(false);
 }
 
 

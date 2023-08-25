@@ -25,6 +25,25 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
                     int x = 0, int y = 0, int w = 400, int h = 400,
                     bool vec = false);
 
+struct TimingData
+{
+   // Total times for all major computations:
+   // CG solves (H1 and L2) / force RHS assemblies / quadrature computations.
+   StopWatch sw_cgH1, sw_cgL2, sw_force, sw_qdata;
+
+   // Store the number of dofs of the corresponding local CG
+   const HYPRE_Int L2dof;
+
+   // These accumulate the total processed dofs or quad points:
+   // #(CG iterations) for the L2 CG solve.
+   // #quads * #(RK sub steps) for the quadrature data computations.
+   HYPRE_Int H1iter, L2iter;
+   HYPRE_Int quad_tstep;
+
+   TimingData(const HYPRE_Int l2d) :
+      L2dof(l2d), H1iter(0), L2iter(0), quad_tstep(0) { }
+};
+
 //
 template <int dim>
 class LagrangianLOOperator

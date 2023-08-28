@@ -14,13 +14,7 @@ public:
    
    /* Various parameters */
    const static int shocktube = 1; // 1 - Sod, 2 - Lax, 3 - Leblanc
-   constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity
-
-   /* Saltzman Problem parameters */
-   const static bool change_CFL = false;
-   constexpr static double CFL_first = 0.01;
-   constexpr static double CFL_second = 0.25;
-   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+   constexpr static double rotation_angle = 0; // 0 - 1D horizontal velocity   
 };
 }
 }

@@ -38,6 +38,17 @@ public:
    bool bcs = false; // Indicator for boundary conditions
    string indicator = ""; // Possible: saltzmann
 
+   // CFL change
+   bool _change_cfl = false;
+   constexpr static double CFL_first = 0.5;
+   constexpr static double CFL_second = 0.5;
+   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+
+   virtual bool change_cfl() override { return _change_cfl; }
+   virtual double get_cfl_first() override { return CFL_first; }
+   virtual double get_cfl_second() override { return CFL_second; }
+   virtual double get_cfl_time_change() override { return CFL_time_change; }
+
    /* Override getters */
    virtual double get_a() override { return a; }
    virtual double get_b() override { return b; }

@@ -617,10 +617,10 @@ int main(int argc, char *argv[]) {
    for (int ti = 1; !last_step; ti++)
    {
       /* Check if we need to change CFL */
-      if (CompileTimeVals::change_CFL && problem == 7 && t > CompileTimeVals::CFL_time_change && hydro.GetCFL() != CompileTimeVals::CFL_second)
+      if (problem_class->change_cfl() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
       {
          cout << "Changing CFL for Saltzman at time = " << t << endl;
-         double CFL_new = CompileTimeVals::CFL_second;
+         double CFL_new = problem_class->get_cfl_second();
          hydro.SetCFL(CFL_new);
       }
 

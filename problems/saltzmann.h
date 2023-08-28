@@ -33,10 +33,21 @@ public:
     * Problem Specific constants
     *********************************************************/
    double a = 0., b = 0., gamma = 5./3.;
-   bool distort_mesh = false;
+   bool distort_mesh = true;
    bool known_exact_solution = true;
    bool bcs = true;
    string indicator = "saltzmann";
+
+   // CFL change
+   bool _change_cfl = true;
+   constexpr static double CFL_first = 0.01;
+   constexpr static double CFL_second = 0.25;
+   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+
+   virtual bool change_cfl() override { return _change_cfl; }
+   virtual double get_cfl_first() override { return CFL_first; }
+   virtual double get_cfl_second() override { return CFL_second; }
+   virtual double get_cfl_time_change() override { return CFL_time_change; }
 
    double rotation_angle = 0.; // 0 - 1D horizontal velocity
    double rhoL = 1.0, rhoR = 1.0;;

@@ -40,6 +40,17 @@ public:
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
    string indicator = ""; // Possible: saltzmann
+
+   // CFL change
+   bool _change_cfl = false;
+   constexpr static double CFL_first = 0.5;
+   constexpr static double CFL_second = 0.5;
+   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+
+   virtual bool change_cfl() { return _change_cfl; }
+   virtual double get_cfl_first() { return CFL_first; }
+   virtual double get_cfl_second() { return CFL_second; }
+   virtual double get_cfl_time_change() { return CFL_time_change; }
    
    virtual double get_a() { return a; }
    virtual double get_b() { return b; }
@@ -48,6 +59,7 @@ public:
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
    virtual bool has_boundary_conditions() { return bcs; }
+   
 
    // ProblemDescription
    static double internal_energy(const Vector &U)

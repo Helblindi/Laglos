@@ -529,10 +529,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       is_boundary_cell = false;
 
       sum_validation = 0.;
-      // cout << "CSU::ci: " << ci << endl;
+
       GetCellStateVector(S, ci, U_i);
-      // cout << "cell state vector:\n";
-      // U_i.Print(cout);
       
       val = U_i;
 
@@ -556,8 +554,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
       DenseMatrix F_i = pb->flux(U_i);
       sums = 0.;
-      // cout << "Flux at U_i:\n";
-      // F_i.Print(cout);
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
@@ -571,11 +567,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          n /= F;
          assert(1. - n.Norml2() < 1e-12);
          FI = pmesh->GetFaceInformation(fids[j]);
-         // cout << "\tcell: " << ci << ", face: " << fids[j] << endl;
 
          if (FI.IsInterior())
          {
-            // cout << "\t\tCSU::Interior face\n";
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -600,7 +594,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                double pl = pb->pressure(U_i);
                double pr = pb->pressure(U_j);
                d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
-               // cout << "viscosity: " << d << endl;
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -609,7 +602,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          }
          else
          {
-            // cout << "\t\tCSU::boundary\n";
             assert(FI.IsBoundary());
             is_boundary_cell = true;
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
@@ -661,6 +653,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   }
                   DenseMatrix F_i_slip = pb->flux(U_i_bdry);
                   F_i_slip.Mult(c, y_temp_bdry);
+                  // y_temp *= 2.;
                }
                else
                {
@@ -759,8 +752,8 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
 
    GetNodePosition(S, cell_vdof, cell_x);
 
-   // TODO: Fill in val with exact solution
-   state_val[0] = pb->sv0(cell_x, t+dt); // Is this t or t + dt?
+   // Fill in val with exact solution
+   state_val[0] = pb->sv0(cell_x, t+dt);
    Vector v_exact(dim);
    pb->v0(cell_x, t+dt, v_exact);
    for (int i = 0; i < dim; i++)

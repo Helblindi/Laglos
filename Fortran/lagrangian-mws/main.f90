@@ -2,8 +2,9 @@ PROGRAM riemann
    USE arbitrary_eos_lagrangian_lambda_module
    IMPLICIT NONE
    INTEGER, PARAMETER           :: NUMBER = KIND(1.d0)
+   REAL(KIND=NUMBER)            :: b_covolume_in
    REAL(KIND=NUMBER), PARAMETER :: gamma_ideal=1.4d0
-   REAL(KIND=NUMBER), PARAMETER :: gamma_vdw=1.02d0, a_vdw=1.d0, b_vdw=1.d0
+   REAL(KIND=NUMBER), PARAMETER :: gamma_vdw_in=1.02d0, a_vdw_in=1.d0, b_vdw_in=1.d0
    REAL(KIND=NUMBER)            :: rhol, el, rhor, er
    REAL(KIND=NUMBER)            :: ul, pl, ur, pr
    REAL(KIND=NUMBER)            :: lambda_maxl, lambda_maxr, pstar, tol, t1, t2
@@ -54,24 +55,26 @@ PROGRAM riemann
       READ (21, *) tol
 
       IF (it < 15) THEN 
-            el = gamma_law_internal(rhol, pl)
-            er = gamma_law_internal(rhor, pr)
+         b_covolume_in = 0.1 / max(rhol, rhor)
+         el = gamma_law_internal(rhol, pl)
+         er = gamma_law_internal(rhor, pr)
       ELSE
-            el = van_der_waals_internal(rhol, pl)
-            er = van_der_waals_internal(rhor, pr)
+         el = van_der_waals_internal(rhol, pl)
+         er = van_der_waals_internal(rhor, pr)
       END IF 
 
       CALL CPU_TIME(t1)
       DO n = 1, 1 !1000000
          CALL lambda_arbitrary_eos(rhol, ul, el, pl, rhor, ur, er, pr, tol, WANT_ITER, &
-                                   lambda_maxl, lambda_maxr, pstar, k)
+                                   lambda_maxl, lambda_maxr, pstar, k, &
+                                   b_covolume_in, a_vdw_in, b_vdw_in, gamma_vdw_in)
       END DO
       CALL CPU_TIME(t2)
       WRITE (*, *) header
       !WRITE(*,'(A,e23.17)') 'CPU ', t2-t1
       WRITE (*, '(2(A,e23.17,x),A,I1)') ' lambda_max=', &
          MAX(ABS(lambda_maxl), ABS(lambda_maxr)), 'pstar=', pstar, 'k=', k
-      WRITE (*, *) 'relative Residual', phi(pstar)/MAX(ABS(phi(pl)), ABS(phi(pr)))
+      WRITE (*, *) 'relative residual', phi(pstar)/MAX(ABS(phi(pl)), ABS(phi(pr)))
 
    END DO
    CLOSE (21)
@@ -101,7 +104,7 @@ CONTAINS
       IMPLICIT NONE
       REAL(KIND=NUMBER) :: rho, p
       REAL(KIND=NUMBER) :: e
-      e = p*(1.d0 - b_covolume*rho)/((gamma_ideal - 1.d0)*rho)
+      e = p*(1.d0 - b_covolume_in*rho)/((gamma_ideal - 1.d0)*rho)
    END function gamma_law_internal
    
    !===Compute the specific internal energy from the van der Waals EOS
@@ -109,7 +112,7 @@ CONTAINS
       IMPLICIT NONE
       REAL(KIND=NUMBER) :: rho, p
       REAL(KIND=NUMBER) :: e
-      e = (p + a_vdw*rho*rho)*(1.d0 - b_vdw*rho)/((gamma_vdw - 1.d0)*rho) - a_vdw*rho
+      e = (p + a_vdw_in*rho*rho)*(1.d0 - b_vdw_in*rho)/((gamma_vdw_in - 1.d0)*rho) - a_vdw_in*rho
    END function van_der_waals_internal
 
 END PROGRAM riemann

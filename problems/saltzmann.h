@@ -91,7 +91,7 @@ public:
          _n[0] = cos(rotation_angle);
          if (dim > 1)
          {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
+            _n[1] = sin(rotation_angle);
          }
          double _x_tilde = x * _n;
 
@@ -123,7 +123,7 @@ public:
          _n[0] = cos(rotation_angle);
          if (dim > 1)
          {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
+            _n[1] = sin(rotation_angle);
          }
          double _x_tilde = x * _n;
 
@@ -154,7 +154,7 @@ public:
          _n[0] = cos(rotation_angle);
          if (dim > 1)
          {
-            _n[1] = sin(CompileTimeVals::rotation_angle);
+            _n[1] = sin(rotation_angle);
          }
          double _x_tilde = x * _n;
 

@@ -27,11 +27,12 @@ CONTAINS
    SUBROUTINE lambda_arbitrary_eos(in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr, in_tol, &
                                    WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k, &
                                    b_covolume_in, a_vdw_in, b_vdw_in, gamma_vdw_in)
+      use iso_c_binding
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
       REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
       REAL(KIND=8), INTENT(IN) :: b_covolume_in, a_vdw_in, b_vdw_in, gamma_vdw_in
-      LOGICAL, INTENT(IN) :: WANT_ITERATION
+      LOGICAL(c_bool), INTENT(IN) :: WANT_ITERATION
       REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
       INTEGER, INTENT(OUT):: k
       REAL(KIND=NUMBER)        :: p1, phi1, phi11, p2, phi2, phi22, phi12, phi112, phi221
@@ -101,7 +102,7 @@ CONTAINS
       !===Initialize p1 and p2 where p1 <= pstar <= p2
       CALL initialize_p1_p2(p1, p2)
 
-      IF (.NOT. WANT_ITERATION) THEN        
+      IF (.NOT. WANT_ITERATION) THEN   
          pstar = p2
          CALL no_iter_update_lambda(taul, pl, al, gammal, taur, pr, ar, gammar, p2, lambda_maxl_out, lambda_maxr_out)
          RETURN
@@ -272,6 +273,7 @@ CONTAINS
    END FUNCTION phi
 
    FUNCTION f(p, pz, capAz, capBz, capCz, expoz) RESULT(ff)
+      IMPLICIT NONE
       REAL(KIND=NUMBER), INTENT(IN) :: p, pz, capAz, capBz, capCz, expoz
       REAL(KIND=NUMBER)             :: ff
       IF (p <= pz) THEN

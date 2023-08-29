@@ -1,5 +1,6 @@
 PROGRAM riemann
    USE arbitrary_eos_lagrangian_lambda_module
+   use iso_c_binding
    IMPLICIT NONE
    INTEGER, PARAMETER           :: NUMBER = KIND(1.d0)
    REAL(KIND=NUMBER)            :: b_covolume_in
@@ -12,7 +13,7 @@ PROGRAM riemann
    CHARACTER(LEN=3)             :: case_number
    CHARACTER(LEN=11)            :: header, cmd_line_arg
    LOGICAL                      :: OKAY
-   LOGICAL                      :: WANT_ITER = .TRUE.
+   LOGICAL(c_bool)              :: WANT_ITER = .TRUE.
 
    !===Handle command line argument
    IF (COMMAND_ARGUMENT_COUNT() .GT. 0) THEN

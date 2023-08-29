@@ -11,10 +11,11 @@ using namespace std;
 // Fortran subroutine from Lagrangian code
 extern "C" {
    void __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
-      double *in_taul, double *in_ul, double *in_el, double *in_pl,
-      double *in_taur, double *in_ur, double *in_er, double *in_pr,
-      double *in_tol, bool *no_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k);
+      double *in_rhol, double *in_ul, double *in_el, double *in_pl,
+      double *in_rhor, double *in_ur, double *in_er, double *in_pr,
+      double *in_tol, bool *want_iter,double *lambda_maxl_out,
+      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume,
+      double *a_vdw, double *b_vdw, double *gamma_vdw);
 }
 
 // Fortran subroutine from Eulerian code
@@ -89,13 +90,16 @@ public:
       return v;
    }
 
-   static inline double compute_lambda_max(const Vector & U_i,
-                                           const Vector & U_j,
-                                           const Vector & n_ij,
-                                           const double &in_pl,
-                                           const double &in_pr,
-                                           const double & b_covolume,
-                                           const string flag="NA")
+   inline double compute_lambda_max(const Vector & U_i,
+                                    const Vector & U_j,
+                                    const Vector & n_ij,
+                                    double in_pl,
+                                    double in_pr,
+                                    double b_covolume,
+                                    double a_vdw,
+                                    double b_vdw,
+                                    double gamma_vdw,
+                                    const string flag="NA")
    {
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
       if (flag == "testing")
@@ -129,21 +133,20 @@ public:
             lambda_maxr_out = 0.,
             pstar = 0.,
             vstar = 0.;
-      bool no_iter = false; 
       int k = 0; // Tells you how many iterations were needed for convergence
+      
       // b_covolume = .1 / max(in_rhol, in_rhor);
-
-      // cout << "CLM pre fortran function.\n";
-      // __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
-      //    &in_taul,&in_ul,&in_el,&in_pl,&in_taur,&in_ur,&in_er,&in_pr,&in_tol,
-      //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k);
-
-      cout << "ProblemBase: pre fortran call:\n";
-      cout << "in_rhol: " << in_rhol << ", in_ul: " << in_ul << ", in_el: " << in_el << ", in_pl: " << in_pl << endl;
-      cout << "in_rhor: " << in_rhor << ", in_ur: " << in_ur << ", in_er: " << in_er << ", in_pr: " << in_pr << endl;
-      __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+      bool want_iter = true;
+      __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         &no_iter,&lambda_maxl_out,&lambda_maxr_out,&vstar,&k, &b_covolume);
+         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k,
+         &b_covolume, &a_vdw, &b_vdw, &gamma_vdw);
+
+
+      // bool no_iter = false; 
+      // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+      //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+      //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
 
       double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
 

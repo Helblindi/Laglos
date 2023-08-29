@@ -293,7 +293,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
             cout << "Ur: ";
             U_j.Print(cout);
             cout << "computing lambda max\n";
-            d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
+            d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma()) * c_norm; 
 
             cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
 
@@ -593,7 +593,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             {
                double pl = pb->pressure(U_i);
                double pr = pb->pressure(U_j);
-               d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b()) * c_norm; 
+               d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma()) * c_norm; 
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -1107,7 +1107,7 @@ void LagrangianLOOperator<dim>::
             // Compute max wave speed
             double pl = pb->pressure(Uc);
             double pr = pb->pressure(Ucp);
-            double val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
+            double val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma());
             d = val * c_norm; 
 
             // Compute intermediate face velocity

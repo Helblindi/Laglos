@@ -59,6 +59,9 @@ protected:
    // Problem specific
    ProblemBase<dim> * pb;
 
+   // Matrix to hold max wavespeed values dij
+   SparseMatrix * dij_sparse;
+
    // FE spaces local and global sizes
    const int Vsize_H1;
    const int TVSize_H1;
@@ -86,7 +89,8 @@ protected:
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
-   const int num_vertices, num_faces, num_edges;
+   int el_num_faces;
+   const int num_elements, num_vertices, num_faces, num_edges;
 
    double CFL;
    double timestep = 0.001;
@@ -125,6 +129,8 @@ public:
 
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
+   void InitializeDijMatrix();
+   void BuildDijMatrix(const Vector &S);
    void CalculateTimestep(const Vector &S);
 
    void GetCellStateVector(const Vector &S, const int cell, Vector &U);

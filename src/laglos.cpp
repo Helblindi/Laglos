@@ -71,6 +71,8 @@ namespace plt = matplotlibcpp;
 
 
 int main(int argc, char *argv[]) {
+   StopWatch chrono;
+
    // Initialize MPI.
    Mpi::Init();
    const int num_procs = Mpi::WorldSize();
@@ -613,9 +615,12 @@ int main(int argc, char *argv[]) {
    BlockVector S_old(S);
 
    cout << "Entering time loop\n";
+   chrono.Clear();
+   chrono.Start();
 
    for (int ti = 1; !last_step; ti++)
    {
+      hydro.BuildDijMatrix(S);
       /* Check if we need to change CFL */
       if (problem_class->change_cfl() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
       {
@@ -782,6 +787,8 @@ int main(int argc, char *argv[]) {
          }
       }
    } // End time step iteration
+
+   chrono.Stop();
 
    /* Various problem-specific plots */
    if (visualization)
@@ -1121,6 +1128,8 @@ int main(int argc, char *argv[]) {
       // restore cout stream buffer
       cout.rdbuf(strm_buffer);
    }
+
+   cout << "Program took " << chrono.RealTime() << "s.\n";
    
    delete pmesh;
    delete m;

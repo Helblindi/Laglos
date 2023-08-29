@@ -118,6 +118,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    block_offsets(6),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
+   num_elements(L2.GetNE()),
    num_faces(L2.GetNF()),
    num_vertices(pmesh->GetNV()),
    num_edges(pmesh->GetNEdges()),
@@ -157,8 +158,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    
    // Initialize values of intermediate face velocities
    v_CR_gf = 0.;
-
    assert(v_CR_gf.Size() == dim * num_faces);
+
+   // Initialize Dij sparse
+   InitializeDijMatrix();   
 
    // Set integration rule for Rannacher-Turek space
    // TODO: Modify this to be set by a parameter rather than hard-coded
@@ -176,6 +179,8 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
    cout << "CR.GetNDofs(): " << CR.GetNDofs() << endl;
    cout << "pmesh->GetNFaces(): " << pmesh->GetNFaces() << endl;
+   cout << "each element in the mesh has " << el_num_faces << " faces." << endl;
+   cout << "num_elements: " << num_elements << endl;
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
    cout << "num_edges: " << num_edges << endl;
@@ -185,6 +190,132 @@ template<int dim>
 LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
    // delete pmesh, m_lf, m_hpv;
+}
+
+
+/****************************************************************************************************
+* Function: InitializeDijMatrix
+*
+* Purpose:
+*  The purpose of this function is to initialize a SparseMatrix with the sparsity pattern
+*  that corresponds to the adjacency matrix of the mesh.  I.E. this functions constructs a matrix
+*  of size num_elements x num_elements where the nonzero elements are for each element row
+*  are the cell indices in the stencil. This SparseMatrix will encode the max wave speed of
+*  each corresponding local Riemann problem.  An example of cells in the stencil of cell c is given
+*  below.
+*
+*                  -----------
+*                 | 0 | 1 | 0 |
+*                 |-----------|
+*                 | 1 | c | 1 |
+*                 |-----------|
+*                 | 0 | 1 | 0 |
+*                  -----------
+* 
+* This is accomplished in the following steps:
+*  1) Create ParBilinearForm based on L2FESpace
+*  2) Create DGTraceIntegrator(DG state coeff, CG coeff (ones), double, double)
+*  3) AddInteriorFaceIntegrator using ^
+*  4) Assemble, Finalize, ParallelAssemble calls
+*  5) HypreParMatrix::MergeDiagAndOffd --> SparseMatrix
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::InitializeDijMatrix()
+{
+   switch (dim)
+   {
+      case 1: 
+      {
+         el_num_faces = pmesh->GetElement(0)->GetNVertices();
+         break;
+      }
+      case 2: 
+      {
+         el_num_faces = pmesh->GetElement(0)->GetNEdges();
+         break;
+      }
+      case 3: 
+      {
+         el_num_faces = pmesh->GetElement(0)->GetNFaces();
+         break;
+      }
+      default: MFEM_ABORT("Wrong dimension given.\n");
+   }
+
+   // Initialize SparseMatrix
+   dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces);
+
+   // Create dummy coefficients
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> rho0_static = 
+      std::bind(&ProblemBase<dim>::rho0, pb, std::placeholders::_1, std::placeholders::_2);
+
+   FunctionCoefficient rho_coeff(rho0_static);
+
+   Vector ones(dim); ones = 1.;
+   VectorConstantCoefficient ones_coeff(ones);
+
+   // Assemble SparseMatrix object
+   ParBilinearForm k(&L2);
+   k.AddInteriorFaceIntegrator(new DGTraceIntegrator(rho_coeff, ones_coeff, 1.0, 1.0));
+
+   k.Assemble();
+   k.Finalize();
+
+   HypreParMatrix * k_hpm = k.ParallelAssemble();
+   k_hpm->MergeDiagAndOffd(*dij_sparse);
+
+   // From here, we can modify the sparse matrix according to the sparsity pattern
+}
+
+
+/****************************************************************************************************
+* Function: BuildDijMatrix
+* Parameters:
+*  S - BlockVector that stores mesh information, mesh velocity, and state variables.
+*
+* Purpose:
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
+{
+   mfem::Mesh::FaceInformation FI;
+   int c, cp;
+   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
+   double F, val, d;
+
+   for (int face = 0; face < num_faces; face++) // face iterator
+   {
+      FI = pmesh->GetFaceInformation(face);
+      c = FI.element[0].index;
+      cp = FI.element[1].index;
+
+      GetCellStateVector(S, c, Uc);
+      if (FI.IsInterior())
+      {
+         GetCellStateVector(S, cp, Ucp);
+
+         // Get normal, d, and |F|
+         CalcOutwardNormalInt(S, c, face, n_int);
+         n_vec = n_int;
+         double F = n_vec.Norml2();
+         n_vec /= F;
+
+         assert(1. - n_vec.Norml2() < 1e-12);
+         c_vec = n_int;
+         c_vec /= 2.;
+         double c_norm = c_vec.Norml2();
+
+         // Compute max wave speed
+         double pl = pb->pressure(Uc);
+         double pr = pb->pressure(Ucp);
+         val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma());
+         d = val * c_norm; 
+         dij_sparse->Elem(c,cp) = d;
+         dij_sparse->Elem(cp,c) = d;
+      }
+   } // End face iterator
+
 }
 
 

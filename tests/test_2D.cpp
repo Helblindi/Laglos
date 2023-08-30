@@ -727,6 +727,7 @@ int test_sod_hydro()
    cout << "Done constructing hydro op\n";
 
    // Verify hardcoded timestep is small enough
+   hydro_1d.BuildDijMatrix(S_1d);
    hydro_1d.CalculateTimestep(S_1d);
    if (dt_1d > hydro_1d.GetTimestep()) 
    {
@@ -885,6 +886,7 @@ int test_sod_hydro()
    cout << "Done constructing hydro op\n";
 
    // Verify hardcoded timestep is small enough
+   hydro_2d.BuildDijMatrix(S_2d);
    hydro_2d.CalculateTimestep(S_2d);
    if (dt_2d > hydro_2d.GetTimestep()) 
    {
@@ -1105,6 +1107,7 @@ int test_smooth_hydro()
    cout << "Done constructing hydro op\n";
 
    // Verify hardcoded timestep is small enough
+   hydro_1d.BuildDijMatrix(S_1d);
    hydro_1d.CalculateTimestep(S_1d);
    if (dt_1d > hydro_1d.GetTimestep()) 
    {
@@ -1263,6 +1266,7 @@ int test_smooth_hydro()
    cout << "Done constructing hydro op\n";
 
    // Verify hardcoded timestep is small enough
+   hydro_2d.BuildDijMatrix(S_2d);
    hydro_2d.CalculateTimestep(S_2d);
    if (dt_2d > hydro_2d.GetTimestep()) 
    {

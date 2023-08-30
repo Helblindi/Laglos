@@ -309,8 +309,11 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          // Compute max wave speed
          double pl = pb->pressure(Uc);
          double pr = pb->pressure(Ucp);
+
          val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma());
+
          d = val * c_norm; 
+
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
       }
@@ -335,16 +338,14 @@ template<int dim>
 void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 {
    cout << "CalculateTimestep\n";
-   // int n = m_hpv->Size(); // NDofs_L2
    double t_min = 1.;
    double t_temp = 0;
    double mi = 0;
    int cj = 0;
 
    Array<int> fids, oris;
-   Vector c(dim), n(dim), n_int(dim);;
    Vector U_i(dim+2), U_j(dim+2);
-   double c_norm = 0., d=0., temp_sum = 0.;
+   double d=0., temp_sum = 0.;
 
    mfem::Mesh::FaceInformation FI;
 
@@ -380,30 +381,10 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
-         cout << "cell: " << ci << ", face: " << fids[j] << endl;
-         CalcOutwardNormalInt(S, ci, fids[j], n_int);
-         c = n_int;
-         c /= 2.;
-         c_norm = c.Norml2();
-         n = n_int;
-         double n_norm = n.Norml2();
-         n /= n_norm;
-
-         
-         if (1. - n.Norml2() > 1.e-12)
-         {
-            cout << "1. - n.Norml2(): " << 1. - n.Norml2() << endl;
-            cout << "n.Norml2(): " << n.Norml2() << endl;
-            cout << "n vec causing trouble: ";
-            n.Print(cout);
-            MFEM_ABORT("Normal vec not normal.\n");
-         }
-
          FI = pmesh->GetFaceInformation(fids[j]);
 
          if (FI.IsInterior())
          {
-            cout << "interior face: " << fids[j] << endl;
             // Get index information/state vector for second cell
             if (ci == FI.element[0].index) { 
                cj = FI.element[1].index; 
@@ -412,21 +393,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
                cj = FI.element[0].index; 
             }
 
-            GetCellStateVector(S, cj, U_j);
-
-            // viscosity contribution
-            cout << "getting pressure\n";
-            double pl = pb->pressure(U_i);
-            double pr = pb->pressure(U_j);
-            cout << "pl: " << pl << ", pr: " << pr << endl;
-            cout << "Ul: ";
-            U_i.Print(cout);
-            cout << "Ur: ";
-            U_j.Print(cout);
-            cout << "computing lambda max\n";
-            d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma()) * c_norm; 
-
-            cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
+            d = dij_sparse->Elem(ci, cj); 
 
             temp_sum += d;
          }
@@ -643,11 +610,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
    // We need a place to store the new state variables
    Vector S_new = S;
 
-   Vector val(dim+2), c(dim), n(dim), n_int(dim), U_i(dim+2), U_j(dim+2), sums(dim+2);
+   Vector val(dim+2), c(dim), n_int(dim), U_i(dim+2), U_j(dim+2), sums(dim+2);
    Array<int> fids, fids2, oris, oris2, verts; // TODO: Remove fids2, oris2, These are for testing.
 
    int cj = 0;
-   double d, c_norm;
+   double d;
 
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
@@ -692,11 +659,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          c = n_int;
          c /= 2.;
          sum_validation.Add(1., c);
-         c_norm = c.Norml2();
-         n = n_int;
-         double F = n.Norml2();
-         n /= F;
-         assert(1. - n.Norml2() < 1e-12);
+
          FI = pmesh->GetFaceInformation(fids[j]);
 
          if (FI.IsInterior())
@@ -722,9 +685,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             /* viscosity contribution */
             if (use_viscosity)
             {
-               double pl = pb->pressure(U_i);
-               double pr = pb->pressure(U_j);
-               d = pb->compute_lambda_max(U_i, U_j, n, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma()) * c_norm; 
+               d = dij_sparse->Elem(ci, cj); 
+
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
@@ -1231,15 +1193,9 @@ void LagrangianLOOperator<dim>::
             n_vec /= F;
 
             assert(1. - n_vec.Norml2() < 1e-12);
-            c_vec = n_int;
-            c_vec /= 2.;
-            double c_norm = c_vec.Norml2();
 
-            // Compute max wave speed
-            double pl = pb->pressure(Uc);
-            double pr = pb->pressure(Ucp);
-            double val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma());
-            d = val * c_norm; 
+            // Get max wave speed
+            d = dij_sparse->Elem(c, cp);
 
             // Compute intermediate face velocity
             Vf = pb->velocity(Uc);
@@ -1248,25 +1204,6 @@ void LagrangianLOOperator<dim>::
 
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
-
-            double coeff2 = val / 2.;
-            coeff2 *= (Ucp[0] - Uc[0]);
-            cout << "coeff: " << coeff << ", coeff2: " << coeff2 << endl;
-            
-            // Debugging purposes
-            if (coeff != 0.)
-            {
-               cout << "ifv::coeff: " << coeff << endl;
-               cout << "cell 1: " << c << ", pressure: " << pb->pressure(Uc) << ", density: " <<  1./Uc[0] << ", sv: " << Uc[0] << endl;
-               cout << "cell 2: " << cp << ", pressure: " << pb->pressure(Ucp) << ", density: " <<  1./Ucp[0] << ", sv: " << Ucp[0] << endl;
-               cout << "mws: " << val << ", d: " << d << endl;
-
-               cout << "F: " << F << endl;
-               cout << "n_vec:\n";
-               n_vec.Print(cout);
-               cout << "final face velocity:\n";
-               Vf.Print(cout);
-            } 
          }
          else 
          {

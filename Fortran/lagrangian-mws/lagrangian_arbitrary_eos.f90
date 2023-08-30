@@ -141,9 +141,7 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(OUT) :: gamma, a, alpha, capA, capB, capC, expo
       REAL(KIND=NUMBER) :: x
       x = tau - b_covolume
-      ! write(*,*) "tau: ", tau, ", b_covolume: ", b_covolume, ", x: ", x
       !===local gamma (gamma_Z)
-      ! WRITE(*,*) "p: ", p, ", pinf: ", p_infty, ", x: ", x, ", e: ", e, ", q: ", q
       gamma = 1.d0 + (p + p_infty)*x/(e - q - p_infty*x)
       !===local sound speed (a_Z)
       a = tau*SQRT(gamma*(p + p_infty)/x)

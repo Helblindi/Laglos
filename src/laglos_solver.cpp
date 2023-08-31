@@ -1523,40 +1523,36 @@ void LagrangianLOOperator<dim>::
          Ci = 0., Vgeo = 0., node_v = 0.;
          ComputeCiGeo(node, Ci);
 
-         // Enforce time restrition imposed by calculation of alpha_i
+         // Enforce time restriction imposed by calculation of alpha_i
          if (dim == 2)
          {
-            // Verify determinant > 0
             double trace = Ci.Trace();
             double det = Ci.Det();
-            // if (det <= 1.e-12)
-            // {
-            //    cout << "Negative determinant.\n";
-            //    double _c = abs(Ci(0,0));
-            //    _c += 1.;
-            //    if (dt > 2. / _c)
-            //    {
-            //       dt = 2. / _c;
-            //       is_dt_changed = true;
-            //       cout << "averting alpha_i <= 0 abort call.\n";
-            //    }
-            // }
-            
-            // Enforce timestep restriction
             double val = 2. * sqrt(det);
-
             cout << "trace: " << trace << ", det: " << det << endl;
 
-            /* new timestep restriction */
-            if (det > 0.)
+            // alpha_i must be positive restriction
+            if (det <= 1.e-12 && trace < 0.)
+            {
+               if (dt > 2. / abs(trace))
+               {
+                  dt = 2. / (abs(trace) + 1.);
+                  is_dt_changed = true;
+                  cout << "timestep restriction from velocity computation, det = 0 case.\n";
+               }
+            }
+            
+            // alpha_i must be real
+            else if (det > 0.)
             {
                if (trace < val)
                {
+                  // Enforce timestep restriction
                   double zero2 = 1. / (-trace + val);
-                  if (dt < 2 * zero2)
+                  if (dt > 2 * zero2)
                   {
                      cout << "timestep restriction from velocity computation\n";
-                     cout << "dt: " << dt << "z2: " << zero2 << endl;
+                     cout << "dt: " << dt << ", z2: " << zero2 << endl;
                      dt = 2. * zero2;
                      is_dt_changed = true;
                   }
@@ -1570,49 +1566,8 @@ void LagrangianLOOperator<dim>::
             {
                cout << "negative determinant, no timestep restriction needed.\n";
             }
+         } // End time restriction from velocity computation
 
-            /* old timestep restriction */
-            // No time restriction if det < 0
-            // a = trace, b = determinant
-            // if (det > 0.)
-            // {
-            //    if (pow(trace,2) - 4 * det > 0.)
-            //    {
-            //       // if (trace > 0) -> no timestep restriction
-            //       if (trace <= 0.)
-            //       {
-            //          if (dt > 2. * zero1)
-            //          {
-            //             cout << "timestep restricted (1)\n";
-            //             is_dt_changed = true;
-            //             dt = 2. * zero1;
-            //          }
-            //       }
-            //    }
-            //    else if (pow(trace,2) - 4 * det < 0.)
-            //    {
-            //       if (dt > 2. * zero2)
-            //       {
-            //          cout << "timestep restricted (2)\n";
-            //          is_dt_changed = true;
-            //          dt = 2. * zero2;
-            //       }
-            //    }
-            //    else
-            //    {
-            //       assert (pow(trace,2) - 4 * det == 0.);
-            //       if (trace < 0)
-            //       {
-            //          if (dt > -1. / trace)
-            //          {
-            //             cout << "timestep restricted (2)\n";
-            //             is_dt_changed = true;
-            //             dt = -1. / trace;
-            //          }
-            //       }
-            //    }
-            // }
-         }
          GetViGeo(node, Vgeo);
          cout << "cnv_RT Vgeo: ";
          Vgeo.Print(cout);

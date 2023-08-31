@@ -164,11 +164,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    InitializeDijMatrix();   
 
    // Set integration rule for Rannacher-Turek space
-   // TODO: Modify this to be set by a parameter rather than hard-coded
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
-   RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), 2);
+   RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), RT_ir_order);
 
-   // Print some Dimension information
+   // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
    cout << "TVSize_H1: " << TVSize_H1 << endl;
    cout << "GTVSize_H1: " << GTVSize_H1 << endl;
@@ -494,7 +493,6 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
    {
       int index = pmesh->GetBdrElementEdgeIndex(i);
       BdrElementIndexingArray[index] = i;
-      // cout << "bdr el index: " << i << ", corresponding edge index: " << index << endl;
    }
 }
 
@@ -1531,56 +1529,52 @@ void LagrangianLOOperator<dim>::
             // Verify determinant > 0
             double trace = Ci.Trace();
             double det = Ci.Det();
-            if (det <= 1.e-12)
-            {
-               cout << "Negative determinant.\n";
-               double _c = abs(Ci(0,0));
-               _c += 1.;
-               if (dt > 2. / _c)
-               {
-                  dt = 2. / _c;
-                  is_dt_changed = true;
-                  cout << "averting alpha_i <= 0 abort call.\n";
-               }
-            }
+            // if (det <= 1.e-12)
+            // {
+            //    cout << "Negative determinant.\n";
+            //    double _c = abs(Ci(0,0));
+            //    _c += 1.;
+            //    if (dt > 2. / _c)
+            //    {
+            //       dt = 2. / _c;
+            //       is_dt_changed = true;
+            //       cout << "averting alpha_i <= 0 abort call.\n";
+            //    }
+            // }
             
             // Enforce timestep restriction
             double val = 2. * sqrt(det);
-            double zero1 = 1. / (-trace - val);
-            double zero2 = 1. / (-trace + val);
 
-            cout << "trace: " << trace << ", det: " << det << ", z1: " << zero1 << ", z2: " << zero2 << endl;
+            cout << "trace: " << trace << ", det: " << det << endl;
 
-            /* old timestep restriction */
-            if (zero1 <= 0.)
+            /* new timestep restriction */
+            if (det > 0.)
             {
-               if (zero2 > 0.) // z1 0 z2
+               if (trace < val)
                {
-                  // We must enforce dt <= 2*z2
-                  if (dt > 2.*zero2) { 
-                     cout << "restricting timestep, z1,0,z2\n";
-                     cout << "old timestep: " << dt << ", new timestep: " << zero2 << endl;
-                     dt = 2.*zero2; 
+                  double zero2 = 1. / (-trace + val);
+                  if (dt < 2 * zero2)
+                  {
+                     cout << "timestep restriction from velocity computation\n";
+                     cout << "dt: " << dt << "z2: " << zero2 << endl;
+                     dt = 2. * zero2;
                      is_dt_changed = true;
                   }
                }
-               // else // z1 z2 0 - no enforcement on timestep
-            }
-            else // 0 z1 z2
-            {
-               if (dt > 2.*zero1) // 0 z1 dt z2    --- or --- 0 z1 z2 dt
+               else 
                {
-                  cout << "restricting timestep, 0,z1,z2\n";
-                  cout << "old timestep: " << dt << ", new timestep: " << zero1 << endl;
-                  dt = 2.*zero1;
-                  is_dt_changed = true;
+                  cout << "positive determinant but no timestep restriction needed.\n";
                }
             }
+            else
+            {
+               cout << "negative determinant, no timestep restriction needed.\n";
+            }
 
-            /* new timestep restriction */
-            // No time restriction if b < 0
+            /* old timestep restriction */
+            // No time restriction if det < 0
             // a = trace, b = determinant
-            // if (det >= 0.)
+            // if (det > 0.)
             // {
             //    if (pow(trace,2) - 4 * det > 0.)
             //    {

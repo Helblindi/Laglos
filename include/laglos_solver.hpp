@@ -80,6 +80,7 @@ protected:
    const int NDofs_L2V;
 
    IntegrationRule RT_ir;
+   const int RT_ir_order = 2;
 
    // Tables to relate cell to the contained faces
    Table element_face;

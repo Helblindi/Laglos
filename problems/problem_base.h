@@ -14,8 +14,7 @@ extern "C" {
       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *want_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume,
-      double *a_vdw, double *b_vdw, double *gamma_vdw);
+      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume);
 }
 
 // Fortran subroutine from Eulerian code
@@ -140,7 +139,7 @@ public:
       __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
          &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k,
-         &b_covolume, &a_vdw, &b_vdw, &gamma_vdw);
+         &b_covolume);
 
 
       // bool no_iter = false; 

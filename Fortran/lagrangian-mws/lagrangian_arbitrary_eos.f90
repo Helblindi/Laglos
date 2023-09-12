@@ -5,7 +5,6 @@ MODULE arbitrary_eos_lagrangian_lambda_module
    PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
    REAL(KIND=8), PUBLIC :: b_covolume = 0.d0   !===Covolume constant, if known
    !=== Van der waals constants, if known
-   REAL(KIND=8), PUBLIC :: a_vdw = 1.d0, b_vdw = 1.d0, gamma_vdw = 1.02d0 
    REAL(KIND=8), PARAMETER, PUBLIC :: p_infty = 0.d0      !===Reference pressure
    REAL(KIND=8), PARAMETER, PUBLIC :: q = 0.d0            !===Reference specific internal energy
    PRIVATE
@@ -26,12 +25,12 @@ CONTAINS
 
    SUBROUTINE lambda_arbitrary_eos(in_rhol, in_ul, in_el, in_pl, in_rhor, in_ur, in_er, in_pr, in_tol, &
                                    WANT_ITERATION, lambda_maxl_out, lambda_maxr_out, pstar, k, &
-                                   b_covolume_in, a_vdw_in, b_vdw_in, gamma_vdw_in)
+                                   b_covolume_in)
       use iso_c_binding
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
       REAL(KIND=8), INTENT(IN), TARGET :: in_ul, in_pl, in_ur, in_pr
-      REAL(KIND=8), INTENT(IN) :: b_covolume_in, a_vdw_in, b_vdw_in, gamma_vdw_in
+      REAL(KIND=8), INTENT(IN) :: b_covolume_in
       LOGICAL(c_bool), INTENT(IN) :: WANT_ITERATION
       REAL(KIND=8), INTENT(OUT):: lambda_maxl_out, lambda_maxr_out, pstar
       INTEGER, INTENT(OUT):: k
@@ -39,9 +38,6 @@ CONTAINS
       LOGICAL                  :: check
       !===EOS initialization
       b_covolume = b_covolume_in
-      a_vdw = a_vdw_in
-      b_vdw = b_vdw_in
-      gamma_vdw = gamma_vdw_in
 
       !===State vars initialiation
       taul = 1.d0/in_rhol

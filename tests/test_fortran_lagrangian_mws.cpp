@@ -21,8 +21,7 @@ extern "C" {
       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *want_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k, double* b_covolume,
-      double *a_vdw, double *b_vdw, double *gamma_vdw);
+      double *lambda_maxr_out, double *pstar, int *k, double* b_covolume);
 
    double* __arbirary_eos_lagrangian_lambda_module_MOD_phi_(double *p);
 }
@@ -104,11 +103,9 @@ int main(int argc, char **argv)
             eR = van_der_waals_internal(a_vdw, b_vdw, gamma_vdw, rhoR, pR);
          }
 
-
          __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
             &rhoL, &uL, &eL, &pL, &rhoR, &uR, &eR, &pR, &tol, 
-            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b_covolume,
-            &a_vdw, &b_vdw, &gamma_vdw);
+            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b_covolume);
          
          next_tol = false;
 
@@ -146,5 +143,5 @@ double van_der_waals_internal(const double & a_vdw,
                               const double & rho, 
                               const double & p)
 {
-   return (p + a_vdw*rho*rho)*(1. - b_vdw*rho)/((gamma_vdw - 1.)*rho) - a_vdw*rho;
+   return ((p + a_vdw * pow(rho,2)) * (1. - b_vdw*rho) / (rho * (gamma_vdw - 1.))) - a_vdw * rho;
 }

@@ -304,12 +304,20 @@ int main(int argc, char *argv[]) {
    // - CR/RT for mesh reconstruction at nodes
    H1_FECollection H1FEC(order_mv, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
-   CrouzeixRaviartFECollection CRFEC;
+   FiniteElementCollection * CRFEC;
+   if (dim == 1)
+   {
+      CRFEC = new CrouzeixRaviartFECollection();
+   }
+   else
+   {
+      CRFEC = new RT_FECollection(0, dim);
+   }
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
-   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
 
    HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
    cout << "global_vSize: " << global_vSize << endl;
@@ -618,7 +626,8 @@ int main(int argc, char *argv[]) {
    chrono.Clear();
    chrono.Start();
 
-   for (int ti = 1; !last_step; ti++)
+   int ti = 1;
+   for (; !last_step; ti++)
    {
       hydro.BuildDijMatrix(S);
       /* Check if we need to change CFL */
@@ -633,6 +642,7 @@ int main(int argc, char *argv[]) {
       {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
+         cout << "computed timestep is: " << dt << endl;
       }
 
       if (t + dt >= t_final)
@@ -640,6 +650,7 @@ int main(int argc, char *argv[]) {
          dt = t_final - t;
          last_step = true;
       }
+
       if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
@@ -657,6 +668,9 @@ int main(int argc, char *argv[]) {
       sv_gf.SyncAliasMemory(S);
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
+
+      cout << "mv_gf:\n";
+      mv_gf.Print(cout);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -786,6 +800,7 @@ int main(int argc, char *argv[]) {
             delete ste_ex;
          }
       }
+      cout << "finished step\n";
    } // End time step iteration
 
    chrono.Stop();
@@ -934,11 +949,25 @@ int main(int argc, char *argv[]) {
 
    // Print grid functions to files
    ostringstream sv_filename_suffix;
-   sv_filename_suffix << setfill('0') << setw(2)
+   sv_filename_suffix << "_p"
+                      << setfill('0') << setw(2)
+                      << to_string(problem)
+                      << "_r"
+                      << setw(2)
                       << to_string(rp_levels + rs_levels)
                       << ".out";
    
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
+
+   // Print moved mesh
+   // Can be visualized with glvis -np # -m mesh-test-moved
+   {
+      ostringstream mesh_name;
+      mesh_name << "./results/mesh-test-moved." << setfill('0') << setw(6) << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
 
    if (problem_class->has_exact_solution())
    {
@@ -950,8 +979,10 @@ int main(int argc, char *argv[]) {
       // Save exact to file as well
       BlockVector S_exact(offset, Device::GetMemoryType());
 
-      x_gf.MakeRef(&H1FESpace, S_exact, offset[0]);
-      mv_gf.MakeRef(&H1FESpace, S_exact, offset[1]);
+      ParGridFunction x_gf_exact, mv_gf_exact;
+
+      x_gf_exact.MakeRef(&H1FESpace, S_exact, offset[0]);
+      mv_gf_exact.MakeRef(&H1FESpace, S_exact, offset[1]);
       sv_ex->MakeRef(&L2FESpace, S_exact, offset[2]);
       vel_ex->MakeRef(&L2VFESpace, S_exact, offset[3]);
       ste_ex->MakeRef(&L2FESpace, S_exact, offset[4]);
@@ -979,17 +1010,6 @@ int main(int argc, char *argv[]) {
                         << ".out";
       
       hydro.SaveStateVecsToFile(S_exact, sv_output_prefix, sv_ex_filename_suffix.str());
-   }
-   
-
-   // Print moved mesh
-   // Can be visualized with glvis -np # -m mesh-test-moved
-   {
-      ostringstream mesh_name;
-      mesh_name << "./results/mesh-test-moved." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
    }
 
    // Last time recomputing density
@@ -1130,6 +1150,59 @@ int main(int argc, char *argv[]) {
    }
 
    cout << "Program took " << chrono.RealTime() << "s.\n";
+   double time_per_gp_ts = chrono.RealTime() / ti / L2FESpace.GetNE();
+   cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
+
+   /* Compare sound speed and max wave speed in dim = 1 case */
+   if (dim == 1)
+   {
+      std::vector<double> x_gf_py(pmesh->GetNE());
+      std::vector<double> faces_x_py(L2FESpace.GetNF());
+      std::vector<double> ss_gf_py(pmesh->GetNE());
+      Vector lambda_max_vec;
+      hydro.BuildDijMatrix(S);
+      hydro.GetLambdaMaxVec(lambda_max_vec);
+      std::vector<double> lambda_gf_py(L2FESpace.GetNF());
+      Vector U(dim+2), center(dim);
+
+      for (int i = 0; i < pmesh->GetNE(); i++)
+      {
+         hydro.GetCellStateVector(S, i, U);
+
+         ss_gf_py[i] = problem_class->sound_speed(U);
+
+         pmesh->GetElementCenter(i, center);
+         x_gf_py[i] = center[0];
+      } 
+
+      for (int i = 0; i < L2FESpace.GetNF(); i++)
+      {
+         
+         faces_x_py[i] = x_gf[i];
+         lambda_gf_py[i] = lambda_max_vec[i];
+      }
+      
+      /* --- Plot stuff --- */
+      plt::figure_size(1800, 600);
+
+      const long nrows=1, ncols=2;
+      long row = 0, col = 0;
+      plt::subplot2grid(nrows, ncols, row, col);
+      plt::scatter(x_gf_py, ss_gf_py), 'b';
+      plt::scatter(faces_x_py, lambda_gf_py);
+      plt::title("Sound Speed");
+      plt::xlabel("$x$");
+      plt::ylabel("Sound Speed $c$");
+
+      col = 1;
+      plt::subplot2grid(nrows, ncols, row, col);
+      plt::scatter(faces_x_py, lambda_gf_py);
+      plt::title("Lambda Max");
+      plt::xlabel("$x$");
+      plt::ylabel("Lambda Max");
+
+      plt::show();  
+   }
    
    delete pmesh;
    delete m;

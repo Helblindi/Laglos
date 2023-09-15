@@ -51,6 +51,7 @@ class LagrangianLOOperator
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParGridFunction v_CR_gf; // 5.7(b)
+   Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
    ParLinearForm *m_lf;
@@ -83,9 +84,12 @@ protected:
    const int RT_ir_order = 2;
 
    // Tables to relate cell to the contained faces
+   // Ref: https://mfem.org/howto/nav-mesh-connectivity/
    Table element_face;
+   Table vertex_edge;
    Table * vertex_element;
    Table * face_element;
+   Table * edge_vertex;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
@@ -156,6 +160,7 @@ public:
    void GetViGeo(const int & node, Vector & vel);
    void ComputeCiGeo(const int & node, DenseMatrix & res);
    void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
+   void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);

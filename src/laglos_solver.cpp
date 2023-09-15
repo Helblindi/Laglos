@@ -124,12 +124,16 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    num_edges(pmesh->GetNEdges()),
    vertex_element(pmesh->GetVertexToElementTable()),
    face_element(pmesh->GetFaceToElementTable()),
-   // element_face(pmesh->GetElementToFaceTable()),
+   edge_vertex(pmesh->GetEdgeVertexTable()),
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
    CFL(CFL)
 {
+   // Transpose face_element to get element_face
+   Transpose(*face_element, element_face);
+   Transpose(*edge_vertex, vertex_edge);
+
    cout << "Instantiating hydro op\n";
    block_offsets[0] = 0;
    block_offsets[1] = block_offsets[0] + Vsize_H1;
@@ -149,16 +153,19 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
+   cout << "v_CR_gf.Size before: " << v_CR_gf.Size() << endl;
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
    {
       v_CR_gf.SetSize(num_faces);
+      lambda_max_vec.SetSize(num_faces);
    }
    
    // Initialize values of intermediate face velocities
    v_CR_gf = 0.;
-   assert(v_CR_gf.Size() == dim * num_faces);
+   // assert(v_CR_gf.Size() == dim * num_faces);
+   // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
    // Initialize Dij sparse
    InitializeDijMatrix();   
@@ -281,7 +288,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
    mfem::Mesh::FaceInformation FI;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
-   double F, val, d;
+   double F, lambda_max, d;
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
@@ -306,13 +313,29 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double c_norm = c_vec.Norml2();
 
          // Compute max wave speed
+         // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
+         double b_covolume = 1.;
          double pl = pb->pressure(Uc);
          double pr = pb->pressure(Ucp);
 
-         val = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b(), pb->get_a(), pb->get_b(), pb->get_gamma());
+         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume);
 
-         d = val * c_norm; 
+         d = lambda_max * c_norm; 
 
+         double ss = pb->sound_speed(Uc);
+
+         cout << "c: " << c 
+              << ", pl: " << pl 
+              << ", pr: " << pr
+              << ", cp: " << cp << endl;
+         cout << std::setprecision(12) 
+              << "sound speed: " << ss 
+              << ", lambda_max: " << lambda_max 
+
+              << ", c_norm: " << c_norm 
+              << ", d: " << d << endl;
+
+         lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
       }
@@ -350,7 +373,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
-      cout << "cell: " << ci << endl;
+      cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
       mi = m_hpv->Elem(ci); 
 
@@ -394,15 +417,22 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
             d = dij_sparse->Elem(ci, cj); 
 
+            cout << "face: " << fids[j] << endl;
+            cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
+
             temp_sum += d;
          }
       }
       
       t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
-      if (t_temp < t_min && t_temp > 1e-12) { 
-         cout << "t_min: " << t_min << ", t_temp: " << t_temp << endl;
-         t_min = t_temp; }
+      cout << "CFL: " << CFL << ", mi: " << mi << ", temp_sum: " << temp_sum << endl;
+      cout << "t_temp: " << t_temp << ", t_min: " << t_min << endl;
+
+      if (t_temp < t_min && t_temp > 1.e-12) { 
+         cout << "timestep reduced\n";
+         t_min = t_temp;
+      }
    } // End cell iterator
 
    this->timestep = t_min;
@@ -581,6 +611,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    add(x_gf, dt, mv_gf, x_gf);
+
    pmesh->NodesUpdated();
 } 
 
@@ -1030,9 +1061,9 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S, const int cell, co
 template<int dim>
 void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res)
 {
-   // cout << "=======================================\n"
-   //      << "  Calculating outward normal integral  \n"
-   //      << "=======================================\n";
+   cout << "=======================================\n"
+        << "  Calculating outward normal integral  \n"
+        << "=======================================\n";
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
@@ -1048,7 +1079,6 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
       case 1:
       {
          Vector cell_center_x(dim), face_x(dim);
-         face_dof = face;
 
          vertex_element->GetRow(face, row);
 
@@ -1056,8 +1086,17 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
          GetNodePosition(S, cell_gdof, cell_center_x);
          GetNodePosition(S, face, face_x);
 
+         cout << "cell: " << cell << ", location: ";
+         cell_center_x.Print(cout);
+         cout << "face: " << face << ", location: ";
+         face_x.Print(cout);
+
+
          subtract(face_x, cell_center_x, res);
          res *= 1. / res.Norml2();
+
+         cout << "outward normal: ";
+         res.Print(cout);
          break;
       }
       case 2:
@@ -1192,6 +1231,10 @@ void LagrangianLOOperator<dim>::
             Vf += pb->velocity(Ucp);
             Vf *= 0.5;
 
+            cout << "d: " << d
+                 << ", tau cp: " << Ucp[0]
+                 << ", tau c: " << Uc[0] << endl;
+
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
          }
@@ -1305,7 +1348,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
 
    ComputeNodeVelocities(S, t, dt);
 
-   EnforceMVBoundaryConditions(S, t, dt);
+   // EnforceMVBoundaryConditions(S, t, dt);
 
    if (dim > 1)
    {
@@ -1598,6 +1641,69 @@ void LagrangianLOOperator<dim>::
          cout << "node_v for node " << node << ": ";
          node_v.Print(cout);
          break;
+
+         // TODO: Raviart-Thomas implementation
+         // mfem::Mesh::FaceInformation FI;
+         // Array<int> row, cell_faces, vertex_edge_row;
+         // int row_length, cell_faces_length, vertex_edge_row_length;
+
+         // // Get adjacent edges
+         // vertex_edge.GetRow(node, vertex_edge_row);
+         // vertex_edge_row_length = vertex_edge_row.Size();
+
+         // Vector n_vec(dim);
+         // double mi = 0., Ti = 0., Ki=0.;
+         // Vector Uc(dim+2), Vi(dim), ivf(dim), v_cell(dim);
+         // int vertex_bdr_attribute = 0;
+
+         // node_v = 0.; // Reset vertex velocity 
+
+         // // Get adjacent elements
+         // vertex_element->GetRow(node, row);
+         // row_length = row.Size();
+
+         // cout << "node: " << node << endl;
+         // // Iterate over cells that share this vertex and average their contribution to vertex velocity
+         // for (int element_it = 0; element_it < row_length; element_it++)
+         // {
+         //    v_cell = 0.;
+         //    int el_index = row[element_it];
+         //    cout << "el: " << el_index << endl;
+
+         //    // Get element faces
+         //    element_face.GetRow(el_index, cell_faces);
+         //    cell_faces_length = cell_faces.Size();
+
+         //    // Iterate over faces of this cell that touch vertex
+         //    for (int face_it = 0; face_it < cell_faces_length; face_it++)
+         //    {
+         //       ivf = 0.;
+         //       int face_index = cell_faces[face_it];
+         //       cout << "face: " << face_index << endl;
+
+         //       if (vertex_edge_row.Find(face_index) != -1)
+         //       {
+         //          cout << "element " << el_index << " has adjacent face: " << face_index << endl;
+         //          GetIntermediateFaceVelocity(face_index, ivf);
+         //          cout << "ifv: ";
+         //          ivf.Print(cout);
+         //          v_cell.Add(1., ivf);
+         //       }
+         //       else
+         //       {
+         //          cout << "face " << face_index << " is not adjacent to node " << node << endl;
+         //       }
+         //    }
+
+         //    node_v.Add(1., v_cell);
+         // }
+         // // Average contributions
+         // cout << "node_v pre division: ";
+         // node_v.Print(cout);
+         // cout << "row_length: " << row_length << endl;
+         // node_v /= row_length;
+         // cout << "node_v: ";
+         // node_v.Print(cout);
       }
    }
 }
@@ -1747,8 +1853,17 @@ Purpose:
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeGeoV()
 {
+   cout << "=======================================\n"
+        << "             ComputeViGeo              \n"
+        << "=======================================\n";
+   // cout << "v_CR_gf:\n";
+   // v_CR_gf.Print(cout);
+
    VectorGridFunctionCoefficient vcr_coeff(&v_CR_gf);
    v_geo_gf.ProjectDiscCoefficient(vcr_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);  
+   
+   // cout << "v_geo gf:\n";
+   // v_geo_gf.Print(cout);
 }
 
 

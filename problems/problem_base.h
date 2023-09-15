@@ -95,9 +95,6 @@ public:
                                     double in_pl,
                                     double in_pr,
                                     double b_covolume,
-                                    double a_vdw,
-                                    double b_vdw,
-                                    double gamma_vdw,
                                     const string flag="NA")
    {
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
@@ -134,22 +131,19 @@ public:
             vstar = 0.;
       int k = 0; // Tells you how many iterations were needed for convergence
       
-      // b_covolume = .1 / max(in_rhol, in_rhor);
       bool want_iter = true;
       __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k,
-         &b_covolume);
-
+         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
 
       // bool no_iter = false; 
       // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
       //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
       //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
 
-      double d = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
+      double lambda_max = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
 
-      if (isnan(d))
+      if (isnan(lambda_max))
       {
          cout << "nij:\n";
          n_ij.Print(cout);
@@ -169,7 +163,8 @@ public:
       // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[dim+1] << ", p: " << in_pr << endl;
       // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
-      return d;
+      return lambda_max;
+      // return 0.5;
    }
 
    inline DenseMatrix flux(const Vector &U)
@@ -199,7 +194,7 @@ public:
 
    inline double sound_speed(const Vector &U)
    {
-      double _pressure = pressure(U);
+      double _pressure = this->pressure(U);
       double density = 1. / U[0];
 
       double val = this->get_gamma() * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
@@ -213,7 +208,7 @@ public:
     ********************************************/
    double sv0(const Vector &x, const double & t)
    {
-      double val = rho0(x,t);
+      double val = this->rho0(x,t);
       assert(val != 0.);
       return 1./val;
    }
@@ -221,8 +216,8 @@ public:
    double ste0(const Vector &x, const double & t)
    {
       Vector v(dim);
-      v0(x,t,v);
-      return sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
+      this->v0(x,t,v);
+      return this->sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
    }
 
    /*********************************************

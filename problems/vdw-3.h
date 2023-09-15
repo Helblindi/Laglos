@@ -73,28 +73,40 @@ public:
          }
       }
       else {
-         return 0.5; // TODO: Exact representation of sie0
+         MFEM_ABORT("Exact solution for vdw3 not programmed.\n");
+         return -1.;
       }
    }
    virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       v = 0.;
    }
+
    virtual double sie0(const Vector &x, const double & t) override 
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
-         {
-            return 13.624999999999986;
-         }
-         else
-         {
-            assert(x[0]<=1.);
-            return 0.05341878811326526;
-         }
+         double rho = rho0(x,t);
+         double pressure = p0(x);
+
+         return ((pressure + this->get_a() * pow(rho,2)) * (1. - this->get_b()*rho)  / (rho * (this->get_gamma() - 1.))) - this->get_a() * rho;
       }
       else {
-         return .5; // TODO: Exact representation of sie0
+         MFEM_ABORT("Exact solution for vdw3 not programmed.\n");
+         return -1.;
+      }
+   }
+
+   // Initial values are in terms of pressure
+   double p0(const Vector &x)
+   {
+      if (x[0] <= 0.)
+      {
+         return 3.e-2;
+      }
+      else 
+      {
+         assert(x[0] <= 1.);
+         return 5.e-8;
       }
    }
 

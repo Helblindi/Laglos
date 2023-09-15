@@ -8,7 +8,7 @@ namespace hydrodynamics
 class CompileTimeVals
 {
 public:
-   const static int dim = 2;
+   const static int dim = 1;
 };
 }
 }

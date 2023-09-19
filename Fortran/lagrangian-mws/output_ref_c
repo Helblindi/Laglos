@@ -27,10 +27,10 @@ lambda_max=12.4722, pstar=46.095 k=3
 ===Case 14
 lambda_max=1.24722, pstar=0 k=0
 ===Case 15
-lambda_max=0.12634, pstar=0.0220843 k=0
+lambda_max=0.158386, pstar=0.0220843 k=0
 ===Case 16
-lambda_max=0.085892, pstar=0.0241682 k=2
+lambda_max=0.097538, pstar=0.0240287 k=2
 ===Case 17
-lambda_max=0.0880816, pstar=0.000155498 k=6
+lambda_max=0.10033, pstar=0.000129083 k=6
 ===Case 18
-lambda_max=35.9866, pstar=34.6292 k=2
+lambda_max=257.568, pstar=367.423 k=2

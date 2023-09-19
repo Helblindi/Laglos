@@ -10,6 +10,9 @@
 using namespace mfem;
 using namespace std;
 
+/* Global variables */
+double gamma = 1.02, a = 0., b = 0.;
+
 // Fortran subroutine from Lagrangian code
 extern "C" {
    //  ,-- 2 Leading underscores to start
@@ -26,9 +29,7 @@ extern "C" {
    double* __arbirary_eos_lagrangian_lambda_module_MOD_phi_(double *p);
 }
 
-double gamma_law_internal(double b_covolume, double rho, double p, double gamma);
-double van_der_waals_internal(const double & a_vdw, const double & b_vdw, const double & gamma_vdw, 
-                              const double & rho, const double & p);
+double gamma_law_internal(double rho, double p);
 
 int main(int argc, char **argv)
 {
@@ -44,10 +45,11 @@ int main(int argc, char **argv)
    int num_cases = 0, case_num = 0, k = 0;
    double rhoL, rhoR, uL, uR, pL, pR, tol;
    double tauL, tauR;
-   double b_covolume, gamma, eL, eR;
+   double eL, eR;
    double a_vdw = 1.;
    double b_vdw = 1.;
    double gamma_vdw = 1.02;
+   double gamma_ideal = 1.4;
    double lambdaL, lambdaR, pstar, vstar;
 
    bool next_num_cases = false;
@@ -91,21 +93,23 @@ int main(int argc, char **argv)
          if (case_num < 15)
          {
             // Run case
-            b_covolume = .1/(max(rhoL, rhoR));
-            gamma = 1.4;
-
-            eL = gamma_law_internal(b_covolume, rhoL, pL, gamma);
-            eR = gamma_law_internal(b_covolume, rhoR, pR, gamma);
+            gamma = gamma_ideal;
+            a = 0.;
+            b = .1/(max(rhoL, rhoR));
          }
          else
          {
-            eL = van_der_waals_internal(a_vdw, b_vdw, gamma_vdw, rhoL, pL);
-            eR = van_der_waals_internal(a_vdw, b_vdw, gamma_vdw, rhoR, pR);
+            gamma = gamma_vdw;
+            a = a_vdw;
+            b = b_vdw;
          }
 
+         eL = gamma_law_internal(rhoL, pL);
+         eR = gamma_law_internal(rhoR, pR);
+ 
          __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
             &rhoL, &uL, &eL, &pL, &rhoR, &uR, &eR, &pR, &tol, 
-            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b_covolume);
+            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b);
          
          next_tol = false;
 
@@ -132,16 +136,8 @@ int main(int argc, char **argv)
 }
 
 
-double gamma_law_internal(double b_covolume, double rho, double p, double gamma)
+double gamma_law_internal(double rho, double p)
 {
-   return p*(1.-b_covolume*rho)/((gamma-1.)*rho);
-}
-
-double van_der_waals_internal(const double & a_vdw,
-                              const double & b_vdw,
-                              const double & gamma_vdw,
-                              const double & rho, 
-                              const double & p)
-{
-   return ((p + a_vdw * pow(rho,2)) * (1. - b_vdw*rho) / (rho * (gamma_vdw - 1.))) - a_vdw * rho;
+   cout << "gamma: " << gamma << ", a: " << a << ", b: " << b << endl;
+   return ((p + a * pow(rho,2)) * (1. - b*rho) / (rho * (gamma - 1.))) - a * rho;
 }

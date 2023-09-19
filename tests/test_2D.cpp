@@ -151,10 +151,12 @@ int test_flux()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -214,7 +216,7 @@ int test_flux()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    double _error = 0.;
 
@@ -298,10 +300,12 @@ int test_vel_field_1()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -363,7 +367,7 @@ int test_vel_field_1()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -484,10 +488,12 @@ int test_CSV_getter_setter()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -552,7 +558,7 @@ int test_CSV_getter_setter()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);
@@ -604,6 +610,7 @@ int test_sod_hydro()
 {
    cout << "Test2D::test_sod_hydro\n";
    int _mesh_refinements = 2; // This is enough refinements to check, don't modify or test will crash
+   int ms = 10;
    double t = 0., dt_1d = .001, dt_2d = 0.001;
 
    /*************************************
@@ -639,10 +646,12 @@ int test_sod_hydro()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC_1d(order_mv, dim_1d);
+   H1_FECollection H1FEC_1d_L(1, dim_1d);
    L2_FECollection L2FEC_1d(order_u, dim_1d, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC_1d;
 
    ParFiniteElementSpace H1FESpace_1d(pmesh_1d, &H1FEC_1d, dim_1d);
+   ParFiniteElementSpace H1FESpace_1d_L(pmesh_1d, &H1FEC_1d_L, dim_1d);
    ParFiniteElementSpace L2FESpace_1d(pmesh_1d, &L2FEC_1d);
    ParFiniteElementSpace L2VFESpace_1d(pmesh_1d, &L2FEC_1d, dim_1d);
    ParFiniteElementSpace CRFESpace_1d(pmesh_1d, &CRFEC_1d, dim_1d);
@@ -722,36 +731,39 @@ int test_sod_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
-   // Verify hardcoded timestep is small enough
-   hydro_1d.BuildDijMatrix(S_1d);
-   hydro_1d.CalculateTimestep(S_1d);
-   if (dt_1d > hydro_1d.GetTimestep()) 
+   for (int ts = 1; ts < ms; ts++)
    {
-      MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+      // Verify hardcoded timestep is small enough
+      hydro_1d.BuildDijMatrix(S_1d);
+      hydro_1d.CalculateTimestep(S_1d);
+      if (dt_1d > hydro_1d.GetTimestep()) 
+      {
+         MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+      }
+
+      hydro_1d.MakeTimeStep(S_1d, t, dt_1d);
+
+      // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
+      // data in S. This operation simply updates the Memory validity flags of
+      // the sub-vectors to match those of S.
+      x_gf_1d.SyncAliasMemory(S_1d);
+      mv_gf_1d.SyncAliasMemory(S_1d);
+      sv_gf_1d.SyncAliasMemory(S_1d);
+      v_gf_1d.SyncAliasMemory(S_1d);
+      ste_gf_1d.SyncAliasMemory(S_1d);
+
+      // Make sure that the mesh corresponds to the new solution state. This is
+      // needed, because some time integrators use different S-type vectors
+      // and the oper object might have redirected the mesh positions to those.
+      pmesh_1d->NewNodes(x_gf_1d, false);
+
+      ParGridFunction mc_gf_1d(&L2FESpace_1d);
+      hydro_1d.CheckMassConservation(S_1d, mc_gf_1d);
    }
-
-   hydro_1d.MakeTimeStep(S_1d, t, dt_1d);
-
-   // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
-   // data in S. This operation simply updates the Memory validity flags of
-   // the sub-vectors to match those of S.
-   x_gf_1d.SyncAliasMemory(S_1d);
-   mv_gf_1d.SyncAliasMemory(S_1d);
-   sv_gf_1d.SyncAliasMemory(S_1d);
-   v_gf_1d.SyncAliasMemory(S_1d);
-   ste_gf_1d.SyncAliasMemory(S_1d);
-
-   // Make sure that the mesh corresponds to the new solution state. This is
-   // needed, because some time integrators use different S-type vectors
-   // and the oper object might have redirected the mesh positions to those.
-   pmesh_1d->NewNodes(x_gf_1d, false);
-
-   ParGridFunction mc_gf_1d(&L2FESpace_1d);
-   hydro_1d.CheckMassConservation(S_1d, mc_gf_1d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -796,10 +808,12 @@ int test_sod_hydro()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC_2d(order_mv, dim_2d);
+   H1_FECollection H1FEC_2d_L(1, dim_2d);
    L2_FECollection L2FEC_2d(order_u, dim_2d, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC_2d;
 
    ParFiniteElementSpace H1FESpace_2d(pmesh_2d, &H1FEC_2d, dim_2d);
+   ParFiniteElementSpace H1FESpace_2d_L(pmesh_2d, &H1FEC_2d_L, dim_2d);
    ParFiniteElementSpace L2FESpace_2d(pmesh_2d, &L2FEC_2d);
    ParFiniteElementSpace L2VFESpace_2d(pmesh_2d, &L2FEC_2d, dim_2d);
    ParFiniteElementSpace CRFESpace_2d(pmesh_2d, &CRFEC_2d, dim_2d);
@@ -881,36 +895,39 @@ int test_sod_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
-   // Verify hardcoded timestep is small enough
-   hydro_2d.BuildDijMatrix(S_2d);
-   hydro_2d.CalculateTimestep(S_2d);
-   if (dt_2d > hydro_2d.GetTimestep()) 
+   for (int ts = 1; ts < ms; ts++)
    {
-      MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+      // Verify hardcoded timestep is small enough
+      hydro_2d.BuildDijMatrix(S_2d);
+      hydro_2d.CalculateTimestep(S_2d);
+      if (dt_2d > hydro_2d.GetTimestep()) 
+      {
+         MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
+      }
+
+      hydro_2d.MakeTimeStep(S_2d, t, dt_2d);
+
+      // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
+      // data in S. This operation simply updates the Memory validity flags of
+      // the sub-vectors to match those of S.
+      x_gf_2d.SyncAliasMemory(S_2d);
+      mv_gf_2d.SyncAliasMemory(S_2d);
+      sv_gf_2d.SyncAliasMemory(S_2d);
+      v_gf_2d.SyncAliasMemory(S_2d);
+      ste_gf_2d.SyncAliasMemory(S_2d);
+
+      // Make sure that the mesh corresponds to the new solution state. This is
+      // needed, because some time integrators use different S-type vectors
+      // and the oper object might have redirected the mesh positions to those.
+      pmesh_2d->NewNodes(x_gf_2d, false);
+
+      ParGridFunction mc_gf_2d(&L2FESpace_2d);
+      hydro_2d.CheckMassConservation(S_2d, mc_gf_2d);
    }
-
-   hydro_2d.MakeTimeStep(S_2d, t, dt_2d);
-
-   // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
-   // data in S. This operation simply updates the Memory validity flags of
-   // the sub-vectors to match those of S.
-   x_gf_2d.SyncAliasMemory(S_2d);
-   mv_gf_2d.SyncAliasMemory(S_2d);
-   sv_gf_2d.SyncAliasMemory(S_2d);
-   v_gf_2d.SyncAliasMemory(S_2d);
-   ste_gf_2d.SyncAliasMemory(S_2d);
-
-   // Make sure that the mesh corresponds to the new solution state. This is
-   // needed, because some time integrators use different S-type vectors
-   // and the oper object might have redirected the mesh positions to those.
-   pmesh_2d->NewNodes(x_gf_2d, false);
-
-   ParGridFunction mc_gf_2d(&L2FESpace_2d);
-   hydro_2d.CheckMassConservation(S_2d, mc_gf_2d);
 
    // Output mesh to be visualized
    // Can be visualized with glvis -np # -m mesh-test-moved
@@ -929,6 +946,7 @@ int test_sod_hydro()
    cout << "mv_2d:\n";
    mv_gf_2d.Print(cout);
 
+   // hydro verification
    // Verify that columns of 2d sim match columns of 1d sim
    int a0[4] = {0, 3, 12, 15};
    int a1[4] = {4, 7, 8, 11};
@@ -969,6 +987,36 @@ int test_sod_hydro()
           _ste2 != ste_gf_2d[a2[i]] || _ste3 != ste_gf_2d[a3[i]]) 
       {
          cout << "Test2D::test_sod_hydro failed on ste.\n"; 
+         return 1; 
+      }
+   }
+
+   // mesh velocity verification
+   // Verify that columns of 2d sim match columns of 1d sim
+   int b0[5] = {0, 3, 7, 12, 20};
+   int b1[5] = {1, 2, 5, 14, 16};
+   int b2[5] = {4, 6, 8, 10, 18};
+   int b3[5] = {9, 11, 19, 21, 21};
+   int b4[5] = {13, 15, 17, 22, 23};
+   // double _sv0 = sv_gf_1d[0], _sv1 = sv_gf_1d[1], _sv2 = sv_gf_1d[2], _sv3 = sv_gf_1d[3];
+   double _mv0 = mv_gf_1d[0], _mv1 = mv_gf_1d[1], _mv2 = mv_gf_1d[2], _mv3 = mv_gf_1d[3], _mv4 = mv_gf_1d[4];
+
+   for (int i = 0; i < 5; i++)
+   {
+      // check v
+      if (abs(_mv0 - mv_gf_2d[b0[i]]) > tol || abs(_mv1 - mv_gf_2d[b1[i]]) > tol ||
+          abs(_mv2 - mv_gf_2d[b2[i]]) > tol || abs(_mv3 - mv_gf_2d[b3[i]]) > tol ||
+          abs(_mv4 - mv_gf_2d[b4[i]]) > tol) 
+      {
+         cout << "Test2D::test_sod_hydro failed on mv.\n"; 
+
+         cout << "i: " << i << endl;
+         cout << _mv0 << ", " << mv_gf_2d[b0[i]] << endl;
+         cout << _mv1 << ", " << mv_gf_2d[b1[i]] << endl;
+         cout << _mv2 << ", " << mv_gf_2d[b2[i]] << endl;
+         cout << _mv3 << ", " << mv_gf_2d[b3[i]] << endl;
+         cout << _mv4 << ", " << mv_gf_2d[b4[i]] << endl;
+
          return 1; 
       }
    }
@@ -1019,10 +1067,12 @@ int test_smooth_hydro()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC_1d(order_mv, dim_1d);
+   H1_FECollection H1FEC_1d_L(1, dim_1d);
    L2_FECollection L2FEC_1d(order_u, dim_1d, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC_1d;
 
    ParFiniteElementSpace H1FESpace_1d(pmesh_1d, &H1FEC_1d, dim_1d);
+   ParFiniteElementSpace H1FESpace_1d_L(pmesh_1d, &H1FEC_1d_L, dim_1d);
    ParFiniteElementSpace L2FESpace_1d(pmesh_1d, &L2FEC_1d);
    ParFiniteElementSpace L2VFESpace_1d(pmesh_1d, &L2FEC_1d, dim_1d);
    ParFiniteElementSpace CRFESpace_1d(pmesh_1d, &CRFEC_1d, dim_1d);
@@ -1102,7 +1152,7 @@ int test_smooth_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1176,10 +1226,12 @@ int test_smooth_hydro()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC_2d(order_mv, dim_2d);
+   H1_FECollection H1FEC_2d_L(1, dim_2d);
    L2_FECollection L2FEC_2d(order_u, dim_2d, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC_2d;
 
    ParFiniteElementSpace H1FESpace_2d(pmesh_2d, &H1FEC_2d, dim_2d);
+   ParFiniteElementSpace H1FESpace_2d_L(pmesh_2d, &H1FEC_2d_L, dim_2d);
    ParFiniteElementSpace L2FESpace_2d(pmesh_2d, &L2FEC_2d);
    ParFiniteElementSpace L2VFESpace_2d(pmesh_2d, &L2FEC_2d, dim_2d);
    ParFiniteElementSpace CRFESpace_2d(pmesh_2d, &CRFEC_2d, dim_2d);
@@ -1261,7 +1313,7 @@ int test_smooth_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1394,10 +1446,12 @@ void plot_mv_smooth()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1482,7 +1536,7 @@ void plot_mv_smooth()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 

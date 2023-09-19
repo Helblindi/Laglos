@@ -237,10 +237,12 @@ int test_Vi_geo()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -300,7 +302,7 @@ int test_Vi_geo()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    Vector Vgeo(dim), V_ex(dim), V_error(dim);
@@ -366,10 +368,12 @@ int test_Ci_geo()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -429,7 +433,7 @@ int test_Ci_geo()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix Cgeo(dim), Cgeo_0(dim), C_error(dim);
@@ -505,10 +509,12 @@ int test_RT_vel()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC; // defaults to order 1
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -567,7 +573,7 @@ int test_RT_vel()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Compute intermediate face velocities
    double t = 0., error = 0.;
@@ -725,10 +731,12 @@ int test_IntGradRT()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -788,7 +796,7 @@ int test_IntGradRT()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -857,10 +865,12 @@ int test_IntGradRT2()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -920,7 +930,7 @@ int test_IntGradRT2()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -992,10 +1002,12 @@ int test_IntGradRT_quadratic()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1055,7 +1067,7 @@ int test_IntGradRT_quadratic()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -1122,10 +1134,12 @@ int test_determinant()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1185,7 +1199,7 @@ int test_determinant()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Bread and butter of test
    // First determinant test
@@ -1278,10 +1292,12 @@ void plot_velocities()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1339,7 +1355,7 @@ void plot_velocities()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
@@ -1631,10 +1647,12 @@ void test_vel_field_1()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1698,7 +1716,7 @@ void test_vel_field_1()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
@@ -1844,10 +1862,12 @@ void test_vel_field_2()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -1911,7 +1931,7 @@ void test_vel_field_2()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
@@ -2051,10 +2071,12 @@ void test_RT_nodal_vel()
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    CrouzeixRaviartFECollection CRFEC;
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
@@ -2118,7 +2140,7 @@ void test_RT_nodal_vel()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim), node_v(dim);
    DenseMatrix dm(dim);

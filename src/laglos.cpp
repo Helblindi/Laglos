@@ -18,18 +18,15 @@
 /*
 * Example run time parameters:
 *
-* ./Laglos -m data/rectangle_saltzmann.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
-* ./Laglos -m data/ref-square.mesh -rs 3 -visc -mm -tf 0.5 -ot -vis [problem = 8, dim = 2]
-*
+*  Test runs that I have yet to implement
 * -------------- 2D ----------
 * ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
-* ./Laglos -m data/square5c0_vortex.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 5, dim = 2] // Isentropic Vortex, stationary center
-*
+* ./Laglos -m data/rectangle_saltzmann.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 *
 * ========================================= New .h based problem runs =========================================
 * ----- 1D -----
 * ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 8     ## Smooth
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -ot -visc -mm -vis -rs 8  ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -ot -visc -mm -vis -rs 8    ## Sod
 * ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -vis -rs 8    ## Lax
 # ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
 *

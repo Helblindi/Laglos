@@ -50,6 +50,8 @@ class LagrangianLOOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
+   ParFiniteElementSpace &H1_L;
+   ParFiniteElementSpace H1c;
    ParGridFunction v_CR_gf; // 5.7(b)
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
@@ -108,6 +110,7 @@ public:
    enum DofEntity {corner, face, cell};
 
    LagrangianLOOperator(ParFiniteElementSpace &h1,
+                        ParFiniteElementSpace &h1_l,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
@@ -186,6 +189,15 @@ public:
 
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
+
+   // Raviart-Thomas mesh motion (as of 09/11/2023)
+   void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
+                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeGeoVRaviart(const Vector &S);
+   void ComputeNodeVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeNodeVelocityRaviart(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
+   void ComputeCiGeoRaviart(const int & node, DenseMatrix & res);
+   void IntGradRaviart(const int cell, DenseMatrix & res);
 };
 
 } // end ns hydrodynamics

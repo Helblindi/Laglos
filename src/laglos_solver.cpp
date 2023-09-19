@@ -84,6 +84,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 ****************************************************************************************************/
 template<int dim>
 LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
+                                                ParFiniteElementSpace &h1_l,
                                                 ParFiniteElementSpace &l2,
                                                 ParFiniteElementSpace &l2v,
                                                 ParFiniteElementSpace &cr,
@@ -93,12 +94,14 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                 bool mm, 
                                                 double CFL) :
    H1(h1),
+   H1_L(h1_l),
+   H1c(H1_L.GetParMesh(), H1_L.FEColl(), 1),
    L2(l2),
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
    v_CR_gf(&CR),
-   v_geo_gf(&h1),
+   v_geo_gf(&H1_L),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -285,6 +288,9 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 template<int dim>
 void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 {
+   cout << "=======================================\n"
+        << "           Build Dij Matrix            \n"
+        << "=======================================\n";
    mfem::Mesh::FaceInformation FI;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
@@ -292,6 +298,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
+      cout << "face: " << face << endl;
       FI = pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
       cp = FI.element[1].index;
@@ -313,8 +320,9 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double c_norm = c_vec.Norml2();
 
          // Compute max wave speed
-         // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
-         double b_covolume = 1.;
+         // double b_covolume = 0.;
+         double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
+         // double b_covolume = 1.;
          double pl = pb->pressure(Uc);
          double pr = pb->pressure(Ucp);
 
@@ -335,9 +343,13 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
               << ", c_norm: " << c_norm 
               << ", d: " << d << endl;
 
-         lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
+
+         if (dim == 1)
+         {
+            lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
+         }
       }
    } // End face iterator
 
@@ -598,7 +610,8 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    {
       // Compute mesh velocities
       // This function may change the timestep
-      ComputeMeshVelocities(S, t, dt);
+      // ComputeMeshVelocities(S, t, dt);
+      ComputeMeshVelocitiesRaviart(S,t,dt);
    }
 
    // Update state variables contained in S_new
@@ -1641,69 +1654,6 @@ void LagrangianLOOperator<dim>::
          cout << "node_v for node " << node << ": ";
          node_v.Print(cout);
          break;
-
-         // TODO: Raviart-Thomas implementation
-         // mfem::Mesh::FaceInformation FI;
-         // Array<int> row, cell_faces, vertex_edge_row;
-         // int row_length, cell_faces_length, vertex_edge_row_length;
-
-         // // Get adjacent edges
-         // vertex_edge.GetRow(node, vertex_edge_row);
-         // vertex_edge_row_length = vertex_edge_row.Size();
-
-         // Vector n_vec(dim);
-         // double mi = 0., Ti = 0., Ki=0.;
-         // Vector Uc(dim+2), Vi(dim), ivf(dim), v_cell(dim);
-         // int vertex_bdr_attribute = 0;
-
-         // node_v = 0.; // Reset vertex velocity 
-
-         // // Get adjacent elements
-         // vertex_element->GetRow(node, row);
-         // row_length = row.Size();
-
-         // cout << "node: " << node << endl;
-         // // Iterate over cells that share this vertex and average their contribution to vertex velocity
-         // for (int element_it = 0; element_it < row_length; element_it++)
-         // {
-         //    v_cell = 0.;
-         //    int el_index = row[element_it];
-         //    cout << "el: " << el_index << endl;
-
-         //    // Get element faces
-         //    element_face.GetRow(el_index, cell_faces);
-         //    cell_faces_length = cell_faces.Size();
-
-         //    // Iterate over faces of this cell that touch vertex
-         //    for (int face_it = 0; face_it < cell_faces_length; face_it++)
-         //    {
-         //       ivf = 0.;
-         //       int face_index = cell_faces[face_it];
-         //       cout << "face: " << face_index << endl;
-
-         //       if (vertex_edge_row.Find(face_index) != -1)
-         //       {
-         //          cout << "element " << el_index << " has adjacent face: " << face_index << endl;
-         //          GetIntermediateFaceVelocity(face_index, ivf);
-         //          cout << "ifv: ";
-         //          ivf.Print(cout);
-         //          v_cell.Add(1., ivf);
-         //       }
-         //       else
-         //       {
-         //          cout << "face " << face_index << " is not adjacent to node " << node << endl;
-         //       }
-         //    }
-
-         //    node_v.Add(1., v_cell);
-         // }
-         // // Average contributions
-         // cout << "node_v pre division: ";
-         // node_v.Print(cout);
-         // cout << "row_length: " << row_length << endl;
-         // node_v /= row_length;
-         // cout << "node_v: ";
-         // node_v.Print(cout);
       }
    }
 }
@@ -2463,7 +2413,7 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 {
    for (int i = 0; i < dim; i++)
    {
-      int index = node + i * NDofs_H1;
+      int index = node + i * num_vertices;
       vel[i] = v_geo_gf[index];
    }
 }
@@ -2558,6 +2508,457 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    // }
    // fstream_rho.close();
 }
+
+/****************************************************************************************************
+* Function: Raviart-Thomas Velocity Functions
+****************************************************************************************************/
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S        - BlockVector corresponding to nth timestep that stores mesh information, 
+*             mesh velocity, and state variables.
+*  t        - Current time
+*  dt       - Current timestep
+*  flag     - Flag used to indicate testing, can be "testing" or "NA"
+*  test_vel - Velocity used for testing
+*
+* Purpose:
+*     This function accomplishes the following steps:
+*        1) Constructs intermediate face velocity objects for all faces at the nth timestep.
+*        2) Computes V_i^geo on all nodes using Raviart-Thomas
+*        3) Compute the corrected velocity, which uses the above defined velocity field to 
+*           then compute C^i on all nodes
+*        4) Computes the corrective face velocities.
+*        5) Fills unnecessary node at cell center with the average velocity of the corner nodes.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
+   Vector &S, const double & t, double & dt, const string flag, 
+   void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   cout << "=======================================\n"
+        << "     ComputeMeshVelocitiesRaviart      \n"
+        << "=======================================\n";
+   ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
+
+   if (dim > 1)
+   {
+      ComputeGeoVRaviart(S);
+   }
+   
+   ComputeNodeVelocitiesRaviart(S, t, dt);
+
+   /* Iterate over faces and check intermediate face velocities compared to corner nodes */
+   mfem::Mesh::FaceInformation FI;
+   Array<int> row;
+   Vector Vf(dim), node1_v(dim), node2_v(dim);
+   cout << "verifying face velocities\n";
+   for (int face = 0; face < num_faces; face++)
+   {
+      FI = pmesh->GetFaceInformation(face);
+      H1.GetFaceDofs(face, row);
+
+      int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
+      GetIntermediateFaceVelocity(face, Vf);
+      GetNodeVelocity(S, face_vdof1, node1_v);
+      GetNodeVelocity(S, face_vdof2, node2_v);
+
+      cout << "Vf: ";
+      Vf.Print(cout);
+      cout << "node1_v: ";
+      node1_v.Print(cout);
+      cout << "node2_v: ";
+      node2_v.Print(cout);
+   }
+
+   if (dim > 1)
+   {
+      // Don't need to fill face velocities with average in dim=1
+      // FillFaceVelocitiesWithAvg(S);
+      ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+   }
+
+   FillCenterVelocitiesWithAvg(S);
+}
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
+{
+   cout << "=======================================\n"
+        << "          ComputeGeoVRaviart           \n"
+        << "=======================================\n";
+   Vector vertex_v(dim);
+
+   for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
+   {
+      // Raviart-Thomas implementation to compute Vgeo
+      mfem::Mesh::FaceInformation FI;
+      Array<int> edge_row, element_row, cell_faces_row;
+      int row_length, cell_faces_length, vertex_edge_row_length;
+
+      // Get adjacent edges
+      vertex_edge.GetRow(vertex, edge_row);
+      vertex_edge_row_length = edge_row.Size();
+
+      Vector n_vec(dim);
+      double mi = 0., Ti = 0., Ki=0.;
+      Vector Uc(dim+2), Vi(dim), ivf(dim), v_cell(dim);
+      int vertex_bdr_attribute = 0;
+
+      vertex_v = 0.; // Reset vertex velocity 
+
+      // Get adjacent elements
+      vertex_element->GetRow(vertex, element_row);
+      row_length = element_row.Size();
+
+      // cout << "vertex: " << vertex << endl;
+      // Iterate over cells that share this vertex and average their contribution to vertex velocity
+      for (int element_it = 0; element_it < row_length; element_it++)
+      {
+         v_cell = 0.;
+         int el_index = element_row[element_it];
+         // cout << "el: " << el_index << endl;
+
+         // Get element faces
+         element_face.GetRow(el_index, cell_faces_row);
+         cell_faces_length = cell_faces_row.Size();
+
+         // Iterate over faces of this cell that touch vertex
+         for (int face_it = 0; face_it < cell_faces_length; face_it++)
+         {
+            ivf = 0.;
+            int face_index = cell_faces_row[face_it];
+            // cout << "face: " << face_index << endl;
+
+            if (edge_row.Find(face_index) != -1)
+            {
+               // cout << "element " << el_index << " has adjacent face: " << face_index << endl;
+               GetIntermediateFaceVelocity(face_index, ivf);
+               CalcOutwardNormalInt(S, el_index, face_index, n_vec);
+               n_vec /= n_vec.Norml2();
+
+               double coeff = n_vec * ivf;
+               // cout << "ifv: ";
+               // ivf.Print(cout);
+               v_cell.Add(coeff, n_vec);
+            }
+            // else
+            // {
+            //    cout << "face " << face_index << " is not adjacent to node " << node << endl;
+            // }
+         }
+
+         vertex_v.Add(1., v_cell);
+      }
+      // Average contributions
+      // cout << "vertex_v pre division: ";
+      // vertex_v.Print(cout);
+      // cout << "row_length: " << row_length << endl;
+      vertex_v /= row_length;
+      // cout << "vertex_v: ";
+      // vertex_v.Print(cout);
+
+      /* Put this velocity into v_geo_gf*/
+      for (int i = 0; i < dim; i++)
+      {
+         int index = vertex + i * num_vertices;
+         v_geo_gf[index] = vertex_v[i];
+      }
+   } // End vertex iterator
+
+}
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeNodeVelocitiesRaviart(
+   Vector &S, const double & t, double & dt, const string, 
+   void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   cout << "=======================================\n"
+        << "     ComputeNodeVelocitiesRaviart      \n"
+        << "=======================================\n";
+   
+   Vector vertex_v(dim);
+
+   bool is_dt_changed = false;
+   // Iterate over vertices
+   for (int vertex = 0; vertex < num_vertices; vertex++) // Vertex iterator
+   {
+      ComputeNodeVelocityRaviart(vertex, dt, vertex_v, is_dt_changed);
+
+      if (vertex_v[0] != vertex_v[0] || vertex_v[1] != vertex_v[1])
+      {
+         cout << "NaN velocity encountered in ComputeNodeVelocities at vertex: " << vertex << endl;
+         MFEM_ABORT("Aborting due to NaNs.\n");
+      }
+
+      UpdateNodeVelocity(S, vertex, vertex_v);
+
+      // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
+      if (is_dt_changed)
+      {
+         vertex = -1;
+         is_dt_changed = false;
+         cout << "Restarting vertex iterator\n";
+      }
+   } // End Vertex iterator
+
+}
+
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
+   const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
+{
+   cout << "=======================================\n"
+        << "      ComputeNodeVelocityRaviart       \n"
+        << "=======================================\n";
+   
+   switch (dim)
+   {
+      case 1:
+      {
+         // Remark 5.3 in the paper states that since each geometric node belongs to one
+         // face only, the RT velocity is equal to the IFV previously computed.
+         assert(node < num_faces);
+         GetIntermediateFaceVelocity(node, node_v);
+         break;
+      }
+      default:
+      {
+         DenseMatrix Ci(dim);
+         Vector Vgeo(dim);
+         double d = 0.;
+         
+         Ci = 0., Vgeo = 0., node_v = 0.;
+         ComputeCiGeoRaviart(node, Ci);
+
+         // Enforce time restriction imposed by calculation of alpha_i
+         // if (dim == 2)
+         // {
+         //    double trace = Ci.Trace();
+         //    double det = Ci.Det();
+         //    double val = 2. * sqrt(det);
+         //    cout << "trace: " << trace << ", det: " << det << endl;
+
+         //    // alpha_i must be positive restriction
+         //    if (det <= 1.e-12 && trace < 0.)
+         //    {
+         //       if (dt > 2. / abs(trace))
+         //       {
+         //          dt = 2. / (abs(trace) + 1.);
+         //          is_dt_changed = true;
+         //          cout << "timestep restriction from velocity computation, det = 0 case.\n";
+         //       }
+         //    }
+            
+         //    // alpha_i must be real
+         //    else if (det > 0.)
+         //    {
+         //       if (trace < val)
+         //       {
+         //          // Enforce timestep restriction
+         //          double zero2 = 1. / (-trace + val);
+         //          if (dt > 2 * zero2)
+         //          {
+         //             cout << "timestep restriction from velocity computation\n";
+         //             cout << "dt: " << dt << ", z2: " << zero2 << endl;
+         //             dt = 2. * zero2;
+         //             is_dt_changed = true;
+         //          }
+         //       }
+         //       else 
+         //       {
+         //          cout << "positive determinant but no timestep restriction needed.\n";
+         //       }
+         //    }
+         //    else
+         //    {
+         //       cout << "negative determinant, no timestep restriction needed.\n";
+         //    }
+         // } // End time restriction from velocity computation
+
+         GetViGeo(node, Vgeo);
+         cout << "cnv_RT Vgeo: ";
+         Vgeo.Print(cout);
+
+         ComputeDeterminant(Ci, dt, d);
+
+         // Compute V_i^n
+         DenseMatrix _mat(Ci);
+         _mat *= - dt / 2.;
+         for (int i = 0; i < dim; i++)
+         {
+            _mat(i,i) += d;
+         }
+
+         cout << "det: " << d << endl;
+         cout << "Ci: ";
+         Ci.Print(cout);
+         cout << "Pre inverse: \n";
+         _mat.Print(cout);
+
+         _mat.Invert();
+         cout << "Inverse: \n";
+         _mat.Print(cout);
+
+         _mat.Mult(Vgeo, node_v);
+         cout << "cnv_RT post mult V geo: ";
+         Vgeo.Print(cout);
+         cout << "node_v for node " << node << ": ";
+         node_v.Print(cout);
+         break;
+      }
+   }
+
+}
+
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeCiGeoRaviart(const int & node, DenseMatrix & res)
+{
+   // cout << "=======================================\n"
+   //      << "             ComputeCiGeo              \n"
+   //      << "=======================================\n";
+   assert(node < NDofs_H1); // "Invalid nodal index"
+   res.SetSize(dim);
+   res = 0.;
+
+   // Check if node corresponds to a face or to a vertex
+   // and get adjacent cell indices
+   double denom = 0.;
+   DenseMatrix dm_temp(dim);
+   mfem::Array<int> row;
+
+   DofEntity entity;
+   int EDof;
+   GetEntityDof(node, entity, EDof);
+   // cout << "entity: " << entity << ", Edof: " << EDof << endl;
+
+   switch (entity)
+   {
+      case 0: // corner
+      {
+         // cout << "ComputeCiGeo::corner node\n";
+         vertex_element->GetRow(node, row);
+         break;
+      }
+      case 1: // face
+      {
+         // cout << "face node\n";
+         face_element->GetRow(EDof, row);
+         break;
+      }
+      case 2: // cell
+      {
+         MFEM_ABORT("No need to compute C_i at cell centers.\n");
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid entity\n");
+      }
+   }
+
+   int row_length = row.Size();
+   for (int row_it = 0; row_it < row_length; row_it++)
+   {
+      int row_el = row[row_it];
+      double cell_vol = pmesh->GetElementVolume(row_el);
+      denom += cell_vol;
+
+      dm_temp = 0.;
+      IntGradRaviart(row_el, dm_temp);
+      // res.Add(1., dm_temp);
+      res.Add(cell_vol, dm_temp);
+      cout << "cell_vol: " << cell_vol << endl;
+      // cout << "int_grad for row el: " << row_el << endl;
+      // dm_temp.Print(cout);
+   }
+
+   cout << "denom: " << denom << endl;
+   // cout << "res before dividing: \n";
+   // res.Print(cout);
+   res *= 1./denom;
+   cout << "Ci for node " << node << ": \n";
+   res.Print(cout);
+}
+
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IntGradRaviart(const int cell, DenseMatrix & res)
+{
+   // cout << "=======================================\n"
+   //      << "             IntGradRaviart            \n"
+   //      << "=======================================\n";
+   ParGridFunction H1_L_c_gf(&H1c);
+   const int _size = H1c.GetVSize();
+
+   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+   Vector grad(dim), row(dim);
+   res.SetSize(dim);
+   res = 0., row = 0.;
+
+   // Iterate over quadrature
+   for (int i = 0; i < RT_ir.GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = RT_ir.IntPoint(i);
+      trans->SetIntPoint(&ip);
+
+      for (int j = 0; j < dim; j++)
+      {
+         H1_L_c_gf.MakeRef(&H1c, v_geo_gf, j*_size);
+         H1_L_c_gf.GetGradient(*trans, grad);
+
+         // Put information into Dense Matrix
+         res.GetRow(j, row);
+         row.Add(ip.weight, grad);
+         res.SetRow(j, row);
+      }
+   }
+   cout << "int grad vh for cell: " << cell << ": \n";
+   res.Print(cout);
+}
+
 
 /* Explicit n_vectantiation */
 template class LagrangianLOOperator<1>;

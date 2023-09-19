@@ -29,7 +29,7 @@
 * ========================================= New .h based problem runs =========================================
 * ----- 1D -----
 * ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 8     ## Smooth
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 0.25 -ot -visc -mm -vis -rs 8  ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -ot -visc -mm -vis -rs 8  ## Sod
 * ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -vis -rs 8    ## Lax
 # ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
 *
@@ -303,6 +303,7 @@ int main(int argc, char *argv[]) {
    // - L2 (Q0, discontinuous) for state variables
    // - CR/RT for mesh reconstruction at nodes
    H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
@@ -315,6 +316,7 @@ int main(int argc, char *argv[]) {
    }
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
@@ -507,7 +509,7 @@ int main(int argc, char *argv[]) {
    cout << "GridFunctions initiated.\n";
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(H1FESpace, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
    cout << "Solver created.\n";
 
    /* Set up visualiztion object */
@@ -1188,7 +1190,7 @@ int main(int argc, char *argv[]) {
       const long nrows=1, ncols=2;
       long row = 0, col = 0;
       plt::subplot2grid(nrows, ncols, row, col);
-      plt::scatter(x_gf_py, ss_gf_py), 'b';
+      plt::scatter(x_gf_py, ss_gf_py);
       plt::scatter(faces_x_py, lambda_gf_py);
       plt::title("Sound Speed");
       plt::xlabel("$x$");

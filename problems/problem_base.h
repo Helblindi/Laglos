@@ -200,7 +200,7 @@ public:
       double val = this->get_gamma() * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
       val -= 2. * this->get_a() * density;
       val = pow(val, 0.5);
-      return val;
+      return val * density;
    }
 
    /*********************************************

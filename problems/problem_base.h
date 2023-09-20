@@ -67,10 +67,10 @@ public:
    virtual bool has_exact_solution() { return known_exact_solution; }
    virtual bool has_boundary_conditions() { return bcs; }
    
-   // Update
-   virtual void lm_update(const double b_covolume)
-   {
-      cout << "Wrong funcall.\n";
+   /* Functions that update the class, can be overridden */
+   virtual void lm_update(const double b_covolume) {
+   }
+   virtual void update(Vector x_gf, double t = 0.) {
    }
 
    /* ProblemDescription */
@@ -261,11 +261,8 @@ public:
    } // virtual function, must be overridden
    virtual double sie0(const Vector &x, const double & t) {
       MFEM_ABORT("Must override sie0 in ProblemBase class.\n");
-      return 0.;
+      return 1.;
    } // virtual function, must be overridden
-   virtual void update(Vector x_gf, double t = 0.) {
-      // MFEM_ABORT("Must override update in ProblemBase class.\n");
-   };
    
 }; // End ProblemBase
 

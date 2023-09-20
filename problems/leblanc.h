@@ -26,30 +26,41 @@ namespace hydrodynamics
 template<int dim>
 class LeblancProblem: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 5./3.;
+   double _a = 0.;     
+   double _b = 0.;
+   double _gamma = 5./3.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
 
    double rhoL = 1., rhoR = 0.001, pL = (2./3.)/10., pR = (2./3.)/10.e10, vL = 0., vR = 0.;
    double x_center = 0.5;
 
+public:
+   LeblancProblem()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
+
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   double pressure(const Vector &U) override
    {
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
@@ -79,7 +90,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) override
    {
       if (t < 1e-12)
       {
@@ -111,7 +122,7 @@ public:
          return riemann1D::rho(p);
       }
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
       if (t < 1e-12)
       {
@@ -139,7 +150,7 @@ public:
       }
       return;
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) override
    {
       return (x(0) < x_center) ? pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
                         : pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);

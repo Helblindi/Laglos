@@ -35,13 +35,11 @@ namespace hydrodynamics
 template<int dim>
 class VdwTest1: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 1.;     
-   double b = 1.;
-   double gamma = 1.02;
+   double _a = 1., _b = 1., _gamma = 1.02;
    bool distort_mesh = false;
    bool known_exact_solution = true; // exact is known, information in supplementary material
 
@@ -54,11 +52,15 @@ public:
    Vector x_sorted_vec;
    int vec_size = 0;
 
+public:
+   VdwTest1()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
 
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
    virtual bool get_distort_mesh() override { return distort_mesh; }
    virtual bool has_exact_solution() override { return known_exact_solution; }
    virtual void update(Vector x_gf, double t = 0.) override {
@@ -170,7 +172,7 @@ public:
       double out_vL, out_vR, out_pL, out_pR;
       
       // Run Fortran code to compute exact solution
-      __vdw_MOD_initialize_vdw(&rhop, &a, &b, &gamma, &rhoL, &rhoR, &out_vL, &out_vR, &out_pL, &out_pR);
+      __vdw_MOD_initialize_vdw(&rhop, &_a, &_b, &_gamma, &rhoL, &rhoR, &out_vL, &out_vR, &out_pL, &out_pR);
       __vdw_MOD_rho_v_p_vdw(&x0, &vec_size, x_gf_sorted, rho.GetData(), v.GetData(), p.GetData());
 
       // Stuff Fortran results into class to be accessed

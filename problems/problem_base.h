@@ -34,7 +34,7 @@ namespace hydrodynamics
 template<int dim>
 class ProblemBase
 {
-public:
+private:
    double a = 0., b = 0., gamma = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
@@ -47,21 +47,33 @@ public:
    constexpr static double CFL_second = 0.5;
    constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
 
+public:
    virtual bool change_cfl() { return _change_cfl; }
    virtual double get_cfl_first() { return CFL_first; }
    virtual double get_cfl_second() { return CFL_second; }
    virtual double get_cfl_time_change() { return CFL_time_change; }
    
-   virtual double get_a() { return a; }
-   virtual double get_b() { return b; }
-   virtual double get_gamma() { return gamma; }
+   // Setters
+   void set_a(const double &_a) { a = _a; }
+   void set_b(const double &_b) { b = _b; }
+   void set_gamma(const double &_gamma) { gamma = _gamma; }
+
+   // Getters
+   double get_a() { return a; }
+   double get_b() { return b; }
+   double get_gamma() { return gamma; }
    virtual string get_indicator() { return indicator; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
    virtual bool has_boundary_conditions() { return bcs; }
    
+   // Update
+   virtual void lm_update(const double b_covolume)
+   {
+      cout << "Wrong funcall.\n";
+   }
 
-   // ProblemDescription
+   /* ProblemDescription */
    static double internal_energy(const Vector &U)
    {
       const double &rho = 1./U[0];
@@ -94,7 +106,7 @@ public:
                                     const Vector & n_ij,
                                     double in_pl,
                                     double in_pr,
-                                    double b_covolume,
+                                    double b_covolume=-1.,
                                     const string flag="NA")
    {
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
@@ -125,16 +137,28 @@ public:
       in_rhor = 1. / in_taur;
 
       double in_tol = 1.e-15,
-            lambda_maxl_out = 0.,
-            lambda_maxr_out = 0.,
-            pstar = 0.,
-            vstar = 0.;
+             _b=0.;
+      double lambda_maxl_out = 0.,
+             lambda_maxr_out = 0.,
+             pstar = 0.,
+             vstar = 0.;
       int k = 0; // Tells you how many iterations were needed for convergence
-      
       bool want_iter = true;
+
+      // Handle b_covolume parameter
+      if (b_covolume == -1.)
+      {
+         // if b_covolume is not specified, or is -1., use the problem specific value.
+         _b = this->get_b();
+      }
+      else
+      {
+         // if b_covolume is specified, use this value
+         _b = b_covolume;
+      }
       __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
+         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);
 
       // bool no_iter = false; 
       // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(

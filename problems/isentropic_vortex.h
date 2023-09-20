@@ -25,13 +25,13 @@ namespace hydrodynamics
 template<int dim>
 class IsentropicVortex: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 7./5.;
+   double _a = 0.;     
+   double _b = 0.;
+   double _gamma = 7./5.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
    bool bcs = true;
@@ -44,19 +44,30 @@ public:
    const double beta = 5.;
    double xc_0 = 0., xc_1 = 0.;
 
+public:
+   IsentropicVortex()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
+
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual string get_indicator() override { return indicator; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
-   virtual bool has_boundary_conditions() override { return bcs; }
+   string get_indicator() override { return indicator; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+   bool has_boundary_conditions() override { return bcs; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   double pressure(const Vector &U) override
    {
       cout << "IV::Pressure\n";
       double density = 1. / U[0];
@@ -66,13 +77,13 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double pressure(const Vector &x, const double &t)
+   double pressure(const Vector &x, const double &t)
    {
       cout << "IV::Pressure\n";
       double density = rho0(x,t);
       return pow(density, this->get_gamma());
    }
-   virtual double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) override
    {
       cout << "IV::rho\n";
       Vector center(2);
@@ -89,7 +100,7 @@ public:
 
       return rho;
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
       cout << "IV::v0\n";
       Vector center(2);
@@ -108,7 +119,7 @@ public:
       v[1] = 0. + coeff * x_bar[0];
       return;
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) override
    {
       cout << "IV::sie0\n";
       return pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);

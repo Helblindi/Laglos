@@ -26,25 +26,34 @@ namespace hydrodynamics
 template<int dim>
 class SodProblem: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 1.4;
+   double _a = 0., _b = 0., _gamma = 1.4;
    bool distort_mesh = false;
    bool known_exact_solution = true;
 
    double rhoL = 1.0, rhoR = 0.125, pL = 1.0, pR = 0.1, vL = 0., vR = 0.;
    double x_center = 0.5;
 
+public:
+   SodProblem()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
+   
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions

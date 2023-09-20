@@ -24,27 +24,36 @@ namespace hydrodynamics
 template<int dim>
 class SmoothWave: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0.;     
-   double b = 0.;
-   double gamma = 7/5.;
+   double _a = 0., _b = 0., _gamma = 7/5.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
 
+public:
+   SmoothWave()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
+
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   double pressure(const Vector &U) override
    {
       // pL = pR = 1.
       return (this->get_gamma() - 1.) * this->internal_energy(U);
@@ -53,7 +62,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) override
    {
       double x0 = 0.1, x1 = 0.3;
       if (x0 <= x[0] - t && x[0] - t < x1)
@@ -66,12 +75,12 @@ public:
          return 1.;
       }
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
       v[0] = 1.;
       return;
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) override
    {
       return 1.0 / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }

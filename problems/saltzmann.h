@@ -28,11 +28,11 @@ namespace hydrodynamics
 template<int dim>
 class SaltzmannProblem: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0., b = 0., gamma = 5./3.;
+   double _a = 0., _b = 0., _gamma = 5./3.;
    bool distort_mesh = true;
    bool known_exact_solution = true;
    bool bcs = true;
@@ -43,11 +43,6 @@ public:
    constexpr static double CFL_first = 0.01;
    constexpr static double CFL_second = 0.25;
    constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
-
-   virtual bool change_cfl() override { return _change_cfl; }
-   virtual double get_cfl_first() override { return CFL_first; }
-   virtual double get_cfl_second() override { return CFL_second; }
-   virtual double get_cfl_time_change() override { return CFL_time_change; }
 
    double rotation_angle = 0.; // 0 - 1D horizontal velocity
    double rhoL = 1.0, rhoR = 1.0;;
@@ -64,18 +59,34 @@ public:
    double cL = sqrt(this->get_gamma() * pL / rhoL);
    double x0 = 0.0000000001; // Initial shock position
 
+public:
+   SaltzmannProblem()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
+
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual string get_indicator() override { return indicator; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
+   string get_indicator() override { return indicator; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+
+   bool change_cfl() override { return _change_cfl; }
+   double get_cfl_first() override { return CFL_first; }
+   double get_cfl_second() override { return CFL_second; }
+   double get_cfl_time_change() override { return CFL_time_change; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   double pressure(const Vector &U) override
    {
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
@@ -83,7 +94,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double pressure(const Vector &x, const double &t) 
+   double pressure(const Vector &x, const double &t) 
    {
       if (t == 0) { return pow((this->get_gamma() - 1), 2) * 10e-4; } // TODO: Change pressure
       else {
@@ -113,7 +124,7 @@ public:
       }
    }
 
-   virtual double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) override
    {
       assert(dim < 3); //
       if (t == 0) { return 1.; }
@@ -145,7 +156,7 @@ public:
       }
       return 0.;
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
       if (t == 0) { v = 0.; }
       else 
@@ -179,7 +190,7 @@ public:
       }
       return;
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) override
    {
       if (t == 0) { return pow(10, -4); }
       else {

@@ -28,11 +28,11 @@ namespace hydrodynamics
 template<int dim>
 class ProblemTemplate: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 0., b = 0., gamma = 7/5.;
+   double _a = 0., _b = 0., _gamma = 7/5.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
@@ -40,26 +40,37 @@ public:
 
    // CFL change
    bool _change_cfl = false;
-   constexpr static double CFL_first = 0.5;
-   constexpr static double CFL_second = 0.5;
-   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+   // constexpr static double CFL_first = 0.5;
+   // constexpr static double CFL_second = 0.5;
+   // constexpr static double CFL_time_change = 0.01;
 
-   virtual bool change_cfl() override { return _change_cfl; }
-   virtual double get_cfl_first() override { return CFL_first; }
-   virtual double get_cfl_second() override { return CFL_second; }
-   virtual double get_cfl_time_change() override { return CFL_time_change; }
+public:
+   ProblemTemplate()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+   }
 
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
+   bool get_distort_mesh() override { return distort_mesh; }
+   bool has_exact_solution() override { return known_exact_solution; }
+
+   bool change_cfl() override { return _change_cfl; }
+   // double get_cfl_first() override { return CFL_first; }
+   // double get_cfl_second() override { return CFL_second; }
+   // double get_cfl_time_change() override { return CFL_time_change; }
+
+   /* Override specific update functions */
+   void lm_update(const double b_covolume) override 
+   {
+      this->set_b(b_covolume);
+   }
 
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   double pressure(const Vector &U) override
    {
       /*
       Must Override
@@ -70,21 +81,21 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) override
    {
       /*
       Must Override
       */
       return 0.;
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) override
    {
       /*
       Must Override
       */
       return;
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) override
    {
       /*
       Must Override

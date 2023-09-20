@@ -319,15 +319,18 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          c_vec /= 2.;
          double c_norm = c_vec.Norml2();
 
-         // Compute max wave speed
-         // double b_covolume = 0.;
+         /* Compute max wave speed */ 
+         // Some cases require an update to b_covolume at every interface.  This can be done through
+         // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
          double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
-         // double b_covolume = 1.;
+         pb->lm_update(b_covolume);
+
+         // Compute pressure with given EOS
          double pl = pb->pressure(Uc);
          double pr = pb->pressure(Ucp);
 
+         // Finally compute lambda max
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume);
-
          d = lambda_max * c_norm; 
 
          double ss = pb->sound_speed(Uc);

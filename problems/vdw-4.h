@@ -25,20 +25,16 @@ namespace hydrodynamics
 template<int dim>
 class VdwTest4: public ProblemBase<dim>
 {
-public:
+private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double a = 1.;     
-   double b = 1.;
-   double gamma = 1.02;
+   double _a = 1., _b = 1., _gamma = 1.02;
    bool distort_mesh = false;
    bool known_exact_solution = false;
 
+public:
    /* Override getters */
-   virtual double get_a() override { return a; }
-   virtual double get_b() override { return b; }
-   virtual double get_gamma() override { return gamma; }
    virtual bool get_distort_mesh() override { return distort_mesh; }
    virtual bool has_exact_solution() override { return known_exact_solution; }
 
@@ -51,7 +47,7 @@ public:
       double rho = 1. / U[0];
       double sie = this->specific_internal_energy(U);
 
-      double val = (gamma - 1.) * (rho * sie + a * pow(rho, 2)) / (1. - b * rho) - a * pow(rho,2);
+      double val = (this->get_gamma() - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
 
       return val;
    }

@@ -39,10 +39,9 @@ private:
 
    // Free steam conditions
    const double rho_inf = 1., p_inf = 1., T_inf = 1.;
-   // Vector u_inf(2);
-   // // u_inf[0] = 2.; u_inf[1] = 0.;
    const double beta = 5.;
    double xc_0 = 0., xc_1 = 0.;
+   double vc_0 = 0., vc_1 = 0.; // u_inf
 
 public:
    IsentropicVortex()
@@ -87,8 +86,8 @@ public:
    {
       cout << "IV::rho\n";
       Vector center(2);
-      center[0] = xc_0 + 2. * t;
-      center[1] = xc_1;
+      center[0] = xc_0 + vc_0 * t;
+      center[1] = xc_1 + vc_1 * t;
 
       Vector x_bar = x;
       x_bar -= center;
@@ -104,8 +103,8 @@ public:
    {
       cout << "IV::v0\n";
       Vector center(2);
-      center[0] = xc_0 + 2. * t;
-      center[1] = xc_1;
+      center[0] = xc_0 + vc_0 * t;
+      center[1] = xc_1 + vc_1 * t;
 
       Vector x_bar = x;
       x_bar -= center;
@@ -113,10 +112,9 @@ public:
 
       const double coeff = (exp((1. - pow(r,2)) / 2.) * beta) / (2. * M_PI);
 
-      // v[0] = u_inf[0] + coeff * x_bar[1] * -1.;
-      // v[1] = u_inf[1] + coeff * x_bar[0];
-      v[0] = 2. + coeff * x_bar[1] * -1.;
-      v[1] = 0. + coeff * x_bar[0];
+      v[0] = vc_0 + coeff * x_bar[1] * -1.;
+      v[1] = vc_1 + coeff * x_bar[0];
+      
       return;
    }
    double sie0(const Vector &x, const double & t) override

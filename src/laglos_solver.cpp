@@ -1453,6 +1453,9 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
    //      << "=======================================\n";
    Vector U_i(dim + 2);
    int counter = 0;
+
+   double initial_mass_sum = 0.;
+   double current_mass_sum = 0.;
    
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
@@ -1460,7 +1463,13 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
 
-      if (abs(k / U_i[0] - m) > pow(10, -8))
+      double current_mass = k / U_i[0];
+      initial_mass_sum += m;
+      current_mass_sum += current_mass;
+
+      double val = (current_mass - m) / m;
+
+      if (abs(val) > pow(10, -8))
       {
          counter++;
          // cout << "cell: " << ci << endl;
@@ -1471,19 +1480,17 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
          // cout << "m: " << m << endl;
          // cout << "K/T: " << k / U_i[0] << endl;
          // cout << endl;
-         
-         // Fill corresponding cell to indicate graphically mass was broken
-         mc_gf[ci] = 1.;
       }
-      else
-      {
-         // Fill corresponding cell to indicate graphically mass was not broken
-         mc_gf[ci] = 0.;
-      }
+      // Fill corresponding cell to indicate graphically the local change in mass, if any
+      mc_gf[ci] = val;
    }
+   
    double cell_ratio = (double)counter / (double)NDofs_L2;
 
    cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
+   cout << "Initial mass sum: " << initial_mass_sum 
+        << ", Current mass sum: " << current_mass_sum << endl;
+   cout << "Relative total mass: " << (current_mass_sum - initial_mass_sum) / initial_mass_sum << endl;
 }
 
 
@@ -2196,6 +2203,9 @@ void LagrangianLOOperator<dim>::
       }
       UpdateNodeVelocity(S, face_dof, face_velocity);
    }
+
+   // Turn off mass correction
+   do_mass_correction = false;
 }
 
 
@@ -2577,9 +2587,18 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
 
    if (dim > 1)
    {
+      cout << "doing something with the faces\n";
       // Don't need to fill face velocities with average in dim=1
-      // FillFaceVelocitiesWithAvg(S);
-      ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+      if (do_mass_correction)
+      {
+         cout << "Mass correcting\n";
+         ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+      }
+      else
+      {
+         cout << "Face averaging\n";
+         FillFaceVelocitiesWithAvg(S);
+      }
    }
 
    FillCenterVelocitiesWithAvg(S);

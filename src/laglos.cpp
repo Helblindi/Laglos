@@ -91,6 +91,8 @@ int main(int argc, char *argv[]) {
    bool visualization = false;
    int vis_steps = 5;
    int precision = 12;
+   /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
+   int face_correction_frequency = 1;
    bool use_viscosity = true;
    bool mm = false;
    bool optimize_timestep = false;
@@ -116,6 +118,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable GLVis visualization.");
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
+   args.AddOption(&face_correction_frequency, "-fcf", "--face-correction-frequency",
+                  "Frequency to which face correction should be applied.");
    args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
                   "--no-viscosity",
                   "Enable or disable the use of artificial viscosity.");
@@ -651,6 +655,9 @@ int main(int argc, char *argv[]) {
       }
 
       if (ti == max_tsteps) { last_step = true; }
+      
+      // Turn on mass correction at given frequency
+      if (ti % face_correction_frequency == 0) { hydro.EnableMassCorrection(); }
 
       S_old = S;
       

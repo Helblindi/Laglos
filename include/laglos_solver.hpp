@@ -105,6 +105,7 @@ protected:
 
    bool use_viscosity;
    bool mm;
+   bool do_mass_correction = false;
 
 public:
    enum DofEntity {corner, face, cell};
@@ -124,6 +125,7 @@ public:
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
+   void EnableMassCorrection() { this->do_mass_correction = true;  }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 

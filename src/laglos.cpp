@@ -37,9 +37,10 @@
 * ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
 *
 * ----- 2D -----
-* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4     ## Smooth wave in 2D
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4   ## Sod in 2D
-* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3 ## Isentropic Vortex
+* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4          ## Smooth wave in 2D
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4        ## Sod in 2D
+* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4  ## Sod Distorted
+* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3      ## Isentropic Vortex
 *
 */
 #include "lambda_max_lagrange.h"
@@ -93,6 +94,7 @@ int main(int argc, char *argv[]) {
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    int face_correction_frequency = 1;
+   int num_face_correction_iterations = 0;
    bool use_viscosity = true;
    bool mm = false;
    bool optimize_timestep = false;
@@ -120,6 +122,8 @@ int main(int argc, char *argv[]) {
                   "Visualize every n-th timestep.");
    args.AddOption(&face_correction_frequency, "-fcf", "--face-correction-frequency",
                   "Frequency to which face correction should be applied.");
+   args.AddOption(&num_face_correction_iterations, "-fci", "--face-correction-iterations",
+                  "Number of iterations to feed the corrective face velocity back into the corner node computations.");
    args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
                   "--no-viscosity",
                   "Enable or disable the use of artificial viscosity.");
@@ -512,6 +516,9 @@ int main(int argc, char *argv[]) {
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
    cout << "Solver created.\n";
+
+   /* Set parameters of the LagrangianLOOperator */
+   hydro.SetNumFaceCorrectionIterations(num_face_correction_iterations);
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_mc, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
@@ -1094,9 +1101,9 @@ int main(int argc, char *argv[]) {
       ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
       // }
       /* Get composite errors values */
-      const double L1_error = rho_L1_error_n + vel_L1_error_n + ste_L1_error_n;
-      const double L2_error = rho_L2_error_n + vel_L2_error_n + ste_L2_error_n;
-      const double Max_error = rho_Max_error_n + vel_Max_error_n + ste_Max_error_n;
+      const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
+      const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
+      const double Max_error = (rho_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
 
 
       if (Mpi::Root())

@@ -53,6 +53,7 @@ protected:
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1c;
    ParGridFunction v_CR_gf; // 5.7(b)
+   ParGridFunction v_CR_gf_corrected; // 10/2
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
@@ -99,6 +100,7 @@ protected:
    int el_num_faces;
    const int num_elements, num_vertices, num_faces, num_edges;
 
+   int num_face_correction_iterations = 0; // 0 is default, no iterations done
    double CFL;
    double timestep = 0.001;
    double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
@@ -126,6 +128,7 @@ public:
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
    void EnableMassCorrection() { this->do_mass_correction = true;  }
+   void SetNumFaceCorrectionIterations( const int _num_fci) { this->num_face_correction_iterations = _num_fci; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -158,6 +161,8 @@ public:
                                              const string ="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
+   void SetCorrectedFaceVelocity(const int & face, const Vector & vel); // 10/2
+   void GetCorrectedFaceVelocity(const int & face, Vector & vel);       // 10/2
 
    void ComputeNodeVelocityRT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void IntGradRT(const int cell, DenseMatrix & res);

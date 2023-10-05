@@ -101,6 +101,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
    v_CR_gf(&CR),
+   v_CR_gf_corrected(&CR), // 10/2
    v_geo_gf(&H1_L),
    pmesh(H1.GetParMesh()),
    m_lf(m),
@@ -167,6 +168,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    
    // Initialize values of intermediate face velocities
    v_CR_gf = 0.;
+   v_CR_gf_corrected = 0.;
    // assert(v_CR_gf.Size() == dim * num_faces);
    // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
@@ -1329,6 +1331,55 @@ void LagrangianLOOperator<dim>::GetIntermediateFaceVelocity(const int & face, Ve
    }
 }
 
+
+/****************************************************************************************************
+* Function: SetCorrectedFaceVelocity
+* Parameters:
+*  face - Face index
+*  vel  - V_{b}^3 corresponding to the given face
+*
+* Purpose:
+*  Sets corrected face velocity corresponding to the given face.
+*  NOTE: This function requires that ComputeIntermediateFaceVelocities has been run,
+*        though this value will change after the corrective velocities have been computed.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetCorrectedFaceVelocity(const int & face, const Vector & vel)
+{
+   assert(face < num_faces);
+   // Retrieve face velocity from object
+   for (int i = 0; i < dim; i++)
+   {
+      int index = face + i * num_faces;
+      v_CR_gf_corrected[index] = vel[i];
+   }
+}
+
+
+/****************************************************************************************************
+* Function: GetCorrectedFaceVelocity
+* Parameters:
+*  face - Face index
+*  vel  - V_{b}^3 corresponding to the given face
+*
+* Purpose:
+*  Return corrected face velocity corresponding to the given face.
+*  NOTE: This function requires that ComputeIntermediateFaceVelocities has been run,
+*        though this value will change after the corrective velocities have been computed.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::GetCorrectedFaceVelocity(const int & face, Vector & vel)
+{
+   assert(face < num_faces);
+   // Retrieve face velocity from object
+   for (int i = 0; i < dim; i++)
+   {
+      int index = face + i * num_faces;
+      vel[i] = v_CR_gf_corrected[index];
+   }
+}
+
+
 /****************************************************************************************************
 * Function: ComputeMeshVelocities
 * Parameters:
@@ -1356,7 +1407,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S,
    cout << "=======================================\n"
         << "         ComputeMeshVelocities         \n"
         << "=======================================\n";
-
    ComputeIntermediateFaceVelocities(S, t, flag, test_vel);  
 
    // Compute v_geo_gf
@@ -1484,7 +1534,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
       // Fill corresponding cell to indicate graphically the local change in mass, if any
       mc_gf[ci] = val;
    }
-   
+
    double cell_ratio = (double)counter / (double)NDofs_L2;
 
    cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
@@ -1931,23 +1981,23 @@ void LagrangianLOOperator<dim>::
       GetNodePosition(S, face_vdof2, vdof2_x);
 
       // cout << "------------------------------------\n";
-      // cout << "dt: " << dt << endl;
-      // cout << "We are iterating on face: " << face << endl;
-      // cout << "This face is located at: \n";
-      // face_x.Print(cout);
-      // cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
-      // vdof1_x.Print(cout);
-      // cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
-      // vdof2_x.Print(cout);
+      cout << "dt: " << dt << endl;
+      cout << "We are iterating on face: " << face << endl;
+      cout << "This face is located at: \n";
+      face_x.Print(cout);
+      cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
+      vdof1_x.Print(cout);
+      cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
+      vdof2_x.Print(cout);
 
       // retrieve corner velocities
       GetNodeVelocity(S, face_vdof1, vdof1_v);
       GetNodeVelocity(S, face_vdof2, vdof2_v);
       
-      // cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
-      // vdof1_v.Print(cout);
-      // cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
-      // vdof2_v.Print(cout);
+      cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
+      vdof1_v.Print(cout);
+      cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
+      vdof2_v.Print(cout);
 
       if (FI.IsInterior())
       {
@@ -2121,6 +2171,7 @@ void LagrangianLOOperator<dim>::
 
          // Compute V3n (5.11)
          double V3n = c1 * V3nperp + c2 + 3. * bmn / D;
+         // double V3n = c2 + 3. * bmn / D;
          // cout << "V3n: " << V3n << endl;
 
          // Compute face velocity (5.11)
@@ -2140,24 +2191,24 @@ void LagrangianLOOperator<dim>::
          // n_vec_perp.Print(cout);
          // cout << "n_vec_R:\n";
          // n_vec_R.Print(cout);
-         face_velocity.Add(V3nperp, n_vec_perp);
+         face_velocity.Add(V3nperp, n_vec_perp); // 10/2
 
          Vector face_x_new(dim);
          face_x_new = face_x;
          face_x_new.Add(dt, face_velocity);
 
          // Check perpendicular
-         subtract(face_x_new, vdof12_x_new, temp_vec);
-         subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
-         if (abs(temp_vec * temp_vec_2) > pow(10, -12))
-         {
-            // cout << "temp_vec:\n";
-            // temp_vec.Print(cout);
-            // cout << "temp_vec_2:\n";
-            // temp_vec_2.Print(cout);
-            // cout << "################## Vectors are not orthogonal!";
-            MFEM_ABORT("vectors are not orthogonal!\n");
-         }
+         // subtract(face_x_new, vdof12_x_new, temp_vec);
+         // subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
+         // if (abs(temp_vec * temp_vec_2) > pow(10, -12))
+         // {
+         //    // cout << "temp_vec:\n";
+         //    // temp_vec.Print(cout);
+         //    // cout << "temp_vec_2:\n";
+         //    // temp_vec_2.Print(cout);
+         //    // cout << "################## Vectors are not orthogonal!";
+         //    MFEM_ABORT("vectors are not orthogonal!\n");
+         // }
 
          if (flag == "testing")
          {
@@ -2202,9 +2253,9 @@ void LagrangianLOOperator<dim>::
          MFEM_ABORT("Exit");
       }
       UpdateNodeVelocity(S, face_dof, face_velocity);
-   }
 
-   // Turn off mass correction
+      SetCorrectedFaceVelocity(face, face_velocity);
+   }
    do_mass_correction = false;
 }
 
@@ -2377,10 +2428,6 @@ void LagrangianLOOperator<dim>::UpdateNodeVelocity(Vector &S, const int & node, 
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      // if (vel[i] != vel[i]) { 
-      //    cout << "Node: " << node << endl;
-      //    MFEM_ABORT("NaN val encountered."); 
-      // }
       mv_gf[index] = vel[i];
    }
 }
@@ -2554,54 +2601,88 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
         << "     ComputeMeshVelocitiesRaviart      \n"
         << "=======================================\n";
    ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
-
-   if (dim > 1)
-   {
-      ComputeGeoVRaviart(S);
-   }
+   v_CR_gf_corrected = v_CR_gf; // 10/2
    
-   ComputeNodeVelocitiesRaviart(S, t, dt);
-
-   /* Iterate over faces and check intermediate face velocities compared to corner nodes */
-   mfem::Mesh::FaceInformation FI;
-   Array<int> row;
-   Vector Vf(dim), node1_v(dim), node2_v(dim);
-   cout << "verifying face velocities\n";
-   for (int face = 0; face < num_faces; face++)
+   for (int face_corr_it = 0; 
+        face_corr_it < num_face_correction_iterations + 1;  // Option set in Laglos with -
+        face_corr_it++)
    {
-      FI = pmesh->GetFaceInformation(face);
-      H1.GetFaceDofs(face, row);
-
-      int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
-      GetIntermediateFaceVelocity(face, Vf);
-      GetNodeVelocity(S, face_vdof1, node1_v);
-      GetNodeVelocity(S, face_vdof2, node2_v);
-
-      cout << "Vf: ";
-      Vf.Print(cout);
-      cout << "node1_v: ";
-      node1_v.Print(cout);
-      cout << "node2_v: ";
-      node2_v.Print(cout);
-   }
-
-   if (dim > 1)
-   {
-      cout << "doing something with the faces\n";
-      // Don't need to fill face velocities with average in dim=1
-      if (do_mass_correction)
+      if (dim > 1)
       {
-         cout << "Mass correcting\n";
-         ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+         ComputeGeoVRaviart(S);
       }
-      else
+
+      cout << "face correction loop " << face_corr_it << endl;
+
+      cout << "Printing v_CR_gf_corrected:\n";
+      v_CR_gf_corrected.Print(cout);
+
+      cout << "Printing v_CR_gf:\n";
+      v_CR_gf.Print(cout);
+
+
+      ComputeNodeVelocitiesRaviart(S, t, dt);
+
+      /* Iterate over faces and check intermediate face velocities compared to corner nodes */
+      // mfem::Mesh::FaceInformation FI;
+      // Array<int> row;
+      // Vector Vf(dim), node1_v(dim), node2_v(dim);
+      // cout << "verifying face velocities\n";
+      // for (int face = 0; face < num_faces; face++)
+      // {
+      //    FI = pmesh->GetFaceInformation(face);
+      //    H1.GetFaceDofs(face, row);
+
+      //    int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
+      //    // GetIntermediateFaceVelocity(face, Vf);
+      //    GetCorrectedFaceVelocity(face, Vf);
+      //    GetNodeVelocity(S, face_vdof1, node1_v);
+      //    GetNodeVelocity(S, face_vdof2, node2_v);
+
+      //    cout << "Vf: ";
+      //    Vf.Print(cout);
+      //    cout << "node1_v: ";
+      //    node1_v.Print(cout);
+      //    cout << "node2_v: ";
+      //    node2_v.Print(cout);
+      // }
+
+      if (dim > 1)
       {
-         cout << "Face averaging\n";
-         FillFaceVelocitiesWithAvg(S);
+         cout << "doing something with the faces\n";
+         // Don't need to fill face velocities with average in dim=1
+         if (do_mass_correction)
+         {
+            cout << "Mass correcting\n";
+            ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+
+            // Turn off mass correction if at the end of the face
+            // corner node correction iteration
+            // if (face_corr_it >= num_face_correction_iterations)
+            // {
+            //    do_mass_correction = false;
+            // }
+            // Otherwise keep mass correcting
+         }
+         else
+         {
+            cout << "Face averaging\n";
+            FillFaceVelocitiesWithAvg(S);
+         }
       }
-   }
+   } // End face corner node correction iteration
 
    FillCenterVelocitiesWithAvg(S);
+
+   
+   v_CR_gf_corrected -= v_CR_gf;
+   double v_CR_error = v_CR_gf.Norml2();
+   cout << "Printing v_CR norm: " << v_CR_error << endl;
+   cout << "Printing v_CR_gf_corrected:\n";
+   v_CR_gf_corrected.Print(cout);
+
+   cout << "Printing v_CR_gf:\n";
+   v_CR_gf.Print(cout);
 }
 
 /****************************************************************************************************
@@ -2664,7 +2745,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
             if (edge_row.Find(face_index) != -1)
             {
                // cout << "element " << el_index << " has adjacent face: " << face_index << endl;
-               GetIntermediateFaceVelocity(face_index, ivf);
+               // GetIntermediateFaceVelocity(face_index, ivf);
+               GetCorrectedFaceVelocity(face_index, ivf); // 10/2
                CalcOutwardNormalInt(S, el_index, face_index, n_vec);
                n_vec /= n_vec.Norml2();
 
@@ -2767,7 +2849,8 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
          // Remark 5.3 in the paper states that since each geometric node belongs to one
          // face only, the RT velocity is equal to the IFV previously computed.
          assert(node < num_faces);
-         GetIntermediateFaceVelocity(node, node_v);
+         // GetIntermediateFaceVelocity(node, node_v);
+         GetCorrectedFaceVelocity(node, node_v); // 10/2
          break;
       }
       default:
@@ -2838,21 +2921,22 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
             _mat(i,i) += d;
          }
 
-         cout << "det: " << d << endl;
-         cout << "Ci: ";
-         Ci.Print(cout);
-         cout << "Pre inverse: \n";
-         _mat.Print(cout);
+         // cout << "det: " << d << endl;
+         // cout << "Ci: ";
+         // Ci.Print(cout);
+         // cout << "Pre inverse: \n";
+         // _mat.Print(cout);
 
          _mat.Invert();
-         cout << "Inverse: \n";
-         _mat.Print(cout);
+         // cout << "Inverse: \n";
+         // _mat.Print(cout);
 
          _mat.Mult(Vgeo, node_v);
-         cout << "cnv_RT post mult V geo: ";
-         Vgeo.Print(cout);
-         cout << "node_v for node " << node << ": ";
-         node_v.Print(cout);
+         // cout << "cnv_RT post mult V geo: ";
+         // Vgeo.Print(cout);
+         // cout << "node_v for node " << node << ": ";
+         // node_v.Print(cout);
+         // node_v = 0.;
          break;
       }
    }

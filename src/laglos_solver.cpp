@@ -2256,7 +2256,6 @@ void LagrangianLOOperator<dim>::
 
       SetCorrectedFaceVelocity(face, face_velocity);
    }
-   do_mass_correction = false;
 }
 
 
@@ -2658,10 +2657,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
 
             // Turn off mass correction if at the end of the face
             // corner node correction iteration
-            // if (face_corr_it >= num_face_correction_iterations)
-            // {
-            //    do_mass_correction = false;
-            // }
+            if (face_corr_it >= num_face_correction_iterations)
+            {
+               do_mass_correction = false;
+            }
             // Otherwise keep mass correcting
          }
          else

@@ -53,7 +53,8 @@ protected:
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1c;
    ParGridFunction v_CR_gf; // 5.7(b)
-   ParGridFunction v_CR_gf_corrected; // 10/2
+   ParGridFunction v_CR_gf_corrected; // Iteratively updated
+   ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
@@ -161,8 +162,10 @@ public:
                                              const string ="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
-   void SetCorrectedFaceVelocity(const int & face, const Vector & vel); // 10/2
-   void GetCorrectedFaceVelocity(const int & face, Vector & vel);       // 10/2
+   void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
+   void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
+   void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
+   void GetCorrectedFaceFlux(const int & face, Vector & flux);       
 
    void ComputeNodeVelocityRT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void IntGradRT(const int cell, DenseMatrix & res);
@@ -176,9 +179,12 @@ public:
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
    void ComputeNodeVelocities(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
 
    void FillCenterVelocitiesWithAvg(Vector &S);
    void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void FillFaceVelocitiesWithAvg2(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void UpdateFaceVelocitiesWithAvg(Vector &S);
 
    void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);

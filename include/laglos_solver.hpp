@@ -50,7 +50,7 @@ class LagrangianLOOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
-   ParFiniteElementSpace &H1_L;
+   // ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1c;
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated

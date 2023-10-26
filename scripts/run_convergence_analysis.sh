@@ -30,8 +30,9 @@ cd $bin_dir
 
 
 # Dim = 2 cases
-# options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.1 -ot -visc -mm -so -vs 100 -fci 2" ## Isentropic Vortex
-options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100 -fci 2"
+# options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.1 -ot -visc -mm -so -vs 100" ## Isentropic Vortex
+options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.05 -ot -visc -mm -so -vs 100" #rs0-4 ## Sod on distorted grid
+# options="-m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100" #rs2-6 ## Sod on cartesian grid
 
 ./Laglos -rs 0 $options
 ./Laglos -rs 1 $options

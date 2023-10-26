@@ -53,6 +53,7 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
+#include <boost/filesystem.hpp>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -81,6 +82,7 @@ int main(int argc, char *argv[]) {
 
    // Parse command line options
    const char *mesh_file_location = "default";
+   const char *output_flag = "default";
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
@@ -101,12 +103,15 @@ int main(int argc, char *argv[]) {
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
-   string sv_output_prefix=std::string(LAGLOS_DIR) + "build/results/state_vectors/";
+   string sv_output_prefix;
+   string output_path;
 
    OptionsParser args(argc, argv);
 
    args.AddOption(&problem, "-p", "--problem", "Test problem to run.");
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
+   args.AddOption(&output_flag, "-of", "--output-flag", 
+                  "Directory that output files should be placed");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
@@ -230,6 +235,37 @@ int main(int argc, char *argv[]) {
          break;
       }
    }
+
+   // Set output_flag string
+   if (strncmp(output_flag, "default", 7) != 0)
+   {
+      output_path = std::string(LAGLOS_DIR) + "build/results/" + std::string(output_flag) + "/";
+      // We must manually create all corresponding output directories
+      string _convergence = output_path + "convergence";
+      string _temp_output = _convergence + "/temp_output";
+      string _state_vectors = output_path + "state_vectors";
+
+      const char* path = output_path.c_str();
+      boost::filesystem::path output_path_dir(path);
+      boost::filesystem::create_directory(output_path_dir);
+
+      path = _convergence.c_str();
+      boost::filesystem::path convergence_path_dir(path);
+      boost::filesystem::create_directory(convergence_path_dir);
+
+      path = _temp_output.c_str();
+      boost::filesystem::path temp_output_dir(path);
+      boost::filesystem::create_directory(temp_output_dir);
+
+      path = _state_vectors.c_str();
+      boost::filesystem::path state_vectors_dir(path);
+      boost::filesystem::create_directory(state_vectors_dir);
+   }
+   else
+   {
+      output_path = std::string(LAGLOS_DIR) + "build/results/";
+   }
+   sv_output_prefix = output_path + "state_vectors/";
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
@@ -460,10 +496,10 @@ int main(int argc, char *argv[]) {
    }
 
    // Print initialized mesh
-   // Can be visualized with glvis -np # -m ./results/mesh-test-init
+   // Can be visualized with glvis -np # -m build/results/mesh-test-init
    {
       ostringstream mesh_name;
-      mesh_name << "./results/mesh-test-init." << setfill('0') << setw(6) << myid;
+      mesh_name << output_path << "mesh-test-init." << setfill('0') << setw(6) << myid;
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
@@ -973,10 +1009,10 @@ int main(int argc, char *argv[]) {
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
 
    // Print moved mesh
-   // Can be visualized with glvis -np # -m mesh-test-moved
+   // Can be visualized with glvis -np # -m build/results/mesh-test-moved
    {
       ostringstream mesh_name;
-      mesh_name << "./results/mesh-test-moved." << setfill('0') << setw(6) << myid;
+      mesh_name << output_path << "mesh-test-moved." << setfill('0') << setw(6) << myid;
       ofstream omesh(mesh_name.str().c_str());
       omesh.precision(precision);
       pmesh->Print(omesh);
@@ -1109,7 +1145,7 @@ int main(int argc, char *argv[]) {
       if (Mpi::Root())
       {
          ostringstream convergence_filename;
-         convergence_filename << "./results/convergence/temp_output/np" << num_procs;
+         convergence_filename << output_path << "convergence/temp_output/np" << num_procs;
 
          if (rs_levels != 0) {
             convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;

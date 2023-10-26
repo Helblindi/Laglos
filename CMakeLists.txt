@@ -33,12 +33,10 @@ include(PreventInSourceBuilds)
 include(FortranCInterface)
 FortranCInterface_VERIFY(CXX)
 
-# find python libraries
-# SET(PYTHON_LIBRARIES "/opt/homebrew/Frameworks/Python.framework/Versions/3.10/lib/libpython3.10.dylib")
-# SET(PYTHON_INCLUDE_DIR "/opt/homebrew/Frameworks/Python.framework/Versions/3.10/include/python3.10")
-# find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
-# find_package(PythonLibs 3.0 REQUIRED)
+# Boost required for filesystem modification
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
+# Find python
 if(APPLE)
   find_package(Python 3 COMPONENTS Interpreter Development NumPy REQUIRED)
   set(PYTHON_MAJOR $ENV{Python_VERSION_MAJOR})
@@ -53,8 +51,9 @@ else()
   set(PYTHONLIBS_VERSION_STRING $ENV{PY_VERSION})
 endif()
 
+message(STATUS "Found python: " ${Python_EXECUTABLE})
+message(STATUS "Python include dirs: " ${Python_INCLUDE_DIRS})
 include_directories(${PYTHON_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIR})
-# link numpy
 link_libraries(Python::NumPy ${Python_LIBRARIES})
 
 # Load user settings before the defaults - this way the defaults will not
@@ -92,10 +91,6 @@ set(MFEM_DIR "" CACHE PATH "Path to the MFEM build or install prefix.")
 if (MFEM_DIR)
   find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
                 "${MFEM_DIR}/build" NO_DEFAULT_PATH)
-  #  find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
-  #               "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
-  #  message(STATUS "Here is the currect value of mfem_DIR: ${MFEM_DIR}")
-  #  find_package(mfem REQUIRED)
 else()
    find_package(mfem REQUIRED NAMES MFEM)
 endif()

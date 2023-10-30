@@ -56,7 +56,7 @@ protected:
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
-   ParGridFunction v_geo_gf; // 5.11
+   ParGridFunction v_geo_gf, v_geo_gf2; // 5.11
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -109,6 +109,8 @@ protected:
    bool use_viscosity;
    bool mm;
    bool do_mass_correction = false;
+
+   StopWatch chrono_mm, chrono_state;
 
 public:
    enum DofEntity {corner, face, cell};
@@ -207,6 +209,7 @@ public:
    void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeGeoVRaviart(const Vector &S);
+   void ComputeGeoVRaviart2(const Vector &S);
    void ComputeNodeVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeNodeVelocityRaviart(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void ComputeCiGeoRaviart(const int & node, DenseMatrix & res);

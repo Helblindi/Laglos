@@ -11,14 +11,14 @@ state_vectors="${bin_dir}/results/state_vectors/"
 convergence_dir="${bin_dir}/results/convergence/"
 
 
-cd $convergence_dir
-rm *.out
-rm *.txt
+# cd $convergence_dir
+# rm *.out
+# rm *.txt
 
-cd $temp_output
-rm -rf *
-cd $state_vectors
-rm -rf *
+# cd $temp_output
+# rm -rf *
+# cd $state_vectors
+# rm -rf *
 
 cd $bin_dir
 
@@ -30,9 +30,9 @@ cd $bin_dir
 
 
 # Dim = 2 cases
-# options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.1 -ot -visc -mm -so -vs 100" ## Isentropic Vortex
-options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.05 -ot -visc -mm -so -vs 100" #rs0-4 ## Sod on distorted grid
-# options="-m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100" #rs2-6 ## Sod on cartesian grid
+options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.01 -ot -visc -mm -so -vs 100 -of isen-vortex" ## Isentropic Vortex
+# options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.01 -ot -visc -mm -so -vs 100 -of sod-distorted" #rs0-4 ## Sod on distorted grid
+# options="-m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100 -of sod-cartesian" #rs2-6 ## Sod on cartesian grid
 
 ./Laglos -rs 0 $options
 ./Laglos -rs 1 $options
@@ -47,8 +47,9 @@ options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.05 -ot -visc -mm -s
 # ./Laglos -rs 10 $options
 # ./Laglos -rs 11 $options
 # ./Laglos -rs 12 $options
-cd $scripts_dir
+
+# cd $scripts_dir
 
 # python stuff for iterating over files to build convergence table
-python3 $create_convergence $temp_output
-python3 $create_refinement $state_vectors 2
+# python3 $create_convergence $temp_output
+# python3 $create_refinement $state_vectors 2

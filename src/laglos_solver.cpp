@@ -105,6 +105,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf_corrected(&CR), 
    v_CR_gf_fluxes(&CR),
    v_geo_gf(&H1),
+   v_geo_gf2(&H1),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -169,6 +170,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    
    // Initialize values of intermediate face velocities
    v_geo_gf = 0.;
+   v_geo_gf2 = 0.;
    v_CR_gf = 0.;
    v_CR_gf_corrected = 0.;
    v_CR_gf_fluxes = 0.;
@@ -181,6 +183,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
    RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), RT_ir_order);
+
+   // Reset chronos
+   chrono_mm.Clear();
+   chrono_state.Clear();
 
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -614,6 +620,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    cout << "========================================\n"
         << "MakeTimeStep\n"
         << "========================================\n";
+   chrono_mm.Start();
    if (mm)
    {
       // Compute mesh velocities
@@ -621,9 +628,12 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
       // ComputeMeshVelocities(S, t, dt);
       ComputeMeshVelocitiesRaviart(S,t,dt);
    }
+   chrono_mm.Stop();
 
    // Update state variables contained in S_new
+   chrono_state.Start();
    ComputeStateUpdate(S, t, dt);
+   chrono_state.Stop();
 
    // Move the mesh
    Vector* sptr = const_cast<Vector*>(&S);
@@ -634,6 +644,8 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    add(x_gf, dt, mv_gf, x_gf);
 
    pmesh->NodesUpdated();
+   cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
+   cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
 } 
 
 
@@ -1218,11 +1230,14 @@ void LagrangianLOOperator<dim>::
    
    mfem::Mesh::FaceInformation FI;
    int c, cp;
-   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim), Vf(dim); 
+   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim), Vf(dim), Vf_flux(dim); 
    double d, c_norm, F;
+
+   Array<int> row;
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
+      // cout << "face: " << face << endl;
       Vf = 0.;
       FI = pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
@@ -1232,17 +1247,16 @@ void LagrangianLOOperator<dim>::
 
       if (flag == "NA")
       {
+         // Get normal, d, and |F|
+         CalcOutwardNormalInt(S, c, face, n_int);
+         n_vec = n_int;
+         F = n_vec.Norml2();
+         n_vec /= F;
+         assert(1. - n_vec.Norml2() < 1e-12);
+
          if (FI.IsInterior())
          {
             GetCellStateVector(S, cp, Ucp);
-
-            // Get normal, d, and |F|
-            CalcOutwardNormalInt(S, c, face, n_int);
-            n_vec = n_int;
-            double F = n_vec.Norml2();
-            n_vec /= F;
-
-            assert(1. - n_vec.Norml2() < 1e-12);
 
             // Get max wave speed
             d = dij_sparse->Elem(c, cp);
@@ -1252,13 +1266,35 @@ void LagrangianLOOperator<dim>::
             Vf += pb->velocity(Ucp);
             Vf *= 0.5;
 
-            cout << "d: " << d
-                 << ", tau cp: " << Ucp[0]
-                 << ", tau c: " << Uc[0] << endl;
-
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
+
+            // Switch orientation of Vf based on orientation of faces in mfem
+            // Vf_flux = Vf;
+            // Vf_flux *= F;
+            // int ind = -1;
+            // int ori = 0;
+
+            // Array<int> element_face_row, element_face_oris;
+            // pmesh->GetElementEdges(c, element_face_row, element_face_oris);
+            // for (int i = 0; i < 4; i++) // 3DTODO
+            // {
+            //    if (element_face_row[i] == face)
+            //    {
+            //       ind = i;
+            //       ori = element_face_oris[i];
+            //    }
+            // }
+            // if ((ind == 0 && ori == 1)  || 
+            //       (ind == 1 && ori == -1) ||
+            //       (ind == 2 && ori == -1) ||
+            //       (ind == 3 && ori == 1))
+            // {
+            //    cout << "flipping orientation of Vf for face: " << face << endl;
+            //    Vf_flux *= -1.;
+            // }
          }
+
          else 
          {
             assert(FI.IsBoundary());
@@ -1300,12 +1336,19 @@ void LagrangianLOOperator<dim>::
          test_vel(face_x, t, Vf);
       }
 
-      // Put face velocity into object
+      // Put face velocity into object (for state var update)
       for (int i = 0; i < dim; i++)
       {
          int index = face + i * num_faces;
          v_CR_gf[index] = Vf[i];
       }
+
+      // Put face velocity into object [for MFEM implementation, has errors]
+      // for (int i = 0; i < dim; i++)
+      // {
+      //    int index = face + i * num_faces;
+      //    v_CR_gf_fluxes[index] = Vf_flux[i];
+      // }
 
    } // End face iterator
 
@@ -1891,43 +1934,93 @@ void LagrangianLOOperator<dim>::ComputeGeoV()
    cout << "=======================================\n"
         << "             ComputeViGeo              \n"
         << "=======================================\n";
-   cout << "v_CR_gf:\n";
-   v_CR_gf.Print(cout);
 
-   VectorGridFunctionCoefficient vcr_coeff(&v_CR_gf); // fluxes
+   cout << "v_CR_gf:\n";
+   v_CR_gf_fluxes.Print(cout);
+
+   VectorGridFunctionCoefficient vcr_coeff(&v_CR_gf_fluxes); // fluxes
    v_geo_gf.ProjectDiscCoefficient(vcr_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);  
    
+   // double hmin, hmax, kmin, kmax;
+   // pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
+   // v_geo_gf *= hmin;
+   // cout << "hmin: " << hmin << ", hmax: " << hmax << endl;
+
    cout << "v_geo gf:\n";
    v_geo_gf.Print(cout);
 
-   for (int el = 0; el < 4; el++)
-   {
-      Array<int> el_faces, oris;
-      pmesh->GetElementEdges(el, el_faces, oris);
-      cout << "iterating on element: " << el << endl;
-      for (int f_it = 0; f_it < 4; f_it++)
-      {
-         cout << "face: " << el_faces[f_it] << " has orientation " << oris[f_it] << endl;
-      }
-   }
+   // TODO: Return v_geo_gf must be scaled by the face length
+
+   // Do the stuff from the field-interp miniapp in gslib
+   // Vector vxyz;
+   // int point_ordering;
+   // vxyz = pmesh->GetNodes();
+   // point_ordering = pmesh->GetNodes()->FESpace()->GetOrdering();
+   // const int nodes_cnt = vxyz.Size() / dim;
+   
+
+   // std::ostringstream vcr_name;
+   // vcr_name << "/Users/madisonsheridan/Workspace/Laglos/build/results/vcr_gf";
+   // std::ofstream vcr_ofs(vcr_name.str().c_str());
+   // vcr_ofs.precision(8);
+   // v_CR_gf.SaveAsOne(vcr_ofs);
+   // vcr_ofs.close();
+
+   // socketstream vis_vcr;
+   // vis_vcr.precision(8);
+   // char vishost[] = "localhost";
+   // int  visport   = 19916;
+   // int Wx = 0, Wy = 0; // window position
+   // int Ww = 350, Wh = 350; // window size
+   // VisualizeField(vis_vcr, vishost, visport, v_CR_gf,
+   //                "vis_vcr", Wx, Wy, Ww, Wh);
+   // vis_vcr.close();
 
    // cout << "Look at normals:\n";
+   // Vector center_node(dim), res(dim);
+   // center_node = 0.5;
 
-   // Vector nor;
-   // const int nfaces = pmesh->GetNumFaces();
-   // for (int i = 0; i < nfaces; i++)
+   // Array<int> vdofs;
+   // Vector vals;
+   // Array<int> face_orientations;
+
+   // for (int i = 0; i < L2.GetNE(); i++)
    // {
-   //    ElementTransformation *T = pmesh->GetFaceTransformation(i);
-      // // Evaluate the Jacobian at the center of the face:
-      // CalcOrtho(T->Jacobian(), nor);
-      // T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceBaseGeometry(i)));
-      // CalcOrtho(T->Jacobian(), nor);
-   //    // Use 'nor' ...
-   //    cout << "normal vector at center of face i = " << i << " is: ";
-   //    nor.Print(cout);
+   //    cout << "element: " << i << endl;
+      // ElementTransformation *T = CR.GetElementTransformation(i);
+      // IntegrationPoint ip;
+      // T->TransformBack(center_node, ip);
+      // // T->SetIntPoint(&ip);
+      // cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << endl;
+      // vcr_coeff.Eval(res, *T, ip);
+      // cout << "resulting vec: ";
+      // res.Print(cout);
+      // v_CR_gf.GetVectorValue(*T, ip, res);
+      // cout << "resulting vec2: ";
+      // res.Print(cout);
+
+      // DofTransformation * doftrans = CR.GetElementVDofs(i, vdofs); // null object returned
+      // for (int j=0; j<vdofs.Size(); j++)
+      // {
+      //    cout << "vdof for j: " << j << " = " << vdofs[j] << endl;
+      // }
+      // // Local interpolation of coeff.
+      // vals.SetSize(vdofs.Size());
+      // CR.GetFE(i)->Project(vcr_coeff, *pmesh->GetElementTransformation(i), vals);
+      // cout << "printing vals:\n";
+      // vals.Print(cout);
+
+      // Get face orientations
+      // Array<int> oris, cell_faces;
+      // pmesh->GetElementEdges(i, cell_faces, oris);
+      // cout << "iterating over faces of cell " << i << endl;
+      // for (int j = 0; j < cell_faces.Size(); j++)
+      // {
+      //    cout << "face " << cell_faces[j] << " has orientation " << oris[j] << endl;
+      // }
    // }
 
-   assert(false);
+   // assert(false);
 }
 
 
@@ -2853,13 +2946,19 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
    {
       if (dim > 1)
       {
-         ComputeGeoVRaviart(S);
+         // ComputeGeoVRaviart(S);
+         ComputeGeoVRaviart2(S);
          // ComputeGeoV();
       }
       // cout << "Printing v_CR_gf:\n";
       // v_CR_gf.Print(cout);
-      // cout << "printing v_geo_gf:\n";
-      // v_geo_gf.Print(cout);
+      cout << "printing v_geo_gf:\n";
+      v_geo_gf.Print(cout);
+
+      cout << "printing v_geo_gf2:\n";
+      v_geo_gf2.Print(cout);
+
+      assert(false);
 
       ComputeNodeVelocitiesRaviart(S, t, dt);
 
@@ -2892,43 +2991,44 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
       //    node2_v.Print(cout);
       // }
 
-      if (dim > 1)
-      {
-         if (do_mass_correction)
-         {
-            cout << "Mass correcting\n";
-            ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+   //    if (dim > 1)
+   //    {
+   //       if (do_mass_correction)
+   //       {
+   //          cout << "Mass correcting\n";
+   //          ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
             
-            // Turn off mass correction if at the end of the face
-            // corner node correction iteration
-            if (face_corr_it >= num_face_correction_iterations)
-            {
-               do_mass_correction = false;
-            }
-            else
-            {
-               // Since we will continue to iterate, we must
-               // compute our iterative face flux and store 
-               // the value
-               ComputeCorrectiveFaceFluxes(S, t, dt);
-            }
-            // Otherwise keep mass correcting
-            // do_mass_correction = false;
-         }
-         else
-         {
-            cout << "Face averaging\n";
-            // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
-            // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
-            FillFaceVelocitiesWithAvg(S);
+   //          // Turn off mass correction if at the end of the face
+   //          // corner node correction iteration
+   //          if (face_corr_it >= num_face_correction_iterations)
+   //          {
+   //             do_mass_correction = false;
+   //          }
+   //          else
+   //          {
+   //             // Since we will continue to iterate, we must
+   //             // compute our iterative face flux and store 
+   //             // the value
+   //             ComputeCorrectiveFaceFluxes(S, t, dt);
+   //          }
+   //          // Otherwise keep mass correcting
+   //          // do_mass_correction = false;
+   //       }
+   //       else
+   //       {
+   //          cout << "Face averaging\n";
+   //          // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
+   //          // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
+   //          FillFaceVelocitiesWithAvg(S);
 
-            // End the iteration loop
-            face_corr_it = num_face_correction_iterations + 1;
-         }
-      }
-   } // End face corner node correction iteration
+   //          // End the iteration loop
+   //          face_corr_it = num_face_correction_iterations + 1;
+   //       }
+   //    }
+   // } // End face corner node correction iteration
 
    FillCenterVelocitiesWithAvg(S);
+   }
 }
 
 
@@ -2938,7 +3038,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
 *  S    - 
 *
 * Purpose:
-*  
+*  Iterate over nodes, then look at adjacent elements
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
@@ -2946,12 +3046,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
    cout << "=======================================\n"
         << "          ComputeGeoVRaviart           \n"
         << "=======================================\n";
-   
-   // VectorGridFunctionCoefficient vcr_coeff(&v_CR_gf); // fluxes
-   // v_geo_gf.ProjectDiscCoefficient(vcr_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);  
-
-   // cout << "v_geo from projection:\n";
-   // v_geo_gf.Print(cout);
 
    Vector node_v(dim), n_vec(dim);
    Vector ivf(dim), v_cell(dim);
@@ -3033,28 +3127,20 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
          const FiniteElement * CR_fe = CR.GetFE(el_index);
          CR_fe->CalcPhysVShape(*trans, shape_funcs);
 
-         // cout << "iterating for cell (" << el_index << ")\n";
          // Iterate over faces of this cell that touch vertex
          for (int face_it = 0; face_it < cell_faces_length; face_it++)
          {
             ivf = 0.;
             int face_index = cell_faces_row[face_it];
-            // cout << "iterating on face: " << face_index << endl;
 
             GetCorrectedFaceFlux(face_index, ivf); 
             CalcOutwardNormalInt(S, el_index, face_index, n_vec);
-            // double F = n_vec.Norml2();
-            // n_vec /= F;
-            // cout << "ivf: ";
-            // ivf.Print(cout);
-            // cout << "n_vec: ";
-            // n_vec.Print(cout);
 
             double coeff = n_vec * ivf;
-            // cout << "shape function: \n";
+
             Vector _shape_fun(dim);
             shape_funcs.GetRow(face_it, _shape_fun);
-            // _shape_fun.Print(cout);
+
             v_cell.Add(coeff, _shape_fun);
          }
 
@@ -3070,9 +3156,103 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
          v_geo_gf[index] = node_v[i];
       }
    } // End vertex iterator
+}
 
-   // cout << "v_geo from iteration:\n";
-   // v_geo_gf.Print(cout);
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  Iterate over cells and average contribution to nodes
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
+{
+   cout << "=======================================\n"
+        << "          ComputeGeoVRaviart2          \n"
+        << "=======================================\n";
+   Vector node_v(dim), n_vec(dim);
+   Vector ivf(dim), v_cell(dim);
+   Array<int> edge_row, element_row, cell_faces_row, zones_per_dof;
+   Array<int> oris;
+   int row_length, cell_faces_length;
+
+   Array<int> vdofs;
+   Vector node_x(dim);
+
+   v_geo_gf2 = 0.;
+
+   ElementTransformation * trans;
+   IntegrationPoint ip;
+   int ldof;
+   DenseMatrix shape_funcs(4,2);
+
+   zones_per_dof.SetSize(NDofs_H1);
+   zones_per_dof = 0;
+   cout << "zones per dof size: " << zones_per_dof.Size() << endl;
+
+   // Iterate over all cells and distribute its contribution to the nodes
+   for (int el = 0; el < L2.GetNE(); el++)
+   {
+      cout << "el: " << el << endl;
+
+      pmesh->GetElementEdges(el, cell_faces_row, oris);
+      cell_faces_length = cell_faces_row.Size();
+      
+      trans = pmesh->GetElementTransformation(el);
+      H1.GetElementDofs(el, vdofs);
+      // vals.SetSize(vdofs.Size());
+
+      cout << "vdofs size: " << vdofs.Size() << endl;
+      for (int i = 0; i < vdofs.Size(); i++)
+      {
+         v_cell = 0.;
+         ldof = vdofs[i];
+         cout << "i = " << i << " vdof: " << ldof << endl;
+         GetNodePosition(S, ldof, node_x);
+         trans->TransformBack(node_x, ip);
+         trans->SetIntPoint(&ip);
+
+         // Get vector shape function evaluations
+         const FiniteElement * CR_fe = CR.GetFE(el);
+         CR_fe->CalcPhysVShape(*trans, shape_funcs);
+
+         // Iterate over faces of this cell
+         for (int face_it = 0; face_it < cell_faces_length; face_it++)
+         {
+            ivf = 0.;
+            int face_index = cell_faces_row[face_it];
+
+            GetCorrectedFaceFlux(face_index, ivf); 
+            CalcOutwardNormalInt(S, el, face_index, n_vec);
+
+            double coeff = n_vec * ivf;
+
+            Vector _shape_fun(dim);
+            shape_funcs.GetRow(face_it, _shape_fun);
+
+            v_cell.Add(coeff, _shape_fun);
+         }
+
+         /* Put this velocity into v_geo_gf*/
+         for (int i = 0; i < dim; i++)
+         {
+            int index = ldof + i * NDofs_H1;
+            v_geo_gf2[index] += v_cell[i];
+         }
+         
+         zones_per_dof[ldof]++;
+      }
+   }
+   for (int i = 0; i < zones_per_dof.Size(); i++)
+   {
+      const int nz = zones_per_dof[i];
+      if (nz) { v_geo_gf2(i) /= nz; }
+      cout << "i: " << i << ", nz: " << nz << endl;
+   }
+
    // assert(false);
 }
 
@@ -3119,7 +3299,6 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesRaviart(
       //    cout << "Restarting vertex iterator\n";
       // }
    } // End Vertex iterator
-
 }
 
 

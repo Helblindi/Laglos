@@ -1008,15 +1008,43 @@ int main(int argc, char *argv[]) {
    
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
 
+   // Save mesh and gfs to files
+   std::ostringstream mesh_name, rho_name, v_name, ste_name;
+   mesh_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_mesh";
+   rho_name  << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_rho";
+   v_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_v";
+   ste_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_e";
+
+   std::ofstream mesh_ofs(mesh_name.str().c_str());
+   mesh_ofs.precision(8);
+   pmesh->PrintAsOne(mesh_ofs);
+   mesh_ofs.close();
+
+   std::ofstream rho_ofs(rho_name.str().c_str());
+   rho_ofs.precision(8);
+   rho_gf.SaveAsOne(rho_ofs);
+   rho_ofs.close();
+
+   std::ofstream v_ofs(v_name.str().c_str());
+   v_ofs.precision(8);
+   v_gf.SaveAsOne(v_ofs);
+   v_ofs.close();
+
+   std::ofstream ste_ofs(ste_name.str().c_str());
+   ste_ofs.precision(8);
+   ste_gf.SaveAsOne(ste_ofs);
+   ste_ofs.close();
+
+
    // Print moved mesh
    // Can be visualized with glvis -np # -m build/results/mesh-test-moved
-   {
-      ostringstream mesh_name;
-      mesh_name << output_path << "mesh-test-moved." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
-   }
+   // {
+   //    ostringstream mesh_name;
+   //    mesh_name << output_path << "mesh-test-moved." << setfill('0') << setw(6) << myid;
+   //    ofstream omesh(mesh_name.str().c_str());
+   //    omesh.precision(precision);
+   //    pmesh->Print(omesh);
+   // }
 
    if (problem_class->has_exact_solution())
    {

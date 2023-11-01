@@ -9,6 +9,7 @@
 #include "leblanc.h"
 #include "noh.h"
 #include "isentropic_vortex.h"
+#include "sedov.h"
 #include "saltzmann.h"
 #include "vdw-1.h"
 #include "vdw-2.h"

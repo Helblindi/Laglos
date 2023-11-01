@@ -201,6 +201,11 @@ int main(int argc, char *argv[]) {
          problem_class = new IsentropicVortex<dim>();
          break;
       }
+      case 6: // Sedov
+      {
+         problem_class = new SedovProblem<dim>();
+         break;
+      }
       case 7:
       {
          problem_class = new SaltzmannProblem<dim>();
@@ -226,7 +231,6 @@ int main(int argc, char *argv[]) {
          problem_class = new VdwTest4<dim>();
          break;
       }
-      case 6: MFEM_ABORT("Case not implemented.\n");
       default:
       {
          problem_class = new ProblemTemplate<dim>();

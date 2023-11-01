@@ -2114,9 +2114,9 @@ void LagrangianLOOperator<dim>::
                                     void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    assert(dim > 1); // No need to correct face velocities in dim=1
-   cout << "==============================================\n";
-   cout << "Computing corrective interior face velocities.\n";
-   cout << "==============================================\n";
+   // cout << "==============================================\n";
+   // cout << "Computing corrective interior face velocities.\n";
+   // cout << "==============================================\n";
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
@@ -2321,7 +2321,7 @@ void LagrangianLOOperator<dim>::
          const2 = temp_vec * temp_vec_2;
          const2 *= dt; // denominator
          V3nperp = -1. * const1 / const2;
-         cout << "V3nperp the old way: " << V3nperp << endl;
+         // cout << "V3nperp the old way: " << V3nperp << endl;
 
          // Compute face velocity (Appendix A)
          Vector n_vec_perp(dim);
@@ -2338,22 +2338,22 @@ void LagrangianLOOperator<dim>::
          // Modification 10-16 to use Raviart-Thomas tangential component
          Vector rt_face_vel(dim);
          GetNodeVelocity(S, face_dof, rt_face_vel);
-         cout << "rt_face_vel for face " << face << ": ";
-         rt_face_vel.Print(cout);
+         // cout << "rt_face_vel for face " << face << ": ";
+         // rt_face_vel.Print(cout);
          V3nperp = rt_face_vel * n_vec_perp;
-         cout << "V3nperp: " << V3nperp << endl;
+         // cout << "V3nperp: " << V3nperp << endl;
 
          // Compute V3n (5.11)
          V3n = c1 * V3nperp + c2 + 3. * bmn / D;
 
-         cout << "V3n: " << V3n << endl;
+         // cout << "V3n: " << V3n << endl;
 
          face_velocity = 0.;
          face_velocity.Add(V3n, n_vec);
          face_velocity.Add(V3nperp, n_vec_perp); // 10/2
 
-         cout << "resulting corrective velocity: ";
-         face_velocity.Print(cout);
+         // cout << "resulting corrective velocity: ";
+         // face_velocity.Print(cout);
 
          Vector face_x_new(dim);
          face_x_new = face_x;
@@ -2367,24 +2367,24 @@ void LagrangianLOOperator<dim>::
          //    MFEM_ABORT("vectors are not orthogonal!\n");
          // }
 
-         if (flag == "testing")
-         {
-            cout << "The coordinate location of face " << face << " is: ";
-            face_x.Print(cout);
-            cout << "The computed velocity on this face is: ";
-            face_velocity.Print(cout);
-            cout << "The exact face velocity is: ";
-            Vector face_v_exact(dim);
-            test_vel(face_x, 0., face_v_exact);
-            face_v_exact.Print(cout);
-            Vector temp_vel(dim);
+         // if (flag == "testing")
+         // {
+         //    cout << "The coordinate location of face " << face << " is: ";
+         //    face_x.Print(cout);
+         //    cout << "The computed velocity on this face is: ";
+         //    face_velocity.Print(cout);
+         //    cout << "The exact face velocity is: ";
+         //    Vector face_v_exact(dim);
+         //    test_vel(face_x, 0., face_v_exact);
+         //    face_v_exact.Print(cout);
+         //    Vector temp_vel(dim);
             // subtract(face_v_exact, face_velocity, temp_vel);
 
             // if (temp_vel.Norml2() > 10e-6)
             // {
             //    MFEM_ABORT("Incorrect face velocity.\n");
             // }
-         }
+         // }
       } // End interior face
 
       // On the boundary, we just need the average of the adjacent 
@@ -3011,7 +3011,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
       // {
       //    if (do_mass_correction)
       //    {
-      //       cout << "Mass correcting\n";
+      //       // cout << "Mass correcting\n";
       //       ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
             
       //       // Turn off mass correction if at the end of the face

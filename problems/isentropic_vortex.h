@@ -68,7 +68,6 @@ public:
     *********************************************************/
    double pressure(const Vector &U) override
    {
-      cout << "IV::Pressure\n";
       double density = 1. / U[0];
       return pow(density, this->get_gamma());
    }
@@ -78,13 +77,11 @@ public:
     *********************************************************/
    double pressure(const Vector &x, const double &t)
    {
-      cout << "IV::Pressure\n";
       double density = rho0(x,t);
       return pow(density, this->get_gamma());
    }
    double rho0(const Vector &x, const double & t) override
    {
-      cout << "IV::rho\n";
       Vector center(2);
       center[0] = xc_0 + vc_0 * t;
       center[1] = xc_1 + vc_1 * t;
@@ -95,13 +92,11 @@ public:
 
       const double dT = -1. * (exp(1 - pow(r,2)) * pow(beta, 2) * (this->get_gamma() - 1.)) / (8. * this->get_gamma() * pow(M_PI, 2));
       const double rho = pow(T_inf + dT, 1./(this->get_gamma() - 1.));
-      cout << "rho: " << rho << endl;
 
       return rho;
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
-      cout << "IV::v0\n";
       Vector center(2);
       center[0] = xc_0 + vc_0 * t;
       center[1] = xc_1 + vc_1 * t;
@@ -112,14 +107,13 @@ public:
 
       const double coeff = (exp((1. - pow(r,2)) / 2.) * beta) / (2. * M_PI);
 
-      v[0] = vc_0 + coeff * x_bar[1] * -1.;
+      v[0] = vc_0 - coeff * x_bar[1];
       v[1] = vc_1 + coeff * x_bar[0];
       
       return;
    }
    double sie0(const Vector &x, const double & t) override
    {
-      cout << "IV::sie0\n";
       return pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 

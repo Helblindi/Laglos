@@ -626,6 +626,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
       // This function may change the timestep
       // ComputeMeshVelocities(S, t, dt);
       ComputeMeshVelocitiesRaviart(S,t,dt);
+      EnforceMVBoundaryConditions(S,t,dt);
    }
    // chrono_mm.Stop();
 
@@ -932,9 +933,9 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
 template<int dim>
 void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt)
 {
-   cout << "========================================\n"
-        << "EnforcingMVBoundaryConditions\n"
-        << "========================================\n";
+   // cout << "========================================\n"
+   //      << "EnforcingMVBoundaryConditions\n"
+   //      << "========================================\n";
 
    if (pb->get_indicator() == "saltzmann")
    {
@@ -973,6 +974,18 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       // mv_gf.ProjectBdrCoefficientNormal(zero, other_bdr_attr);
 
       mv_gf.SyncAliasMemory(S);
+   }
+   else if (pb->get_indicator() == "IsentropicVortex")
+   {
+      Vector* sptr = const_cast<Vector*>(&S);
+      ParGridFunction x_gf, mv_gf;
+      mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+
+      Vector zero(dim);
+      zero = 0.;
+      VectorConstantCoefficient zero_coeff(zero);
+
+      mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
    }
 }
 

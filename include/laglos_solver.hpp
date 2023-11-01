@@ -56,7 +56,7 @@ protected:
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
-   ParGridFunction v_geo_gf, v_geo_gf2; // 5.11
+   ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
@@ -110,7 +110,7 @@ protected:
    bool mm;
    bool do_mass_correction = false;
 
-   StopWatch chrono_mm, chrono_state;
+   StopWatch chrono_mm, chrono_state, chrono_temp;
 
 public:
    enum DofEntity {corner, face, cell};

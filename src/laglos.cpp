@@ -41,6 +41,7 @@
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4        ## Sod in 2D
 * ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4  ## Sod Distorted
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3      ## Isentropic Vortex
+* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -ot -visc -mm -vis -rs 3 -of noh
 *
 */
 #include "lambda_max_lagrange.h"
@@ -93,18 +94,20 @@ int main(int argc, char *argv[]) {
    double dt = 0.001;
    bool visualization = false;
    int vis_steps = 5;
+   bool gfprint = false;
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    int face_correction_frequency = 1;
    int num_face_correction_iterations = 0;
    bool use_viscosity = true;
-   bool mm = false;
-   bool optimize_timestep = false;
+   bool mm = true;
+   bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
    string sv_output_prefix;
    string output_path;
+   string gfprint_path;
 
    OptionsParser args(argc, argv);
 
@@ -125,6 +128,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable GLVis visualization.");
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
+   args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
+                  "Enable or disable result output (files in mfem format).");
    args.AddOption(&face_correction_frequency, "-fcf", "--face-correction-frequency",
                   "Frequency to which face correction should be applied.");
    args.AddOption(&num_face_correction_iterations, "-fci", "--face-correction-iterations",
@@ -137,7 +142,7 @@ int main(int argc, char *argv[]) {
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
                   "--no-optimize-timestep",
                   "Enable or disable timestep optimization using CFL.");
-   args.AddOption(&CFL, "-cfl", "--time-step-restriction",
+   args.AddOption(&CFL, "-cfl", "--CFL",
                   "CFL value to use.");
    args.AddOption(&convergence_testing, "-ct", "--set-dt-to-h", "-no-ct", 
                   "--no-set-dt-to-h", 
@@ -154,17 +159,6 @@ int main(int argc, char *argv[]) {
       return 1;
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
-
-   // Optionally suppress std::ios output to console
-   ofstream file("/dev/null");
-
-   //save cout stream buffer
-   streambuf* strm_buffer = cout.rdbuf();
-   if (suppress_output)
-   {
-      // redirect cout to /dev/null
-      cout.rdbuf(file.rdbuf());
-   }
 
    // Check that convergence testing and optimizing the timestep are not both set to true
    if (optimize_timestep && convergence_testing)
@@ -197,6 +191,11 @@ int main(int argc, char *argv[]) {
          problem_class = new LeblancProblem<dim>();
          break;
       }
+      case 4: // Noh
+      {
+         problem_class = new NohProblem<dim>();
+         break;
+      }
       case 5: // Isentropic Vortex, stationary center
       {
          problem_class = new IsentropicVortex<dim>();
@@ -227,7 +226,6 @@ int main(int argc, char *argv[]) {
          problem_class = new VdwTest4<dim>();
          break;
       }
-      case 4: // Noh
       case 6: MFEM_ABORT("Case not implemented.\n");
       default:
       {
@@ -260,6 +258,23 @@ int main(int argc, char *argv[]) {
       path = _state_vectors.c_str();
       boost::filesystem::path state_vectors_dir(path);
       boost::filesystem::create_directory(state_vectors_dir);
+
+      if (gfprint)
+      {
+         ostringstream gfprint_path_ss;
+         gfprint_path_ss << output_path
+                         << "gfs_r"
+                         << setfill('0') 
+                         << setw(2)
+                         << to_string(rp_levels + rs_levels)
+                         << "/";
+
+         gfprint_path = gfprint_path_ss.str();
+
+         path = gfprint_path.c_str();
+         boost::filesystem::path gfprint_output_dir(path);
+         boost::filesystem::create_directory(gfprint_output_dir);
+      }
    }
    else
    {
@@ -473,13 +488,9 @@ int main(int argc, char *argv[]) {
       mfem::Mesh::FaceInformation FI;
       for (int face = 0; face < pmesh->GetNumFaces(); face++)
       {
-         cout << "Iterating on face: " << face << endl;
          FI = pmesh->GetFaceInformation(face);
          Array<int> face_dof_row;
          H1FESpace.GetFaceDofs(face, face_dof_row);
-
-         cout << "Face dof row for face: " << face << ":\n";
-         face_dof_row.Print(cout);
 
          int face_dof = face_dof_row[2];
          int index0 = face_dof_row[0];
@@ -493,16 +504,6 @@ int main(int argc, char *argv[]) {
          }
       }
       cout << "Mesh distorted\n";
-   }
-
-   // Print initialized mesh
-   // Can be visualized with glvis -np # -m build/results/mesh-test-init
-   {
-      ostringstream mesh_name;
-      mesh_name << output_path << "mesh-test-init." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
    }
 
    // Initialize mesh velocity
@@ -565,14 +566,18 @@ int main(int argc, char *argv[]) {
    ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
-   if (visualization)
+   // Compute the density if we need to visualize it
+   if (visualization || gfprint)
    {
       // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
       {
          rho_gf[i] = 1./sv_gf[i];
       } 
+   }
 
+   if (visualization)
+   {
       // Make sure all MPI ranks have sent their 'v' solution before initiating
       // another set of GLVis connections (one from each rank):
       MPI_Barrier(pmesh->GetComm());
@@ -656,6 +661,55 @@ int main(int argc, char *argv[]) {
       delete ste_ex;
    }
 
+   // Print initialized mesh and gridfunctions
+   // Can be visualized with glvis -np # -m *.mesh
+   //                        glvis -m *.mesh -g *.gf
+   if (gfprint)
+   {
+      // Save initial mesh and gfs to files
+      std::ostringstream mesh_name, rho_name, v_name, ste_name;
+      mesh_name << gfprint_path 
+                  << setfill('0') 
+                  << setw(6)
+                  << 0
+                  << ".mesh";
+      rho_name  << gfprint_path 
+                  << setfill('0') 
+                  << setw(6)
+                  << 0
+                  << "_rho.gf";
+      v_name << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << "_v.gf";
+      ste_name << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << "_ste.gf";
+
+      std::ofstream mesh_ofs(mesh_name.str().c_str());
+      mesh_ofs.precision(8);
+      pmesh->PrintAsOne(mesh_ofs);
+      mesh_ofs.close();
+
+      std::ofstream rho_ofs(rho_name.str().c_str());
+      rho_ofs.precision(8);
+      rho_gf.SaveAsOne(rho_ofs);
+      rho_ofs.close();
+
+      std::ofstream v_ofs(v_name.str().c_str());
+      v_ofs.precision(8);
+      v_gf.SaveAsOne(v_ofs);
+      v_ofs.close();
+
+      std::ofstream ste_ofs(ste_name.str().c_str());
+      ste_ofs.precision(8);
+      ste_gf.SaveAsOne(ste_ofs);
+      ste_ofs.close();
+   }
+
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
@@ -671,6 +725,17 @@ int main(int argc, char *argv[]) {
    cout << "Entering time loop\n";
    chrono.Clear();
    chrono.Start();
+
+   // Optionally suppress std::ios output to console
+   ofstream file("/dev/null");
+
+   //save cout stream buffer
+   streambuf* strm_buffer = cout.rdbuf();
+   if (suppress_output)
+   {
+      // redirect cout to /dev/null
+      cout.rdbuf(file.rdbuf());
+   }
 
    int ti = 1;
    for (; !last_step; ti++)
@@ -688,8 +753,8 @@ int main(int argc, char *argv[]) {
       {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
-         cout << "computed timestep is: " << dt << endl;
       }
+
 
       if (t + dt >= t_final)
       {
@@ -717,9 +782,6 @@ int main(int argc, char *argv[]) {
       sv_gf.SyncAliasMemory(S);
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
-
-      cout << "mv_gf:\n";
-      mv_gf.Print(cout);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -760,14 +822,18 @@ int main(int argc, char *argv[]) {
             cout.rdbuf(file.rdbuf());
          }
 
-         if (visualization)
+         // Compute the density if we need to visualize it
+         if (visualization || gfprint)
          {
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
             {
                rho_gf[i] = 1./sv_gf[i];
             } 
-            
+         }
+
+         if (visualization)
+         {            
             int Wx = 0, Wy = 0; // window position
             int Ww = 350, Wh = 350; // window size
             int offx = Ww+10, offy = Wh + 45; // window offsets
@@ -848,11 +914,63 @@ int main(int argc, char *argv[]) {
             delete vel_ex;
             delete ste_ex;
          }
+         
+         if (gfprint)
+         {
+            // Save mesh and gfs to files
+            std::ostringstream mesh_name, rho_name, v_name, ste_name;
+            mesh_name << gfprint_path 
+                      << setfill('0') 
+                      << setw(6)
+                      << ti 
+                      << ".mesh";
+            rho_name  << gfprint_path 
+                      << setfill('0') 
+                      << setw(6)
+                      << ti 
+                      << "_rho.gf";
+            v_name << gfprint_path 
+                   << setfill('0') 
+                   << setw(6)
+                   << ti 
+                   << "_v.gf";
+            ste_name << gfprint_path 
+                     << setfill('0') 
+                     << setw(6)
+                     << ti  
+                     << "_ste.gf";
+
+            std::ofstream mesh_ofs(mesh_name.str().c_str());
+            mesh_ofs.precision(8);
+            pmesh->PrintAsOne(mesh_ofs);
+            mesh_ofs.close();
+
+            std::ofstream rho_ofs(rho_name.str().c_str());
+            rho_ofs.precision(8);
+            rho_gf.SaveAsOne(rho_ofs);
+            rho_ofs.close();
+
+            std::ofstream v_ofs(v_name.str().c_str());
+            v_ofs.precision(8);
+            v_gf.SaveAsOne(v_ofs);
+            v_ofs.close();
+
+            std::ofstream ste_ofs(ste_name.str().c_str());
+            ste_ofs.precision(8);
+            ste_gf.SaveAsOne(ste_ofs);
+            ste_ofs.close();
+         }
       }
-      cout << "finished step\n";
+      // cout << "finished step\n";
    } // End time step iteration
 
    chrono.Stop();
+
+   // Last time computing density
+   for (int i = 0; i < sv_gf.Size(); i++)
+   {
+      rho_gf[i] = 1./sv_gf[i];
+   } 
 
    /* Various problem-specific plots */
    if (visualization)
@@ -875,7 +993,7 @@ int main(int argc, char *argv[]) {
 
                // Density plot 
                int nc_py = L2FESpace.GetNE();
-               cout << "nc_py: " << nc_py << endl;
+               // cout << "nc_py: " << nc_py << endl;
                Vector center(dim);
                std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
                double _min = 0.6, _max = 1.;
@@ -1005,46 +1123,8 @@ int main(int argc, char *argv[]) {
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
                       << ".out";
-   
+
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
-
-   // Save mesh and gfs to files
-   std::ostringstream mesh_name, rho_name, v_name, ste_name;
-   mesh_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_mesh";
-   rho_name  << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_rho";
-   v_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_v";
-   ste_name << output_path << "_r" << to_string(rp_levels + rs_levels) << "_" << ti << "_e";
-
-   std::ofstream mesh_ofs(mesh_name.str().c_str());
-   mesh_ofs.precision(8);
-   pmesh->PrintAsOne(mesh_ofs);
-   mesh_ofs.close();
-
-   std::ofstream rho_ofs(rho_name.str().c_str());
-   rho_ofs.precision(8);
-   rho_gf.SaveAsOne(rho_ofs);
-   rho_ofs.close();
-
-   std::ofstream v_ofs(v_name.str().c_str());
-   v_ofs.precision(8);
-   v_gf.SaveAsOne(v_ofs);
-   v_ofs.close();
-
-   std::ofstream ste_ofs(ste_name.str().c_str());
-   ste_ofs.precision(8);
-   ste_gf.SaveAsOne(ste_ofs);
-   ste_ofs.close();
-
-
-   // Print moved mesh
-   // Can be visualized with glvis -np # -m build/results/mesh-test-moved
-   // {
-   //    ostringstream mesh_name;
-   //    mesh_name << output_path << "mesh-test-moved." << setfill('0') << setw(6) << myid;
-   //    ofstream omesh(mesh_name.str().c_str());
-   //    omesh.precision(precision);
-   //    pmesh->Print(omesh);
-   // }
 
    if (problem_class->has_exact_solution())
    {
@@ -1089,12 +1169,6 @@ int main(int argc, char *argv[]) {
       hydro.SaveStateVecsToFile(S_exact, sv_output_prefix, sv_ex_filename_suffix.str());
    }
 
-   // Last time recomputing density
-   for (int i = 0; i < sv_gf.Size(); i++)
-   {
-      rho_gf[i] = 1./sv_gf[i];
-   } 
-
    /* When the exact solution is known, print out an error file */
    if (problem_class->has_exact_solution())
    {
@@ -1115,34 +1189,6 @@ int main(int argc, char *argv[]) {
              vel_Max_error_n = 0.,
              ste_Max_error_n = 0.;
 
-      // if (problem == 1) // Sod
-      // {
-      //    riemann1D::ExactVelocityCoefficient v_coeff_r;
-      //    v_coeff_r.SetTime(t);
-      //    riemann1D::ExactDensityCoefficient rho_coeff_r;
-      //    rho_coeff_r.SetTime(t);
-      //    riemann1D::ExactSTEnergyCoefficient ste_coeff_r;
-      //    ste_coeff_r.SetTime(t);
-
-      //    rho_ex->ProjectCoefficient(rho_coeff_r);
-      //    vel_ex->ProjectCoefficient(v_coeff_r);
-      //    ste_ex->ProjectCoefficient(ste_coeff_r);
-
-      //    /* Compute relative errors */
-      //    rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff_r) / rho_ex->ComputeL1Error(zero);
-      //    vel_L1_error_n = v_gf.ComputeL1Error(v_coeff_r) / vel_ex->ComputeL1Error(zero);
-      //    ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff_r) / ste_ex->ComputeL1Error(zero);
-
-      //    rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff_r) / rho_ex->ComputeL2Error(zero);
-      //    vel_L2_error_n = v_gf.ComputeL2Error(v_coeff_r) / vel_ex->ComputeL2Error(zero);
-      //    ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff_r) / ste_ex->ComputeL2Error(zero);
-
-      //    rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff_r) / rho_ex->ComputeMaxError(zero);
-      //    vel_Max_error_n = v_gf.ComputeMaxError(v_coeff_r) / vel_ex->ComputeMaxError(zero);
-      //    ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff_r) / ste_ex->ComputeMaxError(zero);
-      // }
-      // else
-      // {
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
       ste_coeff.SetTime(t);
@@ -1163,7 +1209,7 @@ int main(int argc, char *argv[]) {
       rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex->ComputeMaxError(zero);
       vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
       ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
-      // }
+
       /* Get composite errors values */
       const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
       const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;

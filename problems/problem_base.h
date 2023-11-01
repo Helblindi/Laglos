@@ -136,14 +136,14 @@ public:
       in_rhol = 1. / in_taul;
       in_rhor = 1. / in_taur;
 
-      double in_tol = 1.e-15,
+      double in_tol = 1.e-16,
              _b=0.;
       double lambda_maxl_out = 0.,
              lambda_maxr_out = 0.,
              pstar = 0.,
              vstar = 0.;
       int k = 0; // Tells you how many iterations were needed for convergence
-      bool want_iter = true;
+      bool want_iter = false;
 
       // Handle b_covolume parameter
       if (b_covolume == -1.)
@@ -156,6 +156,7 @@ public:
          // if b_covolume is specified, use this value
          _b = b_covolume;
       }
+
       __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
          &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);

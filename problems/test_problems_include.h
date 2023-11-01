@@ -7,6 +7,7 @@
 #include "sod.h"
 #include "lax.h"
 #include "leblanc.h"
+#include "noh.h"
 #include "isentropic_vortex.h"
 #include "saltzmann.h"
 #include "vdw-1.h"

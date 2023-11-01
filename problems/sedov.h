@@ -32,7 +32,7 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _a = 0., _b = 0., _gamma = 7/5.;
+   double _a = 0., _b = 0., _gamma = 1.4;
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
@@ -43,6 +43,9 @@ private:
    // constexpr static double CFL_first = 0.5;
    // constexpr static double CFL_second = 0.5;
    // constexpr static double CFL_time_change = 0.01;
+
+   // Constants specific to Sedov problem
+   double h = 0., cell_vol = 0.;
 
 public:
    SedovProblem()
@@ -65,6 +68,15 @@ public:
    void lm_update(const double b_covolume) override 
    {
       this->set_b(b_covolume);
+   }
+   virtual void update(Vector x_gf, double t) override {
+      if (t <= 1.e-16)
+      {  
+         cout << "setting internal energy params.\n";
+         this->h = x_gf[0];
+         this->cell_vol = x_gf[1];
+      }
+      
    }
 
    /*********************************************************
@@ -103,12 +115,14 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
+      assert(h != 0.);
+      assert(cell_vol != 0.);
       double norm = x.Norml2();
       if (t < 1.e-16)
       {
          // Initial condition
-         if (norm <= 0.05) {
-            return 0.979264;
+         if (norm <= h) {
+            return 0.979264 / (4. * cell_vol);
          }
          else
          {
@@ -118,6 +132,15 @@ public:
       return 0.;
    }
 
+   /*********************************************************
+    * Sedov specific functions
+    *********************************************************/
+   void set_internal_energy_params(double _h, double _cell_vol)
+   {
+      cout << "setting internal energy params.\n";
+      this->h = h;
+      this->cell_vol = _cell_vol;
+   }
 }; // End class
 
 } // ns hydrodynamics

@@ -20,28 +20,28 @@
 *
 *  Test runs that I have yet to implement
 * -------------- 2D ----------
-* ./Laglos -m data/ref-square-c0.mesh -tf 2. -cfl 0.5 -ot -visc -mm -vis -rs 3 [problem = 4, dim = 2] // Noh (Not working properly) [See Ryujin for initial conditions and exact solution]
 * ./Laglos -m data/rectangle_saltzmann.mesh -rs 3 -visc -mm -vis -tf 0.6 -ot -cfl 0.01 [problem = 7, dim = 2] // Saltzman problem
 *
 * ========================================= New .h based problem runs =========================================
 * ----- 1D -----
-* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 8     ## Smooth
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -ot -visc -mm -vis -rs 8    ## Sod
-* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -ot -visc -mm -vis -rs 8    ## Lax
-# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -ot -visc -mm -vis -rs 8   ## Leblanc
+* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 8     ## Smooth
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -rs 8    ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -rs 8    ## Lax
+# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -rs 8   ## Leblanc
 *
 * * --- vdw ---
-* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -ot -mm -visc -rs 8 -vis
-* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -ot -mm -visc -rs 8 -vis
-* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -ot -mm -visc -rs 8 -vis
-* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -ot -mm -visc -rs 8 -vis
+* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -rs 8 -vis
+* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 8 -vis
+* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 8 -vis
+* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis
 *
 * ----- 2D -----
-* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -ot -visc -mm -vis -rs 4          ## Smooth wave in 2D
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4        ## Sod in 2D
-* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -vis -rs 4  ## Sod Distorted
-* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -ot -visc -mm -vis -rs 3      ## Isentropic Vortex
-* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -ot -visc -mm -vis -rs 3 -of noh
+* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4          ## Smooth wave in 2D
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4        ## Sod in 2D
+* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4  ## Sod Distorted
+* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3      ## Isentropic Vortex
+* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 5       ## Noh
+* ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5        ## Sedov
 *
 */
 #include "lambda_max_lagrange.h"
@@ -167,77 +167,6 @@ int main(int argc, char *argv[]) {
       return -1;
    }
 
-   // Set up problem
-   ProblemBase<dim> * problem_class = NULL;
-   switch (problem)
-   {
-      case 0:
-      {
-         problem_class = new SmoothWave<dim>();
-         break;
-      }
-      case 1:
-      {
-         problem_class = new SodProblem<dim>();
-         break;
-      }
-      case 2: // Lax
-      {
-         problem_class = new LaxProblem<dim>();
-         break;
-      }
-      case 3: // Leblanc
-      {
-         problem_class = new LeblancProblem<dim>();
-         break;
-      }
-      case 4: // Noh
-      {
-         problem_class = new NohProblem<dim>();
-         break;
-      }
-      case 5: // Isentropic Vortex, stationary center
-      {
-         problem_class = new IsentropicVortex<dim>();
-         break;
-      }
-      case 6: // Sedov
-      {
-         problem_class = new SedovProblem<dim>();
-         break;
-      }
-      case 7:
-      {
-         problem_class = new SaltzmannProblem<dim>();
-         break;
-      }
-      case 8:
-      {
-         problem_class = new VdwTest1<dim>();
-         break;
-      }
-      case 9:
-      {
-         problem_class = new VdwTest2<dim>();
-         break;
-      }
-      case 10:
-      {
-         problem_class = new VdwTest3<dim>();
-         break;
-      }
-      case 11:
-      {
-         problem_class = new VdwTest4<dim>();
-         break;
-      }
-      default:
-      {
-         problem_class = new ProblemTemplate<dim>();
-         break;
-      }
-   }
-
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
    {
@@ -357,6 +286,84 @@ int main(int argc, char *argv[]) {
    pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
    if (myid == 0)
    { cout << "Zones min/max: " << ne_min << " " << ne_max << endl; }
+
+   // Set up problem
+   ProblemBase<dim> * problem_class = NULL;
+   switch (problem)
+   {
+      case 0:
+      {
+         problem_class = new SmoothWave<dim>();
+         break;
+      }
+      case 1:
+      {
+         problem_class = new SodProblem<dim>();
+         break;
+      }
+      case 2: // Lax
+      {
+         problem_class = new LaxProblem<dim>();
+         break;
+      }
+      case 3: // Leblanc
+      {
+         problem_class = new LeblancProblem<dim>();
+         break;
+      }
+      case 4: // Noh
+      {
+         problem_class = new NohProblem<dim>();
+         break;
+      }
+      case 5: // Isentropic Vortex, stationary center
+      {
+         problem_class = new IsentropicVortex<dim>();
+         break;
+      }
+      case 6: // Sedov
+      {
+         assert(hmin == hmax);
+         Vector params(2);
+         params[0] = hmax, params[1] = pmesh->GetElementVolume(0);
+
+         problem_class = new SedovProblem<dim>();
+         problem_class->update(params, 0.);
+         // TODO: Will need to modify initialization of internal energy
+         //       if distorted meshes are used.
+         break;
+      }
+      case 7:
+      {
+         problem_class = new SaltzmannProblem<dim>();
+         break;
+      }
+      case 8:
+      {
+         problem_class = new VdwTest1<dim>();
+         break;
+      }
+      case 9:
+      {
+         problem_class = new VdwTest2<dim>();
+         break;
+      }
+      case 10:
+      {
+         problem_class = new VdwTest3<dim>();
+         break;
+      }
+      case 11:
+      {
+         problem_class = new VdwTest4<dim>();
+         break;
+      }
+      default:
+      {
+         problem_class = new ProblemTemplate<dim>();
+         break;
+      }
+   }
 
    // Define the parallel finite element spaces. We use:
    // - H1 (Q2, continuous) for mesh movement.
@@ -622,7 +629,7 @@ int main(int argc, char *argv[]) {
 
       if (problem_class->has_exact_solution())
       {
-         // problem_class->update(x_gf);
+         problem_class->update(x_gf);
 
          rho_ex->ProjectCoefficient(rho_coeff);
          vel_ex->ProjectCoefficient(v_coeff);

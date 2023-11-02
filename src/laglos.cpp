@@ -89,6 +89,7 @@ int main(int argc, char *argv[]) {
    int rp_levels = 0;
    int order_mv = 2;  // Order of mesh movement approximation space
    int order_u = 0;
+   double t_init = 0.0;
    double t_final = 0.6;
    int max_tsteps = -1;
    double dt = 0.001;
@@ -119,6 +120,8 @@ int main(int argc, char *argv[]) {
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
                   "Number of times to refine the mesh uniformly in parallel.");
+   args.AddOption(&t_init, "-ti", "--t-init",
+                  "Start time; default is 0.");               
    args.AddOption(&t_final, "-tf", "--t-final",
                   "Final time; start time is 0.");
    args.AddOption(&max_tsteps, "-ms", "--max-steps",
@@ -266,6 +269,7 @@ int main(int argc, char *argv[]) {
    // }
 
    cout << "done with serial refinement\n";
+
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
    // parallel mesh is defined, the serial mesh can be deleted.
@@ -328,7 +332,7 @@ int main(int argc, char *argv[]) {
          params[0] = hmax, params[1] = pmesh->GetElementVolume(0);
 
          problem_class = new SedovProblem<dim>();
-         problem_class->update(params, 0.);
+         problem_class->update(params, t_init);
          // TODO: Will need to modify initialization of internal energy
          //       if distorted meshes are used.
          break;
@@ -537,24 +541,24 @@ int main(int argc, char *argv[]) {
 
    // Initialize specific volume, velocity, and specific total energy
    FunctionCoefficient sv_coeff(sv0_static);
-   sv_coeff.SetTime(0.);
+   sv_coeff.SetTime(t_init);
    sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
    VectorFunctionCoefficient v_coeff(dim, v0_static);
-   v_coeff.SetTime(0.);
+   v_coeff.SetTime(t_init);
    v_gf.ProjectCoefficient(v_coeff);
    // Sync the data location of v_gf with its base, S
    v_gf.SyncAliasMemory(S);
 
    FunctionCoefficient ste_coeff(ste0_static);
-   ste_coeff.SetTime(0.);
+   ste_coeff.SetTime(t_init);
    ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
-   rho_coeff.SetTime(0.);
+   rho_coeff.SetTime(t_init);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
@@ -724,7 +728,8 @@ int main(int argc, char *argv[]) {
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
-   double t = 0.0;
+   double t = t_init;
+
    if (convergence_testing)
    {
       dt = hmin; // Set timestep to smalled h val for convergence testing

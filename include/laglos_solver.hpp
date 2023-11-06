@@ -169,17 +169,11 @@ public:
    void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
    void GetCorrectedFaceFlux(const int & face, Vector & flux);       
 
-   void ComputeNodeVelocityRT(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
-   void IntGradRT(const int cell, DenseMatrix & res);
-   void ComputeGeoV();
    void GetViGeo(const int & node, Vector & vel);
-   void ComputeCiGeo(const int & node, DenseMatrix & res);
-   void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
    void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
-   void ComputeNodeVelocities(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
 
@@ -188,8 +182,6 @@ public:
    void FillFaceVelocitiesWithAvg2(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void UpdateFaceVelocitiesWithAvg(Vector &S);
 
-   void ComputeMeshVelocities(Vector &S, const double & t, double & dt, const string ="NA", 
-                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
    void GetNodePosition(const Vector &S, const int & node, Vector & x);

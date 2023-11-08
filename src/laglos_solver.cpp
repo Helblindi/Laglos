@@ -1685,24 +1685,9 @@ void LagrangianLOOperator<dim>::
       GetNodePosition(S, face_vdof1, vdof1_x);
       GetNodePosition(S, face_vdof2, vdof2_x);
 
-      // cout << "------------------------------------\n";
-      // cout << "dt: " << dt << endl;
-      // cout << "We are iterating on face: " << face << endl;
-      // cout << "This face is located at: \n";
-      // face_x.Print(cout);
-      // cout << "The adjacent vertices are vertex 1: " << face_vdof1 << ", located at: \n";
-      // vdof1_x.Print(cout);
-      // cout << "and vertex 2: " << face_vdof2 << ", located at: \n";
-      // vdof2_x.Print(cout);
-
       // retrieve corner velocities
       GetNodeVelocity(S, face_vdof1, vdof1_v);
       GetNodeVelocity(S, face_vdof2, vdof2_v);
-      
-      // cout << "The computed velocity at vertex: " << face_vdof1 << " is: \n";
-      // vdof1_v.Print(cout);
-      // cout << "The computed velocity at vertex: " << face_vdof2 << " is: \n";
-      // vdof2_v.Print(cout);
 
       if (FI.IsInterior())
       {
@@ -1713,13 +1698,6 @@ void LagrangianLOOperator<dim>::
          GetCellStateVector(S, cp, Ucp);
          cell_c_v = pb->velocity(Uc);
          cell_cp_v = pb->velocity(Ucp);
-         
-         // cout << "We have an interior face: " << face << endl;
-         // cout << "Cell c: " << c << ", cell cp: " << cp << endl;
-         // cout << "Velocity on cell c:\n";
-         // cell_c_v.Print(cout);
-         // cout << "Velocity on cell cp:\n";
-         // cell_cp_v.Print(cout);
 
          // Calculate outer normal
          CalcOutwardNormalInt(S, c, face, n_int);
@@ -1728,12 +1706,6 @@ void LagrangianLOOperator<dim>::
          n_vec /= F;
 
          assert(1. - n_vec.Norml2() < 1e-12);
-
-         // cout << "outward normal integral: ";
-         // n_int.Print(cout);
-         // cout << "Face Length: " << F << endl;
-         // cout << "The outward normal vector is: \n";
-         // n_vec.Print(cout);
 
          // Calculate new corner locations and half  step locations
          Vector vdof1_x_new(dim), vdof2_x_new(dim), vdof1_x_half(dim), vdof2_x_half(dim);
@@ -1753,92 +1725,32 @@ void LagrangianLOOperator<dim>::
          vdof12_x_new += vdof2_x_new;
          vdof12_x_new /= 2.;
 
-         // Output new nodal location information
-         // cout << "New locations for vdof1. full:\n";
-         // vdof1_x_new.Print(cout);
-         // cout << "half: \n";
-         // vdof1_x_half.Print(cout);
-
-         // cout << "New locations for vdof2. full:\n";
-         // vdof2_x_new.Print(cout);
-         // cout << "half: \n";
-         // vdof2_x_half.Print(cout);
-
-         // cout << "new tangent midpoint, vdof12_x_new: \n";
-         // vdof12_x_new.Print(cout);
-
          // Compute D (A.4c)
          Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
          n_vec_R = n_vec;
          Orthogonal(n_vec_R);
-         // cout << "n_vec_R: \n";
-         // n_vec_R.Print(cout);
-
          subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-         // cout << "V1-V2:\n";
-         // temp_vec.Print(cout);
-
          subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         // cout << "A2-A1:\n";
-         // temp_vec_2.Print(cout);
-
          Orthogonal(temp_vec_2);
-         // cout << "(A2-A1)^R:\n";
-         // temp_vec_2.Print(cout);
-
          double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
-         // cout << "D: " << D << endl;
 
          // Compute c1 (A.4a)
          subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-         // cout << "V2-V1:\n";
-         // temp_vec.Print(cout);
-         // cout << "c1 computation n_vec:\n";
-         // n_vec.Print(cout);
          double c1 = ( dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
-         // cout << "c1 computation n_vec_R:\n";
-         // n_vec_R.Print(cout);
-         // cout << "c1: " << c1 << endl;
 
          // Compute c0 (A.4b)
-         // cout << "!!!Computing c0\n";
-
-         // cout << "\n === First we compute bmn ===\n";
          Vector n_vec_half(dim);
          subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
          Orthogonal(n_vec_half);
-         // cout << "n_vec_half:\n";
-         // n_vec_half.Print(cout);
-         // Vector v_exact_at_face(dim);
-         // test_vel(face_x, 0., v_exact_at_face);
-         // double bmn = v_exact_at_face * n_vec_half;
-         
          GetIntermediateFaceVelocity(face, Vf);
          
          double bmn = Vf * n_vec;
          bmn *= F;
 
-         // cout << "face length: " << face_length << endl;
-         // bmn *= face_length;
-         // cout << "bmn: " << bmn << endl;
-
-         // cout << "\n\n==========================\n";
-         // cout << "corrective face\nface: " << face << endl;
-         // cout << "'inside' cell: " << c << endl;
-         // cout << "Vf:\n";
-         // Vf.Print(cout);
-         // cout << "n_vec:\n";
-         // n_vec.Print(cout);
-         // cout << "=========================\n";
-
          temp_vec = vdof1_x_half;
          Orthogonal(temp_vec); // A1R
-         // cout << "A1^R:\n";
-         // temp_vec.Print(cout);
          temp_vec_2 = vdof2_x_half;
          Orthogonal(temp_vec_2); // A2R
-         // cout << "A2^R:\n";
-         // temp_vec_2.Print(cout);
          double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
          double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
          
@@ -1848,8 +1760,21 @@ void LagrangianLOOperator<dim>::
          double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
          double c2 = (3. / D) * (const1 / 2. + const2 / 6. + 2. * const3 / 3.);
          
-         // Compute V3n_perp
-         // cout << "Computing V3n_perp\n";
+         /**
+          * Compute V3n_perp
+          * This value we choose:
+          *    Option 1) new node is places in the normal direction
+          *              of the midpoint of the secant line.
+          *    Option 2) Choose perpendicular component of the 
+          *              Raviart-Thomas velocity.
+          * */ 
+
+         // Necessary quantity for either calculation
+         Vector n_vec_perp(dim);
+         n_vec_perp = n_vec_R;
+         n_vec_perp *= -1.;
+
+         /* Option 1 */ 
          subtract(vdof2_x_new, vdof1_x_new, temp_vec);
          subtract(face_x, vdof12_x_new, temp_vec_2);
          temp_vec_2.Add((c2+ (3. * bmn / D))*dt, n_vec);
@@ -1860,69 +1785,30 @@ void LagrangianLOOperator<dim>::
          const2 = temp_vec * temp_vec_2;
          const2 *= dt; // denominator
          V3nperp = -1. * const1 / const2;
-         // cout << "V3nperp the old way: " << V3nperp << endl;
 
-         // Compute face velocity (Appendix A)
-         Vector n_vec_perp(dim);
-         n_vec_perp = n_vec_R;
-         n_vec_perp *= -1.;
-
-         // Modification 10-13 of tangential component
-         // Vector avg_vel(dim);
-         // avg_vel = vdof1_v;
-         // avg_vel += vdof2_v;
-         // avg_vel /= 2.;
-         // V3nperp =  avg_vel * n_vec_perp;
-
-         // Modification 10-16 to use Raviart-Thomas tangential component
+         /* Option 2 */
          Vector rt_face_vel(dim);
          GetNodeVelocity(S, face_dof, rt_face_vel);
-         // cout << "rt_face_vel for face " << face << ": ";
-         // rt_face_vel.Print(cout);
          V3nperp = rt_face_vel * n_vec_perp;
-         // cout << "V3nperp: " << V3nperp << endl;
 
          // Compute V3n (5.11)
          V3n = c1 * V3nperp + c2 + 3. * bmn / D;
 
-         // cout << "V3n: " << V3n << endl;
-
+         // Add in normal and tangentional contributions
          face_velocity = 0.;
          face_velocity.Add(V3n, n_vec);
          face_velocity.Add(V3nperp, n_vec_perp); // 10/2
 
-         // cout << "resulting corrective velocity: ";
-         // face_velocity.Print(cout);
-
-         Vector face_x_new(dim);
-         face_x_new = face_x;
-         face_x_new.Add(dt, face_velocity);
-
-         // Check perpendicular
+         // Check perpendicular only in the case where new 
+         // nodal location is exactly above tangent location
+         // Vector face_x_new(dim);
+         // face_x_new = face_x;
+         // face_x_new.Add(dt, face_velocity);
          // subtract(face_x_new, vdof12_x_new, temp_vec);
          // subtract(vdof2_x_new, vdof1_x_new, temp_vec_2);
          // if (abs(temp_vec * temp_vec_2) > pow(10, -12))
          // {
          //    MFEM_ABORT("vectors are not orthogonal!\n");
-         // }
-
-         // if (flag == "testing")
-         // {
-         //    cout << "The coordinate location of face " << face << " is: ";
-         //    face_x.Print(cout);
-         //    cout << "The computed velocity on this face is: ";
-         //    face_velocity.Print(cout);
-         //    cout << "The exact face velocity is: ";
-         //    Vector face_v_exact(dim);
-         //    test_vel(face_x, 0., face_v_exact);
-         //    face_v_exact.Print(cout);
-         //    Vector temp_vel(dim);
-            // subtract(face_v_exact, face_velocity, temp_vel);
-
-            // if (temp_vel.Norml2() > 10e-6)
-            // {
-            //    MFEM_ABORT("Incorrect face velocity.\n");
-            // }
          // }
       } // End interior face
 
@@ -1945,8 +1831,7 @@ void LagrangianLOOperator<dim>::
       // Lastly, put face velocity into gridfunction object
       if (face_velocity[0] != face_velocity[0] || face_velocity[1] != face_velocity[1])
       {
-         cout << "Houston we have a problem.\n";
-         MFEM_ABORT("Exit");
+         MFEM_ABORT("NaN values encountered in corrective face velocity calculation.\n");
       }
 
       UpdateNodeVelocity(S, face_dof, face_velocity);
@@ -2569,16 +2454,16 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
       //       // Otherwise keep mass correcting
       //       // do_mass_correction = false;
       //    }
-      //    else
-      //    {
-      //       cout << "Face averaging\n";
-      //       // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
-      //       // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
-      //       FillFaceVelocitiesWithAvg(S);
+      //    // else
+      //    // {
+      //    //    cout << "Face averaging\n";
+      //    //    // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
+      //    //    // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
+      //    //    FillFaceVelocitiesWithAvg(S);
 
-      //       // End the iteration loop
-      //       face_corr_it = num_face_correction_iterations + 1;
-      //    }
+      //    //    // End the iteration loop
+      //    //    face_corr_it = num_face_correction_iterations + 1;
+      //    // }
       // }
    } // End face corner node correction iteration
 

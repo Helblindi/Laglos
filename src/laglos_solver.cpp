@@ -629,7 +629,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
       case 1:
          ComputeMeshVelocitiesRaviart(S,t,dt);
          break;
-         
+
       case 2:
          ComputeMeshVelocitiesNormal(S,t,dt);
          break;
@@ -2435,18 +2435,18 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
    ComputeNodeVelocitiesNormal(S, t, dt, flag, test_vel);
 
    // Optionally mass correct
-   // if (dim > 1)
-   // {
-   //    if (do_mass_correction)
-   //    {
-   //       // cout << "Mass correcting\n";
-   //       ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
-   //    }
-   //    else
-   //    {
-   //       FillFaceVelocitiesWithAvg(S);
-   //    }
-   // }
+   if (dim > 1)
+   {
+      if (do_mass_correction)
+      {
+         // cout << "Mass correcting\n";
+         ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+      }
+      // else
+      // {
+      //    FillFaceVelocitiesWithAvg(S);
+      // }
+   }
 
    // Fill cell centers with average
    FillCenterVelocitiesWithAvg(S);
@@ -2576,40 +2576,40 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
       // _chrono.Stop();
       // cout << "linearization took: " << _chrono.RealTime() << " seconds.\n";
 
-      // if (dim > 1)
-      // {
-      //    if (do_mass_correction)
-      //    {
-      //       // cout << "Mass correcting\n";
-      //       ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+      if (dim > 1)
+      {
+         if (do_mass_correction)
+         {
+            // cout << "Mass correcting\n";
+            ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
             
-      //       // Turn off mass correction if at the end of the face
-      //       // corner node correction iteration
-      //       if (face_corr_it >= num_face_correction_iterations)
-      //       {
-      //          do_mass_correction = false;
-      //       }
-      //       else
-      //       {
-      //          // Since we will continue to iterate, we must
-      //          // compute our iterative face flux and store 
-      //          // the value
-      //          ComputeCorrectiveFaceFluxes(S, t, dt);
-      //       }
-      //       // Otherwise keep mass correcting
-      //       // do_mass_correction = false;
-      //    }
-      //    // else
-      //    // {
-      //    //    cout << "Face averaging\n";
-      //    //    // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
-      //    //    // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
-      //    //    FillFaceVelocitiesWithAvg(S);
+            // Turn off mass correction if at the end of the face
+            // corner node correction iteration
+            if (face_corr_it >= num_face_correction_iterations)
+            {
+               do_mass_correction = false;
+            }
+            else
+            {
+               // Since we will continue to iterate, we must
+               // compute our iterative face flux and store 
+               // the value
+               ComputeCorrectiveFaceFluxes(S, t, dt);
+            }
+            // Otherwise keep mass correcting
+            // do_mass_correction = false;
+         }
+         // else
+         // {
+         //    cout << "Face averaging\n";
+         //    // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
+         //    // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
+         //    FillFaceVelocitiesWithAvg(S);
 
-      //    //    // End the iteration loop
-      //    //    face_corr_it = num_face_correction_iterations + 1;
-      //    // }
-      // }
+         //    // End the iteration loop
+         //    face_corr_it = num_face_correction_iterations + 1;
+         // }
+      }
    } // End face corner node correction iteration
 
    FillCenterVelocitiesWithAvg(S);

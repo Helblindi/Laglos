@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
    bool gfprint = false;
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
+   bool mc = false;
    int face_correction_frequency = 1;
    int num_face_correction_iterations = 0;
    bool use_viscosity = true;
@@ -134,6 +135,8 @@ int main(int argc, char *argv[]) {
                   "Visualize every n-th timestep.");
    args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
                   "Enable or disable result output (files in mfem format).");
+   args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
+                  "Enable or disable mass correction.");
    args.AddOption(&face_correction_frequency, "-fcf", "--face-correction-frequency",
                   "Frequency to which face correction should be applied.");
    args.AddOption(&num_face_correction_iterations, "-fci", "--face-correction-iterations",
@@ -785,7 +788,7 @@ int main(int argc, char *argv[]) {
       if (ti == max_tsteps) { last_step = true; }
       
       // Turn on mass correction at given frequency
-      if (ti % face_correction_frequency == 0) { hydro.EnableMassCorrection(); }
+      if (mc && (ti % face_correction_frequency == 0)) { hydro.EnableMassCorrection(); }
 
       S_old = S;
       

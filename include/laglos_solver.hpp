@@ -108,6 +108,7 @@ protected:
 
    bool use_viscosity;
    bool mm;
+   int mv_option = 0;
    bool do_mass_correction = false;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
@@ -155,14 +156,10 @@ public:
 
    /* cij comp */
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
-
    void Orthogonal(Vector &v);
 
    /* Mesh movement */
-   void ComputeIntermediateFaceVelocities(const Vector &S, 
-                                             const double t,
-                                             const string ="NA", 
-                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void SetMVOption(const int & option);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
@@ -172,7 +169,15 @@ public:
    void GetViGeo(const int & node, Vector & vel);
    void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
+
+   void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
+   void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
+   void GetNodePosition(const Vector &S, const int & node, Vector & x);
    
+   void ComputeIntermediateFaceVelocities(const Vector &S, 
+                                             const double t,
+                                             const string ="NA", 
+                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
@@ -182,20 +187,11 @@ public:
    void FillFaceVelocitiesWithAvg2(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void UpdateFaceVelocitiesWithAvg(Vector &S);
 
-   void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
-   void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
-   void GetNodePosition(const Vector &S, const int & node, Vector & x);
-
-   void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
-                             const double &dt, Vector & state_val);
-   
-   void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
-   
-   double CalcMassLoss(const Vector &S);
-   void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
-
-   // Various print functions
-   void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
+   // Normal vector mesh motion
+   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
+   void ComputeMeshVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", 
+                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeNodeVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
    // Raviart-Thomas mesh motion (as of 09/11/2023)
    void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
@@ -206,6 +202,18 @@ public:
    void ComputeNodeVelocityRaviart(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void ComputeCiGeoRaviart(const int & node, DenseMatrix & res);
    void IntGradRaviart(const int cell, DenseMatrix & res);
+
+   // Enforce Boundary Conditions
+   void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
+                             const double &dt, Vector & state_val);
+   void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
+   
+   // Validate mass conservation
+   double CalcMassLoss(const Vector &S);
+   void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
+
+   // Various print functions
+   void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
 };
 
 } // end ns hydrodynamics

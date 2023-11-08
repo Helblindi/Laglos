@@ -624,7 +624,21 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    {
       // Compute mesh velocities
       // This function may change the timestep
-      ComputeMeshVelocitiesRaviart(S,t,dt);
+      switch (mv_option)
+      {
+      case 1:
+         ComputeMeshVelocitiesRaviart(S,t,dt);
+         break;
+         
+      case 2:
+         ComputeMeshVelocitiesNormal(S,t,dt);
+         break;
+      
+      default:
+         MFEM_ABORT("Invalid mesh velocity option.\n");
+      }
+      
+      // Enforce boundary conditions
       EnforceMVBoundaryConditions(S,t,dt);
    }
    // chrono_mm.Stop();
@@ -1363,6 +1377,23 @@ void LagrangianLOOperator<dim>::
 
    } // End face iterator
 
+}
+
+
+/****************************************************************************************************
+* Function: SetMVOption
+* Parameters:
+*  option - integer parameter indicating which mesh velocity to use.
+*
+* Purpose:
+*  To set the mesh velocity motion computation type:
+*     1) Raviart-Thomas reconstruction method.
+*     2) Normal vector type
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMVOption(const int & option)
+{
+   this->mv_option = option;
 }
 
 
@@ -2346,12 +2377,155 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    // fstream_rho.close();
 }
 
+
+/****************************************************************************************************
+* Function: Normal direction based Velocity Functions
+****************************************************************************************************/
+
+/****************************************************************************************************
+* Function: tensor
+* Parameters:
+*  
+*        
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)
+{
+   const int v1_len = v1.Size(), v2_len = v2.Size();
+   for (int i = 0; i < v1_len; i++)
+   {
+      for (int j = 0; j < v2_len; j++)
+      {
+         dm.Elem(i,j) = v1[i] * v2[j];
+      }
+   }
+}
+
+/****************************************************************************************************
+* Function: ComputeMeshVelocitiesNormal
+* Parameters:
+*  S        - BlockVector corresponding to nth timestep that stores mesh information, 
+*             mesh velocity, and state variables.
+*  t        - Current time
+*  dt       - Current timestep
+*  flag     - Flag used to indicate testing, can be "testing" or "NA"
+*  test_vel - Velocity used for testing
+*
+* Purpose:
+*     This function computes mesh velocities by:
+*        1) Constructs Mi, which is the sum of the tensor products of all
+*           adjacent normal vectors.
+*        2) Constructs Ri, which is the sum of the tensor products of all
+*           adjacent normal vectors, multiplied by the intermediate face 
+*           velocity.
+*        3) Computes Vi as Mi^{-1} * Ri.
+*        4) Optionally computes mass corrective face velocities.
+*        5) Fills cell center velocities with average.
+*        
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
+   Vector &S, const double & t, double & dt, const string flag, 
+   void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   // cout << "=======================================\n"
+   //      << "     ComputeMeshVelocitiesNormal       \n"
+   //      << "=======================================\n";
+   ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
+   ComputeNodeVelocitiesNormal(S, t, dt, flag, test_vel);
+
+   // Optionally mass correct
+   // if (dim > 1)
+   // {
+   //    if (do_mass_correction)
+   //    {
+   //       // cout << "Mass correcting\n";
+   //       ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
+   //    }
+   //    else
+   //    {
+   //       FillFaceVelocitiesWithAvg(S);
+   //    }
+   // }
+
+   // Fill cell centers with average
+   FillCenterVelocitiesWithAvg(S);
+}
+
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeNodeVelocitiesNormal(
+   Vector &S, const double & t, double & dt, const string, 
+   void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   // Compute mesh node velocities
+   mfem::Mesh::FaceInformation FI;
+   Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
+   DenseMatrix Mi(dim), dm_tmp(dim);
+
+   Array<int> faces_row, oris;
+   int faces_length;
+   double c_norm;
+
+   // Corner nodes
+   for (int node = 0; node < num_vertices; node++) // Vertex iterator
+   {
+      // Reset Mi, Ri, Vi
+      Mi = 0., Ri = 0., node_v = 0.;
+
+      // Get cell faces
+      vertex_edge.GetRow(node, faces_row);
+      faces_length = faces_row.Size();
+
+      // iterate over adjacent faces
+      for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+      {
+         int face = faces_row[face_it];
+         GetIntermediateFaceVelocity(face, Vf);
+         FI = pmesh->GetFaceInformation(face);
+
+         // Retrieve corresponding normal (orientation doesn't matter)
+         CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+         c_norm = n_vec.Norml2();
+         n_vec /= c_norm;
+
+         tensor(n_vec, n_vec, dm_tmp);
+         Mi += dm_tmp;
+         dm_tmp.Mult(Vf, y);
+         Ri += y;
+      }
+
+      Mi.Invert();
+      Mi.Mult(Ri, node_v);
+
+      // Finally, update the node velocity
+      UpdateNodeVelocity(S, node, node_v);
+   }
+
+   // face nodes just set to ivf
+   for (int face = 0; face < num_faces; face++)
+   {
+      int node = face + num_vertices;
+      GetIntermediateFaceVelocity(face, node_v);
+      UpdateNodeVelocity(S, node, node_v);
+   }
+}
+
+
 /****************************************************************************************************
 * Function: Raviart-Thomas Velocity Functions
 ****************************************************************************************************/
 
 /****************************************************************************************************
-* Function: 
+* Function: ComputeMeshVelocitiesRaviart
 * Parameters:
 *  S        - BlockVector corresponding to nth timestep that stores mesh information, 
 *             mesh velocity, and state variables.
@@ -2402,35 +2576,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
       // _chrono.Stop();
       // cout << "linearization took: " << _chrono.RealTime() << " seconds.\n";
 
-      // Vector* sptr = const_cast<Vector*>(&S);
-      // ParGridFunction mv_gf;
-      // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-      // mv_gf = v_geo_gf;
-
-      /* Iterate over faces and check intermediate face velocities compared to corner nodes */
-      // mfem::Mesh::FaceInformation FI;
-      // Array<int> row;
-      // Vector Vf(dim), node1_v(dim), node2_v(dim);
-      // cout << "verifying face velocities\n";
-      // for (int face = 0; face < num_faces; face++)
-      // {
-      //    FI = pmesh->GetFaceInformation(face);
-      //    H1.GetFaceDofs(face, row);
-      //
-      //    int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
-      //    // GetIntermediateFaceVelocity(face, Vf);
-      //    GetCorrectedFaceVelocity(face, Vf);
-      //    GetNodeVelocity(S, face_vdof1, node1_v);
-      //    GetNodeVelocity(S, face_vdof2, node2_v);
-      //
-      //    cout << "Vf: ";
-      //    Vf.Print(cout);
-      //    cout << "node1_v: ";
-      //    node1_v.Print(cout);
-      //    cout << "node2_v: ";
-      //    node2_v.Print(cout);
-      // }
-
       // if (dim > 1)
       // {
       //    if (do_mass_correction)
@@ -2468,7 +2613,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
    } // End face corner node correction iteration
 
    FillCenterVelocitiesWithAvg(S);
-   // }
 }
 
 

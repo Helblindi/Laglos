@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
    int num_face_correction_iterations = 0;
    bool use_viscosity = true;
    bool mm = true;
+   int mv_option = 1;
    bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
@@ -142,6 +143,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable the use of artificial viscosity.");
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
+   args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
+                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
                   "--no-optimize-timestep",
                   "Enable or disable timestep optimization using CFL.");
@@ -571,6 +574,7 @@ int main(int argc, char *argv[]) {
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetNumFaceCorrectionIterations(num_face_correction_iterations);
+   hydro.SetMVOption(mv_option);
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_mc, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;

@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
    }
    else
    {
-      output_path = std::string(LAGLOS_DIR) + "build/results/";
+      output_path = std::string(LAGLOS_DIR) + "build/results/temp/";
    }
    sv_output_prefix = output_path + "state_vectors/";
 

@@ -30,16 +30,17 @@ cd $bin_dir
 
 
 # Dim = 2 cases
-options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.01 -ot -visc -mm -so -vs 100 -of isen-vortex" ## Isentropic Vortex
+options="-m data/square5c0_vortex.mesh -p 5 -tf 1.9 -cfl 0.5 -ot -visc -mm -so -vs 10 -of vortex" ## Isentropic Vortex
 # options="-m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.01 -ot -visc -mm -so -vs 100 -of sod-distorted" #rs0-4 ## Sod on distorted grid
-# options="-m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 100 -of sod-cartesian" #rs2-6 ## Sod on cartesian grid
+# options="-m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -ot -visc -mm -so -vs 10 -of sod-cartesian" #rs2-6 ## Sod on cartesian grid
+options="-m data/ref-square-c0.mesh -p 6 -tf .2 -cfl 0.5 -of sedov"
 
-./Laglos -rs 0 $options
+# ./Laglos -rs 0 $options
 ./Laglos -rs 1 $options
 ./Laglos -rs 2 $options
 ./Laglos -rs 3 $options
 ./Laglos -rs 4 $options
-# ./Laglos -rs 5 $options
+./Laglos -rs 5 $options
 # ./Laglos -rs 6 $options
 # ./Laglos -rs 7 $options
 # ./Laglos -rs 8 $options
@@ -53,3 +54,5 @@ options="-m data/square5c0_vortex.mesh -p 5 -tf 4 -cfl 0.01 -ot -visc -mm -so -v
 # python stuff for iterating over files to build convergence table
 # python3 $create_convergence $temp_output
 # python3 $create_refinement $state_vectors 2
+
+# nohup ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 1 -cfl 0.5 -rs 0 -ot -visc -mm -so -vs 10 -of vortex-tf1 > out-vortex-0 &

@@ -109,7 +109,7 @@ protected:
    bool use_viscosity;
    bool mm;
    int mv_option = 0;
-   bool do_mass_correction = false;
+   int fv_option = 0;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
 
@@ -131,7 +131,6 @@ public:
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
-   void EnableMassCorrection() { this->do_mass_correction = true;  }
    void SetNumFaceCorrectionIterations( const int _num_fci) { this->num_face_correction_iterations = _num_fci; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
@@ -160,6 +159,7 @@ public:
 
    /* Mesh movement */
    void SetMVOption(const int & option);
+   void SetFVOption(const int & option);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       

@@ -1398,6 +1398,24 @@ void LagrangianLOOperator<dim>::SetMVOption(const int & option)
 
 
 /****************************************************************************************************
+* Function: SetFVOption
+* Parameters:
+*  option - integer parameter indicating which face velocity to use.
+*
+* Purpose:
+*  To set the mesh velocity motion computation type:
+*     1) Mass corrective.
+*     2) Average of corners, Q1 type.
+*     Default) Use computed velocity, RT or Vf
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetFVOption(const int & option)
+{
+   this->fv_option = option;
+}
+
+
+/****************************************************************************************************
 * Function: GetIntermediateFaceVelocity
 * Parameters:
 *  face - Face index
@@ -2437,16 +2455,21 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
    // Optionally mass correct
    if (dim > 1)
    {
-      if (do_mass_correction)
+      switch (fv_option)
       {
-         // cout << "Mass correcting\n";
+      case 1:
          ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
-      }
-      // else
-      // {
-      //    FillFaceVelocitiesWithAvg(S);
-      // }
-   }
+         break;
+      
+      case 2:
+         FillFaceVelocitiesWithAvg(S);
+         break;
+      
+      default:
+         /* Do nothing */
+         break;
+      } // End face velocity switch case
+   } // End dim > 1
 
    // Fill cell centers with average
    FillCenterVelocitiesWithAvg(S);
@@ -2578,38 +2601,21 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
 
       if (dim > 1)
       {
-         if (do_mass_correction)
+         switch (fv_option)
          {
-            // cout << "Mass correcting\n";
+         case 1:
             ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
-            
-            // Turn off mass correction if at the end of the face
-            // corner node correction iteration
-            if (face_corr_it >= num_face_correction_iterations)
-            {
-               do_mass_correction = false;
-            }
-            else
-            {
-               // Since we will continue to iterate, we must
-               // compute our iterative face flux and store 
-               // the value
-               ComputeCorrectiveFaceFluxes(S, t, dt);
-            }
-            // Otherwise keep mass correcting
-            // do_mass_correction = false;
-         }
-         // else
-         // {
-         //    cout << "Face averaging\n";
-         //    // ComputeCorrectiveFaceVelocities(S,t,dt,flag,test_vel);
-         //    // UpdateFaceVelocitiesWithAvg(S); // theta parameter to incremently add newly computed
-         //    FillFaceVelocitiesWithAvg(S);
-
-         //    // End the iteration loop
-         //    face_corr_it = num_face_correction_iterations + 1;
-         // }
-      }
+            break;
+         
+         case 2:
+            FillFaceVelocitiesWithAvg(S);
+            break;
+         
+         default:
+            /* Do nothing */
+            break;
+         } // End face velocity switch case
+      } // End dim > 1
    } // End face corner node correction iteration
 
    FillCenterVelocitiesWithAvg(S);

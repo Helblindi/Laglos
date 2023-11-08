@@ -14,6 +14,7 @@
 
 #include "mfem.hpp"
 #include "problem_base.h"
+#include "sedov_exact.hpp"
 #include <cmath>
 #include <string>
 
@@ -34,15 +35,12 @@ private:
     *********************************************************/
    double _a = 0., _b = 0., _gamma = 1.4;
    bool distort_mesh = false;
-   bool known_exact_solution = false;
+   bool known_exact_solution = true;
    bool bcs = false; // Indicator for boundary conditions
    string indicator = ""; // Possible: saltzmann
 
    // CFL change
    bool _change_cfl = false;
-   // constexpr static double CFL_first = 0.5;
-   // constexpr static double CFL_second = 0.5;
-   // constexpr static double CFL_time_change = 0.01;
 
    // Constants specific to Sedov problem
    double h = 0., cell_vol = 0.;
@@ -76,7 +74,6 @@ public:
          this->h = x_gf[0];
          this->cell_vol = x_gf[1];
       }
-      
    }
 
    /*********************************************************
@@ -99,7 +96,13 @@ public:
       }
       else 
       {
-         return 0.;
+         if (dim != 2)
+         {
+            MFEM_ABORT("Dimension != 2 is not supported.\n");
+         }
+         double xyt[3];
+         xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+         return sedov_rho(xyt);
       }
    }
    void v0(const Vector &x, const double & t, Vector &v) override
@@ -111,6 +114,15 @@ public:
          // Initial condition
          return;
       }
+      else
+      {
+         double xyt[3];
+         xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+
+         v[0] = sedov_vx(xyt);
+         v[1] = sedov_vy(xyt);
+      }
+
       return;
    }
    double sie0(const Vector &x, const double & t) override
@@ -123,13 +135,20 @@ public:
          // Initial condition
          if (norm <= h) {
             return 0.979264 / (4. * cell_vol);
+            // return 2. / (4. * cell_vol);
          }
          else
          {
             return 0.;
          }
       }
-      return 0.;
+      else
+      {
+         double xyt[3];
+         xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+
+         return sedov_e(xyt);
+      }
    }
 
    /*********************************************************

@@ -98,6 +98,8 @@ protected:
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
+   Array<HYPRE_BigInt> global_vertex_indices, global_face_indices;
+
    int el_num_faces;
    const int num_elements, num_vertices, num_faces, num_edges;
 

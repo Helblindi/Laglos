@@ -259,7 +259,10 @@ int main(int argc, char *argv[]) {
            << "Aborting program.\n";
       return -1;
    }
-   cout << "Meshing done\n";
+   if (Mpi::Root())
+   {
+      cout << "Meshing done\n";
+   }
 
    // mesh->SetCurvature(2);
 
@@ -277,8 +280,6 @@ int main(int argc, char *argv[]) {
    //    mesh->SetCurvature(max(mesh_order, 1));
    // }
 
-   cout << "done with serial refinement\n";
-
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
    // parallel mesh is defined, the serial mesh can be deleted.
@@ -288,9 +289,12 @@ int main(int argc, char *argv[]) {
    {
       pmesh->UniformRefinement();
    }
-   cout << "done with parallel refinement\n";
 
-   cout << "dim: " << pmesh->Dimension() << ", spacedim: " << pmesh->SpaceDimension() << endl;
+   if (Mpi::Root())
+   {
+      cout << "done with parallel refinement\n";
+      cout << "dim: " << pmesh->Dimension() << ", spacedim: " << pmesh->SpaceDimension() << endl;
+   }
 
    int NE = pmesh->GetNE(), ne_min, ne_max;
    MPI_Reduce(&NE, &ne_min, 1, MPI_INT, MPI_MIN, 0, pmesh->GetComm());
@@ -298,7 +302,27 @@ int main(int argc, char *argv[]) {
    double hmin, hmax, kmin, kmax;
    pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
    if (myid == 0)
-   { cout << "Zones min/max: " << ne_min << " " << ne_max << endl; }
+   { 
+      cout << "Zones min/max: " << ne_min << " " << ne_max << endl; 
+   }
+
+   /**
+    * Print parallelized mesh for visualization 
+    * Visualize with:
+    *    glvis -np # -m mesh-init
+    * */
+   if (gfprint)
+   {
+      ostringstream mesh_name;
+      mesh_name << gfprint_path 
+                << "mesh-init."
+                << setfill('0') 
+                << setw(6)
+                << myid;
+      ofstream omesh(mesh_name.str().c_str());
+      omesh.precision(precision);
+      pmesh->Print(omesh);
+   }
 
    // Set up problem
    ProblemBase<dim> * problem_class = NULL;
@@ -401,15 +425,6 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
 
-   HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
-   cout << "global_vSize: " << global_vSize << endl;
-   cout << "N dofs: " << H1FESpace.GetNDofs() << endl;
-   cout << "Num Scalar Vertex DoFs: " << H1FESpace.GetNVDofs() << endl;
-   cout << "Num Scalar edge-interior DoFs: " << H1FESpace.GetNEDofs() << endl;
-   cout << "Num Scalar face-interior DoFs: " << H1FESpace.GetNFDofs() << endl;
-   cout << "Num faces: " << H1FESpace.GetNF() << endl;
-   cout << "dim: " << dim << endl;
-
    // Print # DoFs
    const HYPRE_Int glob_size_l2 = L2FESpace.GlobalTrueVSize();
    const HYPRE_Int glob_size_h1 = H1FESpace.GlobalTrueVSize();
@@ -417,41 +432,9 @@ int main(int argc, char *argv[]) {
    {
       cout << "Number of kinematic (position, mesh velocity) dofs: "
            << glob_size_h1 << endl
-           << "Corresponding NDofs: "
-           << H1FESpace.GetNDofs() << endl
-           << "Corresponding VDim: " 
-           << H1FESpace.GetVDim() << endl
-           << "Corresponding Vsize: "
-           << H1FESpace.GetVSize() << endl;
-
-      cout << "Number of specific internal energy dofs: "
-           << glob_size_l2 << endl
-           << "Corresponding NDofs: "
-           << L2FESpace.GetNDofs() << endl
-           << "Corresponding VDim: " 
-           << L2FESpace.GetVDim() << endl
-           << "Corresponding Vsize: "
-           << L2FESpace.GetVSize() << endl;
-      
-      cout << "Number of velocity dofs: "
-           << L2VFESpace.GlobalTrueVSize() << endl
-           << "Corresponding NDofs: "
-           << L2VFESpace.GetNDofs() << endl
-           << "Corresponding VDim: " 
-           << L2VFESpace.GetVDim() << endl
-           << "Corresponding Vsize: "
-           << L2VFESpace.GetVSize() << endl;
+           << "Number of specific internal energy dofs: "
+           << glob_size_l2 << endl;
    }
-
-   /* Print Face Information */
-   pmesh->ExchangeFaceNbrData();
-   cout << "num interior faces: " << pmesh->GetNFbyType(FaceType::Interior) << endl;
-   cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
-   cout << "num total faces: " << pmesh->GetNumFaces() << endl;
-
-   /* Print element information */
-   cout << "num boundary elements: " << pmesh->GetNBE() << endl;
-   cout << "num elements: " << pmesh->GetNE() << endl;
 
    /* The monolithic BlockVector stores unknown fields as:
    *   - 0 -> position
@@ -472,7 +455,10 @@ int main(int argc, char *argv[]) {
    offset[5] = offset[4] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
-   cout << "Block Vector constructed\n";
+   if (Mpi::Root())
+   {
+      cout << "Block Vector constructed\n";
+   }
 
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
@@ -484,7 +470,10 @@ int main(int argc, char *argv[]) {
    v_gf.MakeRef(&L2VFESpace, S, offset[3]);
    ste_gf.MakeRef(&L2FESpace, S, offset[4]);
 
-   cout << "grid functions associated\n";
+   if (Mpi::Root())
+   {
+      cout << "Gridfunctions associated\n";
+   }
 
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
@@ -527,7 +516,10 @@ int main(int argc, char *argv[]) {
             x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
          }
       }
-      cout << "Mesh distorted\n";
+      if (Mpi::Root())
+      {
+         cout << "Mesh distorted\n";
+      }
    }
 
    // Initialize mesh velocity
@@ -572,11 +564,18 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
-   cout << "GridFunctions initiated.\n";
+   if (Mpi::Root())
+   {
+      cout << "GridFunctions initiated.\n";
+   }
 
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
-   cout << "Solver created.\n";
+
+   if (Mpi::Root())
+   {
+      cout << "Solver created.\n";
+   }
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetNumFaceCorrectionIterations(num_face_correction_iterations);
@@ -749,7 +748,11 @@ int main(int argc, char *argv[]) {
    bool last_step = false;
    BlockVector S_old(S);
 
-   cout << "Entering time loop\n";
+   if (Mpi::Root())
+   {
+      cout << "Entering time loop\n";
+   }
+   
    chrono.Clear();
    chrono.Start();
 
@@ -767,13 +770,22 @@ int main(int argc, char *argv[]) {
    int ti = 1;
    for (; !last_step; ti++)
    {
+      if (Mpi::Root())
+      {
+         cout << "timestep: " << ti << endl;
+      }
+
       hydro.BuildDijMatrix(S);
+
       /* Check if we need to change CFL */
       if (problem_class->change_cfl() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
-      {
-         cout << "Changing CFL for Saltzman at time = " << t << endl;
+      {         
          double CFL_new = problem_class->get_cfl_second();
          hydro.SetCFL(CFL_new);
+         if (Mpi::Root())
+         {
+            cout << "Changing CFL for Saltzman at time = " << t << endl;
+         }
       }
 
       if (optimize_timestep)
@@ -781,7 +793,6 @@ int main(int argc, char *argv[]) {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
       }
-
 
       if (t + dt >= t_final)
       {
@@ -985,7 +996,6 @@ int main(int argc, char *argv[]) {
             ste_ofs.close();
          }
       }
-      // cout << "finished step\n";
    } // End time step iteration
 
    chrono.Stop();
@@ -1017,7 +1027,6 @@ int main(int argc, char *argv[]) {
 
                // Density plot 
                int nc_py = L2FESpace.GetNE();
-               // cout << "nc_py: " << nc_py << endl;
                Vector center(dim);
                std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
                double _min = 0.6, _max = 1.;
@@ -1261,7 +1270,7 @@ int main(int argc, char *argv[]) {
                            << "n_processes " << num_procs << "\n"
                            << "n_refinements "
                            << to_string(rp_levels + rs_levels) << "\n"
-                           << "n_Dofs " << global_vSize << "\n"
+                           << "n_Dofs " << glob_size_l2 << "\n"
                            << "h " << hmin << "\n"
                            // rho
                            << "rho_L1_Error " << rho_L1_error_n << "\n"

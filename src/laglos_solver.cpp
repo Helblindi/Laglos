@@ -136,11 +136,28 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    mm(mm),
    CFL(CFL)
 {
+   if (Mpi::Root())
+   {
+      cout << "Instantiating hydro op\n";
+   }
+
+   // Get global index arrays
+   // 3DTODO
+   pmesh->GetGlobalFaceIndices(global_face_indices);
+   pmesh->GetGlobalVertexIndices(global_vertex_indices);
+
+   if (Mpi::WorldRank() == 1)
+   {
+      cout << "global face indices:\n";
+      global_face_indices.Print(cout);
+      cout << "global vertex indices:\n";
+      global_vertex_indices.Print(cout);
+   }
+
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
    Transpose(*edge_vertex, vertex_edge);
-
-   cout << "Instantiating hydro op\n";
+   
    block_offsets[0] = 0;
    block_offsets[1] = block_offsets[0] + Vsize_H1;
    block_offsets[2] = block_offsets[1] + Vsize_H1;
@@ -187,21 +204,23 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    chrono_state.Clear();
 
    // Print some dimension information
-   cout << "Vsize_H1: " << Vsize_H1 << endl;
-   cout << "TVSize_H1: " << TVSize_H1 << endl;
-   cout << "GTVSize_H1: " << GTVSize_H1 << endl;
-   cout << "NDofs_H1: " << NDofs_H1 << endl;
-   cout << "NVDofs_H1: " << NVDofs_H1 << endl;
-   cout << "NDofs_L2: " << NDofs_L2 << endl;
-   cout << "NDofs_L2V: " << NDofs_L2V << endl;
-   cout << "Vsize_L2V: " << Vsize_L2V << endl;
-   cout << "CR.GetNDofs(): " << CR.GetNDofs() << endl;
-   cout << "pmesh->GetNFaces(): " << pmesh->GetNFaces() << endl;
-   cout << "each element in the mesh has " << el_num_faces << " faces." << endl;
-   cout << "num_elements: " << num_elements << endl;
-   cout << "num_faces: " << num_faces << endl;
-   cout << "num_vertices: " << num_vertices << endl;
-   cout << "num_edges: " << num_edges << endl;
+   if (Mpi::Root())
+   {
+      cout << "Vsize_H1: " << Vsize_H1 << endl
+           << "TVSize_H1: " << TVSize_H1 << endl
+           << "GTVSize_H1: " << GTVSize_H1 << endl
+           << "NDofs_H1: " << NDofs_H1 << endl
+           << "NVDofs_H1: " << NVDofs_H1 << endl
+           << "NDofs_L2: " << NDofs_L2 << endl
+           << "NDofs_L2V: " << NDofs_L2V << endl
+           << "Vsize_L2V: " << Vsize_L2V << endl
+           << "CR.GetNDofs(): " << CR.GetNDofs() << endl
+           << "each element in the mesh has " << el_num_faces << " faces." << endl
+           << "num_elements: " << num_elements << endl
+           << "num_faces: " << num_faces << endl
+           << "num_vertices: " << num_vertices << endl
+           << "num_edges: " << num_edges << endl;
+   }
 }
 
 template<int dim>
@@ -283,6 +302,13 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    HypreParMatrix * k_hpm = k.ParallelAssemble();
    k_hpm->MergeDiagAndOffd(*dij_sparse);
 
+   if (Mpi::WorldRank() == 1)
+   {
+      cout << "dij_sparse dimensions. Cols: " << dij_sparse->NumCols() << ", Row: " << dij_sparse->NumRows() << endl;
+      cout << "printing dij_sparse on " << Mpi::WorldRank() << ": \n";
+      dij_sparse->Print(cout);
+   }
+
    // From here, we can modify the sparse matrix according to the sparsity pattern
 }
 
@@ -297,37 +323,71 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 template<int dim>
 void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 {
-   // cout << "=======================================\n"
-   //      << "           Build Dij Matrix            \n"
-   //      << "=======================================\n";
+   if (Mpi::Root())
+   {
+      cout << "=======================================\n"
+           << "           Build Dij Matrix            \n"
+           << "=======================================\n";
+   }
+   
    mfem::Mesh::FaceInformation FI;
-   int c, cp;
+   int c, cp, gcp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
    double F, lambda_max, d;
 
+   // TODO: Add in exchanging of face neighbor data for all of S.
+
    for (int face = 0; face < num_faces; face++) // face iterator
-   {
-      // cout << "face: " << face << endl;
+   {     
       FI = pmesh->GetFaceInformation(face);
-      c = FI.element[0].index;
-      cp = FI.element[1].index;
-
-      GetCellStateVector(S, c, Uc);
-      if (FI.IsInterior())
+      if (!FI.IsBoundary())
       {
-         GetCellStateVector(S, cp, Ucp);
+         c = FI.element[0].index;
+         cp = FI.element[1].index;
 
-         // Get normal, d, and |F|
+         GetCellStateVector(S, c, Uc);
          CalcOutwardNormalInt(S, c, face, n_int);
          n_vec = n_int;
          double F = n_vec.Norml2();
          n_vec /= F;
-
          assert(1. - n_vec.Norml2() < 1e-12);
          c_vec = n_int;
          c_vec /= 2.;
          double c_norm = c_vec.Norml2();
 
+         if (FI.IsShared())
+         {
+            if (Mpi::WorldRank() == 1)
+            {
+               cout << "shared face\n";
+            }
+            
+            // cp relates to a neighbor data
+            // TODO: Use the face neighbor data
+            // Set gcp to that global index
+            if (Mpi::WorldRank() == 1)
+            {
+               cout << "num face neighbor elements: "
+                    << pmesh->GetNFaceNeighborElements()
+                    << endl
+                    << "face nbr 1: " << pmesh->face_nbr_elements[0]
+                    << ", face nbr 2: " << pmesh->face_nbr_elements[1]
+                    << endl;
+               cout << "face_nbr_elements_offset:\n";
+               pmesh->face_nbr_elements_offset.Print(cout);
+               
+            }
+            
+         }
+         else // No need to worry about neighbors
+         {
+            GetCellStateVector(S, cp, Ucp);
+            gcp = pmesh->GetGlobalElementNum(cp);
+         }
+
+         gcp = pmesh->GetGlobalElementNum(cp);
+
+         // The rest of the function proceeds the same
          /* Compute max wave speed */ 
          // Some cases require an update to b_covolume at every interface.  This can be done through
          // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
@@ -339,33 +399,28 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double pr = pb->pressure(Ucp);
 
          // Finally compute lambda max
-         // cout << "pre compute lambda max\n";
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume);
          d = lambda_max * c_norm; 
 
          double ss = pb->sound_speed(Uc);
 
-         // cout << "c: " << c 
-         //      << ", pl: " << pl 
-         //      << ", pr: " << pr
-         //      << ", cp: " << cp << endl;
-         // cout << std::setprecision(12) 
-         //      << "sound speed: " << ss 
-         //      << ", lambda_max: " << lambda_max 
+         // Note that dij_sparse is local_NE * global_NE size, hence the 
+         // column index must be the corresponding global numbering
+         dij_sparse->Elem(c, gcp) = d;
 
-         //      << ", c_norm: " << c_norm 
-         //      << ", d: " << d << endl;
-
-         dij_sparse->Elem(c,cp) = d;
-         dij_sparse->Elem(cp,c) = d;
+         if (Mpi::WorldRank() == 1)
+         {
+            cout << "face: " << face << endl
+                 << "c: " << c << ", global c: " << pmesh->GetGlobalElementNum(c) 
+                 << ", cp: " << cp << ", gcp: " << gcp << endl;
+         }
 
          if (dim == 1)
          {
             lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
          }
-      }
+      } // Not boundary
    } // End face iterator
-
 }
 
 
@@ -384,7 +439,11 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 template<int dim>
 void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 {
-   // cout << "CalculateTimestep\n";
+   if (Mpi::Root())
+   {
+      cout << "CalculateTimestep\n";
+   }
+   
    double t_min = 1.;
    double t_temp = 0;
    double mi = 0;
@@ -398,7 +457,6 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
-      // cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
       mi = m_hpv->Elem(ci); 
 
@@ -407,6 +465,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
       assert(mi > 0); // Assumption, equation (3.6)
 
       H1.ExchangeFaceNbrData();
+      // PTODO: Get facenbrdata and use it when necessary
 
       switch (dim)
       {
@@ -440,10 +499,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
                cj = FI.element[0].index; 
             }
 
-            d = dij_sparse->Elem(ci, cj); 
-
-            // cout << "face: " << fids[j] << endl;
-            // cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
+            d = dij_sparse->Elem(ci, pmesh->GetGlobalElementNum(cj)); 
 
             temp_sum += d;
          }
@@ -451,11 +507,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
       
       t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
-      // cout << "CFL: " << CFL << ", mi: " << mi << ", temp_sum: " << temp_sum << endl;
-      // cout << "t_temp: " << t_temp << ", t_min: " << t_min << endl;
-
       if (t_temp < t_min && t_temp > 1.e-12) { 
-         // cout << "timestep reduced\n";
          t_min = t_temp;
       }
    } // End cell iterator
@@ -616,9 +668,13 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 template<int dim>
 void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double & dt)
 {
-   // cout << "========================================\n"
-   //      << "MakeTimeStep\n"
-   //      << "========================================\n";
+   if (Mpi::Root())
+   {
+      cout << "========================================\n"
+           << "             MakeTimeStep\n"
+           << "========================================\n";
+   }
+   
    // chrono_mm.Start();
    if (mm)
    {
@@ -677,9 +733,12 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, const double dt)
 {
-   // cout << "========================================\n"
-   //      << "ComputeStateUpdate\n"
-   //      << "========================================\n";
+   if (Mpi::Root())
+   {
+      cout << "========================================\n"
+           << "ComputeStateUpdate\n"
+           << "========================================\n";
+   }
 
    // We need a place to store the new state variables
    Vector S_new = S;
@@ -1144,17 +1203,9 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
          GetNodePosition(S, cell_gdof, cell_center_x);
          GetNodePosition(S, face, face_x);
 
-         cout << "cell: " << cell << ", location: ";
-         cell_center_x.Print(cout);
-         cout << "face: " << face << ", location: ";
-         face_x.Print(cout);
-
-
          subtract(face_x, cell_center_x, res);
          res *= 1. / res.Norml2();
 
-         cout << "outward normal: ";
-         res.Print(cout);
          break;
       }
       case 2:
@@ -1262,7 +1313,6 @@ void LagrangianLOOperator<dim>::
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
-      // cout << "face: " << face << endl;
       Vf = 0.;
       FI = pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
@@ -1293,31 +1343,6 @@ void LagrangianLOOperator<dim>::
 
             double coeff = d * (Ucp[0] - Uc[0]) / F;
             Vf.Add(coeff, n_vec);
-
-            // Switch orientation of Vf based on orientation of faces in mfem
-            // Vf_flux = Vf;
-            // Vf_flux *= F;
-            // int ind = -1;
-            // int ori = 0;
-
-            // Array<int> element_face_row, element_face_oris;
-            // pmesh->GetElementEdges(c, element_face_row, element_face_oris);
-            // for (int i = 0; i < 4; i++) // 3DTODO
-            // {
-            //    if (element_face_row[i] == face)
-            //    {
-            //       ind = i;
-            //       ori = element_face_oris[i];
-            //    }
-            // }
-            // if ((ind == 0 && ori == 1)  || 
-            //       (ind == 1 && ori == -1) ||
-            //       (ind == 2 && ori == -1) ||
-            //       (ind == 3 && ori == 1))
-            // {
-            //    cout << "flipping orientation of Vf for face: " << face << endl;
-            //    Vf_flux *= -1.;
-            // }
          }
 
          else 
@@ -1627,10 +1652,13 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
 
    double cell_ratio = (double)counter / (double)NDofs_L2;
 
-   cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
-   cout << "Initial mass sum: " << denom 
-        << ", Current mass sum: " << current_mass_sum << endl;
-   cout << "Mass Error: " << num / denom << endl;
+   if (Mpi::Root())
+   {
+      cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl;
+      cout << "Initial mass sum: " << denom 
+           << ", Current mass sum: " << current_mass_sum << endl;
+      cout << "Mass Error: " << num / denom << endl;
+   }
 }
 
 
@@ -1649,9 +1677,9 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const double &dt, double & alpha)
 {
-   // cout << "=====================\n";
-   // cout << "Computing determinant\n";
-   // cout << "=====================\n";
+   // cout << "=====================\n"
+   //      << "Computing determinant\n"
+   //      << "=====================\n";
    double trace = C.Trace();
    double det = C.Det();
 
@@ -1702,9 +1730,9 @@ void LagrangianLOOperator<dim>::
                                     void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
 {
    assert(dim > 1); // No need to correct face velocities in dim=1
-   // cout << "==============================================\n";
-   // cout << "Computing corrective interior face velocities.\n";
-   // cout << "==============================================\n";
+   // cout << "==============================================\n"
+   //      << "Computing corrective interior face velocities.\n"
+   //      << "==============================================\n";
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
@@ -1905,9 +1933,12 @@ void LagrangianLOOperator<dim>::
    ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt)
 {
    assert(dim > 1); // There is no need for this function in dim=1
-   cout << "========================================================\n";
-   cout << "Computing corrective interior geometric face velocities.\n";
-   cout << "========================================================\n";
+   if (Mpi::Root())
+   {
+      cout << "========================================================\n"
+           << "Computing corrective interior geometric face velocities.\n"
+           << "========================================================\n";
+   }
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
@@ -1946,20 +1977,16 @@ void LagrangianLOOperator<dim>::
          assert(1. - n_vec.Norml2() < 1e-12);
 
          /*** Compute Face Flux ***/
-         cout << "computing face flux for face: " << face << ", which corresponds to face_dof: " << face_dof << endl;
 
          // Compute C_i
          DenseMatrix Ci;
          // mfem::Array<int> elements;
          // face_element->GetRow(face_dof, elements);
          ComputeCiGeoRaviart(face_dof, Ci);
-         cout << "ci:\n";
-         Ci.Print(cout);
 
          // Compute alpha_i
          double alpha_i;
          ComputeDeterminant(Ci, dt, alpha_i);
-         cout << "alpha_i: " << alpha_i << endl;
 
          // Compute flux
          Vector face_flux(dim);
@@ -1969,9 +1996,6 @@ void LagrangianLOOperator<dim>::
          {
             _mat(i,i) += alpha_i;
          }
-
-         cout << "face flux correction matrix:\n";
-         _mat.Print(cout);
 
          _mat.Mult(face_velocity, face_flux);
          SetCorrectedFaceFlux(face, face_flux); 
@@ -2570,10 +2594,13 @@ template<int dim>
 void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
    Vector &S, const double & t, double & dt, const string flag, 
    void (*test_vel)(const Vector&, const double&, Vector&))
-{
-   // cout << "=======================================\n"
-   //      << "     ComputeMeshVelocitiesRaviart      \n"
-   //      << "=======================================\n";
+{  
+   if (Mpi::Root())
+   {
+      cout << "=======================================\n"
+           << "     ComputeMeshVelocitiesRaviart      \n"
+           << "=======================================\n";
+   }
 
    ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
    v_CR_gf_fluxes = v_CR_gf; // V_F^0 = V_F
@@ -2668,7 +2695,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
             // cout << "ComputeGeoVRaviart::face node for face: " << EDof << endl;
             face_element->GetRow(EDof, element_row);
             row_length = element_row.Size();
-            // cout << "row length: " << row_length << endl;
 
             break;
          }
@@ -3113,10 +3139,6 @@ void LagrangianLOOperator<dim>::IntGradRaviart(const int cell, DenseMatrix & res
       {
          H1c_gf.MakeRef(&H1c, v_geo_gf, j*_size);
          H1c_gf.GetGradient(*trans, grad);
-         // cout << "grad for dim " << j << ": \n";
-         // grad.Print(cout);
-         // cout << "H1c_gf: \n";
-         // H1c_gf.Print(cout);
 
          // Put information into Dense Matrix
          res.GetRow(j, row);

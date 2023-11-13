@@ -101,6 +101,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
+   GlobIndicesGf(&l2),
    v_CR_gf(&CR),
    v_CR_gf_corrected(&CR), 
    v_CR_gf_fluxes(&CR),
@@ -135,23 +136,20 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    use_viscosity(use_viscosity),
    mm(mm),
    CFL(CFL)
-{
+{  
+   // Fill GlobIndicesGF
+   for (int i=0; i<NDofs_L2; i++)
+   {
+      GlobIndicesGf[i] = pmesh->GetGlobalElementNum(i);
+   }
+
+   // Set num face neighbors as this value does not change
+   pmesh->ExchangeFaceNbrData();
+   NumFaceNbrs = pmesh->GetNFaceNeighborElements();
+
    if (Mpi::Root())
    {
       cout << "Instantiating hydro op\n";
-   }
-
-   // Get global index arrays
-   // 3DTODO
-   pmesh->GetGlobalFaceIndices(global_face_indices);
-   pmesh->GetGlobalVertexIndices(global_vertex_indices);
-
-   if (Mpi::WorldRank() == 1)
-   {
-      cout << "global face indices:\n";
-      global_face_indices.Print(cout);
-      cout << "global vertex indices:\n";
-      global_vertex_indices.Print(cout);
    }
 
    // Transpose face_element to get element_face
@@ -320,6 +318,105 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 *
 * Purpose:
 ****************************************************************************************************/
+// template<int dim>
+// void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
+// {
+//    if (Mpi::Root())
+//    {
+//       cout << "=======================================\n"
+//            << "           Build Dij Matrix            \n"
+//            << "=======================================\n";
+//    }
+   
+//    mfem::Mesh::FaceInformation FI;
+//    int c, cp, gcp;
+//    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
+//    double F, lambda_max, d;
+
+//    // TODO: Add in exchanging of face neighbor data for all of S.
+
+//    for (int face = 0; face < num_faces; face++) // face iterator
+//    {     
+//       FI = pmesh->GetFaceInformation(face);
+//       if (!FI.IsBoundary())
+//       {
+//          c = FI.element[0].index;
+//          cp = FI.element[1].index;
+
+//          GetCellStateVector(S, c, Uc);
+//          CalcOutwardNormalInt(S, c, face, n_int);
+//          n_vec = n_int;
+//          double F = n_vec.Norml2();
+//          n_vec /= F;
+//          assert(1. - n_vec.Norml2() < 1e-12);
+//          c_vec = n_int;
+//          c_vec /= 2.;
+//          double c_norm = c_vec.Norml2();
+
+//          if (FI.IsShared())
+//          {
+//             if (Mpi::WorldRank() == 1)
+//             {
+//                cout << "shared face\n";
+            
+//                // cp relates to a neighbor data
+//                // TODO: Use the face neighbor data
+//                // Set gcp to that global index
+//                cout << "num face neighbor elements: "
+//                     << pmesh->GetNFaceNeighborElements()
+//                     << endl
+//                     << "face nbr 1: " << pmesh->face_nbr_elements[0]
+//                     << ", face nbr 2: " << pmesh->face_nbr_elements[1]
+//                     << endl;
+//                cout << "face_nbr_elements_offset:\n";
+//                pmesh->face_nbr_elements_offset.Print(cout);
+               
+//             }
+            
+//          }
+//          else // No need to worry about neighbors
+//          {
+//             GetCellStateVector(S, cp, Ucp);
+//             gcp = pmesh->GetGlobalElementNum(cp);
+//          }
+
+//          gcp = pmesh->GetGlobalElementNum(cp);
+
+//          // The rest of the function proceeds the same
+//          /* Compute max wave speed */ 
+//          // Some cases require an update to b_covolume at every interface.  This can be done through
+//          // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
+//          double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
+//          pb->lm_update(b_covolume);
+
+//          // Compute pressure with given EOS
+//          double pl = pb->pressure(Uc);
+//          double pr = pb->pressure(Ucp);
+
+//          // Finally compute lambda max
+//          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume);
+//          d = lambda_max * c_norm; 
+
+//          double ss = pb->sound_speed(Uc);
+
+//          // Note that dij_sparse is local_NE * global_NE size, hence the 
+//          // column index must be the corresponding global numbering
+//          dij_sparse->Elem(c, gcp) = d;
+
+//          if (Mpi::WorldRank() == 1)
+//          {
+//             cout << "face: " << face << endl
+//                  << "c: " << c << ", global c: " << pmesh->GetGlobalElementNum(c) 
+//                  << ", cp: " << cp << ", gcp: " << gcp << endl;
+//          }
+
+//          if (dim == 1)
+//          {
+//             lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
+//          }
+//       } // Not boundary
+//    } // End face iterator
+// }
 template<int dim>
 void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 {
@@ -331,96 +428,126 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
    }
    
    mfem::Mesh::FaceInformation FI;
-   int c, cp, gcp;
+   int c, cp, gcp, diag_k;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
-   double F, lambda_max, d;
+   double F, lambda_max, d, rowsum;
 
-   // TODO: Add in exchanging of face neighbor data for all of S.
+   const int m = dij_sparse->Height();
+   const int *I = dij_sparse->HostReadI(), *J = dij_sparse->HostReadJ();
 
-   for (int face = 0; face < num_faces; face++) // face iterator
-   {     
-      FI = pmesh->GetFaceInformation(face);
-      if (!FI.IsBoundary())
+   double *D_data = dij_sparse->HostReadWriteData();
+   Array<int> faces, oris;
+
+   for (int i = 0, k = 0; i < m; i++)
+   {
+      int i_global = pmesh->GetGlobalElementNum(i);
+
+      // Get data corresponding to ith cell
+      GetCellStateVector(S, i, Uc);
+
+      // pmesh->GetElementEdges(i, faces, oris);
+      GlobIndicesGf.ExchangeFaceNbrData();
+      Vector nbr_glob_indices = GlobIndicesGf.FaceNbrData();
+      // if (Mpi::Root())
+      // {
+      //    cout << "printing face nbr data root: ";
+      //    face_nbr_data.Print(cout);
+         
+      //    cout << "face to all element table:\n";
+      //    Table * face_all_el = pmesh->GetFaceToAllElementTable();
+      //    face_all_el->Print(cout);
+         
+      //    cout << "element faces for el: " << i_global << endl;
+      //    faces.Print(cout);
+
+      //    assert(false);
+      // }
+
+      for (int end = I[i+1]; k < end; k++)
       {
-         c = FI.element[0].index;
-         cp = FI.element[1].index;
-
-         GetCellStateVector(S, c, Uc);
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
-         double F = n_vec.Norml2();
-         n_vec /= F;
-         assert(1. - n_vec.Norml2() < 1e-12);
-         c_vec = n_int;
-         c_vec /= 2.;
-         double c_norm = c_vec.Norml2();
-
-         if (FI.IsShared())
+         int j_global = J[k]; // global index
+         
+         if (Mpi::Root())
          {
-            if (Mpi::WorldRank() == 1)
+            cout << "Printing glob indices: ";
+            nbr_glob_indices.Print(cout);
+            // std::find function call
+            // if (it != nbr_glob_indices.end()) 
+            // {
+            //    std::cout << "Value: " << j_global << 
+            //                " found at position: ";
+            //    std::cout << it - nbr_glob_indices.begin() << 
+            //                " (counting from zero) \n";
+            // }
+            // else
+            //    std::cout << "Value " << j_global << "  not found.\n\n";
+         }
+
+         // Get data
+         int j_local = pmesh->GetLocalElementNum(j_global);
+
+         // Iterate over faces to identify which one corresponds to cell j
+         for (int face_it = 0; face_it < faces.Size(); face_it++)
+         {
+            FI = pmesh->GetFaceInformation(faces[face_it]);
+            if (Mpi::Root())
             {
-               cout << "shared face\n";
+               cout << "face " << faces[face_it]
+                  << " has adjacent elements: "
+                  << FI.element[0].index
+                  << " and "
+                  << FI.element[1].index 
+                  << endl;
             }
-            
-            // cp relates to a neighbor data
-            // TODO: Use the face neighbor data
-            // Set gcp to that global index
-            if (Mpi::WorldRank() == 1)
+         }
+
+         // Face normal information
+         // CalcOutwardNormalInt(S, c, face, n_int);
+         // n_vec = n_int;
+         // double F = n_vec.Norml2();
+         // n_vec /= F;
+         // assert(1. - n_vec.Norml2() < 1e-12);
+         // c_vec = n_int;
+         // c_vec /= 2.;
+         // double c_norm = c_vec.Norml2();
+
+         if (i != j_global) {
+            /* Computing dij */
+            double dij = 0.;
+
+            if (j_local == -1)
             {
-               cout << "num face neighbor elements: "
-                    << pmesh->GetNFaceNeighborElements()
-                    << endl
-                    << "face nbr 1: " << pmesh->face_nbr_elements[0]
-                    << ", face nbr 2: " << pmesh->face_nbr_elements[1]
-                    << endl;
-               cout << "face_nbr_elements_offset:\n";
-               pmesh->face_nbr_elements_offset.Print(cout);
-               
+               // element is not owned by this processor.
+               // Must use neigbor data
+               // Get face_nbr index
+               auto it = std::find(nbr_glob_indices.begin(), 
+                                 nbr_glob_indices.end(),
+                                 j_global);
+               int nbr_index = it - nbr_glob_indices.begin();
+               GetNbrCellStateVector(S, nbr_index, Ucp);
             }
-            
+            else
+            {
+               // element is owned by this processor
+               GetCellStateVector(S, j_local, Ucp);
+            }
+
+            // Compute lambda max
+
+            // Finally put val into SparseMatrix
+            D_data[k] = dij;
+
+            // Add to diagonal entry
+            rowsum += dij;
          }
-         else // No need to worry about neighbors
-         {
-            GetCellStateVector(S, cp, Ucp);
-            gcp = pmesh->GetGlobalElementNum(cp);
+         else {
+            // Get index for diagonal entry
+            diag_k = k;
          }
-
-         gcp = pmesh->GetGlobalElementNum(cp);
-
-         // The rest of the function proceeds the same
-         /* Compute max wave speed */ 
-         // Some cases require an update to b_covolume at every interface.  This can be done through
-         // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
-         double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
-         pb->lm_update(b_covolume);
-
-         // Compute pressure with given EOS
-         double pl = pb->pressure(Uc);
-         double pr = pb->pressure(Ucp);
-
-         // Finally compute lambda max
-         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, b_covolume);
-         d = lambda_max * c_norm; 
-
-         double ss = pb->sound_speed(Uc);
-
-         // Note that dij_sparse is local_NE * global_NE size, hence the 
-         // column index must be the corresponding global numbering
-         dij_sparse->Elem(c, gcp) = d;
-
-         if (Mpi::WorldRank() == 1)
-         {
-            cout << "face: " << face << endl
-                 << "c: " << c << ", global c: " << pmesh->GetGlobalElementNum(c) 
-                 << ", cp: " << cp << ", gcp: " << gcp << endl;
-         }
-
-         if (dim == 1)
-         {
-            lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
-         }
-      } // Not boundary
-   } // End face iterator
+      }
+      // Finally, put the diagonal entry in
+      D_data[diag_k] = -1 *  rowsum; 
+   }
 }
 
 
@@ -1106,6 +1233,62 @@ void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, const int ce
 
    // Retrieve cell specific total energy
    U[dim+1] = ste_gf.Elem(cell);
+}
+
+
+/****************************************************************************************************
+* Function: GetNbrCellStateVector
+* Parameters:
+*  S    - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  cell - Index of the corresponding face_nbr_data
+*  U    - Returned vector contained the hydrodynamic state variables
+*
+* Purpose:
+*  Given a cell, return the hydrodynamic state variables of that cell, i.e. in vector for get
+*  (specific volume, velocity, specific total energy)
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::GetNbrCellStateVector(const Vector &S, const int nbr_index, Vector &U)
+{
+   U.SetSize(dim + 2);
+
+   // This happens when a face is a boundary face, one of the cells index is -1q
+   if (cell == -1) {
+      U = 0.;
+      return;
+   }
+
+   // Retrieve information from BlockVector S
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction sv_gf, v_gf, ste_gf;
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
+   ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
+
+   // Exchange face nbr information
+   sv_gf.ExchangeFaceNbrData();
+   v_gf.ExchangeFaceNbrData();
+   ste_gf.ExchangeFaceNbrData();
+
+   Vector nbr_sv = sv_gf.FaceNbrData(),
+          nbr_v = v_gf.FaceNbrData(),
+          nbr_ste = ste_gf.FaceNbrData();
+
+   // Retrieve specific volume on cell
+   U[0] = nbr_sv[nbr_index];
+
+   // Retrieve cell velocity 
+   // Here the corresponding gridfunction is a stacked vector:
+   // Ex: x1, y1, x2, y2, x3, y3, x4, y4
+   for (int i = 0; i < dim; i++)
+   {
+      int index = nbr_index*NumFaceNbrs + i;
+      assert(index < nbr_v.Size());
+      U[i+1] = nbr_v[index];
+   }
+
+   // Retrieve cell specific total energy
+   U[dim+1] = nbr_ste[nbr_index];
 }
 
 

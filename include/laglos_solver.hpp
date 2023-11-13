@@ -55,6 +55,8 @@ protected:
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
+   ParGridFunction GlobIndicesGf;
+   int NumFaceNbrs;
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
@@ -98,7 +100,7 @@ protected:
    Array<int> BdrElementIndexingArray;
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
-   Array<HYPRE_BigInt> global_vertex_indices, global_face_indices;
+   GridFunction NbrElGlobalIndices;
 
    int el_num_faces;
    const int num_elements, num_vertices, num_faces, num_edges;
@@ -152,6 +154,7 @@ public:
    void CalculateTimestep(const Vector &S);
 
    void GetCellStateVector(const Vector &S, const int cell, Vector &U);
+   void GetNbrCellStateVector(const Vector &S, const int nbr_index, Vector &U);
 
    void SetCellStateVector(Vector &S_new, const int cell, const Vector &U);
 

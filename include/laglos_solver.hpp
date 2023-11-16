@@ -194,17 +194,17 @@ public:
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
    void ComputeMeshVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeGeoVNormal(const Vector &S);
+   void ComputeGeoVNormal(Vector &S);
    void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocityFromVgeo(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
+   void ComputeNodeVelocityFromVgeo(Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
 
    // Raviart-Thomas mesh motion (as of 09/11/2023)
    void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeGeoVRaviart(const Vector &S);
+   void ComputeGeoVRaviart(Vector &S);
    void ComputeGeoVRaviart2(const Vector &S);
    void ComputeNodeVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocityRaviart(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
+   void ComputeNodeVelocityRaviart(const Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
    void ComputeCiGeoRaviart(const int & node, DenseMatrix & res);
    void IntGradRaviart(const int cell, DenseMatrix & res);
 

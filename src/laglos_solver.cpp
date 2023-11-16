@@ -95,7 +95,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                 double CFL) :
    H1(h1),
    H1_L(h1_l),
-   H1c(H1.GetParMesh(), H1.FEColl(), 1),
+   H1c(H1_L.GetParMesh(), H1_L.FEColl(), 1),
    L2(l2),
    L2V(l2v),
    CR(cr),
@@ -103,7 +103,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf(&CR),
    v_CR_gf_corrected(&CR), 
    v_CR_gf_fluxes(&CR),
-   v_geo_gf(&H1),
+   v_geo_gf(&H1_L),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -2423,7 +2423,7 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 {
    for (int i = 0; i < dim; i++)
    {
-      int index = node + i * NDofs_H1;
+      int index = node + i * NVDofs_H1;
       vel[i] = v_geo_gf[index];
    }
 }
@@ -2642,7 +2642,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S)
+void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
 {
    cout << "ComputeGeoVNormal\n";
 
@@ -2700,6 +2700,14 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S)
             Mi.Invert();
             Mi.Mult(Ri, node_v);
 
+            // Only update the v_geo_gf in the case of the corners
+            // Using Q1 for this velocity field
+            for (int i = 0; i < dim; i++)
+            {
+               int index = node + i * NVDofs_H1;
+               v_geo_gf[index] = node_v[i];
+            }
+
             break;
          }
          case 1: // face
@@ -2727,12 +2735,9 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S)
          }
       }
 
-      // Finally, update the node velocity in v_geo_gf
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node + i * NDofs_H1;
-         v_geo_gf[index] = node_v[i];
-      }
+      // In every case, update the corresponding nodal velocity in S
+      UpdateNodeVelocity(S, node, node_v);
+
    } // End mv node iterator
 }
 
@@ -2760,7 +2765,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
    // Iterate over vertices and faces
    for (int node = 0; node < NDofs_H1 - NDofs_L2; node++) // Vertex and face iterator
    {
-      ComputeNodeVelocityFromVgeo(node, dt, node_v, is_dt_changed);
+      ComputeNodeVelocityFromVgeo(S, node, dt, node_v, is_dt_changed);
       UpdateNodeVelocity(S, node, node_v);
    } // End Vertex iterator
 }
@@ -2776,7 +2781,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
-   const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
+   Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "=======================================\n"
    //      << "      ComputeNodeVelocityRaviart       \n"
@@ -2852,7 +2857,8 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
          //    }
          // } // End time restriction from velocity computation
 
-         GetViGeo(node, Vgeo);
+         // GetViGeo(node, Vgeo);
+         GetNodeVelocity(S, node, Vgeo);
          
          // chrono_temp.Clear();
          // chrono_temp.Start();
@@ -2979,7 +2985,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
 *  Iterate over nodes, then look at adjacent elements
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
+void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
 {
    // cout << "=======================================\n"
    //      << "          ComputeGeoVRaviart           \n"
@@ -2993,7 +2999,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
    DofEntity entity;
    int EDof;
 
-   for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
+   for (int node = 0; node < NDofs_H1 - NDofs_L2; node++) // Vertex iterator
    {
       node_v = 0.; // Reset node velocity
 
@@ -3026,12 +3032,9 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
             GetCellStateVector(S, EDof, Uc);
             node_v = pb->velocity(Uc);
 
-            /* Put this velocity into v_geo_gf*/
-            for (int i = 0; i < dim; i++)
-            {
-               int index = node + i * NDofs_H1;
-               v_geo_gf[index] = node_v[i];
-            }
+            /* Put this velocity into mv_gf */
+            UpdateNodeVelocity(S,node,node_v);
+            
             continue;
          }
          default:
@@ -3088,11 +3091,17 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(const Vector &S)
       node_v /= row_length;
 
       /* Put this velocity into v_geo_gf*/
-      for (int i = 0; i < dim; i++)
+      if (entity == 0) // Only for corners
       {
-         int index = node + i * NDofs_H1;
-         v_geo_gf[index] = node_v[i];
+         for (int i = 0; i < dim; i++)
+         {
+            int index = node + i * NVDofs_H1;
+            v_geo_gf[index] = node_v[i];
+         }
       }
+
+      UpdateNodeVelocity(S, node, node_v);
+      
    } // End vertex iterator
 }
 
@@ -3167,7 +3176,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
          /* Put this velocity into v_geo_gf*/
          for (int i = 0; i < dim; i++)
          {
-            int index = ldof + i * NDofs_H1;
+            int index = ldof + i * NVDofs_H1;
             v_geo_gf[index] += v_cell[i];
          }
          
@@ -3207,7 +3216,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesRaviart(
    // Iterate over vertices
    for (int node = 0; node < NDofs_H1 - NDofs_L2; node++) // Vertex iterator
    {
-      ComputeNodeVelocityRaviart(node, dt, node_v, is_dt_changed);
+      ComputeNodeVelocityRaviart(S, node, dt, node_v, is_dt_changed);
       // GetViGeo(node, node_v);
 
       // if (node_v[0] != node_v[0] || node_v[1] != node_v[1])
@@ -3241,7 +3250,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesRaviart(
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
-   const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
+   const Vector & S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "=======================================\n"
    //      << "      ComputeNodeVelocityRaviart       \n"
@@ -3318,7 +3327,8 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
          //    }
          // } // End time restriction from velocity computation
 
-         GetViGeo(node, Vgeo);
+         // GetViGeo(node, Vgeo);
+         GetNodeVelocity(S, node, Vgeo);
          
          // chrono_temp.Clear();
          // chrono_temp.Start();

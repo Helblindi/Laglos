@@ -51,7 +51,7 @@ class LagrangianLOOperator
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
-   ParFiniteElementSpace H1c;
+   ParFiniteElementSpace H1Lc;
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
@@ -136,13 +136,11 @@ public:
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
    void CreateBdrElementIndexingArray();
-
    void CreateBdrVertexIndexingArray();
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
    void MakeTimeStep(Vector &S, const double & t, double & dt);
-
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
    void InitializeDijMatrix();
@@ -150,7 +148,6 @@ public:
    void CalculateTimestep(const Vector &S);
 
    void GetCellStateVector(const Vector &S, const int cell, Vector &U);
-
    void SetCellStateVector(Vector &S_new, const int cell, const Vector &U);
 
    /* cij comp */
@@ -166,6 +163,7 @@ public:
    void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
    void GetCorrectedFaceFlux(const int & face, Vector & flux);       
 
+   void SetViGeo(const int &node, const Vector &vel);
    void GetViGeo(const int & node, Vector & vel);
    void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
@@ -175,38 +173,38 @@ public:
    void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
    void GetNodePosition(const Vector &S, const int & node, Vector & x);
    
+   // Face velocity functions
    void ComputeIntermediateFaceVelocities(const Vector &S, 
                                              const double t,
                                              const string ="NA", 
                                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
+   void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
 
+   // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);
    void FillCenterVelocitiesWithL2(Vector &S);
    void FillCenterVelocitiesWithAvg(Vector &S);
-   void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void FillFaceVelocitiesWithAvg2(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void UpdateFaceVelocitiesWithAvg(Vector &S);
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
    void ComputeMeshVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeGeoVNormal(Vector &S);
-   void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocityFromVgeo(Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
-
+   
    // Raviart-Thomas mesh motion (as of 09/11/2023)
    void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeGeoVRaviart(Vector &S);
    void ComputeGeoVRaviart2(const Vector &S);
-   void ComputeNodeVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocityRaviart(const Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
-   void ComputeCiGeoRaviart(const int & node, DenseMatrix & res);
-   void IntGradRaviart(const int cell, DenseMatrix & res);
+   
+   // Convert from geometric velocity to mesh velocity
+   void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
+   void ComputeCiGeo(const int & node, DenseMatrix & res);
+   void IntGrad(const int cell, DenseMatrix & res);
+   void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeNodeVelocityFromVgeo(Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
 
    // Enforce Boundary Conditions
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 

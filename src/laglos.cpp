@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
-                  "Choose how to compute face velocities, 1 - Mass conservative bubble, 2 - Average, Q1 type");
+                  "Choose how to compute face velocities, 0 - Do nothing, 1 - Mass conservative bubble, 2 - Average, Q1 type");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
                   "--no-optimize-timestep",
                   "Enable or disable timestep optimization using CFL.");

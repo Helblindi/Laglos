@@ -94,8 +94,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                 bool mm, 
                                                 double CFL) :
    H1(h1),
-   // H1_L(h1_l),
-   // H1c(H1_L.GetParMesh(), H1_L.FEColl(), 1),
+   H1_L(h1_l),
    H1c(H1.GetParMesh(), H1.FEColl(), 1),
    L2(l2),
    L2V(l2v),
@@ -616,9 +615,9 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 template<int dim>
 void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double & dt)
 {
-   // cout << "========================================\n"
-   //      << "MakeTimeStep\n"
-   //      << "========================================\n";
+   cout << "========================================\n"
+        << "MakeTimeStep\n"
+        << "========================================\n";
    // chrono_mm.Start();
    if (mm)
    {
@@ -655,6 +654,14 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    add(x_gf, dt, mv_gf, x_gf);
+
+   // SetCellCenterAsCenter(S);
+
+   cout << "mv_gf: \n";
+   mv_gf.Print(cout);
+
+   cout << "x_gf post move: \n";
+   x_gf.Print(cout);
 
    pmesh->NodesUpdated();
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
@@ -1144,17 +1151,8 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
          GetNodePosition(S, cell_gdof, cell_center_x);
          GetNodePosition(S, face, face_x);
 
-         cout << "cell: " << cell << ", location: ";
-         cell_center_x.Print(cout);
-         cout << "face: " << face << ", location: ";
-         face_x.Print(cout);
-
-
          subtract(face_x, cell_center_x, res);
          res *= 1. / res.Norml2();
-
-         cout << "outward normal: ";
-         res.Print(cout);
          break;
       }
       case 2:
@@ -1946,20 +1944,16 @@ void LagrangianLOOperator<dim>::
          assert(1. - n_vec.Norml2() < 1e-12);
 
          /*** Compute Face Flux ***/
-         cout << "computing face flux for face: " << face << ", which corresponds to face_dof: " << face_dof << endl;
 
          // Compute C_i
          DenseMatrix Ci;
          // mfem::Array<int> elements;
          // face_element->GetRow(face_dof, elements);
          ComputeCiGeoRaviart(face_dof, Ci);
-         cout << "ci:\n";
-         Ci.Print(cout);
 
          // Compute alpha_i
          double alpha_i;
          ComputeDeterminant(Ci, dt, alpha_i);
-         cout << "alpha_i: " << alpha_i << endl;
 
          // Compute flux
          Vector face_flux(dim);
@@ -1970,30 +1964,29 @@ void LagrangianLOOperator<dim>::
             _mat(i,i) += alpha_i;
          }
 
-         cout << "face flux correction matrix:\n";
-         _mat.Print(cout);
-
          _mat.Mult(face_velocity, face_flux);
          SetCorrectedFaceFlux(face, face_flux); 
       }
    }
 }
 
-
 /****************************************************************************************************
-* Function: FillCenterVelocitiesWithAvg
+* Function: SetCellCenterAsCenter
 * Parameters:
 *   S        - BlockVector representing FiniteElement information
 *
 * Purpose:
 *  This function is only needed since we are not able to implement the Serendipity finite elements.
 *  Since the mesh motion does not depends on a value for the node corresponding to the center of the 
-*  element, we need to fill this with a velocity which will ensure the center node remains inside the
-*  cell.  This is done by average the values at the four corner nodes of the cell.
+*  element, we fill the actual grid function with the average of the moved adjacent corners
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
+void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 {
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf;
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
@@ -2027,6 +2020,153 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
       // GetCellStateVector(S, ci, Uc);
       // Vc = pb->velocity(Uc);
       Vc = 0.;
+      pmesh->GetElementVertices(ci, verts);
+      cout << "cell: " << ci << " and corresponding verts:\n";
+      verts.Print(cout);
+      for (int j = 0; j < verts.Size(); j++)
+      {
+         cout << "vert: " << verts[j] << " has corresponding vel: ";
+         GetNodePosition(S, verts[j], node_v);
+         node_v.Print(cout);
+         Vc += node_v;
+      }
+      Vc /= verts.Size();
+      cout << "\tAveraged v for cell: ";
+      Vc.Print(cout);
+      // if (dim == 1)
+      // {
+      //    pmesh->GetElementVertices(ci, verts);
+      //    for (int j = 0; j < verts.Size(); j++)
+      //    {
+      //       GetNodeVelocity(S, verts[j], node_v);
+      //       Vc += node_v;
+      //    }
+      //    Vc /= verts.Size();
+      // }
+      // else if (dim == 2)
+      // {
+      //    Array<int> element_face_row, element_face_oris;
+      //    pmesh->GetElementEdges(ci, element_face_row, element_face_oris);
+      //    for (int face_it = 0; face_it < element_face_row.Size(); face_it++)
+      //    {
+      //       int face = element_face_row[face_it];
+
+      //       // Get intermediate face velocities corresponding to faces
+      //       // GetIntermediateFaceVelocity(face, node_v);
+      //       GetNodeVelocity(S, face + NVDofs_H1, node_v);
+      //       if (face_it%2 == 0)
+      //       {
+      //          Vc[1] = Vc[1] + node_v[1];
+      //       }
+      //       else
+      //       {
+      //          Vc[0] = Vc[0] + node_v[0];
+      //       }
+      //    }
+
+      //    Vc /= 2.;
+      // }
+
+      UpdateNodePosition(S, cell_vdof, Vc);
+   }
+}
+
+
+/****************************************************************************************************
+* Function: FillCenterVelocitiesWithAvg
+* Parameters:
+*   S        - BlockVector representing FiniteElement information
+*
+* Purpose:
+*  This function is only needed since we are not able to implement the Serendipity finite elements.
+*  Since the mesh motion does not depends on a value for the node corresponding to the center of the 
+*  element, we need to fill this with a velocity which will ensure the center node remains inside the
+*  cell.  This is done by average the values at the four corner nodes of the cell.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
+{
+   // Since we cannot use Serendipity elements, we must update cell center velocities
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction v_gf;
+   v_gf.MakeRef(&H1, *sptr, block_offsets[3]);
+
+   cout << "size of v_gf: " << v_gf.Size() << endl;
+
+   Vector node_v(dim);
+
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      // Get center node dof
+      int cell_vdof;
+      switch (dim)
+      {
+         case 1:
+         {
+            cell_vdof = num_faces + ci;
+            break;
+         }
+         case 2:
+         {
+            cell_vdof = NVDofs_H1 + num_faces + ci;
+            break;
+         }
+         case 3:
+         {
+            MFEM_ABORT("3D not implemented.\n");
+         }
+         default:
+         {
+            MFEM_ABORT("Incorrect dim value provided.\n");
+         }
+      }
+
+      for (int i = 0; i < dim; i++)
+      {
+         int index = ci + i*NDofs_L2;
+         node_v[i] = v_gf[index];
+      }
+      
+      // Get corresponding velocity from ParGridFunction
+      UpdateNodeVelocity(S, cell_vdof, node_v);
+   }
+}
+
+template<int dim>
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
+{
+   // Since we cannot use Serendipity elements, we must update cell center velocities
+   Vector Vc(dim), Uc(dim+2), node_v(dim);
+
+   Array<int> verts;
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      // Get center node dof
+      int cell_vdof;
+      switch (dim)
+      {
+         case 1:
+         {
+            cell_vdof = num_faces + ci;
+            break;
+         }
+         case 2:
+         {
+            cell_vdof = NVDofs_H1 + num_faces + ci;
+            break;
+         }
+         case 3:
+         {
+            MFEM_ABORT("3D not implemented.\n");
+         }
+         default:
+         {
+            MFEM_ABORT("Incorrect dim value provided.\n");
+         }
+      }
+      
+      Vc = 0.;
+
       if (dim == 1)
       {
          pmesh->GetElementVertices(ci, verts);
@@ -2039,33 +2179,16 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
       }
       else if (dim == 2)
       {
-         Array<int> element_face_row, element_face_oris;
-         pmesh->GetElementEdges(ci, element_face_row, element_face_oris);
-         for (int face_it = 0; face_it < element_face_row.Size(); face_it++)
+         pmesh->GetElementVertices(ci, verts);
+         for (int j = 0; j < verts.Size(); j++)
          {
-            int face = element_face_row[face_it];
-
-            // Get intermediate face velocities corresponding to faces
-            // GetIntermediateFaceVelocity(face, node_v);
-            GetNodeVelocity(S, face + NVDofs_H1, node_v);
-            if (face_it%2 == 0)
-            {
-               Vc[1] = Vc[1] + node_v[1];
-            }
-            else
-            {
-               Vc[0] = Vc[0] + node_v[0];
-            }
+            GetNodeVelocity(S, verts[j], node_v);
+            Vc += node_v;
          }
 
-         Vc /= 2.;
+         Vc /= verts.Size();
       }
 
-      // Update the velocity for the center node
-      if (Vc[0] != Vc[0] || Vc[1] != Vc[1])
-      {
-         MFEM_ABORT("Center velocity average resulted in NaN.\n");
-      }
       UpdateNodeVelocity(S, cell_vdof, Vc);
    }
 }
@@ -2307,6 +2430,31 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 
 
 /****************************************************************************************************
+* Function: UpdateNodePosition
+* Parameters:
+*   S    - BlockVector representing FiniteElement information
+*   node - Global index of node in question.
+*   x    - Coordinate position at given node.
+*
+* Purpose:
+*  This function updates the cartesian location corresponding to a global node.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::UpdateNodePosition(Vector &S, const int & node, const Vector &x)
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf;
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NDofs_H1;
+      x_gf[index] = x[i];
+   }
+}
+
+
+/****************************************************************************************************
 * Function: GetNodePosition
 * Parameters:
 *   S    - BlockVector representing FiniteElement information
@@ -2436,9 +2584,11 @@ void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, Den
 *        2) Constructs Ri, which is the sum of the tensor products of all
 *           adjacent normal vectors, multiplied by the intermediate face 
 *           velocity.
-*        3) Computes Vi as Mi^{-1} * Ri.
-*        4) Optionally computes mass corrective face velocities.
-*        5) Fills cell center velocities with average.
+*        3) Computes Vi_geo as Mi^{-1} * Ri.
+*        4) Compute the corrected velocity, which uses the above defined 
+*           velocity field to then compute C^i on all nodes
+*        5) Optionally computes mass corrective face velocities.
+*        6) Fills cell center velocities with average.
 *        
 ****************************************************************************************************/
 template<int dim>
@@ -2446,11 +2596,17 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
    Vector &S, const double & t, double & dt, const string flag, 
    void (*test_vel)(const Vector&, const double&, Vector&))
 {
-   // cout << "=======================================\n"
-   //      << "     ComputeMeshVelocitiesNormal       \n"
-   //      << "=======================================\n";
+   cout << "=======================================\n"
+        << "     ComputeMeshVelocitiesNormal       \n"
+        << "=======================================\n";
    ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
-   ComputeNodeVelocitiesNormal(S, t, dt, flag, test_vel);
+
+   if (dim > 1)
+   {
+      ComputeGeoVNormal(S);
+   }
+   
+   ComputeNodeVelocitiesFromVgeo(S, t, dt, flag, test_vel);
 
    // Optionally mass correct
    if (dim > 1)
@@ -2473,6 +2629,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
 
    // Fill cell centers with average
    FillCenterVelocitiesWithAvg(S);
+   // FillCenterVelocitiesWithL2(S);
 }
 
 
@@ -2485,10 +2642,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeNodeVelocitiesNormal(
-   Vector &S, const double & t, double & dt, const string, 
-   void (*test_vel)(const Vector&, const double&, Vector&))
+void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S)
 {
+   cout << "ComputeGeoVNormal\n";
+
    // Compute mesh node velocities
    mfem::Mesh::FaceInformation FI;
    Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
@@ -2498,47 +2655,238 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesNormal(
    int faces_length;
    double c_norm;
 
-   // Corner nodes
-   for (int node = 0; node < num_vertices; node++) // Vertex iterator
+   DofEntity entity;
+   int EDof;
+
+   // Iterate over all mesh velocity dofs
+   for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
    {
-      // Reset Mi, Ri, Vi
-      Mi = 0., Ri = 0., node_v = 0.;
+      node_v = 0.; // Reset node velocity
 
-      // Get cell faces
-      vertex_edge.GetRow(node, faces_row);
-      faces_length = faces_row.Size();
+      // Check if node corresponds to a face or to a 
+      // vertex and get adjacent cell indices and edge indices
+      GetEntityDof(node, entity, EDof);
 
-      // iterate over adjacent faces
-      for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+      switch (entity)
       {
-         int face = faces_row[face_it];
-         GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         case 0: // corner
+         {
+            // cout << "ComputeGeoVNormal::corner node\n";
+            // Reset Mi, Ri, Vi
+            Mi = 0., Ri = 0., node_v = 0.;
 
-         // Retrieve corresponding normal (orientation doesn't matter)
-         CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-         c_norm = n_vec.Norml2();
-         n_vec /= c_norm;
+            // Get cell faces
+            vertex_edge.GetRow(node, faces_row);
+            faces_length = faces_row.Size();
 
-         tensor(n_vec, n_vec, dm_tmp);
-         Mi += dm_tmp;
-         dm_tmp.Mult(Vf, y);
-         Ri += y;
+            // iterate over adjacent faces
+            for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+            {
+               int face = faces_row[face_it];
+               GetIntermediateFaceVelocity(face, Vf);
+               FI = pmesh->GetFaceInformation(face);
+
+               // Retrieve corresponding normal (orientation doesn't matter)
+               CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+               c_norm = n_vec.Norml2();
+               n_vec /= c_norm;
+
+               tensor(n_vec, n_vec, dm_tmp);
+               Mi += dm_tmp;
+               dm_tmp.Mult(Vf, y);
+               Ri += y;
+            }
+
+            Mi.Invert();
+            Mi.Mult(Ri, node_v);
+
+            break;
+         }
+         case 1: // face
+         {
+            cout << "ComputeGeoVNormal::face node for face: " << EDof << endl;
+            // face nodes just set to ivf
+            assert(face >= 0);
+            GetIntermediateFaceVelocity(EDof, node_v);
+            // cout << "EDof: " << EDof << ", node_v: ";
+            // node_v.Print(cout);
+
+            break;
+         }
+         case 2: // Cell Center
+         {
+            Vector Uc(dim+2);
+            GetCellStateVector(S, EDof, Uc);
+            node_v = pb->velocity(Uc);
+
+            break;
+         }
+         default:
+         {
+            MFEM_ABORT("Invalid entity\n");
+         }
       }
 
-      Mi.Invert();
-      Mi.Mult(Ri, node_v);
+      // Finally, update the node velocity in v_geo_gf
+      for (int i = 0; i < dim; i++)
+      {
+         int index = node + i * NDofs_H1;
+         v_geo_gf[index] = node_v[i];
+      }
+   } // End mv node iterator
+}
 
-      // Finally, update the node velocity
-      UpdateNodeVelocity(S, node, node_v);
-   }
 
-   // face nodes just set to ivf
-   for (int face = 0; face < num_faces; face++)
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
+   Vector &S, const double & t, double & dt, const string, 
+   void (*test_vel)(const Vector&, const double&, Vector&))
+{
+   // cout << "=======================================\n"
+   //      << "     ComputeNodeVelocitiesNormal       \n"
+   //      << "=======================================\n";
+   
+   Vector node_v(dim);
+
+   bool is_dt_changed = false;
+   // Iterate over vertices and faces
+   for (int node = 0; node < NDofs_H1 - NDofs_L2; node++) // Vertex and face iterator
    {
-      int node = face + num_vertices;
-      GetIntermediateFaceVelocity(face, node_v);
+      ComputeNodeVelocityFromVgeo(node, dt, node_v, is_dt_changed);
       UpdateNodeVelocity(S, node, node_v);
+   } // End Vertex iterator
+}
+
+
+/****************************************************************************************************
+* Function: 
+* Parameters:
+*  S    - 
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
+   const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
+{
+   // cout << "=======================================\n"
+   //      << "      ComputeNodeVelocityRaviart       \n"
+   //      << "=======================================\n";
+   chrono_temp.Clear();
+   switch (dim)
+   {
+      case 1:
+      {
+         // Remark 5.3 in the paper states that since each geometric node belongs to one
+         // face only, the RT velocity is equal to the IFV previously computed.
+         assert(node < num_faces);
+         GetIntermediateFaceVelocity(node, node_v);
+         break;
+      }
+      default:
+      {
+         DenseMatrix Ci(dim);
+         Vector Vgeo(dim);
+         double d = 0.;
+         
+         Ci = 0., Vgeo = 0., node_v = 0.;
+
+         // chrono_temp.Clear();
+         // chrono_temp.Start();
+         ComputeCiGeoRaviart(node, Ci);
+         // chrono_temp.Stop();
+         // cout << "ci computation for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
+
+
+         // Enforce time restriction imposed by calculation of alpha_i
+         // if (dim == 2)
+         // {
+         //    double trace = Ci.Trace();
+         //    double det = Ci.Det();
+         //    double val = 2. * sqrt(det);
+         //    cout << "trace: " << trace << ", det: " << det << endl;
+         //
+         //    // alpha_i must be positive restriction
+         //    if (det <= 1.e-12 && trace < 0.)
+         //    {
+         //       if (dt > 2. / abs(trace))
+         //       {
+         //          dt = 2. / (abs(trace) + 1.);
+         //          is_dt_changed = true;
+         //          cout << "timestep restriction from velocity computation, det = 0 case.\n";
+         //       }
+         //    }
+         //  
+         //    // alpha_i must be real
+         //    else if (det > 0.)
+         //    {
+         //       if (trace < val)
+         //       {
+         //          // Enforce timestep restriction
+         //          double zero2 = 1. / (-trace + val);
+         //          if (dt > 2 * zero2)
+         //          {
+         //             cout << "timestep restriction from velocity computation\n";
+         //             cout << "dt: " << dt << ", z2: " << zero2 << endl;
+         //             dt = 2. * zero2;
+         //             is_dt_changed = true;
+         //          }
+         //       }
+         //       else 
+         //       {
+         //          cout << "positive determinant but no timestep restriction needed.\n";
+         //       }
+         //    }
+         //    else
+         //    {
+         //       cout << "negative determinant, no timestep restriction needed.\n";
+         //    }
+         // } // End time restriction from velocity computation
+
+         GetViGeo(node, Vgeo);
+         
+         // chrono_temp.Clear();
+         // chrono_temp.Start();
+         ComputeDeterminant(Ci, dt, d);
+         cout << "alphai: " << d << endl;
+         // chrono_temp.Stop();
+         // cout << "determinant for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
+
+         // Compute V_i^n
+         // chrono_temp.Clear();
+         // chrono_temp.Start();
+         DenseMatrix _mat(Ci);
+         _mat *= - dt / 2.;
+         for (int i = 0; i < dim; i++)
+         {
+            _mat(i,i) += d;
+         }
+
+         _mat.Invert();
+         _mat.Mult(Vgeo, node_v);
+
+         cout << "matrix inversion to solve for v from vgeo for node: " << node << endl;
+         cout << "Vgeo: ";
+         Vgeo.Print(cout);
+         cout << "V: ";
+         node_v.Print(cout);
+         cout << "_mat: \n";
+         _mat.Print(cout);
+
+         // chrono_temp.Stop();
+         // cout << "mult for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
+
+         break;
+      }
    }
 }
 
@@ -2975,6 +3323,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityRaviart(
          // chrono_temp.Clear();
          // chrono_temp.Start();
          ComputeDeterminant(Ci, dt, d);
+         cout << "alphai: " << d << endl;
          // chrono_temp.Stop();
          // cout << "determinant for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
 

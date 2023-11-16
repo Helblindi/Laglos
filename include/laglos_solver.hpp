@@ -50,7 +50,7 @@ class LagrangianLOOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
-   // ParFiniteElementSpace &H1_L;
+   ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1c;
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
@@ -172,6 +172,7 @@ public:
 
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
+   void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
    void GetNodePosition(const Vector &S, const int & node, Vector & x);
    
    void ComputeIntermediateFaceVelocities(const Vector &S, 
@@ -182,6 +183,8 @@ public:
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
 
+   void SetCellCenterAsCenter(Vector &S);
+   void FillCenterVelocitiesWithL2(Vector &S);
    void FillCenterVelocitiesWithAvg(Vector &S);
    void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void FillFaceVelocitiesWithAvg2(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
@@ -191,7 +194,9 @@ public:
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
    void ComputeMeshVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", 
                               void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeGeoVNormal(const Vector &S);
+   void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeNodeVelocityFromVgeo(const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
 
    // Raviart-Thomas mesh motion (as of 09/11/2023)
    void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 

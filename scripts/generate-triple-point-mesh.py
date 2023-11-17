@@ -57,18 +57,14 @@ def main():
    # BOUNDARY
    f.write("boundary\n")
 
-   bdry_left = 1
-   bdry_bottom = 2
-   bdry_right = 3
-   bdry_top = 4
+   bdry_bottom = 1
+   bdry_right = 2
+   bdry_top = 3
+   bdry_left = 4
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints - 1) + 2 * (ny_gridpoints - 1)) + "\n")
    # TODO: Vertices connecting boundary edges
-   
-   #LEFT
-   for i in range(0, ny_gridpoints - 1):
-      f.write("%d 1 %d %d\n" % (bdry_left, i, i+1))
 
    #BOTTOM
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
@@ -81,6 +77,10 @@ def main():
    #TOP
    for i in range(nx_gridpoints * ny_gridpoints - 1, ny_gridpoints - 1, -ny_gridpoints):
       f.write("%d %d %d %d\n" % (bdry_top, 1, i, i-ny_gridpoints))
+   
+   #LEFT
+   for i in range(ny_gridpoints - 1, 0, -1):
+      f.write("%d 1 %d %d\n" % (bdry_left, i, i-1))
 
    f.write("\n")
 

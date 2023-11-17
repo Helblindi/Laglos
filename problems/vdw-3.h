@@ -48,7 +48,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U) override
+   virtual double pressure(const Vector &U, const int &cell_attr=0) override
    {
       // Use van der Waals
       double rho = 1. / U[0];

@@ -60,7 +60,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U) override
+   double pressure(const Vector &U, const int &cell_attr=0) override
    {
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }

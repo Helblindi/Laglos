@@ -11,6 +11,7 @@
 #include "isentropic_vortex.h"
 #include "sedov.h"
 #include "saltzmann.h"
+#include "triple_point.h"
 #include "vdw-1.h"
 #include "vdw-2.h"
 #include "vdw-3.h"

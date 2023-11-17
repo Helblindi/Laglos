@@ -42,6 +42,7 @@
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3      ## Isentropic Vortex
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 5       ## Noh
 * ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5        ## Sedov
+* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 3        ## Triple Point
 *
 */
 #include "lambda_max_lagrange.h"
@@ -304,12 +305,12 @@ int main(int argc, char *argv[]) {
    ProblemBase<dim> * problem_class = NULL;
    switch (problem)
    {
-      case 0:
+      case 0: // Smooth
       {
          problem_class = new SmoothWave<dim>();
          break;
       }
-      case 1:
+      case 1: // Sod
       {
          problem_class = new SodProblem<dim>();
          break;
@@ -346,11 +347,12 @@ int main(int argc, char *argv[]) {
          //       if distorted meshes are used.
          break;
       }
-      case 7:
+      case 7: // Saltzmann
       {
          problem_class = new SaltzmannProblem<dim>();
          break;
       }
+      /* VDW */
       case 8:
       {
          problem_class = new VdwTest1<dim>();
@@ -369,6 +371,11 @@ int main(int argc, char *argv[]) {
       case 11:
       {
          problem_class = new VdwTest4<dim>();
+         break;
+      }
+      case 12:
+      {
+         problem_class = new TriplePoint<dim>();
          break;
       }
       default:
@@ -1091,7 +1098,7 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < sv_gf.Size(); i++)
             {
                hydro.GetCellStateVector(S, i, U);
-               double pressure = problem_class->pressure(U);
+               double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
                press_gf[i] = pressure;
                // Form python arrays
                press_gf_py[i] = pressure;

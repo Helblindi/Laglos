@@ -61,7 +61,7 @@ public:
    // Getters
    double get_a() { return a; }
    double get_b() { return b; }
-   double get_gamma() { return gamma; }
+   virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
    virtual string get_indicator() { return indicator; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
@@ -233,6 +233,7 @@ public:
     ********************************************/
    double sv0(const Vector &x, const double & t)
    {
+      cout << "ProblemBase::sv0\n";
       double val = this->rho0(x,t);
       assert(val != 0.);
       return 1./val;
@@ -248,7 +249,7 @@ public:
    /*********************************************
     * Functions to be overridden
     ********************************************/
-   virtual double pressure(const Vector &U) {
+   virtual double pressure(const Vector &U, const int &cell_attr=0) {
       MFEM_ABORT("Must override pressure in ProblemBase class.\n");
       return 1.;
    } // virtual function, must be overridden

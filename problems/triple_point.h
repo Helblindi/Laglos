@@ -26,42 +26,36 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class NohProblem: public ProblemBase<dim>
+class TriplePoint: public ProblemBase<dim>
 {
 private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _a = 0., _b = 0., _gamma = 5./3.;
+   double _a = 0., _b = 0., _gamma_1 = 1.5, _gamma_2 = 1.4;
    bool distort_mesh = false;
-   bool known_exact_solution = true;
+   bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
-   string indicator = "Noh"; // Possible: saltzmann
+   string indicator = ""; // Possible: saltzmann
 
    // CFL change
    bool _change_cfl = false;
-   // constexpr static double CFL_first = 0.5;
-   // constexpr static double CFL_second = 0.5;
-   // constexpr static double CFL_time_change = 0.01;
 
 public:
-   NohProblem()
+   TriplePoint()
    {
       this->set_a(_a);
       this->set_b(_b);
-      this->set_gamma(_gamma);
    }
 
    /* Override getters */
-   string get_indicator() override { return indicator; }
    bool get_distort_mesh() override { return distort_mesh; }
    bool has_exact_solution() override { return known_exact_solution; }
-   bool has_boundary_conditions() override { return bcs; }
+   double get_gamma(const int &cell_attr) override {
+      return (cell_attr == 1) ? _gamma_1 : _gamma_2;
+   }
 
    bool change_cfl() override { return _change_cfl; }
-   // double get_cfl_first() override { return CFL_first; }
-   // double get_cfl_second() override { return CFL_second; }
-   // double get_cfl_time_change() override { return CFL_time_change; }
 
    /* Override specific update functions */
    void lm_update(const double b_covolume) override 
@@ -74,7 +68,15 @@ public:
     *********************************************************/
    double pressure(const Vector &U, const int &cell_attr=0) override
    {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
+      // TODO: Must fix to use cell specific gamma
+      double _g;
+      if (cell_attr == 1) { 
+         _g = _gamma_1;
+      } else {
+         _g = _gamma_2;
+      }
+      return (_g - 1.) * this->internal_energy(U);
+      
    }
 
    /*********************************************************
@@ -82,65 +84,37 @@ public:
     *********************************************************/
    double rho0(const Vector &x, const double & t) override
    {
-      /* Initial condition */
-      double norm = x.Norml2();
-
-      if (t < 1.e-16) {
-         return 1.;
-      }
-      /* Exact solution */
-      else 
-      {
-         if (t < 3. * norm) {
-            return 1.0 + t / norm;
-         } else { // (t / 3. >= norm)
-            return 16.0;
-         }
-      }
+      cout << "TriplePoint::rho0\n";
+      return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
+         /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
+                                         (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
-      double norm = x.Norml2();
       v = 0.;
-
-      /* Initial condition */
-      if (t < 1.e-16) {
-         if (norm > 1.e-16) {
-            v[0] = -x[0] / norm, v[1] = -x[1] / norm;
-         }
-      } // Check here
-
-      /* Exact solution */
-      else if (t < 3. * norm) {
-         v[0] = -x[0] / norm, v[1] = -x[1] / norm;
-      } 
-
       return;
    }
    double sie0(const Vector &x, const double & t) override
    {
-      double norm = x.Norml2();
-
-      /* Initial condition */
-      if (t < 1.e-16) {
-         // if (norm > 1.e-16) {
-         return 1.e-12 / (this->get_gamma() - 1.);
-         // }
+      if (x[0] <= 1)
+      {
+         // D_1
+         return 2.;
       }
-
-      /* Exact solution */
-      else {
-         if (t < 3. * norm) {
-            return 1.e-12 / (this->get_gamma() - 1.);
-         } 
-         else  {
-            // All KE converted to IE on the backside of the shock
-            return 0.5 + 1.e-12 / (this->get_gamma() - 1.);
+      else
+      {
+         if (x[1] <= 1.5)
+         {
+            // D_2
+            return 0.25;
+         }
+         else 
+         {
+            // D_3
+            assert(x[1] <= 3.);
+            return 1.6;
          }
       }
-      cout << "norm: " << norm << ", t: " << t << "\n";
-      MFEM_ABORT("Noh problem, this spot should not have been encountered.\n");
-      return 0.;
    }
 
 }; // End class

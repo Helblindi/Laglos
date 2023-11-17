@@ -45,35 +45,30 @@ def main():
 
    # BOUNDARY
    f.write("boundary\n")
-   bdry_left = 1
    bdry_bottom = 1
-   bdry_right = 1
-   bdry_top = 1
+   bdry_right = 2
+   bdry_top = 3
+   bdry_left = 4
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")
    # TODO: Vertices connecting boundary edges
-   
-   #LEFT
-   bdr_el = 1
-   for i in range(0, (ny_gridpoints - 1)):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_left, i, i+1))
-      bdr_el += 1
 
    #BOTTOM
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_bottom, i, i+ny_gridpoints))
-      bdr_el += 1
+      f.write("%d %d %d %d\n" % (bdry_bottom, 1, i, i+ny_gridpoints))
 
    #RIGHT
    for i in range((nx_gridpoints - 1) * ny_gridpoints, nx_gridpoints * ny_gridpoints - 1):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_right, i, i+1))
-      bdr_el += 1
+      f.write("%d %d %d %d\n" % (bdry_right, 1, i, i+1))
 
    #TOP
    for i in range(nx_gridpoints * ny_gridpoints - 1, ny_gridpoints, -ny_gridpoints):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_top, i, i-ny_gridpoints))
-      bdr_el += 1
+      f.write("%d %d %d %d\n" % (bdry_top, 1, i, i-ny_gridpoints))
+
+   #LEFT
+   for i in range(ny_gridpoints - 1, 0, -1):
+      f.write("%d %d %d %d\n" % (bdry_left, 1, i, i-1))
 
    f.write("\n")
 

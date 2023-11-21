@@ -101,7 +101,6 @@ protected:
    int el_num_faces;
    const int num_elements, num_vertices, num_faces, num_edges;
 
-   int num_face_correction_iterations = 0; // 0 is default, no iterations done
    double CFL;
    double timestep = 0.001;
    double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
@@ -131,7 +130,6 @@ public:
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
-   void SetNumFaceCorrectionIterations( const int _num_fci) { this->num_face_correction_iterations = _num_fci; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -187,15 +185,14 @@ public:
    void FillCenterVelocitiesWithL2(Vector &S);
    void FillCenterVelocitiesWithAvg(Vector &S);
 
+   // Compute mesh velocities
+   void ComputeMeshVelocities(Vector &S, const double &t, double &dt);
+
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
-   void ComputeMeshVelocitiesNormal(Vector &S, const double & t, double & dt, const string ="NA", 
-                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeGeoVNormal(Vector &S);
    
-   // Raviart-Thomas mesh motion (as of 09/11/2023)
-   void ComputeMeshVelocitiesRaviart(Vector &S, const double & t, double & dt, const string ="NA", 
-                              void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   // Raviart-Thomas mesh motion 
    void ComputeGeoVRaviart(Vector &S);
    void ComputeGeoVRaviart2(const Vector &S);
    

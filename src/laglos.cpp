@@ -42,7 +42,7 @@
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3      ## Isentropic Vortex
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 5       ## Noh
 * ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5        ## Sedov
-* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 3        ## Triple Point
+* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2        ## Triple Point
 *
 */
 #include "lambda_max_lagrange.h"
@@ -100,8 +100,6 @@ int main(int argc, char *argv[]) {
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    bool mc = false;
-   int face_correction_frequency = 1;
-   int num_face_correction_iterations = 0;
    bool use_viscosity = true;
    bool mm = true;
    int mv_option = 1;
@@ -139,10 +137,6 @@ int main(int argc, char *argv[]) {
                   "Enable or disable result output (files in mfem format).");
    args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
                   "Enable or disable mass correction.");
-   args.AddOption(&face_correction_frequency, "-fcf", "--face-correction-frequency",
-                  "Frequency to which face correction should be applied.");
-   args.AddOption(&num_face_correction_iterations, "-fci", "--face-correction-iterations",
-                  "Number of iterations to feed the corrective face velocity back into the corner node computations.");
    args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
                   "--no-viscosity",
                   "Enable or disable the use of artificial viscosity.");
@@ -586,7 +580,6 @@ int main(int argc, char *argv[]) {
    cout << "Solver created.\n";
 
    /* Set parameters of the LagrangianLOOperator */
-   hydro.SetNumFaceCorrectionIterations(num_face_correction_iterations);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
 

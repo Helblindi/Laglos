@@ -530,8 +530,9 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
    // cout << "Constructing BdrElementIndexingArray:\n";
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
+      int bdr_attr = pmesh->GetBdrAttribute(i);
       int index = pmesh->GetBdrElementEdgeIndex(i);
-      BdrElementIndexingArray[index] = i;
+      BdrElementIndexingArray[index] = bdr_attr;
    }
 }
 
@@ -555,30 +556,27 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);
-      pmesh->GetBdrElementEdges(i, fids, oris);
+      int face = pmesh->GetBdrFace(i);
 
-      // iterate over boundary faces
-      for (int j = 0; j < fids.Size(); j++)
+      pmesh->GetEdgeVertices(face, verts);
+      for (int k = 0; k < verts.Size(); k++)
       {
-         pmesh->GetEdgeVertices(fids[j], verts);
-         for (int k = 0; k < verts.Size(); k++)
+         int index = verts[k];
+         if (pb->get_indicator() == "saltzmann")
          {
-            int index = verts[k];
-            if (pb->get_indicator() == "saltzmann")
-            {
-               // Replace the bdr attribute in the array as long as it is not
-               // the dirichlet condition (For Saltzman Problem)
-               if (BdrVertexIndexingArray[index] != 1)
-               {
-                  BdrVertexIndexingArray[index] = bdr_attr;
-               }
-            }
-            else
+            // Replace the bdr attribute in the array as long as it is not
+            // the dirichlet condition (For Saltzman Problem)
+            if (BdrVertexIndexingArray[index] != 1)
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
-         } // end vertex iterator
-      } // end boundary faces
+         }
+         else
+         {
+            BdrVertexIndexingArray[index] = bdr_attr;
+         }
+      } // end vertex iterator
+
    } // end boundary elements
 }
 
@@ -601,29 +599,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    // cout << "========================================\n"
    //      << "             MakeTimeStep               \n"
    //      << "========================================\n";
-   // chrono_mm.Start();
-   if (mm)
-   {
-      // Compute mesh velocities
-      // This function may change the timestep
-      switch (mv_option)
-      {
-      case 1:
-         ComputeMeshVelocitiesRaviart(S,t,dt);
-         break;
-
-      case 2:
-         ComputeMeshVelocitiesNormal(S,t,dt);
-         break;
-      
-      default:
-         MFEM_ABORT("Invalid mesh velocity option.\n");
-      }
-      
-      // Enforce boundary conditions
-      EnforceMVBoundaryConditions(S,t,dt);
-   }
-   // chrono_mm.Stop();
+   ComputeMeshVelocities(S, t, dt);
 
    // Update state variables contained in S_new
    // chrono_state.Start();
@@ -642,6 +618,69 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
    // cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
 } 
+
+
+/****************************************************************************************************
+* Function: ComputeMeshVelocities
+* Parameters:
+*     S_new - BlockVector that stores mesh information, mesh velocity, and state variables.
+*     t     - Current time
+*     dt    - Current timestep
+*
+* Purpose:
+*     Determine the velocity with which to move the mesh.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t, double &dt)
+{
+   // cout << "========================================\n"
+   //      << "         ComputeMeshVelocities          \n"
+   //      << "========================================\n";
+   // chrono_mm.Start();
+   if (mm)
+   {
+      ComputeIntermediateFaceVelocities(S, t);
+      // Compute mesh velocities
+      // This function may change the timestep
+      if (dim > 1)
+      {
+         switch (mv_option)
+         {
+         case 1:
+            ComputeGeoVRaviart(S);
+            break;
+
+         case 2:
+            ComputeGeoVNormal(S);
+            break;
+         
+         default:
+            MFEM_ABORT("Invalid mesh velocity option.\n");
+         }
+
+         ComputeNodeVelocitiesFromVgeo(S, t, dt);
+         EnforceMVBoundaryConditions(S,t,dt);
+
+         switch (fv_option)
+         {
+         case 1:
+            ComputeCorrectiveFaceVelocities(S, t, dt);
+            break;
+         
+         case 2:
+            FillFaceVelocitiesWithAvg(S);
+            break;
+         
+         default:
+            /* Do nothing */
+            break;
+         } // End face velocity switch case
+      }
+      
+      FillCenterVelocitiesWithAvg(S);
+   }
+   // chrono_mm.Stop();
+}
 
 
 /****************************************************************************************************
@@ -676,16 +715,15 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
    H1.ExchangeFaceNbrData();
 
    bool is_boundary_cell = false;
+   int cell_bdr = 0;
 
    Vector sum_validation(dim);
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
       is_boundary_cell = false;
-
+      cell_bdr = 0;
       sum_validation = 0.;
-
       GetCellStateVector(S, ci, U_i);
-      
       val = U_i;
 
       switch (dim)
@@ -703,6 +741,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          case 3:
          {
             pmesh->GetElementFaces(ci, fids, oris);
+            break;
+         }
+         default:
+         {
+            MFEM_ABORT("Incorrect dimension provided.\n");
          }
       }
 
@@ -752,8 +795,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          {
             assert(FI.IsBoundary());
             is_boundary_cell = true;
-            Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
+            int bdr_attr = BdrElementIndexingArray[fids[j]];
+            // cout << "boundary attribute for face " << fids[j] << ": " << bdr_attr << endl;
+            cell_bdr = bdr_attr;
 
+            Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
             U_i_bdry = U_i;
             y_temp_bdry = 0.;
@@ -763,6 +809,18 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             // {
             //    // Since we will enforce Dirichlet conditions on all boundary cells, 
             //    // this enforcement will be done after the face iterator
+            // }
+            // if (pb->get_indicator() == "Sod" && (bdr_attr == 1 || bdr_attr == 3))
+            // {
+            //    /** 
+            //     * numerical flux on boundary faces should be 
+            //     *            |  0^T |
+            //     *     f(U) = | pI_D |
+            //     *            |  0^T |
+            //    */
+            //    y_temp[0] = 0.;
+            //    y_temp[dim+1] = 0.;
+            //    y_temp *= 2.;
             // }
             if (pb->get_indicator() == "saltzmann")
             {
@@ -824,10 +882,10 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
       } // End Face iterator
 
-      // Enforce exact condition on boundary for Noh and Isentropic Vortex
+      // Enforce exact condition on boundary for Isentropic Vortex
       if (pb->has_boundary_conditions() && is_boundary_cell)
       {
-         if (pb->get_indicator() == "IsentropicVortex") // || pb->get_indicator() == "Noh")
+         if (pb->get_indicator() == "IsentropicVortex")
          {
             EnforceExactBCOnCell(S, ci, t, dt, val);
          }
@@ -842,6 +900,58 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          double _mass = k / U_i[0];
          sums /= _mass;
          val += sums;
+      }
+      
+      // Post processing modify computed values to enforce BCs
+      if (pb->get_indicator() == "Sod" && cell_bdr % 2 == 1)
+      {
+         // Subtract out the normal component of the velocity
+         // on the top and bottom cells
+         Vector tmp_vel(dim), tmp_tan(dim);
+         Array<int> tmp_dofs(2);
+         tmp_dofs[0] = 1, tmp_dofs[1]=2;
+         tmp_tan = 0.;
+         tmp_tan[0] = 1.;
+         val.GetSubVector(tmp_dofs, tmp_vel);
+         cout << "pre corrected veloc: ";
+         tmp_vel.Print(cout);
+
+         double coeff = tmp_tan * tmp_vel;
+         tmp_vel = tmp_tan;
+         tmp_vel *= coeff;
+         cout << "corrected veloc: ";
+         tmp_vel.Print(cout);
+         val.SetSubVector(tmp_dofs, tmp_vel);
+      }
+      else if (pb->get_indicator() == "TriplePoint")
+      {
+         Vector tmp_vel(dim), tmp_tan(dim);
+         double coeff;
+         Array<int> tmp_dofs(2);
+         tmp_dofs[0] = 1, tmp_dofs[1]=2;
+         tmp_tan = 0.;
+         val.GetSubVector(tmp_dofs, tmp_vel);
+
+         if (cell_bdr % 2 == 1) // Bottom and top
+         {
+            // Subtract out the normal component of the velocity
+            // on the top and bottom cells
+            // tmp_tan[0] = 1.;
+            // coeff = tmp_tan * tmp_vel;
+            // tmp_vel = tmp_tan;
+            // tmp_vel *= coeff;
+            tmp_vel[1] = -1. * tmp_vel[1];
+            val.SetSubVector(tmp_dofs, tmp_vel);
+         }
+         else if (cell_bdr == 2) // Right
+         {
+            // tmp_tan[1] = 1.;
+            // coeff = tmp_tan * tmp_vel;
+            // tmp_vel = tmp_tan;
+            // tmp_vel *= coeff;
+            tmp_vel[0] = -1. * tmp_vel[0];
+            val.SetSubVector(tmp_dofs, tmp_vel);
+         }
       }
 
       // In either case, update the cell state vector
@@ -928,7 +1038,126 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    //      << "     EnforcingMVBoundaryConditions      \n"
    //      << "========================================\n";
 
-   if (pb->get_indicator() == "saltzmann")
+   if (pb->get_indicator() == "Sod")
+   {
+      int bdr_ind = 0;
+      Vector normal(dim), node_v(dim);
+      for (int i = 0; i < NVDofs_H1; i++)
+      {
+         cout << "enforcing MV BCs on vertex: " << i << endl;
+         bdr_ind = BdrVertexIndexingArray[i];
+         /* Get corresponding normal vector */
+         switch (bdr_ind)
+         {
+         case 1:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            /* code */
+            break;
+         
+         case 2:
+            // right
+            // normal[0] = 1., normal[1] = 0.;
+            // break;
+            cout << "continue\n";
+            continue;
+         
+         case 3:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case 4:
+            // left
+            // normal[0] = -1., normal[1] = 0.;
+            // break;
+            cout << "continue\n";
+            continue;
+         
+         case -1:
+            // Not a boundary vertex
+            continue;
+
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+         }
+
+         if (bdr_ind == -1) 
+         {
+            MFEM_ABORT("Dont correct interior vertices.\n");
+         }
+         /* Correct node velocity accordingly */
+         GetNodeVelocity(S, i, node_v);
+         cout << "bdr_int: " << bdr_ind << endl;
+         cout << "old node velocity: ";
+         node_v.Print(cout);
+         double coeff = node_v * normal;
+         node_v.Add(-coeff, normal);
+         cout << "new node_v: ";
+         node_v.Print(cout);
+         UpdateNodeVelocity(S, i, node_v);
+      }
+   }
+   else if (pb->get_indicator() == "TriplePoint")
+   {
+      int bdr_ind = 0;
+      Vector normal(dim), node_v(dim);
+      for (int i = 0; i < NVDofs_H1; i++)
+      {
+         // cout << "enforcing MV BCs on vertex: " << i << endl;
+         bdr_ind = BdrVertexIndexingArray[i];
+         /* Get corresponding normal vector */
+         switch (bdr_ind)
+         {
+         case 1:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            /* code */
+            break;
+         
+         case 2:
+            // right
+            normal[0] = 1., normal[1] = 0.;
+            break;
+            
+         case 3:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case 4:
+            // left
+            // normal[0] = -1., normal[1] = 0.;
+            // break;
+            continue;
+         
+         case -1:
+            // Not a boundary vertex
+            continue;
+
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+         }
+
+         if (bdr_ind == -1) 
+         {
+            MFEM_ABORT("Dont correct interior vertices.\n");
+         }
+         /* Correct node velocity accordingly */
+         GetNodeVelocity(S, i, node_v);
+         // cout << "bdr_ind: " << bdr_ind << endl;
+         // cout << "old node velocity: ";
+         // node_v.Print(cout);
+         double coeff = node_v * normal;
+         node_v.Add(-coeff, normal);
+         // cout << "new node_v: ";
+         // node_v.Print(cout);
+         UpdateNodeVelocity(S, i, node_v);
+      }
+   }
+   else if (pb->get_indicator() == "saltzmann")
    {
       // Enforce
       Vector* sptr = const_cast<Vector*>(&S);
@@ -2425,71 +2654,6 @@ void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, Den
    }
 }
 
-/****************************************************************************************************
-* Function: ComputeMeshVelocitiesNormal
-* Parameters:
-*  S        - BlockVector corresponding to nth timestep that stores mesh information, 
-*             mesh velocity, and state variables.
-*  t        - Current time
-*  dt       - Current timestep
-*  flag     - Flag used to indicate testing, can be "testing" or "NA"
-*  test_vel - Velocity used for testing
-*
-* Purpose:
-*     This function computes mesh velocities by:
-*        1) Constructs Mi, which is the sum of the tensor products of all
-*           adjacent normal vectors.
-*        2) Constructs Ri, which is the sum of the tensor products of all
-*           adjacent normal vectors, multiplied by the intermediate face 
-*           velocity.
-*        3) Computes Vi_geo as Mi^{-1} * Ri.
-*        4) Compute the corrected velocity, which uses the above defined 
-*           velocity field to then compute C^i on all nodes
-*        5) Optionally computes mass corrective face velocities.
-*        6) Fills cell center velocities with average.
-*        
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeMeshVelocitiesNormal(
-   Vector &S, const double & t, double & dt, const string flag, 
-   void (*test_vel)(const Vector&, const double&, Vector&))
-{
-   // cout << "=======================================\n"
-   //      << "     ComputeMeshVelocitiesNormal       \n"
-   //      << "=======================================\n";
-   ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
-
-   if (dim > 1)
-   {
-      ComputeGeoVNormal(S);
-   }
-   
-   ComputeNodeVelocitiesFromVgeo(S, t, dt, flag, test_vel);
-
-   // Optionally mass correct
-   if (dim > 1)
-   {
-      switch (fv_option)
-      {
-      case 1:
-         ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
-         break;
-      
-      case 2:
-         FillFaceVelocitiesWithAvg(S);
-         break;
-      
-      default:
-         /* Do nothing */
-         break;
-      } // End face velocity switch case
-   } // End dim > 1
-
-   // Fill cell centers with average or L2
-   FillCenterVelocitiesWithAvg(S);
-   // FillCenterVelocitiesWithL2(S);
-}
-
 
 /****************************************************************************************************
 * Function: ComputeGeoVNormal
@@ -2622,7 +2786,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
    bool is_dt_changed = false;
 
    // Iterate over vertices and faces
-   for (int node = 0; node < NDofs_H1 - NDofs_L2; node++) // Vertex and face iterator
+   for (int node = 0; node < NVDofs_H1; node++) // Vertex and face iterator
    {
       ComputeNodeVelocityFromVgeo(S, node, dt, node_v, is_dt_changed);
 
@@ -2670,7 +2834,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
    Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "=======================================\n"
-   //      << "      ComputeNodeVelocityRaviart       \n"
+   //      << "      ComputeNodeVelocityFromVgeo      \n"
    //      << "=======================================\n";
    chrono_temp.Clear();
    switch (dim)
@@ -2774,81 +2938,6 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
 /****************************************************************************************************
 * Function: Raviart-Thomas Velocity Functions
 ****************************************************************************************************/
-
-/****************************************************************************************************
-* Function: ComputeMeshVelocitiesRaviart
-* Parameters:
-*  S        - BlockVector corresponding to nth timestep that stores mesh information, 
-*             mesh velocity, and state variables.
-*  t        - Current time
-*  dt       - Current timestep
-*  flag     - Flag used to indicate testing, can be "testing" or "NA"
-*  test_vel - Velocity used for testing
-*
-* Purpose:
-*     This function accomplishes the following steps:
-*        1) Constructs intermediate face velocity objects for all faces at the nth timestep.
-*        2) Computes V_i^geo on all nodes using Raviart-Thomas
-*        3) Compute the corrected velocity, which uses the above defined velocity field to 
-*           then compute C^i on all nodes
-*        4) Computes the corrective face velocities.
-*        5) Fills unnecessary node at cell center with the average velocity of the corner nodes.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeMeshVelocitiesRaviart(
-   Vector &S, const double & t, double & dt, const string flag, 
-   void (*test_vel)(const Vector&, const double&, Vector&))
-{
-   // cout << "=======================================\n"
-   //      << "     ComputeMeshVelocitiesRaviart      \n"
-   //      << "=======================================\n";
-
-   ComputeIntermediateFaceVelocities(S, t, flag, test_vel);
-   v_CR_gf_fluxes = v_CR_gf; // V_F^0 = V_F
-   
-   for (int face_corr_it = 0; 
-        face_corr_it < num_face_correction_iterations + 1;  // Option set in Laglos with -fci
-        face_corr_it++)
-   {
-      StopWatch _chrono;
-      if (dim > 1)
-      {
-         // _chrono.Clear();
-         // _chrono.Start();
-         ComputeGeoVRaviart(S);
-         // ComputeGeoVRaviart2(S);
-         // _chrono.Stop();
-         // cout << "computegeov took: " << _chrono.RealTime() << " seconds.\n";
-      }
-
-      // _chrono.Clear();
-      // _chrono.Start();
-      ComputeNodeVelocitiesFromVgeo(S,t,dt);
-      // _chrono.Stop();
-      // cout << "linearization took: " << _chrono.RealTime() << " seconds.\n";
-
-      if (dim > 1)
-      {
-         switch (fv_option)
-         {
-         case 1:
-            ComputeCorrectiveFaceVelocities(S, t, dt, flag, test_vel);
-            break;
-         
-         case 2:
-            FillFaceVelocitiesWithAvg(S);
-            break;
-         
-         default:
-            /* Do nothing */
-            break;
-         } // End face velocity switch case
-      } // End dim > 1
-   } // End face corner node correction iteration
-
-   FillCenterVelocitiesWithAvg(S);
-}
-
 
 /****************************************************************************************************
 * Function: ComputeGeoVRaviart

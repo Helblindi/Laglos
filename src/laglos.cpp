@@ -39,7 +39,7 @@
 * ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4          ## Smooth wave in 2D
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4        ## Sod in 2D
 * ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4  ## Sod Distorted
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.2 -cfl 0.25 -rs 4         ## Sod Radial
+* ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4        ## Sod Radial
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3      ## Isentropic Vortex
 * ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 1                 ## Noh
 * ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5        ## Sedov
@@ -1147,7 +1147,7 @@ int main(int argc, char *argv[]) {
 
    // Print grid functions to files
    ostringstream sv_filename_suffix;
-   sv_filename_suffix << "sv_r"
+   sv_filename_suffix << "sv_"
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
                       << ".out";

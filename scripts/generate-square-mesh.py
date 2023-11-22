@@ -2,16 +2,16 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 363
-   ny_gridpoints = 363
-   xL = -5.
-   xR = 5.
-   yL = -5.
-   yR = 5.
+   nx_gridpoints = 31
+   ny_gridpoints = 31
+   xL = -1.
+   xR = 1.
+   yL = -1.
+   yR = 1.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/vortex-square-131044.mesh"
+   filename = home_dir + "data/noh.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -50,9 +50,9 @@ def main():
    f.write("boundary\n")
 
    bdry_left = 1
-   bdry_bottom = 2
-   bdry_right = 3
-   bdry_top = 4
+   bdry_bottom = 1
+   bdry_right = 1
+   bdry_top = 1
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints - 1) + 2 * (ny_gridpoints - 1)) + "\n")

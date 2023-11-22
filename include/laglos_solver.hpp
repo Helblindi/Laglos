@@ -109,6 +109,7 @@ protected:
    bool mm;
    int mv_option = 0;
    int fv_option = 0;
+   int problem = -1;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
 
@@ -130,6 +131,8 @@ public:
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
+
+   void SetProblem(const int _problem) { this->problem = _problem; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 

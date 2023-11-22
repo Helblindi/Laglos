@@ -562,6 +562,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       for (int k = 0; k < verts.Size(); k++)
       {
          int index = verts[k];
+         // TODO: Get rid of all get_indicator() funcalls, replace with use of class int problem.
          if (pb->get_indicator() == "saltzmann")
          {
             // Replace the bdr attribute in the array as long as it is not
@@ -903,24 +904,71 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       }
       
       // Post processing modify computed values to enforce BCs
-      if (pb->get_indicator() == "Sod" && cell_bdr % 2 == 1)
+      // Post processing modify computed values to enforce BCs
+      if (pb->get_indicator() == "SodRadial")
       {
-         // Subtract out the normal component of the velocity
-         // on the top and bottom cells
-         Vector tmp_vel(dim), tmp_tan(dim);
+         Vector tmp_vel(dim), normal(dim);
          Array<int> tmp_dofs(2);
+         normal = 0.;
          tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         tmp_tan = 0.;
-         tmp_tan[0] = 1.;
          val.GetSubVector(tmp_dofs, tmp_vel);
-         cout << "pre corrected veloc: ";
-         tmp_vel.Print(cout);
+         
+         if (cell_bdr == 1)
+         {
+            // bottom
+            normal[1] = -1.;
+         }
+         else if (cell_bdr == 4)
+         {
+            // left
+            normal[0] = -1.;
+         }
 
-         double coeff = tmp_tan * tmp_vel;
-         tmp_vel = tmp_tan;
-         tmp_vel *= coeff;
-         cout << "corrected veloc: ";
-         tmp_vel.Print(cout);
+         double coeff = tmp_vel * normal;
+         if (coeff > 0.)
+         {
+            // cout << "pre corrected veloc: ";
+            // tmp_vel.Print(cout);
+            // cout << "coeff: " << coeff << endl;
+            normal *= coeff;
+            subtract(tmp_vel, normal, tmp_vel);
+            // cout << "corrected veloc: ";
+            // tmp_vel.Print(cout);
+         }
+
+         val.SetSubVector(tmp_dofs, tmp_vel);
+      }
+      else if (pb->get_indicator() == "Sod")
+      {
+         Vector tmp_vel(dim), normal(dim);
+         Array<int> tmp_dofs(2);
+         normal = 0.;
+         tmp_dofs[0] = 1, tmp_dofs[1]=2;
+         val.GetSubVector(tmp_dofs, tmp_vel);
+         
+         if (cell_bdr == 1)
+         {
+            // bottom
+            normal[1] = -1.;
+         }
+         else if (cell_bdr == 3)
+         {
+            // top
+            normal[1] = 1.;
+         }
+
+         double coeff = tmp_vel * normal;
+         if (coeff > 0.)
+         {
+            // cout << "pre corrected veloc: ";
+            // tmp_vel.Print(cout);
+            // cout << "coeff: " << coeff << endl;
+            normal *= coeff;
+            subtract(tmp_vel, normal, tmp_vel);
+            // cout << "corrected veloc: ";
+            // tmp_vel.Print(cout);
+         }
+
          val.SetSubVector(tmp_dofs, tmp_vel);
       }
       else if (pb->get_indicator() == "TriplePoint")
@@ -1038,13 +1086,12 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    //      << "     EnforcingMVBoundaryConditions      \n"
    //      << "========================================\n";
 
-   if (pb->get_indicator() == "Sod")
+   if (pb->get_indicator() == "SodRadial")
    {
       int bdr_ind = 0;
       Vector normal(dim), node_v(dim);
       for (int i = 0; i < NVDofs_H1; i++)
       {
-         cout << "enforcing MV BCs on vertex: " << i << endl;
          bdr_ind = BdrVertexIndexingArray[i];
          /* Get corresponding normal vector */
          switch (bdr_ind)
@@ -1052,14 +1099,62 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          case 1:
             // bottom
             normal[0] = 0., normal[1] = -1.;
-            /* code */
             break;
          
          case 2:
             // right
-            // normal[0] = 1., normal[1] = 0.;
-            // break;
-            cout << "continue\n";
+            normal[0] = 1., normal[1] = 0.;
+            break;
+         
+         case 3:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case 4:
+            // left
+            normal[0] = -1., normal[1] = 0.;
+            break;
+         
+         case -1:
+            // Not a boundary vertex
+            continue;
+
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+         }
+
+         if (bdr_ind == -1) 
+         {
+            MFEM_ABORT("Dont correct interior vertices.\n");
+         }
+         /* Correct node velocity accordingly */
+         GetNodeVelocity(S, i, node_v);
+
+         double coeff = node_v * normal;
+         node_v.Add(-coeff, normal);
+
+         UpdateNodeVelocity(S, i, node_v);
+      }
+   }
+   else if (pb->get_indicator() == "Sod")
+   {
+      int bdr_ind = 0;
+      Vector normal(dim), node_v(dim);
+      for (int i = 0; i < NVDofs_H1; i++)
+      {
+         bdr_ind = BdrVertexIndexingArray[i];
+         /* Get corresponding normal vector */
+         switch (bdr_ind)
+         {
+         case 1:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            break;
+         
+         case 2:
+            // right
             continue;
          
          case 3:
@@ -1069,9 +1164,6 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          
          case 4:
             // left
-            // normal[0] = -1., normal[1] = 0.;
-            // break;
-            cout << "continue\n";
             continue;
          
          case -1:
@@ -1089,13 +1181,10 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          }
          /* Correct node velocity accordingly */
          GetNodeVelocity(S, i, node_v);
-         cout << "bdr_int: " << bdr_ind << endl;
-         cout << "old node velocity: ";
-         node_v.Print(cout);
+
          double coeff = node_v * normal;
          node_v.Add(-coeff, normal);
-         cout << "new node_v: ";
-         node_v.Print(cout);
+
          UpdateNodeVelocity(S, i, node_v);
       }
    }
@@ -2105,9 +2194,9 @@ void LagrangianLOOperator<dim>::
    ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt)
 {
    assert(dim > 1); // There is no need for this function in dim=1
-   cout << "========================================================\n";
-   cout << "Computing corrective interior geometric face velocities.\n";
-   cout << "========================================================\n";
+   // cout << "========================================================\n";
+   // cout << "Computing corrective interior geometric face velocities.\n";
+   // cout << "========================================================\n";
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
    Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
@@ -2588,7 +2677,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    // Fill density
 
    // Form filenames and ofstream objects
-   std::string sv_file = output_file_prefix + "sv_" + output_file_suffix;
+   std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
    fstream_sv << "x,rho,v\n";
 
@@ -2597,32 +2686,30 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    {
       pmesh->GetElementCenter(i, center);
 
-      fstream_sv << center[0] << ","
+      double x_val = 0.;
+
+      // We fill the x-coordinate depending on the problem.
+      // This really depends on what kind of visualization is needed
+      switch (problem)
+      {
+      // For stacked Sod problem, we only need the x-coord
+      case 1: // Sod
+         x_val = center[0];
+         break;
+      
+      // Any radial plot, we take the L2 norm of the cell center
+      case 4:  // Noh
+      case 6:  // Sedov
+      case 13: // Sod Radial
+      default:
+         x_val = center.Norml2();
+         break;
+      }
+
+      fstream_sv << x_val << ","
                  << 1./sv_gf[i] << ","
                  << v_gf[i] << "\n";
    }
-
-   // fstream_v.close();
-
-   // const int nqp = ir.GetNPoints();
-   // Vector pos(dim);
-   // for (int e = 0; e < NE; e++)
-   // {
-   //    ElementTransformation &Tr = *L2.GetElementTransformation(e);
-   //    for (int q = 0; q < nqp; q++)
-   //    {
-   //       const IntegrationPoint &ip = ir.IntPoint(q);
-   //       Tr.SetIntPoint(&ip);
-   //       Tr.Transform(ip, pos);
-
-   //       double r = sqrt(pos(0)*pos(0) + pos(1)*pos(1));
-
-   //       double rho = qdata.rho0DetJ0w(e*nqp + q) / Tr.Weight() / ip.weight;
-   //       fstream_rho << r << " " << rho << "\n";
-   //       fstream_rho.flush();
-   //    }
-   // }
-   // fstream_rho.close();
 }
 
 

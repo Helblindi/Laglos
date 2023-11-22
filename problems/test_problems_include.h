@@ -5,6 +5,7 @@
 #include "problem_template.h"
 #include "smooth-wave.h"
 #include "sod.h"
+#include "sod-radial.h"
 #include "lax.h"
 #include "leblanc.h"
 #include "noh.h"

@@ -39,8 +39,9 @@
 * ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4          ## Smooth wave in 2D
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4        ## Sod in 2D
 * ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4  ## Sod Distorted
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.2 -cfl 0.25 -rs 4         ## Sod Radial
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3      ## Isentropic Vortex
-* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 5       ## Noh
+* ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 1                 ## Noh
 * ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5        ## Sedov
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2        ## Triple Point
 *
@@ -372,6 +373,11 @@ int main(int argc, char *argv[]) {
          problem_class = new TriplePoint<dim>();
          break;
       }
+      case 13:
+      {
+         problem_class = new SodRadial<dim>();
+         break;
+      }
       default:
       {
          problem_class = new ProblemTemplate<dim>();
@@ -582,6 +588,7 @@ int main(int argc, char *argv[]) {
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
+   hydro.SetProblem(problem);
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_mc, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
@@ -1140,10 +1147,7 @@ int main(int argc, char *argv[]) {
 
    // Print grid functions to files
    ostringstream sv_filename_suffix;
-   sv_filename_suffix << "_p"
-                      << setfill('0') << setw(2)
-                      << to_string(problem)
-                      << "_r"
+   sv_filename_suffix << "sv_r"
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
                       << ".out";
@@ -1187,7 +1191,7 @@ int main(int argc, char *argv[]) {
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;
       sv_ex_filename_suffix << setfill('0') << setw(2)
-                        << "exact"
+                        << "sv_exact"
                         << ".out";
       
       hydro.SaveStateVecsToFile(S_exact, sv_output_prefix, sv_ex_filename_suffix.str());

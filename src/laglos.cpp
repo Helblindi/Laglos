@@ -1148,6 +1148,7 @@ int main(int argc, char *argv[]) {
    // Print grid functions to files
    ostringstream sv_filename_suffix;
    sv_filename_suffix << "sv_"
+                      << setfill('0')
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
                       << ".out";

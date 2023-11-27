@@ -567,6 +567,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
          {
             // Replace the bdr attribute in the array as long as it is not
             // the dirichlet condition (For Saltzman Problem)
+            // This ensures the left wall vertices have the proper indicator
             if (BdrVertexIndexingArray[index] != 1)
             {
                BdrVertexIndexingArray[index] = bdr_attr;
@@ -579,6 +580,8 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       } // end vertex iterator
 
    } // end boundary elements
+   cout << "bdr vertex indexing array: \n";
+   BdrVertexIndexingArray.Print(cout);
 }
 
 
@@ -826,10 +829,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             if (pb->get_indicator() == "saltzmann")
             {
                // Check bdry flag
-               int BdrElIndex = BdrElementIndexingArray[fids[j]];
-               int bdr_attribute = pmesh->GetBdrAttribute(BdrElIndex);
+               int bdr_attribute = BdrElementIndexingArray[fids[j]]; 
 
-               if (bdr_attribute == 1) // Dirichlet (star states "ghost")
+               switch (bdr_attribute)
+               {
+               case 1:
                {
                   double _rho = 3.9992502342988532;
                   double _p = 1.3334833281256551;
@@ -849,29 +853,34 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   F_i_bdry.SetRow(dim+1, _vp);
 
                   F_i_bdry.Mult(c, y_temp_bdry);
+                  break;
                }
-
-               else if (bdr_attribute == 2) // slip
+               // case 2:
+               // case 3:
+               // case 4:
+               // {
+               //    // Negate velocity
+               //    for (int _it = 0; _it < dim; _it++)
+               //    {
+               //       U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
+               //    }
+               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+               //    F_i_slip.Mult(c, y_temp_bdry);
+               //    // y_temp *= 2.;
+               //    break;
+               // }
+               
+               default:
                {
-                  // Negate velocity
-                  for (int _it = 0; _it < dim; _it++)
-                  {
-                     U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
-                  }
-                  DenseMatrix F_i_slip = pb->flux(U_i_bdry);
-                  F_i_slip.Mult(c, y_temp_bdry);
-                  // y_temp *= 2.;
-               }
-               else
-               {
-                  cout << "invalid boundary attribute: " << bdr_attribute << endl;
-                  cout << "cell : " << ci << endl;
-                  cout << "face: " << fids[j] << endl;  
+                  // cout << "invalid boundary attribute: " << bdr_attribute << endl;
+                  // cout << "cell : " << ci << endl;
+                  // cout << "face: " << fids[j] << endl;  
                   y_temp *= 2.; 
+                  break;
                }
-
+               } // switch (bdr_attr)
                y_temp += y_temp_bdry;
-            }
+            } // if saltzmann
             else
             {
                y_temp *= 2.;
@@ -952,6 +961,44 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             normal[1] = -1.;
          }
          else if (cell_bdr == 3)
+         {
+            // top
+            normal[1] = 1.;
+         }
+
+         double coeff = tmp_vel * normal;
+         if (coeff > 0.)
+         {
+            // cout << "pre corrected veloc: ";
+            // tmp_vel.Print(cout);
+            // cout << "coeff: " << coeff << endl;
+            normal *= coeff;
+            subtract(tmp_vel, normal, tmp_vel);
+            // cout << "corrected veloc: ";
+            // tmp_vel.Print(cout);
+         }
+
+         val.SetSubVector(tmp_dofs, tmp_vel);
+      }
+      else if (pb->get_indicator() == "saltzmann")
+      {
+         Vector tmp_vel(dim), normal(dim);
+         Array<int> tmp_dofs(2);
+         normal = 0.;
+         tmp_dofs[0] = 1, tmp_dofs[1]=2;
+         val.GetSubVector(tmp_dofs, tmp_vel);
+         
+         if (cell_bdr == 2)
+         {
+            // bottom
+            normal[1] = -1.;
+         }
+         else if (cell_bdr == 3)
+         {
+            // right
+            normal[0] = 1.;
+         }
+         else if (cell_bdr == 4)
          {
             // top
             normal[1] = 1.;
@@ -1249,40 +1296,83 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    else if (pb->get_indicator() == "saltzmann")
    {
       // Enforce
-      Vector* sptr = const_cast<Vector*>(&S);
-      ParGridFunction x_gf, mv_gf;
-      mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+      // Vector* sptr = const_cast<Vector*>(&S);
+      // ParGridFunction x_gf, mv_gf;
+      // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
       Vector ex(dim);
       ex = 0.;
       /* Ramping up to ex */
-      // if (timestep_first == 0.)
-      // {
-      //    timestep_first = timestep;
-      // }
-      // double _xi = t / (2*timestep_first);
-      // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-      // ex[0] = 1. * _psi;
-      ex[0] = 1.;
+      if (timestep_first == 0.)
+      {
+         timestep_first = timestep;
+      }
+      double _xi = t / (2*timestep_first);
+      double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+      ex[0] = 1. * _psi;
+      // ex[0] = 1.;
 
-      VectorConstantCoefficient left_wall_coeff(ex);
-      Array<int> left_wall_attr(1);
-      left_wall_attr[0] = 1;
+      // VectorConstantCoefficient left_wall_coeff(ex);
+      // Array<int> left_wall_attr(1);
+      // left_wall_attr[0] = 1;
 
-      mv_gf.ProjectBdrCoefficient(left_wall_coeff, left_wall_attr);
+      // mv_gf.ProjectBdrCoefficient(left_wall_coeff, left_wall_attr);
 
-      /* TODO: Vladimir 
-         How to enforce v.n=0 on rest of boundary?
-      */
-      // Vector vZero(dim);
-      // vZero = 0.;
-      // VectorConstantCoefficient zero(vZero);
-      // Array<int> other_bdr_attr(1);
-      // other_bdr_attr[0] = 2;
+      /* Enforce v.n=0 on rest of boundary */
+      int bdr_ind = 0;
+      Vector normal(dim), node_v(dim);
+      for (int i = 0; i < NVDofs_H1; i++)
+      {
+         bdr_ind = BdrVertexIndexingArray[i];
 
-      // mv_gf.ProjectBdrCoefficientNormal(zero, other_bdr_attr);
+         /* Get corresponding normal vector */
+         switch (bdr_ind)
+         {
+         case 1:
+            // left
+            UpdateNodeVelocity(S,i,ex);
+            continue;
+         
+         case 2:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            break;
+         
+         case 3:
+            // right
+            normal[0] = 1., normal[1] = 0.;
+            break;
+         
+         case 4:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case -1:
+            // Not a boundary vertex
+            continue;
 
-      mv_gf.SyncAliasMemory(S);
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+         }
+
+         if (bdr_ind == -1) 
+         {
+            MFEM_ABORT("Dont correct interior vertices.\n");
+         }
+         else if (bdr_ind == 1)
+         {
+            MFEM_ABORT("Left wall BCs already handled.\n");
+         }
+         /* Correct node velocity accordingly */
+         GetNodeVelocity(S, i, node_v);
+
+         double coeff = node_v * normal;
+
+         node_v.Add(-coeff, normal);
+         UpdateNodeVelocity(S, i, node_v);
+      }
    }
    else if (pb->get_indicator() == "IsentropicVortex")
    {

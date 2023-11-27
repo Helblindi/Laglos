@@ -45,11 +45,10 @@ def main():
    # BOUNDARY
    f.write("boundary\n")
    d_bdry = 1 # Dirichlet BCs for left side.  v = e_x
-   n_bdry = 2 # Neumann BCs for everywhere else. v.n=0
    bdry_left = d_bdry
-   bdry_bottom = n_bdry
-   bdry_right = n_bdry
-   bdry_top = n_bdry
+   bdry_bottom = 2
+   bdry_right = 3
+   bdry_top = 4
    
    # Num boundary faces
    f.write(str(nx_gridpoints * ny_gridpoints) + "\n")

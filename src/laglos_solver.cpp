@@ -735,13 +735,12 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
    H1.ExchangeFaceNbrData();
 
    bool is_boundary_cell = false;
-   int cell_bdr = 0;
 
    Vector sum_validation(dim);
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
       is_boundary_cell = false;
-      cell_bdr = 0;
+      Array<int> cell_bdr_arr;
       sum_validation = 0.;
       GetCellStateVector(S, ci, U_i);
       val = U_i;
@@ -817,7 +816,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             is_boundary_cell = true;
             int bdr_attr = BdrElementIndexingArray[fids[j]];
             // cout << "boundary attribute for face " << fids[j] << ": " << bdr_attr << endl;
-            cell_bdr = bdr_attr;
+            cell_bdr_arr.Append(bdr_attr);
 
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
@@ -897,32 +896,32 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                } // switch (bdr_attr)
                y_temp += y_temp_bdry;
             } // if saltzmann
-            if (pb->get_indicator() == "TriplePoint")
-            {
-               switch (bdr_attr)
-               {
-               case 2:
-               case 3:
-               case 4:
-               {
-                  // Negate velocity
-                  for (int _it = 0; _it < dim; _it++)
-                  {
-                     U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -2.;
-                  }
-                  DenseMatrix F_i_slip = pb->flux(U_i_bdry);
-                  F_i_slip.Mult(c, y_temp_bdry);
-                  // y_temp *= 2.;
-                  break;
-               }
-               default: 
-               {
-                  y_temp *= 2.; 
-                  break;
-               }
-               }
-               y_temp += y_temp_bdry;
-            } // if TriplePoint
+            // if (pb->get_indicator() == "TriplePoint")
+            // {
+            //    switch (bdr_attr)
+            //    {
+            //    case 2:
+            //    case 3:
+            //    case 4:
+            //    {
+            //       // Negate velocity
+            //       for (int _it = 0; _it < dim; _it++)
+            //       {
+            //          U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -2.;
+            //       }
+            //       DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+            //       F_i_slip.Mult(c, y_temp_bdry);
+            //       // y_temp *= 2.;
+            //       break;
+            //    }
+            //    default: 
+            //    {
+            //       y_temp *= 2.; 
+            //       break;
+            //    }
+            //    }
+            //    y_temp += y_temp_bdry;
+            // } // if TriplePoint
             else
             {
                y_temp *= 2.;
@@ -954,213 +953,164 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          val += sums;
       }
       
+      /* Iterate over cell boundaries, i.e. corner cells could have multiple bc flags */
       // Post processing modify computed values to enforce BCs
-      // Post processing modify computed values to enforce BCs
-      if (pb->get_indicator() == "SodRadial")
+      for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
       {
-         Vector tmp_vel(dim), normal(dim);
-         Array<int> tmp_dofs(2);
-         normal = 0.;
-         tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         val.GetSubVector(tmp_dofs, tmp_vel);
-         
-         if (cell_bdr == 1)
-         {
-            // bottom
-            normal[1] = -1.;
-         }
-         else if (cell_bdr == 4)
-         {
-            // left
-            normal[0] = -1.;
-         }
+         int cell_bdr = cell_bdr_arr[cell_bdr_it];
 
-         double coeff = tmp_vel * normal;
-         if (coeff > 0.)
+         if (pb->get_indicator() == "SodRadial")
          {
-            // cout << "pre corrected veloc: ";
-            // tmp_vel.Print(cout);
-            // cout << "coeff: " << coeff << endl;
-            normal *= coeff;
-            subtract(tmp_vel, normal, tmp_vel);
-            // cout << "corrected veloc: ";
-            // tmp_vel.Print(cout);
-         }
+            Vector tmp_vel(dim), normal(dim);
+            Array<int> tmp_dofs(2);
+            normal = 0.;
+            tmp_dofs[0] = 1, tmp_dofs[1]=2;
+            val.GetSubVector(tmp_dofs, tmp_vel);
+            
+            if (cell_bdr == 1)
+            {
+               // bottom
+               normal[1] = -1.;
+            }
+            else if (cell_bdr == 4)
+            {
+               // left
+               normal[0] = -1.;
+            }
 
-         val.SetSubVector(tmp_dofs, tmp_vel);
-      }
-      else if (pb->get_indicator() == "Sod")
-      {
-         Vector tmp_vel(dim), normal(dim);
-         Array<int> tmp_dofs(2);
-         normal = 0.;
-         tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         val.GetSubVector(tmp_dofs, tmp_vel);
-         
-         if (cell_bdr == 1)
-         {
-            // bottom
-            normal[1] = -1.;
-         }
-         else if (cell_bdr == 3)
-         {
-            // top
-            normal[1] = 1.;
-         }
+            double coeff = tmp_vel * normal;
+            if (coeff > 0.)
+            {
+               // cout << "pre corrected veloc: ";
+               // tmp_vel.Print(cout);
+               // cout << "coeff: " << coeff << endl;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               // cout << "corrected veloc: ";
+               // tmp_vel.Print(cout);
+            }
 
-         double coeff = tmp_vel * normal;
-         if (coeff > 0.)
-         {
-            // cout << "pre corrected veloc: ";
-            // tmp_vel.Print(cout);
-            // cout << "coeff: " << coeff << endl;
-            normal *= coeff;
-            subtract(tmp_vel, normal, tmp_vel);
-            // cout << "corrected veloc: ";
-            // tmp_vel.Print(cout);
+            val.SetSubVector(tmp_dofs, tmp_vel);
          }
-
-         val.SetSubVector(tmp_dofs, tmp_vel);
-      }
-      else if (pb->get_indicator() == "saltzmann")
-      {
-         Vector tmp_vel(dim), normal(dim);
-         Array<int> tmp_dofs(2);
-         normal = 0.;
-         tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         val.GetSubVector(tmp_dofs, tmp_vel);
-         
-         if (cell_bdr == 2)
+         else if (pb->get_indicator() == "Sod")
          {
-            // bottom
-            normal[1] = -1.;
+            Vector tmp_vel(dim), normal(dim);
+            Array<int> tmp_dofs(2);
+            normal = 0.;
+            tmp_dofs[0] = 1, tmp_dofs[1]=2;
+            val.GetSubVector(tmp_dofs, tmp_vel);
+            
+            if (cell_bdr == 1)
+            {
+               // bottom
+               normal[1] = -1.;
+            }
+            else if (cell_bdr == 3)
+            {
+               // top
+               normal[1] = 1.;
+            }
+
+            double coeff = tmp_vel * normal;
+            if (coeff > 0.)
+            {
+               // cout << "pre corrected veloc: ";
+               // tmp_vel.Print(cout);
+               // cout << "coeff: " << coeff << endl;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               // cout << "corrected veloc: ";
+               // tmp_vel.Print(cout);
+            }
+
+            val.SetSubVector(tmp_dofs, tmp_vel);
          }
-         else if (cell_bdr == 3)
+         else if (pb->get_indicator() == "saltzmann")
          {
-            // right
-            normal[0] = 1.;
+            Vector tmp_vel(dim), normal(dim);
+            Array<int> tmp_dofs(2);
+            normal = 0.;
+            tmp_dofs[0] = 1, tmp_dofs[1]=2;
+            val.GetSubVector(tmp_dofs, tmp_vel);
+            
+            if (cell_bdr == 2)
+            {
+               // bottom
+               normal[1] = -1.;
+            }
+            else if (cell_bdr == 3)
+            {
+               // right
+               normal[0] = 1.;
+            }
+            else if (cell_bdr == 4)
+            {
+               // top
+               normal[1] = 1.;
+            }
+
+            double coeff = tmp_vel * normal;
+            if (coeff > 0.)
+            {
+               // cout << "pre corrected veloc: ";
+               // tmp_vel.Print(cout);
+               // cout << "coeff: " << coeff << endl;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               // cout << "corrected veloc: ";
+               // tmp_vel.Print(cout);
+            }
+
+            val.SetSubVector(tmp_dofs, tmp_vel);
          }
-         else if (cell_bdr == 4)
+         else if (pb->get_indicator() == "TriplePoint")
          {
-            // top
-            normal[1] = 1.;
+            Vector tmp_vel(dim), normal(dim);
+            double coeff;
+            Array<int> tmp_dofs(2);
+            tmp_dofs[0] = 1, tmp_dofs[1]=2;
+            normal = 0.;
+            val.GetSubVector(tmp_dofs, tmp_vel);
+
+            switch (cell_bdr)
+            {
+            case 0:
+               // not a boundary cell
+               continue;
+            case 1:
+               // bottom
+               normal[1] = -1.;
+               break;
+            
+            case 2:
+               // right
+               normal[0] = 1.;
+               break;
+            
+            case 3:
+               // top
+               normal[1] = 1.;
+               break;
+            
+            case 4:
+               // left
+               // normal[0] = -1;
+               // break;
+               tmp_vel[0] = 0.;
+               val.SetSubVector(tmp_dofs, tmp_vel);
+               continue;
+            
+            default:
+               MFEM_ABORT("Not a valid cell_bdr index.\n");
+            }
+
+            coeff = tmp_vel * normal;
+
+            tmp_vel.Add(-coeff, normal);
+            val.SetSubVector(tmp_dofs, tmp_vel);
+
          }
-
-         double coeff = tmp_vel * normal;
-         if (coeff > 0.)
-         {
-            // cout << "pre corrected veloc: ";
-            // tmp_vel.Print(cout);
-            // cout << "coeff: " << coeff << endl;
-            normal *= coeff;
-            subtract(tmp_vel, normal, tmp_vel);
-            // cout << "corrected veloc: ";
-            // tmp_vel.Print(cout);
-         }
-
-         val.SetSubVector(tmp_dofs, tmp_vel);
-      }
-      // else if (pb->get_indicator() == "TriplePoint")
-      // {
-      //    Vector tmp_vel(dim), tmp_tan(dim);
-      //    double coeff;
-      //    Array<int> tmp_dofs(2);
-      //    tmp_dofs[0] = 1, tmp_dofs[1]=2;
-      //    tmp_tan = 0.;
-      //    val.GetSubVector(tmp_dofs, tmp_vel);
-
-      //    if (cell_bdr == 1 || cell_bdr == 3) // Bottom and top
-      //    {
-      //       // v.n=0
-      //       tmp_vel[1] = 0.;
-      //       val.SetSubVector(tmp_dofs, tmp_vel);
-      //    }
-      //    else if (cell_bdr == 2)
-      //    {
-      //       // reflect
-      //       // if (tmp_vel[0] > 0.)
-      //       // {
-      //       //    tmp_vel[0] = -1. * tmp_vel[0];
-      //       //    val.SetSubVector(tmp_dofs, tmp_vel);
-      //       // }
-      //       tmp_vel[0] = 0.;
-      //       val.SetSubVector(tmp_dofs, tmp_vel);
-      //    }
-      //    else if (cell_bdr == 4) // Left, Right
-      //    {
-      //       // reflect
-      //       // if (tmp_vel[0] < 0.)
-      //       // {
-      //       //    tmp_vel[0] = -1. * tmp_vel[0];
-      //       //    val.SetSubVector(tmp_dofs, tmp_vel);
-      //       // }
-      //       tmp_vel[0] = 0.;
-      //       val.SetSubVector(tmp_dofs, tmp_vel);
-      //    }
-      //    // switch (cell_bdr)
-      //    // {
-      //    // case 0:
-      //    //    // not a boundary cell
-      //    //    continue;
-      //    // case 1:
-      //    //    // bottom
-      //    //    // normal[1] = -1.;
-      //    //    // _add = 1.;
-      //    //    tmp_vel[1] = 0.;
-      //    //    break;
-         
-      //    // case 2:
-      //    //    // right
-      //    //    // normal[0] = 1.;
-      //    //    // _add = 2.;
-      //    //    tmp_vel[0] = 0.;
-      //    //    // if (tmp_vel[0] > 0)
-      //    //    // {
-      //    //    //    tmp_vel[0] = -1. * tmp_vel[0];
-      //    //    //    break;
-      //    //    // }
-      //    //    // else
-      //    //    // {
-      //    //    //    continue;
-      //    //    // }
-      //    //    break;
-         
-      //    // case 3:
-      //    //    // top
-      //    //    // normal[1] = 1.;
-      //    //    // _add = 1.;
-      //    //    tmp_vel[1] = 0;
-      //    //    break;
-         
-      //    // case 4:
-      //    //    // left
-      //    //    // normal[0] = -1;
-      //    //    // _add = 1.;
-      //    //    tmp_vel[0] = 0.;
-      //    //    break;
-      //    //    // if (tmp_vel[0] < 0)
-      //    //    // {
-      //    //    //    tmp_vel[0] = -1. * tmp_vel[0];
-      //    //    //    break;
-      //    //    // }
-      //    //    // else
-      //    //    // {
-      //    //    //    continue;
-      //    //    // }
-         
-      //    // default:
-      //    //    MFEM_ABORT("Not a valid cell_bdr index.\n");
-      //    // }
-
-      //    // // cout << "pre corrected state var vel: ";
-      //    // // tmp_vel.Print(cout);
-      //    // // coeff = tmp_vel * normal;
-      //    // // coeff *= _add;
-      //    // // tmp_vel.Add(-coeff, normal);
-      //    // // cout << "state var corrected vel: ";
-      //    // // tmp_vel.Print(cout);
-      //    // val.SetSubVector(tmp_dofs, tmp_vel);
-      // }
+      } // End post processing BC application
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);

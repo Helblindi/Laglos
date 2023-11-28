@@ -527,7 +527,7 @@ void LagrangianLOOperator<dim>::GetEntityDof(const int GDof, DofEntity & entity,
 template<int dim>
 void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 {
-   // cout << "Constructing BdrElementIndexingArray:\n";
+   cout << "Constructing BdrElementIndexingArray:\n";
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);
@@ -569,6 +569,22 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
             // the dirichlet condition (For Saltzman Problem)
             // This ensures the left wall vertices have the proper indicator
             if (BdrVertexIndexingArray[index] != 1)
+            {
+               BdrVertexIndexingArray[index] = bdr_attr;
+            }
+         }
+         else if (pb->get_indicator() == "TriplePoint")
+         {
+            // Mark corner vertices as 5
+            // These nodes should not move at all during the simulation
+            // Identify these corner vertices as those that already have
+            // a value non negative
+            if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
+            {
+               cout << "vertex " << index << " is a corner.\n";
+               BdrVertexIndexingArray[index] = 5;
+            }
+            else 
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
@@ -881,6 +897,32 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                } // switch (bdr_attr)
                y_temp += y_temp_bdry;
             } // if saltzmann
+            if (pb->get_indicator() == "TriplePoint")
+            {
+               switch (bdr_attr)
+               {
+               case 2:
+               case 3:
+               case 4:
+               {
+                  // Negate velocity
+                  for (int _it = 0; _it < dim; _it++)
+                  {
+                     U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -2.;
+                  }
+                  DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+                  F_i_slip.Mult(c, y_temp_bdry);
+                  // y_temp *= 2.;
+                  break;
+               }
+               default: 
+               {
+                  y_temp *= 2.; 
+                  break;
+               }
+               }
+               y_temp += y_temp_bdry;
+            } // if TriplePoint
             else
             {
                y_temp *= 2.;
@@ -1018,36 +1060,107 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
          val.SetSubVector(tmp_dofs, tmp_vel);
       }
-      else if (pb->get_indicator() == "TriplePoint")
-      {
-         Vector tmp_vel(dim), tmp_tan(dim);
-         double coeff;
-         Array<int> tmp_dofs(2);
-         tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         tmp_tan = 0.;
-         val.GetSubVector(tmp_dofs, tmp_vel);
+      // else if (pb->get_indicator() == "TriplePoint")
+      // {
+      //    Vector tmp_vel(dim), tmp_tan(dim);
+      //    double coeff;
+      //    Array<int> tmp_dofs(2);
+      //    tmp_dofs[0] = 1, tmp_dofs[1]=2;
+      //    tmp_tan = 0.;
+      //    val.GetSubVector(tmp_dofs, tmp_vel);
 
-         if (cell_bdr % 2 == 1) // Bottom and top
-         {
-            // Subtract out the normal component of the velocity
-            // on the top and bottom cells
-            // tmp_tan[0] = 1.;
-            // coeff = tmp_tan * tmp_vel;
-            // tmp_vel = tmp_tan;
-            // tmp_vel *= coeff;
-            tmp_vel[1] = -1. * tmp_vel[1];
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-         else if (cell_bdr == 2) // Right
-         {
-            // tmp_tan[1] = 1.;
-            // coeff = tmp_tan * tmp_vel;
-            // tmp_vel = tmp_tan;
-            // tmp_vel *= coeff;
-            tmp_vel[0] = -1. * tmp_vel[0];
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-      }
+      //    if (cell_bdr == 1 || cell_bdr == 3) // Bottom and top
+      //    {
+      //       // v.n=0
+      //       tmp_vel[1] = 0.;
+      //       val.SetSubVector(tmp_dofs, tmp_vel);
+      //    }
+      //    else if (cell_bdr == 2)
+      //    {
+      //       // reflect
+      //       // if (tmp_vel[0] > 0.)
+      //       // {
+      //       //    tmp_vel[0] = -1. * tmp_vel[0];
+      //       //    val.SetSubVector(tmp_dofs, tmp_vel);
+      //       // }
+      //       tmp_vel[0] = 0.;
+      //       val.SetSubVector(tmp_dofs, tmp_vel);
+      //    }
+      //    else if (cell_bdr == 4) // Left, Right
+      //    {
+      //       // reflect
+      //       // if (tmp_vel[0] < 0.)
+      //       // {
+      //       //    tmp_vel[0] = -1. * tmp_vel[0];
+      //       //    val.SetSubVector(tmp_dofs, tmp_vel);
+      //       // }
+      //       tmp_vel[0] = 0.;
+      //       val.SetSubVector(tmp_dofs, tmp_vel);
+      //    }
+      //    // switch (cell_bdr)
+      //    // {
+      //    // case 0:
+      //    //    // not a boundary cell
+      //    //    continue;
+      //    // case 1:
+      //    //    // bottom
+      //    //    // normal[1] = -1.;
+      //    //    // _add = 1.;
+      //    //    tmp_vel[1] = 0.;
+      //    //    break;
+         
+      //    // case 2:
+      //    //    // right
+      //    //    // normal[0] = 1.;
+      //    //    // _add = 2.;
+      //    //    tmp_vel[0] = 0.;
+      //    //    // if (tmp_vel[0] > 0)
+      //    //    // {
+      //    //    //    tmp_vel[0] = -1. * tmp_vel[0];
+      //    //    //    break;
+      //    //    // }
+      //    //    // else
+      //    //    // {
+      //    //    //    continue;
+      //    //    // }
+      //    //    break;
+         
+      //    // case 3:
+      //    //    // top
+      //    //    // normal[1] = 1.;
+      //    //    // _add = 1.;
+      //    //    tmp_vel[1] = 0;
+      //    //    break;
+         
+      //    // case 4:
+      //    //    // left
+      //    //    // normal[0] = -1;
+      //    //    // _add = 1.;
+      //    //    tmp_vel[0] = 0.;
+      //    //    break;
+      //    //    // if (tmp_vel[0] < 0)
+      //    //    // {
+      //    //    //    tmp_vel[0] = -1. * tmp_vel[0];
+      //    //    //    break;
+      //    //    // }
+      //    //    // else
+      //    //    // {
+      //    //    //    continue;
+      //    //    // }
+         
+      //    // default:
+      //    //    MFEM_ABORT("Not a valid cell_bdr index.\n");
+      //    // }
+
+      //    // // cout << "pre corrected state var vel: ";
+      //    // // tmp_vel.Print(cout);
+      //    // // coeff = tmp_vel * normal;
+      //    // // coeff *= _add;
+      //    // // tmp_vel.Add(-coeff, normal);
+      //    // // cout << "state var corrected vel: ";
+      //    // // tmp_vel.Print(cout);
+      //    // val.SetSubVector(tmp_dofs, tmp_vel);
+      // }
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);
@@ -1264,8 +1377,12 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          
          case 4:
             // left
-            // normal[0] = -1., normal[1] = 0.;
-            // break;
+            normal[0] = -1., normal[1] = 0.;
+            break;
+
+         case 5:
+            node_v = 0.;
+            UpdateNodeVelocity(S, i, node_v);
             continue;
          
          case -1:
@@ -1283,13 +1400,8 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          }
          /* Correct node velocity accordingly */
          GetNodeVelocity(S, i, node_v);
-         // cout << "bdr_ind: " << bdr_ind << endl;
-         // cout << "old node velocity: ";
-         // node_v.Print(cout);
          double coeff = node_v * normal;
          node_v.Add(-coeff, normal);
-         // cout << "new node_v: ";
-         // node_v.Print(cout);
          UpdateNodeVelocity(S, i, node_v);
       }
    }
@@ -3225,7 +3337,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
             ivf = 0.;
             int face_index = cell_faces_row[face_it];
 
-            GetCorrectedFaceFlux(face_index, ivf); 
+            // GetCorrectedFaceFlux(face_index, ivf); 
+            GetIntermediateFaceVelocity(face_index, ivf);
             CalcOutwardNormalInt(S, el_index, face_index, n_vec);
 
             double coeff = n_vec * ivf;

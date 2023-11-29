@@ -387,9 +387,12 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
    {
       // cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
-      mi = m_hpv->Elem(ci); 
 
       GetCellStateVector(S, ci, U_i);
+
+      // Compute mass at time tn
+      const double k = pmesh->GetElementVolume(ci);
+      mi = k / U_i[0];
 
       assert(mi > 0); // Assumption, equation (3.6)
 

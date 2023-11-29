@@ -192,8 +192,9 @@ def compute_rates(vals):
     table = []
     for i in range(len(vals['h'])):
         if i == 0:
-            table.append([vals['n_Dofs'][i], vals['L1_Error'][i], "{---}", vals['L2_Error'][i], "{---}",
-                          vals['Linf_Error'][i], "{---}", vals['mass_loss'][i], "{---}"])
+            table.append([vals['n_Dofs'][i], vals['L1_Error'][i], "{---}", 
+                        #   vals['L2_Error'][i], "{---}", vals['Linf_Error'][i], "{---}", 
+                          vals['mass_loss'][i], "{---}"])
         else:
             L1_rate = np.around(np.log(vals['L1_Error'][i]/vals['L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
             L2_rate = np.around(np.log(vals['L2_Error'][i]/vals['L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
@@ -201,19 +202,20 @@ def compute_rates(vals):
             if vals['mass_loss'][i-1] > pow(10,-14):
                 mass_loss_rate = np.around(np.log(vals['mass_loss'][i]/vals['mass_loss'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
-                          vals['L2_Error'][i], L2_rate,
-                          vals['Linf_Error'][i], Linf_rate,
+                        #   vals['L2_Error'][i], L2_rate,
+                        #   vals['Linf_Error'][i], Linf_rate,
                           vals['mass_loss'][i], mass_loss_rate])
             else:
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
-                          vals['L2_Error'][i], L2_rate,
-                          vals['Linf_Error'][i], Linf_rate,
+                        #   vals['L2_Error'][i], L2_rate,
+                        #   vals['Linf_Error'][i], Linf_rate,
                           vals['mass_loss'][i], "{---}"])
             
 
     s_table = tabulate(table,
-                       headers=["# dof", "L1 Error", "Rate", "L2 Error",
-                                "Rate", "L-Inf Error", "Rate", "Mass Loss", "Rate"],
+                       headers=["# dof", "L1 Error", "Rate", 
+                              #   "L2 Error", "Rate", "L-Inf Error", "Rate", 
+                                "Mass Loss", "Rate"],
                        tablefmt="latex")
 
     # Output table to console

@@ -84,6 +84,6 @@ def main():
       x = x_arr[i]
       for j in range(0, ny_gridpoints):
          y = y_arr[j]
-         f.write("%.2f %.2f\n" % (x, y))
+         f.write("%.12f %.12f\n" % (x, y))
 
 main()

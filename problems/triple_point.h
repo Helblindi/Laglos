@@ -35,8 +35,8 @@ private:
    double _a = 0., _b = 0., _gamma_1 = 1.5, _gamma_2 = 1.4;
    bool distort_mesh = false;
    bool known_exact_solution = false;
-   bool bcs = false; // Indicator for boundary conditions
-   string indicator = ""; // Possible: saltzmann
+   bool bcs = true; // Indicator for boundary conditions
+   string _indicator = "TriplePoint"; // Possible: saltzmann
 
    // CFL change
    bool _change_cfl = false;
@@ -46,6 +46,7 @@ public:
    {
       this->set_a(_a);
       this->set_b(_b);
+      this->set_indicator(_indicator);
    }
 
    /* Override getters */
@@ -84,7 +85,6 @@ public:
     *********************************************************/
    double rho0(const Vector &x, const double & t) override
    {
-      cout << "TriplePoint::rho0\n";
       return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
          /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
                                          (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;

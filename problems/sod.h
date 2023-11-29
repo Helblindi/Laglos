@@ -33,6 +33,8 @@ private:
    double _a = 0., _b = 0., _gamma = 1.4;
    bool distort_mesh = false;
    bool known_exact_solution = true;
+   bool bcs = true; // Indicator for boundary conditions
+   string _indicator = "Sod"; // Possible: saltzmann
 
    double rhoL = 1.0, rhoR = 0.125, pL = 1.0, pR = 0.1, vL = 0., vR = 0.;
    double x_center = 0.5;
@@ -43,6 +45,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_indicator(_indicator);
    }
    
    /* Override getters */

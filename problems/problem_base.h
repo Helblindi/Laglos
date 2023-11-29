@@ -57,12 +57,14 @@ public:
    void set_a(const double &_a) { a = _a; }
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
+   void set_indicator(const string &_ind) { this->indicator = _ind; }
+
 
    // Getters
    double get_a() { return a; }
    double get_b() { return b; }
+   string get_indicator() { return indicator; }
    virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
-   virtual string get_indicator() { return indicator; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
    virtual bool has_boundary_conditions() { return bcs; }
@@ -233,7 +235,6 @@ public:
     ********************************************/
    double sv0(const Vector &x, const double & t)
    {
-      cout << "ProblemBase::sv0\n";
       double val = this->rho0(x,t);
       assert(val != 0.);
       return 1./val;

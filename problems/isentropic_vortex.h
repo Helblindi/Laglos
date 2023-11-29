@@ -35,7 +35,7 @@ private:
    bool distort_mesh = false;
    bool known_exact_solution = true;
    bool bcs = true;
-   string indicator = "IsentropicVortex"; // Possible: saltzmann
+   string _indicator = "IsentropicVortex"; // Possible: saltzmann
 
    // Free steam conditions
    const double rho_inf = 1., p_inf = 1., T_inf = 1.;
@@ -49,10 +49,10 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_indicator(_indicator);
    }
 
    /* Override getters */
-   string get_indicator() override { return indicator; }
    bool get_distort_mesh() override { return distort_mesh; }
    bool has_exact_solution() override { return known_exact_solution; }
    bool has_boundary_conditions() override { return bcs; }

@@ -76,7 +76,7 @@ public:
       double norm_x = x.Norml2();
       if (t < 1e-12)
       {
-         return (norm_x <= x_center) ? pL : pR;
+         return (norm_x < x_center) ? pL : pR;
       }
       else
       {
@@ -107,7 +107,7 @@ public:
             case 1:
             case 2:
             {
-               return (norm_x <= x_center) ? rhoL : rhoR;
+               return (norm_x < x_center) ? rhoL : rhoR;
             }
             default:
             {
@@ -150,7 +150,9 @@ public:
 
          double p[2];
          p[0] = norm_x; p[1] = t;
-         v[0] = riemann1D::v(p);
+         double v_coeff = riemann1D::v(p);
+         v = x;
+         v *= v_coeff / norm_x;
       }
       return;
    }

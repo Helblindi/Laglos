@@ -37,7 +37,7 @@ private:
    bool distort_mesh = false;
    bool known_exact_solution = true;
    bool bcs = false; // Indicator for boundary conditions
-   string indicator = ""; // Possible: saltzmann
+   string _indicator = "Sedov"; // Possible: saltzmann
 
    // CFL change
    bool _change_cfl = false;
@@ -51,6 +51,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_indicator(_indicator);
    }
 
    /* Override getters */

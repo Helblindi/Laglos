@@ -68,12 +68,12 @@ public:
    {
       this->set_b(b_covolume);
    }
-   virtual void update(Vector x_gf, double t) override {
+   virtual void update(Vector params, double t) override {
+      // params is a vector [hmax, cell_vol]
       if (t <= 1.e-16)
       {  
-         cout << "setting internal energy params.\n";
-         this->h = x_gf[0];
-         this->cell_vol = x_gf[1];
+         this->h = params[0];
+         this->cell_vol = params[0];
       }
    }
 

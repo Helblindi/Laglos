@@ -37,7 +37,7 @@
 * ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4         ## Sod Radial
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3       ## Isentropic Vortex
 * ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 1                  ## Noh
-* ./Laglos -m data/ref-square-c0.mesh -p 6 -tf 1. -cfl 0.1 -rs 5         ## Sedov
+* ./Laglos -m data/ref-square.mesh -p 6 -tf 1. -cfl 0.1 -rs 5         ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3 ## Saltzman problem
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2         ## Triple Point
 *
@@ -647,7 +647,10 @@ int main(int argc, char *argv[]) {
 
       if (problem_class->has_exact_solution())
       {
-         problem_class->update(x_gf);
+         if (problem_class->get_indicator() == "Vdw1")
+         {
+            problem_class->update(x_gf);
+         }
 
          rho_ex->ProjectCoefficient(rho_coeff);
          vel_ex->ProjectCoefficient(v_coeff);
@@ -892,7 +895,10 @@ int main(int argc, char *argv[]) {
 
             if (problem_class->has_exact_solution())
             {
-               problem_class->update(x_gf, t);
+               if (problem_class->get_indicator() == "Vdw1")
+               {
+                  problem_class->update(x_gf, t);
+               }
 
                rho_coeff.SetTime(t);
                v_coeff.SetTime(t);
@@ -1170,7 +1176,10 @@ int main(int argc, char *argv[]) {
       ste_ex->MakeRef(&L2FESpace, S_exact, offset[4]);
 
       // Project exact solution
-      problem_class->update(x_gf, t);
+      if (problem_class->get_indicator() == "Vdw1")
+      {
+         problem_class->update(x_gf, t);
+      }
 
       sv_coeff.SetTime(t);
       v_coeff.SetTime(t);
@@ -1197,7 +1206,11 @@ int main(int argc, char *argv[]) {
    /* When the exact solution is known, print out an error file */
    if (problem_class->has_exact_solution())
    {
-      problem_class->update(x_gf, t);
+      if (problem_class->get_indicator() == "Vdw1")
+      {
+         problem_class->update(x_gf, t);
+      }
+      
       // Compute errors
       ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
       ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());

@@ -600,7 +600,7 @@ int main(int argc, char *argv[]) {
    hydro.SetProblem(problem);
 
    /* Set up visualiztion object */
-   socketstream vis_rho, vis_v, vis_ste, vis_press, vis_mc;
+   socketstream vis_rho, vis_v, vis_ste, vis_press, vis_gamma, vis_mc;
    socketstream vis_rho_ex, vis_v_ex, vis_ste_ex;
    socketstream vis_rho_err, vis_v_err, vis_ste_err;
    char vishost[] = "localhost";
@@ -653,18 +653,34 @@ int main(int argc, char *argv[]) {
 
       if (problem == 12)
       {
-         // pressure instead of energy
+         // pressure, ste, gamma
          vis_press.precision(8);
+         vis_gamma.precision(8);
          ParGridFunction press_gf(&L2FESpace);
+         ParGridFunction gamma_gf(&L2FESpace);
          Vector U(dim+2);
          for (int i = 0; i < press_gf.Size(); i++)
          {
             hydro.GetCellStateVector(S, i, U);
             double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
             press_gf[i] = pressure;
+            gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
          }
+         // Specific total energy
+         VisualizeField(vis_ste, vishost, visport, ste_gf,
+                        "Specific Total Energy", Wx, Wy, Ww, Wh);
+         
+         Wx = 0;
+         Wy += offy;
+
+         // Pressure
          VisualizeField(vis_press, vishost, visport, press_gf,
                         "Pressure", Wx, Wy, Ww, Wh);
+         Wx += offx; 
+
+         // gamma
+         VisualizeField(vis_gamma, vishost, visport, gamma_gf,
+                        "Gamma", Wx, Wy, Ww, Wh);
       }
       else
       {
@@ -911,19 +927,35 @@ int main(int argc, char *argv[]) {
                            v_gf, "Velocity", Wx, Wy, Ww, Wh);
             Wx += offx;
 
-            if (problem == 12) // TriplePoint
+            if (problem == 12)
             {
-               // pressure instead of energy
+               // pressure, ste, gamma
+               vis_press.precision(8);
+               vis_gamma.precision(8);
                ParGridFunction press_gf(&L2FESpace);
+               ParGridFunction gamma_gf(&L2FESpace);
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
                {
                   hydro.GetCellStateVector(S, i, U);
                   double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
                   press_gf[i] = pressure;
+                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
                }
+               // Specific total energy
+               VisualizeField(vis_ste, vishost, visport, ste_gf,
+                              "Specific Total Energy", Wx, Wy, Ww, Wh);
+               Wx = 0;
+               Wy += offy;
+
+               // Pressure
                VisualizeField(vis_press, vishost, visport, press_gf,
                               "Pressure", Wx, Wy, Ww, Wh);
+               Wx += offx; 
+
+               // gamma
+               VisualizeField(vis_gamma, vishost, visport, gamma_gf,
+                              "Specific Total Energy", Wx, Wy, Ww, Wh);
             }
             else
             {

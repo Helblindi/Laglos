@@ -1077,6 +1077,21 @@ int main(int argc, char *argv[]) {
             ste_ofs.precision(8);
             ste_gf.SaveAsOne(ste_ofs);
             ste_ofs.close();
+
+            // Print continuous interpolation of density
+            GridFunctionCoefficient rho_gf_coeff(&rho_gf);
+            ParGridFunction rho_cont_gf(&H1FESpace);
+            rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+            std::ostringstream rho_cont_name;
+            rho_cont_name  << gfprint_path 
+                           << setfill('0') 
+                           << setw(6)
+                           << ti 
+                           << "_rho_c.gf";
+            std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
+            rho_cont_ofs.precision(8);
+            rho_cont_gf.SaveAsOne(rho_cont_ofs);
+            rho_cont_ofs.close();
          }
       }
       // cout << "finished step\n";

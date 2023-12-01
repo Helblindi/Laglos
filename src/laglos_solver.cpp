@@ -576,7 +576,9 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
                BdrVertexIndexingArray[index] = bdr_attr;
             }
          }
-         else if (pb->get_indicator() == "TriplePoint")
+         else if (pb->get_indicator() == "TriplePoint" || 
+                  pb->get_indicator() == "Sedov" || 
+                  pb->get_indicator() == "SodRadial")
          {
             // Mark corner vertices as 5
             // These nodes should not move at all during the simulation
@@ -599,8 +601,6 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       } // end vertex iterator
 
    } // end boundary elements
-   cout << "bdr vertex indexing array: \n";
-   BdrVertexIndexingArray.Print(cout);
 }
 
 
@@ -636,8 +636,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    add(x_gf, dt, mv_gf, x_gf);
-
-   pmesh->NodesUpdated();
+   pmesh->NewNodes(x_gf, false);
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
    // cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
 } 
@@ -962,40 +961,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       {
          int cell_bdr = cell_bdr_arr[cell_bdr_it];
 
-         if (pb->get_indicator() == "SodRadial")
-         {
-            Vector tmp_vel(dim), normal(dim);
-            Array<int> tmp_dofs(2);
-            normal = 0.;
-            tmp_dofs[0] = 1, tmp_dofs[1]=2;
-            val.GetSubVector(tmp_dofs, tmp_vel);
-            
-            if (cell_bdr == 1)
-            {
-               // bottom
-               normal[1] = -1.;
-            }
-            else if (cell_bdr == 4)
-            {
-               // left
-               normal[0] = -1.;
-            }
-
-            double coeff = tmp_vel * normal;
-            if (coeff > 0.)
-            {
-               // cout << "pre corrected veloc: ";
-               // tmp_vel.Print(cout);
-               // cout << "coeff: " << coeff << endl;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               // cout << "corrected veloc: ";
-               // tmp_vel.Print(cout);
-            }
-
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-         else if (pb->get_indicator() == "Sod")
+         if (pb->get_indicator() == "Sod")
          {
             Vector tmp_vel(dim), normal(dim);
             Array<int> tmp_dofs(2);
@@ -1066,7 +1032,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
             val.SetSubVector(tmp_dofs, tmp_vel);
          }
-         else if (pb->get_indicator() == "TriplePoint")
+         else if (pb->get_indicator() == "TriplePoint" || 
+                  pb->get_indicator() == "SodRadial" ||
+                  pb->get_indicator() == "Sedov")
          {
             Vector tmp_vel(dim), normal(dim);
             double coeff;
@@ -1097,11 +1065,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             
             case 4:
                // left
-               // normal[0] = -1;
-               // break;
-               tmp_vel[0] = 0.;
-               val.SetSubVector(tmp_dofs, tmp_vel);
-               continue;
+               normal[0] = -1;
+               break;
             
             default:
                MFEM_ABORT("Not a valid cell_bdr index.\n");
@@ -1199,59 +1164,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    //      << "     EnforcingMVBoundaryConditions      \n"
    //      << "========================================\n";
 
-   if (pb->get_indicator() == "SodRadial")
-   {
-      int bdr_ind = 0;
-      Vector normal(dim), node_v(dim);
-      for (int i = 0; i < NVDofs_H1; i++)
-      {
-         bdr_ind = BdrVertexIndexingArray[i];
-         /* Get corresponding normal vector */
-         switch (bdr_ind)
-         {
-         case 1:
-            // bottom
-            normal[0] = 0., normal[1] = -1.;
-            break;
-         
-         case 2:
-            // right
-            normal[0] = 1., normal[1] = 0.;
-            break;
-         
-         case 3:
-            // top
-            normal[0] = 0., normal[1] = 1.;
-            break;
-         
-         case 4:
-            // left
-            normal[0] = -1., normal[1] = 0.;
-            break;
-         
-         case -1:
-            // Not a boundary vertex
-            continue;
-
-         default:
-            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
-            break;
-         }
-
-         if (bdr_ind == -1) 
-         {
-            MFEM_ABORT("Dont correct interior vertices.\n");
-         }
-         /* Correct node velocity accordingly */
-         GetNodeVelocity(S, i, node_v);
-
-         double coeff = node_v * normal;
-         node_v.Add(-coeff, normal);
-
-         UpdateNodeVelocity(S, i, node_v);
-      }
-   }
-   else if (pb->get_indicator() == "Sod")
+   if (pb->get_indicator() == "Sod")
    {
       int bdr_ind = 0;
       Vector normal(dim), node_v(dim);
@@ -1301,7 +1214,9 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          UpdateNodeVelocity(S, i, node_v);
       }
    }
-   else if (pb->get_indicator() == "TriplePoint")
+   else if (pb->get_indicator() == "TriplePoint" ||
+            pb->get_indicator() == "Sedov" ||
+            pb->get_indicator() == "SodRadial")
    {
       int bdr_ind = 0;
       Vector normal(dim), node_v(dim);
@@ -1441,6 +1356,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    }
    else if (pb->get_indicator() == "IsentropicVortex")
    {
+      // Boundary vertices should not move at all
       Vector* sptr = const_cast<Vector*>(&S);
       ParGridFunction x_gf, mv_gf;
       mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
@@ -2004,9 +1920,12 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
-      num += abs(k / U_i[0] - m);
+      num += abs((k / U_i[0]) - m);
+      // cout << "[cell " << ci << "] k: " << k << ", rho: " << 1. / U_i[0] << endl;
+      // cout << "\tm: " << m << ", num: " << ((k / U_i[0]) - m) << endl;
       denom += abs(m);
    }
+   // cout << "num: " << num << ", denom: " << denom << endl;
 
    return num / denom;
 }

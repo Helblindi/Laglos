@@ -770,7 +770,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          }
       }
 
-      DenseMatrix F_i = pb->flux(U_i);
+      const DenseMatrix F_i = pb->flux(U_i);
       sums = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -898,32 +898,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                } // switch (bdr_attr)
                y_temp += y_temp_bdry;
             } // if saltzmann
-            // if (pb->get_indicator() == "TriplePoint")
-            // {
-            //    switch (bdr_attr)
-            //    {
-            //    case 2:
-            //    case 3:
-            //    case 4:
-            //    {
-            //       // Negate velocity
-            //       for (int _it = 0; _it < dim; _it++)
-            //       {
-            //          U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -2.;
-            //       }
-            //       DenseMatrix F_i_slip = pb->flux(U_i_bdry);
-            //       F_i_slip.Mult(c, y_temp_bdry);
-            //       // y_temp *= 2.;
-            //       break;
-            //    }
-            //    default: 
-            //    {
-            //       y_temp *= 2.; 
-            //       break;
-            //    }
-            //    }
-            //    y_temp += y_temp_bdry;
-            // } // if TriplePoint
             else
             {
                y_temp *= 2.;
@@ -960,15 +934,14 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
       {
          int cell_bdr = cell_bdr_arr[cell_bdr_it];
+         Array<int> tmp_dofs(2);
+         tmp_dofs[0] = 1, tmp_dofs[1]=2;
+         Vector tmp_vel(dim), normal(dim);
+         normal = 0.;
+         val.GetSubVector(tmp_dofs, tmp_vel);
 
          if (pb->get_indicator() == "Sod")
          {
-            Vector tmp_vel(dim), normal(dim);
-            Array<int> tmp_dofs(2);
-            normal = 0.;
-            tmp_dofs[0] = 1, tmp_dofs[1]=2;
-            val.GetSubVector(tmp_dofs, tmp_vel);
-            
             if (cell_bdr == 1)
             {
                // bottom
@@ -981,27 +954,12 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             }
 
             double coeff = tmp_vel * normal;
-            if (coeff > 0.)
-            {
-               // cout << "pre corrected veloc: ";
-               // tmp_vel.Print(cout);
-               // cout << "coeff: " << coeff << endl;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               // cout << "corrected veloc: ";
-               // tmp_vel.Print(cout);
-            }
-
+            normal *= coeff;
+            subtract(tmp_vel, normal, tmp_vel);
             val.SetSubVector(tmp_dofs, tmp_vel);
          }
          else if (pb->get_indicator() == "saltzmann")
          {
-            Vector tmp_vel(dim), normal(dim);
-            Array<int> tmp_dofs(2);
-            normal = 0.;
-            tmp_dofs[0] = 1, tmp_dofs[1]=2;
-            val.GetSubVector(tmp_dofs, tmp_vel);
-            
             if (cell_bdr == 2)
             {
                // bottom
@@ -1019,30 +977,14 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             }
 
             double coeff = tmp_vel * normal;
-            if (coeff > 0.)
-            {
-               // cout << "pre corrected veloc: ";
-               // tmp_vel.Print(cout);
-               // cout << "coeff: " << coeff << endl;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               // cout << "corrected veloc: ";
-               // tmp_vel.Print(cout);
-            }
-
+            normal *= coeff;
+            subtract(tmp_vel, normal, tmp_vel);
             val.SetSubVector(tmp_dofs, tmp_vel);
          }
          else if (pb->get_indicator() == "TriplePoint" || 
                   pb->get_indicator() == "SodRadial" ||
                   pb->get_indicator() == "Sedov")
          {
-            Vector tmp_vel(dim), normal(dim);
-            double coeff;
-            Array<int> tmp_dofs(2);
-            tmp_dofs[0] = 1, tmp_dofs[1]=2;
-            normal = 0.;
-            val.GetSubVector(tmp_dofs, tmp_vel);
-
             switch (cell_bdr)
             {
             case 0:
@@ -1072,11 +1014,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                MFEM_ABORT("Not a valid cell_bdr index.\n");
             }
 
-            coeff = tmp_vel * normal;
-
+            double coeff = tmp_vel * normal;
             tmp_vel.Add(-coeff, normal);
             val.SetSubVector(tmp_dofs, tmp_vel);
-
          }
       } // End post processing BC application
 

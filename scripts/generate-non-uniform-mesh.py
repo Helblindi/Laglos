@@ -3,7 +3,7 @@ import numpy as np
 
 def main():
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/non-uniform-square-c0.mesh"
+   filename = home_dir + "data/noh-nonuniform.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -27,9 +27,10 @@ def main():
 
    n_gridpoints_neg = 33
    n_gridpoints_pos = 65
+   nx_gridpoints = n_gridpoints_neg - 1 + n_gridpoints_pos
+   ny_gridpoints = n_gridpoints_neg - 1 + n_gridpoints_pos
 
-   x_arr = np.concatenate(np.linspace(-1.,0,n_gridpoints_neg), np.linspace(0., 1., n_gridpoints_pos))
-   # y_arr = np.linspace(0,.1,ny_gridpoints)
+   x_arr = np.concatenate((np.linspace(-1.,0.,n_gridpoints_neg-1, endpoint=False), np.linspace(0., 1., n_gridpoints_pos, endpoint=True)))
 
    # ELEMENTS
    f.write("elements\n")
@@ -39,7 +40,6 @@ def main():
    el = 1
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
       for j in range(i, i + ny_gridpoints - 1):
-         print("i: ", i)
          f.write("%d 3 %d %d %d %d\n" % (el, j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
          el += 1
    f.write("\n")
@@ -82,9 +82,9 @@ def main():
    f.write("vertices\n")
    f.write(str(nx_gridpoints * ny_gridpoints) + "\n")
    f.write("2\n")
-   for i in range(0, nx_gridpoints):
-      for j in range(0, ny_gridpoints):
+   for i in x_arr:
+      for j in x_arr:
          # print("i: %.2f, j: %.2f" % (x_arr[i], y_arr[j]))
-         f.write("%.2f %.2f\n" % (x_arr[i], y_arr[j]))
+         f.write("%.6f %.6f\n" % (i, j))
 
 main()

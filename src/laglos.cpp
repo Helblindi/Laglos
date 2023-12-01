@@ -37,7 +37,7 @@
 * ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4         ## Sod Radial
 * ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3       ## Isentropic Vortex
 * ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 1                  ## Noh
-* ./Laglos -m data/ref-square.mesh -p 6 -tf 1. -cfl 0.1 -rs 5         ## Sedov
+* ./Laglos -m data/ref-square.mesh -p 6 -tf 1. -cfl 0.1 -rs 5            ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3 ## Saltzman problem
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2         ## Triple Point
 *
@@ -564,9 +564,22 @@ int main(int argc, char *argv[]) {
    v_gf.SyncAliasMemory(S);
 
    FunctionCoefficient ste_coeff(ste0_static);
+   // if (problem == 6)
+   // {
+   //    double blast_energy = 0.25;
+   //    double blast_position[] = {0.0, 0.0, 0.0};
+   //    DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
+   //                             blast_position[2], blast_energy);
+   //    ste_gf.ProjectCoefficient(e_coeff);
+   //    ste_gf.SyncAliasMemory(S);
+   // }
+   // else
+   // {
    ste_coeff.SetTime(t_init);
    ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
+   // }
+   
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
@@ -587,7 +600,9 @@ int main(int argc, char *argv[]) {
    hydro.SetProblem(problem);
 
    /* Set up visualiztion object */
-   socketstream vis_rho, vis_v, vis_ste, vis_mc, vis_rho_ex, vis_v_ex, vis_ste_ex, vis_rho_err, vis_v_err, vis_ste_err;
+   socketstream vis_rho, vis_v, vis_ste, vis_press, vis_mc;
+   socketstream vis_rho_ex, vis_v_ex, vis_ste_ex;
+   socketstream vis_rho_err, vis_v_err, vis_ste_err;
    char vishost[] = "localhost";
    int  visport   = 19916;
 
@@ -635,8 +650,28 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_v, vishost, visport, v_gf,
                      "Velocity", Wx, Wy, Ww, Wh);
       Wx += offx;
-      VisualizeField(vis_ste, vishost, visport, ste_gf,
-                     "Specific Total Energy", Wx, Wy, Ww, Wh);
+
+      if (problem == 12)
+      {
+         // pressure instead of energy
+         vis_press.precision(8);
+         ParGridFunction press_gf(&L2FESpace);
+         Vector U(dim+2);
+         for (int i = 0; i < press_gf.Size(); i++)
+         {
+            hydro.GetCellStateVector(S, i, U);
+            double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+            press_gf[i] = pressure;
+         }
+         VisualizeField(vis_press, vishost, visport, press_gf,
+                        "Pressure", Wx, Wy, Ww, Wh);
+      }
+      else
+      {
+         VisualizeField(vis_ste, vishost, visport, ste_gf,
+                        "Specific Total Energy", Wx, Wy, Ww, Wh);
+      }
+      
       Wx = 0;
       Wy += offy;
 
@@ -876,9 +911,27 @@ int main(int argc, char *argv[]) {
                            v_gf, "Velocity", Wx, Wy, Ww, Wh);
             Wx += offx;
 
-            VisualizeField(vis_ste, vishost, visport, ste_gf,
-                           "Specific Total Energy",
-                           Wx, Wy, Ww,Wh);
+            if (problem == 12) // TriplePoint
+            {
+               // pressure instead of energy
+               ParGridFunction press_gf(&L2FESpace);
+               Vector U(dim+2);
+               for (int i = 0; i < press_gf.Size(); i++)
+               {
+                  hydro.GetCellStateVector(S, i, U);
+                  double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+                  press_gf[i] = pressure;
+               }
+               VisualizeField(vis_press, vishost, visport, press_gf,
+                              "Pressure", Wx, Wy, Ww, Wh);
+            }
+            else
+            {
+               VisualizeField(vis_ste, vishost, visport, ste_gf,
+                              "Specific Total Energy",
+                              Wx, Wy, Ww,Wh);
+            }
+            
             Wx += offx;
 
             VisualizeField(vis_mc, vishost, visport, mc_gf,

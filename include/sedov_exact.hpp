@@ -6,7 +6,7 @@
 // they can not be changed without changing the implementation.
 const double sedov_rho0  = 1.;
 const double sedov_gamma = 1.4;
-// const double sedov_E0  = 1.;
+// const double sedov_E0  = 0.979264;
 
 // time at which the solution is evaluated
 double sedov_t;

@@ -3,7 +3,7 @@ import numpy as np
 
 def main():
    nx_gridpoints = 15
-   ny_gridpoints = 7
+   ny_gridpoints = 13
    xL = 0.
    xR = 7.
    yL = 0.
@@ -12,7 +12,7 @@ def main():
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
    # filename = home_dir + "data/vortex-square-131044.mesh"
-   filename = home_dir + "data/triple-point.mesh"
+   filename = home_dir + "data/triple-point-yr.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file

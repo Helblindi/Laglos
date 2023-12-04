@@ -47,6 +47,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_indicator(_indicator);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */

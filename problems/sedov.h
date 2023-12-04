@@ -52,6 +52,7 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */
@@ -135,8 +136,7 @@ public:
       {
          // Initial condition
          if (norm <= h) {
-            return 0.979264 / (4. * cell_vol);
-            // return 2. / (4. * cell_vol);
+            return 0.979264 / cell_vol;
          }
          else
          {

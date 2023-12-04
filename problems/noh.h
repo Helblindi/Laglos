@@ -51,12 +51,12 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */
    bool get_distort_mesh() override { return distort_mesh; }
    bool has_exact_solution() override { return known_exact_solution; }
-   bool has_boundary_conditions() override { return bcs; }
 
    bool change_cfl() override { return _change_cfl; }
    // double get_cfl_first() override { return CFL_first; }

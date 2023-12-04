@@ -31,6 +31,7 @@ private:
    double _a = 0., _b = 0., _gamma = 7/5.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
+   bool bcs = false;
 
 public:
    SmoothWave()
@@ -38,6 +39,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */

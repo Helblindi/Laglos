@@ -35,6 +35,7 @@ private:
    double _gamma = 5./3.;
    bool distort_mesh = false;
    bool known_exact_solution = true;
+   bool bcs = false;
 
    double rhoL = 1., rhoR = 0.001, pL = (2./3.)/10., pR = (2./3.)/10.e10, vL = 0., vR = 0.;
    double x_center = 0.5;
@@ -45,6 +46,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */

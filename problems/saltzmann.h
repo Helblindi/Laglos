@@ -66,6 +66,7 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
+      this->set_bcs_indicator(bcs);
    }
 
    /* Override getters */

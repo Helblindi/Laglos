@@ -32,8 +32,17 @@ private:
    double _a = 1., _b = 1., _gamma = 1.02;
    bool distort_mesh = false;
    bool known_exact_solution = false;
+   bool _bcs = false;
 
 public:
+   VdwTest4()
+   {
+      this->set_a(_a);
+      this->set_b(_b);
+      this->set_gamma(_gamma);
+      this->set_bcs_indicator(_bcs);
+   }
+
    /* Override getters */
    virtual bool get_distort_mesh() override { return distort_mesh; }
    virtual bool has_exact_solution() override { return known_exact_solution; }

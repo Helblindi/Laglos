@@ -32,6 +32,7 @@ private:
    double _a = 1., _b = 1., _gamma = 1.02;
    bool distort_mesh = false;
    bool known_exact_solution = false;
+   bool _bcs = false;
 
 public:
    VdwTest2() 
@@ -39,6 +40,7 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_bcs_indicator(_bcs);
    }
 
    /* Override getters */

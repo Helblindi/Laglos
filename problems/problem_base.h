@@ -58,6 +58,7 @@ public:
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
+   void set_bcs_indicator(const bool &tvalue) { this->bcs = tvalue; }
 
 
    // Getters
@@ -67,7 +68,7 @@ public:
    virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
    virtual bool get_distort_mesh() { return distort_mesh; }
    virtual bool has_exact_solution() { return known_exact_solution; }
-   virtual bool has_boundary_conditions() { return bcs; }
+   bool has_boundary_conditions() { return bcs; }
    
    /* Functions that update the class, can be overridden */
    virtual void lm_update(const double b_covolume) {

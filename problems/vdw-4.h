@@ -34,6 +34,15 @@ private:
    bool known_exact_solution = false;
    bool _bcs = false;
 
+   // Problem specifics
+   double initial_shock = 0.25;
+   double rhoL = 0.9932, rhoR = 0.95;
+   double vL = 3., vR = -3.;
+   double pL = 2.;
+   double pR = 2.;
+   // double eL = 0.029143658477667977;
+   // double eR = 6.688157894736825
+
 public:
    VdwTest4()
    {
@@ -67,14 +76,14 @@ public:
    virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
-            return 0.9932;
+            return rhoL;
          }
          else
          {
             assert(x[0] <= 1.);
-            return 0.9500;
+            return rhoR;
          }
       }
       else {
@@ -84,14 +93,14 @@ public:
    virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
-            v[0] = 3.;
+            v[0] = vL;
             return;
          }
          else
          {
-            v[0] = -3.;
+            v[0] = vR;
             return;
          }
       }
@@ -100,20 +109,31 @@ public:
          return;
       }
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   virtual double sie0(const Vector &x, const double & t) override 
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
-         {
-            return 0.029143658477667977;
-         }
-         else
-         {
-            return 6.688157894736825;
-         }
+         double rho = rho0(x,t);
+         double pressure = p0(x);
+
+         return ((pressure + this->get_a() * pow(rho,2)) * (1. - this->get_b()*rho)  / (rho * (this->get_gamma() - 1.))) - this->get_a() * rho;
       }
       else {
-         return .5; // TODO: Exact representation of sie0
+         MFEM_ABORT("Exact solution for vdw3 not programmed.\n");
+         return -1.;
+      }
+   }
+
+   // Initial values are in terms of pressure
+   double p0(const Vector &x)
+   {
+      if (x[0] <= initial_shock)
+      {
+         return pL;
+      }
+      else 
+      {
+         assert(x[0] <= 1.);
+         return pR;
       }
    }
 

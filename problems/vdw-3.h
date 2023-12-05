@@ -34,6 +34,13 @@ private:
    bool known_exact_solution = false;
    bool _bcs = false;
 
+   // Problem specifics
+   double initial_shock = 0.25;
+   double rhoL = 0.25, rhoR = 0.000049;
+   double vL = 0., vR = 0.;
+   double pL = 3.e-2;
+   double pR = 5.e-8;
+
 public:
    VdwTest3()
    {
@@ -67,14 +74,14 @@ public:
    virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
-            return 0.25;
+            return rhoL;
          }
          else
          {
             assert(x[0] <= 1.);
-            return 4.9e-5;
+            return rhoR;
          }
       }
       else {
@@ -85,6 +92,17 @@ public:
    virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       v = 0.;
+      if (t < 1.e-16) {
+         if (x[0] <= initial_shock)
+         {
+            v[0] = vL;
+         }
+         else
+         {
+            assert(x[0] <= 1.);
+            v[0] = vR;
+         }
+      }
    }
 
    virtual double sie0(const Vector &x, const double & t) override 
@@ -104,14 +122,14 @@ public:
    // Initial values are in terms of pressure
    double p0(const Vector &x)
    {
-      if (x[0] <= 0.)
+      if (x[0] <= initial_shock)
       {
-         return 3.e-2;
+         return pL;
       }
       else 
       {
          assert(x[0] <= 1.);
-         return 5.e-8;
+         return pR;
       }
    }
 

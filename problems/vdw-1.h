@@ -46,6 +46,7 @@ private:
    string _indicator = "Vdw1"; // Possible: saltzmann
 
    double rhop = 0.35, x0 = 0.;
+   double initial_shock = 0.;
    double rhoL = 0.1, rhoR = 0.39;
    double vL = -0.475504638574729, vR = -0.121375781741349;
    double pL = 0.022084258693080, pR = 0.039073167077590;
@@ -97,7 +98,7 @@ public:
    virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
             return rhoL;
          }
@@ -116,7 +117,7 @@ public:
    virtual void v0(const Vector &x, const double & t, Vector &v) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
             v[0] = vL;
             return;
@@ -137,7 +138,7 @@ public:
    virtual double sie0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {
-         if (x[0] <= 0.)
+         if (x[0] <= initial_shock)
          {
             return sieL;
          }

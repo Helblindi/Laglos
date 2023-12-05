@@ -168,6 +168,7 @@ public:
    void GetViGeo(const int & node, Vector & vel);
    void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
+   void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
 
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);

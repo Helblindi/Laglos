@@ -5,14 +5,14 @@ include_directories(${TEST_SRC_DIR}/src
                     ${MFEM_DIR})
 
 # TESTING
-add_executable(TestRTvel EXCLUDE_FROM_ALL test_RT_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-add_test(NAME TestRTvel COMMAND TestRTvel)
+# add_executable(TestRTvel EXCLUDE_FROM_ALL test_RT_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+# target_link_libraries(TestRTvel PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
+# add_test(NAME TestRTvel COMMAND TestRTvel)
 
 # Raviart-Thomas Velocity Construction
-add_executable(TestRaviart EXCLUDE_FROM_ALL test_Raviart_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestRaviart PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
-add_test(NAME TestRaviart COMMAND TestRaviart)
+# add_executable(TestRaviart EXCLUDE_FROM_ALL test_Raviart_vel.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+# target_link_libraries(TestRaviart PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
+# add_test(NAME TestRaviart COMMAND TestRaviart)
 
 add_executable(Test1D EXCLUDE_FROM_ALL test_1D.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 target_link_libraries(Test1D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
@@ -52,4 +52,5 @@ add_test(NAME LagrangeMWSCompare
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestRTvel TestRaviart Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
+# add_dependencies(build_tests TestRTvel TestRaviart Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
+add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)

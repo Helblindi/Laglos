@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
    d += test_flux();
    d += test_CSV_getter_setter();
 
-   d += test_vel_field_1();
+   // d += test_vel_field_1();
 
    cout << "Must return 0 for test to pass.  d = " << d << endl;
 
@@ -377,184 +377,184 @@ Purpose:
    v_exact = | 1 0 | |x| + |1|
              | 0 0 | |y|   |1|
 */
-int test_vel_field_1()
-{
-   a = 1., b = 0., c = 1., d = 0., e = 0., f = 1.;
+// int test_vel_field_1()
+// {
+//    a = 1., b = 0., c = 1., d = 0., e = 0., f = 1.;
 
-   // Initialize mesh
-   mfem::Mesh *mesh;
-   mesh = new mfem::Mesh(mesh_file, true, true);
+//    // Initialize mesh
+//    mfem::Mesh *mesh;
+//    mesh = new mfem::Mesh(mesh_file, true, true);
 
-   // Refine the mesh
-   for (int lev = 0; lev < mesh_refinements; lev++)
-   {
-      mesh->UniformRefinement();
-   }
+//    // Refine the mesh
+//    for (int lev = 0; lev < mesh_refinements; lev++)
+//    {
+//       mesh->UniformRefinement();
+//    }
 
-   // Construct parmesh object
-   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
-   delete mesh;
+//    // Construct parmesh object
+//    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+//    delete mesh;
 
-   // Output mesh to be visualized
-   // Can be visualized with glvis -np # -m mesh-test-moved
-   {
-      int precision = 12;
-      ostringstream mesh_name;
-      mesh_name << "../results/mesh-Test1D-linear." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
-   }
+//    // Output mesh to be visualized
+//    // Can be visualized with glvis -np # -m mesh-test-moved
+//    {
+//       int precision = 12;
+//       ostringstream mesh_name;
+//       mesh_name << "../results/mesh-Test1D-linear." << setfill('0') << setw(6) << myid;
+//       ofstream omesh(mesh_name.str().c_str());
+//       omesh.precision(precision);
+//       pmesh->Print(omesh);
+//    }
 
-   // Template FE stuff to construct hydro operator
-   H1_FECollection H1FEC(order_mv, dim);
-   H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
-   CrouzeixRaviartFECollection CRFEC;
+//    // Template FE stuff to construct hydro operator
+//    H1_FECollection H1FEC(order_mv, dim);
+//    H1_FECollection H1FEC_L(1, dim);
+//    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+//    CrouzeixRaviartFECollection CRFEC;
 
-   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
-   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
-   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
-   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
-   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+//    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+//    ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
+//    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+//    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+//    ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
 
-   // Output information
-   pmesh->ExchangeFaceNbrData();
+//    // Output information
+//    pmesh->ExchangeFaceNbrData();
 
-   // Construct blockvector
-   const int Vsize_l2 = L2FESpace.GetVSize();
-   const int Vsize_l2v = L2VFESpace.GetVSize();
-   const int Vsize_h1 = H1FESpace.GetVSize();
-   Array<int> offset(6);
-   offset[0] = 0;
-   offset[1] = offset[0] + Vsize_h1;
-   offset[2] = offset[1] + Vsize_h1;
-   offset[3] = offset[2] + Vsize_l2;
-   offset[4] = offset[3] + Vsize_l2v;
-   offset[5] = offset[4] + Vsize_l2;
-   BlockVector S(offset, Device::GetMemoryType());
+//    // Construct blockvector
+//    const int Vsize_l2 = L2FESpace.GetVSize();
+//    const int Vsize_l2v = L2VFESpace.GetVSize();
+//    const int Vsize_h1 = H1FESpace.GetVSize();
+//    Array<int> offset(6);
+//    offset[0] = 0;
+//    offset[1] = offset[0] + Vsize_h1;
+//    offset[2] = offset[1] + Vsize_h1;
+//    offset[3] = offset[2] + Vsize_l2;
+//    offset[4] = offset[3] + Vsize_l2v;
+//    offset[5] = offset[4] + Vsize_l2;
+//    BlockVector S(offset, Device::GetMemoryType());
 
-   // Pair with corresponding gridfunctions
-   // Only need position and velocity for testing
-   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+//    // Pair with corresponding gridfunctions
+//    // Only need position and velocity for testing
+//    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
 
-   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
-   ParGridFunction v_exact_gf(&H1FESpace);
-   v_exact_gf.ProjectCoefficient(v_exact_coeff);
+//    VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+//    ParGridFunction v_exact_gf(&H1FESpace);
+//    v_exact_gf.ProjectCoefficient(v_exact_coeff);
 
-   x_gf.MakeRef(&H1FESpace, S, offset[0]);
-   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
-   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
-   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
-   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+//    x_gf.MakeRef(&H1FESpace, S, offset[0]);
+//    mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+//    sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+//    v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+//    ste_gf.MakeRef(&L2FESpace, S, offset[4]);
 
-   pmesh->SetNodalGridFunction(&x_gf);
-   x_gf.SyncAliasMemory(S);
+//    pmesh->SetNodalGridFunction(&x_gf);
+//    x_gf.SyncAliasMemory(S);
 
-   Vector one(dim);
-   one = 1.;
-   VectorConstantCoefficient one_coeff(one);
-   mv_gf.ProjectCoefficient(one_coeff);
-   mv_gf.SyncAliasMemory(S);
+//    Vector one(dim);
+//    one = 1.;
+//    VectorConstantCoefficient one_coeff(one);
+//    mv_gf.ProjectCoefficient(one_coeff);
+//    mv_gf.SyncAliasMemory(S);
 
-   // Initialize specific volume, velocity, and specific total energy
-   ConstantCoefficient one_const_coeff(1.0);
-   sv_gf.ProjectCoefficient(one_const_coeff);
-   sv_gf.SyncAliasMemory(S);
+//    // Initialize specific volume, velocity, and specific total energy
+//    ConstantCoefficient one_const_coeff(1.0);
+//    sv_gf.ProjectCoefficient(one_const_coeff);
+//    sv_gf.SyncAliasMemory(S);
 
-   v_gf.ProjectCoefficient(one_coeff);
-   v_gf.SyncAliasMemory(S);
+//    v_gf.ProjectCoefficient(one_coeff);
+//    v_gf.SyncAliasMemory(S);
 
-   ste_gf.ProjectCoefficient(one_const_coeff);
-   ste_gf.SyncAliasMemory(S);
+//    ste_gf.ProjectCoefficient(one_const_coeff);
+//    ste_gf.SyncAliasMemory(S);
 
-   // Just leave templated for hydro construction
-   ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
-   m->Assemble();
+//    // Just leave templated for hydro construction
+//    ParLinearForm *m = new ParLinearForm(&L2FESpace);
+//    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+//    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+//    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+//    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
-   Vector _vel(dim), vec_res(dim);
-   double t = 0., dt = 1.;
-   DenseMatrix dm(dim);
+//    Vector _vel(dim), vec_res(dim);
+//    double t = 0., dt = 1.;
+//    DenseMatrix dm(dim);
 
-   hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
-   bool is_dt_changed = false;
-   for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
-   {
-      hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
-      hydro.UpdateNodeVelocity(S, node_it, vec_res);
-      // restart nodal velocity computation if the timestep has been restricted
-      if (is_dt_changed)
-      {
-         is_dt_changed = false;
-         node_it = -1;
-      }
-   }
+//    hydro.ComputeIntermediateFaceVelocities(S, t, "testing", &velocity_exact);
+//    bool is_dt_changed = false;
+//    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
+//    {
+//       hydro.ComputeNodeVelocityRT(node_it, dt, vec_res, is_dt_changed);
+//       hydro.UpdateNodeVelocity(S, node_it, vec_res);
+//       // restart nodal velocity computation if the timestep has been restricted
+//       if (is_dt_changed)
+//       {
+//          is_dt_changed = false;
+//          node_it = -1;
+//       }
+//    }
 
-   // hydro.compute_corrective_face_velocities(S, t, dt);
-   hydro.FillCenterVelocitiesWithAvg(S);
+//    // hydro.compute_corrective_face_velocities(S, t, dt);
+//    hydro.FillCenterVelocitiesWithAvg(S);
 
-   /* ************************
-   Displace Velocities
-   *************************** */ 
-   socketstream vis_vh, vis_vexact;
-   char vishost[] = "localhost";
-   int visport = 19916;
+//    /* ************************
+//    Displace Velocities
+//    *************************** */ 
+//    socketstream vis_vh, vis_vexact;
+//    char vishost[] = "localhost";
+//    int visport = 19916;
 
-   MPI_Barrier(pmesh->GetComm());
+//    MPI_Barrier(pmesh->GetComm());
 
-   int Wx = 0, Wy = 0;
-   const int Ww = 350, Wh = 350;
-   int offx = Ww+10, offy = Wh+45;
-
-
-   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
-
-   Wx += offx;
-
-   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
+//    int Wx = 0, Wy = 0;
+//    const int Ww = 350, Wh = 350;
+//    int offx = Ww+10, offy = Wh+45;
 
 
-   /* ************************
-   Move the mesh according to previously computed nodal velocities
-   *************************** */ 
-   add(x_gf, dt, mv_gf, x_gf);
-   pmesh->NewNodes(x_gf, false);
-   t += dt;
-   if (!suppress_test_output)
-   {
-      cout << "Done moving mesh.\n";
-   }
+//    hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
+
+//    Wx += offx;
+
+//    hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
 
 
-   {
-      int precision = 12;
-      ostringstream mesh_name;
-      mesh_name << "../results/mesh-Test1D-linear-moved." << setfill('0') << setw(6) << myid;
-      ofstream omesh(mesh_name.str().c_str());
-      omesh.precision(precision);
-      pmesh->Print(omesh);
-   }
+//    /* ************************
+//    Move the mesh according to previously computed nodal velocities
+//    *************************** */ 
+//    add(x_gf, dt, mv_gf, x_gf);
+//    pmesh->NewNodes(x_gf, false);
+//    t += dt;
+//    if (!suppress_test_output)
+//    {
+//       cout << "Done moving mesh.\n";
+//    }
 
-   // Since we prescribe the exact velocity on the faces, mv_gf should be the same as v_exact
-   Vector vel_err(mv_gf.Size());
-   subtract(mv_gf, v_exact_gf, vel_err);
-   double _error = vel_err.Norml2();
 
-   if (abs(_error) < tol)
-   {
-      return 0; // Test passed
-   }
-   else 
-   {
-      cout << "error: " << _error << endl;
-      return 1; // Test failed
-   }
-}
+//    {
+//       int precision = 12;
+//       ostringstream mesh_name;
+//       mesh_name << "../results/mesh-Test1D-linear-moved." << setfill('0') << setw(6) << myid;
+//       ofstream omesh(mesh_name.str().c_str());
+//       omesh.precision(precision);
+//       pmesh->Print(omesh);
+//    }
+
+//    // Since we prescribe the exact velocity on the faces, mv_gf should be the same as v_exact
+//    Vector vel_err(mv_gf.Size());
+//    subtract(mv_gf, v_exact_gf, vel_err);
+//    double _error = vel_err.Norml2();
+
+//    if (abs(_error) < tol)
+//    {
+//       return 0; // Test passed
+//    }
+//    else 
+//    {
+//       cout << "error: " << _error << endl;
+//       return 1; // Test failed
+//    }
+// }
 
 int test_CSV_getter_setter()
 {

@@ -379,8 +379,8 @@ int test_vel_field_1()
    dt = hydro.GetTimestep();
    cout << "dt: " << dt << endl;
 
-   hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
-   // hydro.ComputeMeshVelocities(S, t, dt);
+   // hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
+   hydro.ComputeMeshVelocities(S, t, dt);
    cout << "Done computing mesh velocities\n";
 
    /* ************************

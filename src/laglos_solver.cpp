@@ -674,8 +674,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
    if (mm)
    {
       ComputeIntermediateFaceVelocities(S, t);
-      // Compute mesh velocities
-      // This function may change the timestep
+      
       if (dim == 1)
       {
          /* Use intermediate face velocities to move the mesh */

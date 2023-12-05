@@ -33,9 +33,10 @@ private:
    double _a = 0.;     
    double _b = 0.;
    double _gamma = 1.4;
-   bool distort_mesh = false;
-   bool known_exact_solution = true;
-   bool bcs = false;
+   bool _distort_mesh = false;
+   bool _known_exact_solution = true;
+   bool _bcs = false;
+   string _indicator = "Lax";
 
    double rhoL = 0.445, rhoR = 0.5, pL = 3.528, pR = 0.571, vL = 0.698, vR = 0.;
    double x_center = 0.5;
@@ -46,12 +47,11 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
-      this->set_bcs_indicator(bcs);
+      this->set_indicator(_indicator);
+      this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
    }
-
-   /* Override getters */
-   bool get_distort_mesh() override { return distort_mesh; }
-   bool has_exact_solution() override { return known_exact_solution; }
 
    /* Override specific update functions */
    void lm_update(const double b_covolume) override 

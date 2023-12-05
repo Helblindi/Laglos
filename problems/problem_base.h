@@ -42,39 +42,43 @@ private:
    string indicator = ""; // Possible: saltzmann
 
    // CFL change
-   bool _change_cfl = false;
-   constexpr static double CFL_first = 0.5;
-   constexpr static double CFL_second = 0.5;
-   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+   bool change_cfl = false;
+   double cfl_first = 0.5;
+   double cfl_second = 0.5;
+   double cfl_time_change = 0.;
 
 public:
-   virtual bool change_cfl() { return _change_cfl; }
-   virtual double get_cfl_first() { return CFL_first; }
-   virtual double get_cfl_second() { return CFL_second; }
-   virtual double get_cfl_time_change() { return CFL_time_change; }
-   
    // Setters
    void set_a(const double &_a) { a = _a; }
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
    void set_bcs_indicator(const bool &tvalue) { this->bcs = tvalue; }
-
+   void set_distort_mesh(const bool &_distort_mesh) { distort_mesh = _distort_mesh; }
+   void set_exact_solution(const bool &_known_exact_solution) { known_exact_solution = _known_exact_solution; }
+   // CFL change
+   void set_cfl_change(const bool &_change_cfl) { change_cfl = _change_cfl; }
+   void set_cfl_first(const double &_cfl_first) { cfl_first = _cfl_first; }
+   void set_cfl_second(const double &_cfl_second) { cfl_second = _cfl_second; }
+   void set_cfl_time_change(const double &_cfl_time_change) { cfl_time_change = _cfl_time_change; }
 
    // Getters
    double get_a() { return a; }
    double get_b() { return b; }
    string get_indicator() { return indicator; }
-   virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
-   virtual bool get_distort_mesh() { return distort_mesh; }
-   virtual bool has_exact_solution() { return known_exact_solution; }
    bool has_boundary_conditions() { return bcs; }
-   
-   /* Functions that update the class, can be overridden */
-   virtual void lm_update(const double b_covolume) {
-   }
-   virtual void update(Vector x_gf, double t = 0.) {
-   }
+   bool get_distort_mesh() { return distort_mesh; }
+   bool has_exact_solution() { return known_exact_solution; }
+   // CFL change
+   bool get_cfl_change() { return change_cfl; }
+   double get_cfl_first() { return cfl_first; }
+   double get_cfl_second() { return cfl_second; }
+   double get_cfl_time_change() { return cfl_time_change; }
+
+   /* Optionally overridden */
+   virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
+   virtual void lm_update(const double b_covolume) {}
+   virtual void update(Vector vec, double t = 0.) {}
 
    /* ProblemDescription */
    static double internal_energy(const Vector &U)

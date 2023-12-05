@@ -40,8 +40,8 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _a = 1., _b = 1., _gamma = 1.02;
-   bool distort_mesh = false;
-   bool known_exact_solution = true; // exact is known, information in supplementary material
+   bool _distort_mesh = false;
+   bool _known_exact_solution = true; // exact is known, information in supplementary material
    bool _bcs = false; // Indicator for boundary conditions
    string _indicator = "Vdw1"; // Possible: saltzmann
 
@@ -63,11 +63,11 @@ public:
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
    }
 
    /* Override getters */
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
    virtual void update(Vector x_gf, double t = 0.) override {
       cout << "Vdw1::update()\n";
       // cout << "x_gf in update: " << endl;

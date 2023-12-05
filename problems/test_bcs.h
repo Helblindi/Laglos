@@ -33,8 +33,8 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _a = 0., _b = 0., _gamma = 7/5.;
-   bool distort_mesh = false;
-   bool known_exact_solution = false;
+   bool _distort_mesh = false;
+   bool _known_exact_solution = false;
    bool _bcs = true; // Indicator for boundary conditions
    string _indicator = "TestBCs"; // Possible: saltzmann
 
@@ -54,16 +54,9 @@ public:
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
    }
-
-   /* Override getters */
-   bool get_distort_mesh() override { return distort_mesh; }
-   bool has_exact_solution() override { return known_exact_solution; }
-
-   bool change_cfl() override { return _change_cfl; }
-   // double get_cfl_first() override { return CFL_first; }
-   // double get_cfl_second() override { return CFL_second; }
-   // double get_cfl_time_change() override { return CFL_time_change; }
 
    /* Override specific update functions */
    void lm_update(const double b_covolume) override 

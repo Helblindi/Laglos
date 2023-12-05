@@ -30,9 +30,10 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _a = 1., _b = 1., _gamma = 1.02;
-   bool distort_mesh = false;
-   bool known_exact_solution = false;
+   bool _distort_mesh = false;
+   bool _known_exact_solution = false;
    bool _bcs = false;
+   string _indicator = "Vdw4";
 
    // Problem specifics
    double initial_shock = 0.25;
@@ -49,12 +50,11 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
    }
-
-   /* Override getters */
-   virtual bool get_distort_mesh() override { return distort_mesh; }
-   virtual bool has_exact_solution() override { return known_exact_solution; }
 
    /*********************************************************
     * Problem Description functions

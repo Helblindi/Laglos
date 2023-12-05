@@ -850,7 +850,7 @@ int main(int argc, char *argv[]) {
    {
       hydro.BuildDijMatrix(S);
       /* Check if we need to change CFL */
-      if (problem_class->change_cfl() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
+      if (problem_class->get_cfl_change() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
       {
          cout << "Changing CFL for Saltzman at time = " << t << endl;
          double CFL_new = problem_class->get_cfl_second();

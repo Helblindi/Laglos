@@ -33,16 +33,16 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _a = 0., _b = 0., _gamma = 5./3.;
-   bool distort_mesh = true;
-   bool known_exact_solution = true;
-   bool bcs = true;
+   bool _distort_mesh = true;
+   bool _known_exact_solution = true;
+   bool _bcs = true;
    string _indicator = "saltzmann";
 
    // CFL change
    bool _change_cfl = true;
-   constexpr static double CFL_first = 0.01;
-   constexpr static double CFL_second = 0.25;
-   constexpr static double CFL_time_change = 0.01; // From Boscheri's paper
+   double _cfl_first = 0.01;
+   double _cfl_second = 0.25;
+   double _cfl_time_change = 0.01; // From Boscheri's paper
 
    double rotation_angle = 0.; // 0 - 1D horizontal velocity
    double rhoL = 1.0, rhoR = 1.0;;
@@ -66,17 +66,15 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(bcs);
+      this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
+      // CFL change
+      this->set_cfl_change(_change_cfl);
+      this->set_cfl_first(_cfl_first);
+      this->set_cfl_second(_cfl_second);
+      this->set_cfl_time_change(_cfl_time_change);
    }
-
-   /* Override getters */
-   bool get_distort_mesh() override { return distort_mesh; }
-   bool has_exact_solution() override { return known_exact_solution; }
-
-   bool change_cfl() override { return _change_cfl; }
-   double get_cfl_first() override { return CFL_first; }
-   double get_cfl_second() override { return CFL_second; }
-   double get_cfl_time_change() override { return CFL_time_change; }
 
    /* Override specific update functions */
    void lm_update(const double b_covolume) override 

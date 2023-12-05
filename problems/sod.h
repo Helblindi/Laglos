@@ -31,9 +31,9 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _a = 0., _b = 0., _gamma = 1.4;
-   bool distort_mesh = false;
-   bool known_exact_solution = true;
-   bool bcs = true; // Indicator for boundary conditions
+   bool _distort_mesh = false;
+   bool _known_exact_solution = true;
+   bool _bcs = true; // Indicator for boundary conditions
    string _indicator = "Sod"; // Possible: saltzmann
 
    double rhoL = 1.0, rhoR = 0.125, pL = 1.0, pR = 0.1, vL = 0., vR = 0.;
@@ -46,13 +46,11 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(bcs);
+      this->set_bcs_indicator(_bcs);
+      this->set_distort_mesh(_distort_mesh);
+      this->set_exact_solution(_known_exact_solution);
    }
    
-   /* Override getters */
-   bool get_distort_mesh() override { return distort_mesh; }
-   bool has_exact_solution() override { return known_exact_solution; }
-
    /* Override specific update functions */
    void lm_update(const double b_covolume) override 
    {

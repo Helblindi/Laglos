@@ -374,6 +374,11 @@ int main(int argc, char *argv[]) {
          problem_class = new SodRadial<dim>();
          break;
       }
+      case 100:
+      {
+         problem_class = new TestBCs<dim>();
+         break;
+      }
       default:
       {
          problem_class = new ProblemTemplate<dim>();
@@ -610,6 +615,21 @@ int main(int argc, char *argv[]) {
    ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
+   /* Gridfunctions used in Triple Point */
+   ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
+
+   if (problem == 12)
+   {
+      Vector U(dim+2);
+      for (int i = 0; i < press_gf.Size(); i++)
+      {
+         hydro.GetCellStateVector(S, i, U);
+         double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+         press_gf[i] = pressure;
+         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+      }
+   }
+
    // Compute the density if we need to visualize it
    if (visualization || gfprint)
    {
@@ -656,16 +676,7 @@ int main(int argc, char *argv[]) {
          // pressure, ste, gamma
          vis_press.precision(8);
          vis_gamma.precision(8);
-         ParGridFunction press_gf(&L2FESpace);
-         ParGridFunction gamma_gf(&L2FESpace);
-         Vector U(dim+2);
-         for (int i = 0; i < press_gf.Size(); i++)
-         {
-            hydro.GetCellStateVector(S, i, U);
-            double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
-            press_gf[i] = pressure;
-            gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
-         }
+
          // Specific total energy
          VisualizeField(vis_ste, vishost, visport, ste_gf,
                         "Specific Total Energy", Wx, Wy, Ww, Wh);
@@ -791,6 +802,19 @@ int main(int argc, char *argv[]) {
       ste_ofs.precision(8);
       ste_gf.SaveAsOne(ste_ofs);
       ste_ofs.close();
+
+      /* Print gamma grid function for Triple Point problem */
+      if (problem == 12) 
+      {
+         std::ostringstream gamma_name;
+         gamma_name << gfprint_path 
+                    << "gamma.gf";
+
+         std::ofstream gamma_ofs(gamma_name.str().c_str());
+         gamma_ofs.precision(8);
+         gamma_gf.SaveAsOne(gamma_ofs);
+         gamma_ofs.close();
+      }
    }
 
    // Perform the time-integration by looping over time iterations
@@ -1303,7 +1327,19 @@ int main(int argc, char *argv[]) {
       hydro.SaveStateVecsToFile(S_exact, sv_output_prefix, sv_ex_filename_suffix.str());
    }
 
-   /* When the exact solution is known, print out an error file */
+   /* 
+   * Whether or not the exact solution is known, we are still interesting
+   * in the mass defect convergence.  In the case an exact solution is known,
+   * print the cooresponding L1, L2, Linf errors as well.
+   */
+   ostringstream convergence_filename;
+   convergence_filename << output_path << "convergence/temp_output/np" << num_procs;
+
+   /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
+   double rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
+          rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,
+          rho_Max_error_n = 0., vel_Max_error_n = 0., ste_Max_error_n = 0.;
+
    if (problem_class->has_exact_solution())
    {
       if (problem_class->get_indicator() == "Vdw1")
@@ -1315,17 +1351,6 @@ int main(int argc, char *argv[]) {
       ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
       ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
       ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
-
-      /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
-      double rho_L1_error_n = 0.,
-             vel_L1_error_n = 0.,
-             ste_L1_error_n = 0.,
-             rho_L2_error_n = 0.,
-             vel_L2_error_n = 0.,
-             ste_L2_error_n = 0.,
-             rho_Max_error_n = 0.,
-             vel_Max_error_n = 0.,
-             ste_Max_error_n = 0.;
 
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
@@ -1348,61 +1373,58 @@ int main(int argc, char *argv[]) {
       vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
       ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
 
-      /* Get composite errors values */
-      const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
-      const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
-      const double Max_error = (rho_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
+      delete rho_ex;
+      delete vel_ex;
+      delete ste_ex;
+   }
+   /* Get composite errors values, will return 0 if exact solution is not known */
+   const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
+   const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
+   const double Max_error = (rho_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
 
-
-      if (Mpi::Root())
-      {
-         ostringstream convergence_filename;
-         convergence_filename << output_path << "convergence/temp_output/np" << num_procs;
-
-         if (rs_levels != 0) {
-            convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
-         }
-         if (rp_levels != 0) {
-            convergence_filename << "_p" << setfill('0') << setw(2) << rp_levels;
-         }
-         convergence_filename << "_refinement_"
-                              << setfill('0') << setw(2)
-                              << to_string(rp_levels + rs_levels)
-                              << ".out";
-         ofstream convergence_file(convergence_filename.str().c_str());
-         convergence_file.precision(precision);
-         convergence_file << "Processor_Runtime " << "1." << "\n"
-                           << "n_processes " << num_procs << "\n"
-                           << "n_refinements "
-                           << to_string(rp_levels + rs_levels) << "\n"
-                           << "n_Dofs " << global_vSize << "\n"
-                           << "h " << hmin << "\n"
-                           // rho
-                           << "rho_L1_Error " << rho_L1_error_n << "\n"
-                           << "rho_L2_Error " << rho_L2_error_n << "\n"
-                           << "rho_Linf_Error " << rho_Max_error_n << "\n"
-                           // vel
-                           << "vel_L1_Error " << vel_L1_error_n << "\n"
-                           << "vel_L2_Error " << vel_L2_error_n << "\n"
-                           << "vel_Linf_Error " << vel_Max_error_n << "\n"
-                           // ste
-                           << "ste_L1_Error " << ste_L1_error_n << "\n"
-                           << "ste_L2_Error " << ste_L2_error_n << "\n"
-                           << "ste_Linf_Error " << ste_Max_error_n << "\n"
-                           // total
-                           << "L1_Error " << L1_error << "\n"
-                           << "L2_Error " << L2_error << "\n"
-                           << "Linf_Error " << Max_error << "\n"
-                           << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
-                           << "dt " << dt << "\n"
-                           << "Endtime " << t << "\n";
-                     
-         convergence_file.close();
+   /* In either case, write convergence file. */
+   if (Mpi::Root())
+   {
+      if (rs_levels != 0) {
+         convergence_filename << "_s" << setfill('0') << setw(2) << rs_levels;
       }
-         delete rho_ex;
-         delete vel_ex;
-         delete ste_ex;
-   }   
+      if (rp_levels != 0) {
+         convergence_filename << "_p" << setfill('0') << setw(2) << rp_levels;
+      }
+      convergence_filename << "_refinement_"
+                           << setfill('0') << setw(2)
+                           << to_string(rp_levels + rs_levels)
+                           << ".out";
+      ofstream convergence_file(convergence_filename.str().c_str());
+      convergence_file.precision(precision);
+      convergence_file << "Processor_Runtime " << "1." << "\n"
+                        << "n_processes " << num_procs << "\n"
+                        << "n_refinements "
+                        << to_string(rp_levels + rs_levels) << "\n"
+                        << "n_Dofs " << global_vSize << "\n"
+                        << "h " << hmin << "\n"
+                        // rho
+                        << "rho_L1_Error " << rho_L1_error_n << "\n"
+                        << "rho_L2_Error " << rho_L2_error_n << "\n"
+                        << "rho_Linf_Error " << rho_Max_error_n << "\n"
+                        // vel
+                        << "vel_L1_Error " << vel_L1_error_n << "\n"
+                        << "vel_L2_Error " << vel_L2_error_n << "\n"
+                        << "vel_Linf_Error " << vel_Max_error_n << "\n"
+                        // ste
+                        << "ste_L1_Error " << ste_L1_error_n << "\n"
+                        << "ste_L2_Error " << ste_L2_error_n << "\n"
+                        << "ste_Linf_Error " << ste_Max_error_n << "\n"
+                        // total
+                        << "L1_Error " << L1_error << "\n"
+                        << "L2_Error " << L2_error << "\n"
+                        << "Linf_Error " << Max_error << "\n"
+                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                        << "dt " << dt << "\n"
+                        << "Endtime " << t << "\n";
+                  
+      convergence_file.close();
+   } // Writing convergence file
    
    if (suppress_output)
    {

@@ -353,6 +353,8 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          }
       }
    } // End face iterator
+   // cout << "Printing dij_sparse:\n";
+   // dij_sparse->Print(cout);
 }
 
 
@@ -635,6 +637,16 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
+   // cout << "Printing select nodal velocities.\n";
+   // Vector tmp_vel(dim);
+   // Array<int> des_nodes({49,50,51,52,53,54,55});
+   // for (int i = 0; i < des_nodes.Size(); i++)
+   // {
+   //    cout << "nodal velocity at " << des_nodes[i] << " is: ";
+   //    GetNodeVelocity(S, des_nodes[i], tmp_vel);
+   //    tmp_vel.Print(cout);
+   // }
+
    add(x_gf, dt, mv_gf, x_gf);
    pmesh->NewNodes(x_gf, false);
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
@@ -664,7 +676,17 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
       ComputeIntermediateFaceVelocities(S, t);
       // Compute mesh velocities
       // This function may change the timestep
-      if (dim > 1)
+      if (dim == 1)
+      {
+         /* Use intermediate face velocities to move the mesh */
+         for (int face = 0; face < num_faces; face++)
+         {
+            Vector _vel(dim);
+            GetIntermediateFaceVelocity(face, _vel);
+            UpdateNodeVelocity(S, face, _vel);
+         }
+      }
+      else 
       {
          switch (mv_option)
          {
@@ -746,6 +768,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       sum_validation = 0.;
       GetCellStateVector(S, ci, U_i);
       val = U_i;
+      // cout << "cell state vector at tn:\n";
+      // val.Print(cout);
 
       switch (dim)
       {
@@ -796,7 +820,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
             // flux contribution
             DenseMatrix dm = pb->flux(U_j);
+            // cout << "flux at cj = " << cj << ":\n";
+            // dm.Print(cout);
             dm += F_i; 
+            // cout << "flux at ci = " << ci << ":\n";
+            // F_i.Print(cout);
             Vector y(dim+2);
             dm.Mult(c, y);
 
@@ -810,6 +838,18 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                Vector z = U_j;
                z -= U_i;
                sums.Add(d, z);
+
+               /* REMOVE, checking visocity */
+               // Array<int> tmp_dofs(2);
+               // tmp_dofs[0] = 1, tmp_dofs[1]=2;
+               // Vector tmp_vel(dim);
+               // z.GetSubVector(tmp_dofs, tmp_vel);
+               // if (tmp_vel[0] < 0.)
+               // {
+               //    cout << "\tcells ci " << ci << " and cj " << cj << " have a neg vel contribution:\n";
+               //    tmp_vel.Print(cout);
+               //    cout << "corresponding d: " << d << endl;
+               // }
             }
          }
          else
@@ -823,14 +863,13 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
             U_i_bdry = U_i;
-            y_temp_bdry = 0.;
+            /* Remove */
+            // U_i_bdry[1] = 0., U_i_bdry[2] = 0.;
+            // const DenseMatrix F_i_bdry = pb->flux(U_i_bdry);
+            // F_i_bdry.Mult(c, y_temp);
+            // y_temp_bdry = 0.;
 
             /* Enforce Boundary Conditions */
-            // if (pb->get_indicator() == "noh")
-            // {
-            //    // Since we will enforce Dirichlet conditions on all boundary cells, 
-            //    // this enforcement will be done after the face iterator
-            // }
             // if (pb->get_indicator() == "Sod" && (bdr_attr == 1 || bdr_attr == 3))
             // {
             //    /** 
@@ -910,12 +949,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       } // End Face iterator
 
       // Enforce exact condition on boundary for Isentropic Vortex
-      if (pb->has_boundary_conditions() && is_boundary_cell)
+      if (pb->get_indicator() == "IsentropicVortex" && is_boundary_cell)
       {
-         if (pb->get_indicator() == "IsentropicVortex")
-         {
-            EnforceExactBCOnCell(S, ci, t, dt, val);
-         }
+         EnforceExactBCOnCell(S, ci, t, dt, val);
       }
       else
       {
@@ -928,97 +964,164 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          sums /= _mass;
          val += sums;
       }
+
+      // cout << "pre BC implementation velocity sv:\n";
+      // val.Print(cout);
+      // cout << "sum:\n";
+      // sums.Print(cout);
       
       /* Iterate over cell boundaries, i.e. corner cells could have multiple bc flags */
       // Post processing modify computed values to enforce BCs
-      for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
+      if (is_boundary_cell)
       {
-         int cell_bdr = cell_bdr_arr[cell_bdr_it];
-         Array<int> tmp_dofs(2);
-         tmp_dofs[0] = 1, tmp_dofs[1]=2;
-         Vector tmp_vel(dim), normal(dim);
-         normal = 0.;
-         val.GetSubVector(tmp_dofs, tmp_vel);
-
-         if (pb->get_indicator() == "Sod")
+         for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
          {
-            if (cell_bdr == 1)
-            {
-               // bottom
-               normal[1] = -1.;
-            }
-            else if (cell_bdr == 3)
-            {
-               // top
-               normal[1] = 1.;
-            }
+            int cell_bdr = cell_bdr_arr[cell_bdr_it];
+            Array<int> tmp_dofs(2);
+            tmp_dofs[0] = 1, tmp_dofs[1]=2;
+            Vector tmp_vel(dim), normal(dim);
+            normal = 0.;
+            val.GetSubVector(tmp_dofs, tmp_vel);
 
-            double coeff = tmp_vel * normal;
-            normal *= coeff;
-            subtract(tmp_vel, normal, tmp_vel);
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-         else if (pb->get_indicator() == "saltzmann")
-         {
-            if (cell_bdr == 2)
+            if (pb->get_indicator() == "Sod" && dim > 1)
             {
-               // bottom
-               normal[1] = -1.;
-            }
-            else if (cell_bdr == 3)
-            {
-               // right
-               normal[0] = 1.;
-            }
-            else if (cell_bdr == 4)
-            {
-               // top
-               normal[1] = 1.;
-            }
+               if (cell_bdr == 1)
+               {
+                  // bottom
+                  normal[1] = -1.;
+               }
+               else if (cell_bdr == 3)
+               {
+                  // top
+                  normal[1] = 1.;
+               }
 
-            double coeff = tmp_vel * normal;
-            normal *= coeff;
-            subtract(tmp_vel, normal, tmp_vel);
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-         else if (pb->get_indicator() == "TriplePoint" || 
-                  pb->get_indicator() == "SodRadial" ||
-                  pb->get_indicator() == "Sedov")
-         {
-            switch (cell_bdr)
-            {
-            case 0:
-               // not a boundary cell
-               continue;
-            case 1:
-               // bottom
-               normal[1] = -1.;
-               break;
-            
-            case 2:
-               // right
-               normal[0] = 1.;
-               break;
-            
-            case 3:
-               // top
-               normal[1] = 1.;
-               break;
-            
-            case 4:
-               // left
-               normal[0] = -1;
-               break;
-            
-            default:
-               MFEM_ABORT("Not a valid cell_bdr index.\n");
+               double coeff = tmp_vel * normal;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               val.SetSubVector(tmp_dofs, tmp_vel);
             }
+            else if (pb->get_indicator() == "saltzmann")
+            {
+               if (cell_bdr == 2)
+               {
+                  // bottom
+                  normal[1] = -1.;
+               }
+               else if (cell_bdr == 3)
+               {
+                  // right
+                  normal[0] = 1.;
+               }
+               else if (cell_bdr == 4)
+               {
+                  // top
+                  normal[1] = 1.;
+               }
 
-            double coeff = tmp_vel * normal;
-            tmp_vel.Add(-coeff, normal);
-            val.SetSubVector(tmp_dofs, tmp_vel);
-         }
-      } // End post processing BC application
+               double coeff = tmp_vel * normal;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               val.SetSubVector(tmp_dofs, tmp_vel);
+            }
+            else if (pb->get_indicator() == "TriplePoint" || 
+                     pb->get_indicator() == "SodRadial" ||
+                     pb->get_indicator() == "Sedov")
+            {
+               // cout << "enforcing BCs for TP on cell: " << ci << endl;
+               switch (cell_bdr)
+               {
+               case 0:
+                  // not a boundary cell
+                  continue;
+               case 1:
+                  // bottom
+                  // cout << "indic: " << 1 << endl;
+                  normal[1] = -1.;
+                  break;
+               
+               case 2:
+                  // right
+                  // cout << "indic: " << 2 << endl;
+                  normal[0] = 1.;
+                  break;
+               
+               case 3:
+                  // top
+                  // cout << "indic: " << 3 << endl;
+                  normal[1] = 1.;
+                  break;
+               
+               case 4:
+                  // left
+                  // cout << "indic: " << 4 << endl;
+                  normal[0] = -1;
+                  break;
+               
+               default:
+                  MFEM_ABORT("Not a valid cell_bdr index.\n");
+               }
+
+               // cout << "normal: ";
+               // normal.Print(cout);
+               double coeff = tmp_vel * normal;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               coeff = tmp_vel * normal;
+               if (coeff > 1E-12)
+               {
+                  cout << "Normal component not removed: " << coeff << endl;
+                  tmp_vel.Print(cout);
+                  assert(false);
+               }
+               val.SetSubVector(tmp_dofs, tmp_vel);
+            }
+            else if (pb->get_indicator() == "TestBCs")
+            {
+               switch (cell_bdr)
+               {
+               case 0:
+                  // not a boundary cell
+                  continue;
+               case 1:
+                  // bottom
+                  // cout << "indic: " << 1 << endl;
+                  normal[1] = -1.;
+                  break;
+               
+               case 2:
+                  // right
+                  // cout << "indic: " << 2 << endl;
+                  normal[0] = 1.;
+                  break;
+               
+               case 3:
+                  // top
+                  // cout << "indic: " << 3 << endl;
+                  normal[1] = 1.;
+                  break;
+               
+               case 4:
+                  // left
+                  // cout << "indic: " << 4 << endl;
+                  normal[0] = -1;
+                  break;
+               
+               default:
+                  MFEM_ABORT("Not a valid cell_bdr index.\n");
+               }
+
+               double coeff = tmp_vel * normal;
+               normal *= coeff;
+               subtract(tmp_vel, normal, tmp_vel);
+               val.SetSubVector(tmp_dofs, tmp_vel);
+            }
+         } // End post processing BC application
+      
+      } // End is_bdry_cell
+
+      // cout << "post BC implementation velocity sv:\n";
+      // val.Print(cout);
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);
@@ -1306,6 +1409,58 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       VectorConstantCoefficient zero_coeff(zero);
 
       mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
+   }
+   else if (pb->get_indicator() == "TestBCs")
+   {
+      int bdr_ind = 0;
+      Vector normal(dim), node_v(dim);
+      for (int i = 0; i < NVDofs_H1; i++)
+      {
+         bdr_ind = BdrVertexIndexingArray[i];
+         /* Get corresponding normal vector */
+         switch (bdr_ind)
+         {
+         case 1:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            break;
+         
+         case 2:
+            // right
+            normal[0] = 1., normal[1] = 0.;
+            break;
+         
+         case 3:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case 4:
+            // left
+            normal[0] = -1., normal[1] = 0.;
+            break;
+         
+         case -1:
+            // Not a boundary vertex
+            continue;
+
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+         }
+
+         if (bdr_ind == -1) 
+         {
+            MFEM_ABORT("Dont correct interior vertices.\n");
+         }
+         /* Correct node velocity accordingly */
+         GetNodeVelocity(S, i, node_v);
+
+         double coeff = node_v * normal;
+         node_v.Add(-coeff, normal);
+
+         UpdateNodeVelocity(S, i, node_v);
+      }
    }
 }
 
@@ -1664,16 +1819,7 @@ void LagrangianLOOperator<dim>::
          int index = face + i * num_faces;
          v_CR_gf[index] = Vf[i];
       }
-
-      // Put face velocity into object [for MFEM implementation, has errors]
-      // for (int i = 0; i < dim; i++)
-      // {
-      //    int index = face + i * num_faces;
-      //    v_CR_gf_fluxes[index] = Vf_flux[i];
-      // }
-
    } // End face iterator
-
 }
 
 

@@ -9,14 +9,14 @@ MODULE vdw
 CONTAINS
   SUBROUTINE f_test()
     use iso_c_binding
-    write(*,*) "testing in fortran"
+   !  write(*,*) "testing in fortran"
   END SUBROUTINE f_test
 
   SUBROUTINE f_add(xxx,xxy,xxz) 
     use iso_c_binding
     real(c_double), INTENT(in) :: xxx, xxy
     real(c_double), INTENT(out) :: xxz
-    write(*,*) "adding in fortran"
+   !  write(*,*) "adding in fortran"
     xxz = xxx + xxy
   END SUBROUTINE f_add
 
@@ -29,7 +29,7 @@ CONTAINS
     real(KIND=8), INTENT(out) :: out_vL, out_vR, out_pL, out_pR !out_state
    !  real(c_double), INTENT(in) :: in_state(*), in_data(*)
    !  real(c_double), INTENT(out) :: out_state(*)
-    write(*,*) "initialize_vdw call"
+   !  write(*,*) "initialize_vdw call"
     rho_plus = rhop
     avdw      = in_a
     bvdw      = in_b
@@ -55,13 +55,13 @@ CONTAINS
     out_vR = vR
     out_pL = pL
     out_pR = pR
-    WRITE(*,*) 'avdw, bvdw, gamma_vdw', avdw, bvdw, gamma_vdw
-    WRITE(*,*) 'rhominus, SL, SR', rho_minus, SL, SR
-    WRITE(*,*) 'p_minus, p_plus, v_minus, v_plus', p_minus, p_plus, v_minus, v_plus
-    WRITE(*,*) 'XL, XR', XL, XR
-    WRITE(*,*) 'rhoL, rhoR', rhoL, rhoR
-    WRITE(*,*) 'vL, vR', VL, VR
-    WRITE(*,*) 'pL, pR', pL, pR
+   !  WRITE(*,*) 'avdw, bvdw, gamma_vdw', avdw, bvdw, gamma_vdw
+   !  WRITE(*,*) 'rhominus, SL, SR', rho_minus, SL, SR
+   !  WRITE(*,*) 'p_minus, p_plus, v_minus, v_plus', p_minus, p_plus, v_minus, v_plus
+   !  WRITE(*,*) 'XL, XR', XL, XR
+   !  WRITE(*,*) 'rhoL, rhoR', rhoL, rhoR
+   !  WRITE(*,*) 'vL, vR', VL, VR
+   !  WRITE(*,*) 'pL, pR', pL, pR
   END SUBROUTINE initialize_vdw
   
   FUNCTION pressure_vdw(un) RESULT(vv)

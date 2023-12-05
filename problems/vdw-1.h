@@ -69,7 +69,7 @@ public:
 
    /* Override getters */
    virtual void update(Vector x_gf, double t = 0.) override {
-      cout << "Vdw1::update()\n";
+      // cout << "Vdw1::update()\n";
       // cout << "x_gf in update: " << endl;
       // x_gf.Print(cout);
       // x_gf /= t;
@@ -155,9 +155,9 @@ public:
 
    void compute_vdw_arrays(Vector x_gf)
    {
-      cout << "Vdw1::compute_vdw_arrays()\n";
-      cout << "x_gf in compute_vdw_arrays: " << endl;
-      x_gf.Print(cout);
+      // cout << "Vdw1::compute_vdw_arrays()\n";
+      // cout << "x_gf in compute_vdw_arrays: " << endl;
+      // x_gf.Print(cout);
 
       // First sort x_gf
       this->vec_size = x_gf.Size();
@@ -170,7 +170,7 @@ public:
       for (int i = 0; i < vec_size; i++)
       {
          x_sorted_vec[i] = x_gf_sorted[i];
-         cout << "x: " << x_gf_sorted[i] << endl;
+         // cout << "x: " << x_gf_sorted[i] << endl;
       }
       
       Vector rho(vec_size), v(vec_size), p(vec_size);
@@ -185,7 +185,7 @@ public:
       v_d = rho.GetData();
       p_d = rho.GetData();
 
-      cout << "Done computing vdw arrays\n";
+      // cout << "Done computing vdw arrays\n";
    }
 
    void getIndex(const double val, int & index)
@@ -199,7 +199,7 @@ public:
             return;
          }
       }
-      cout << "Never found index for val: " << val << endl;
+      // cout << "Never found index for val: " << val << endl;
    }
 
 // private:

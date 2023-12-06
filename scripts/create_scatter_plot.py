@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 
 # check command line inputs
-assert len(sys.argv) == 4, "This file needs 2 input arguments: directory, num cols, but " + str(len(sys.argv)) + " were given."
+assert len(sys.argv) == 4, "This file needs 3 input arguments: directory, num cols, but " + str(len(sys.argv)) + " were given."
 approx_loc = str(sys.argv[1])
 exact_loc = str(sys.argv[2])
 dofs = int(sys.argv[3])
@@ -23,7 +23,7 @@ def main():
    df_approx = pd.read_csv(approx_loc, dtype=float).sort_values(by=['x'])
    df_exact = pd.read_csv(exact_loc, dtype=float).sort_values(by=['x'])
    
-   plt.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[1]], 'k-', label="Exact solution")
+   # plt.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[1]], 'k-', label="Exact solution")
    _label = "# dof = " + str(dofs)
    plt.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[1]], label=_label, s=1)
 

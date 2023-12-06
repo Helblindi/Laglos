@@ -36,7 +36,7 @@ private:
    string _indicator = "Vdw3";
 
    // Problem specifics
-   double initial_shock = 0.25;
+   double initial_shock = 0.0;
    double rhoL = 0.25, rhoR = 0.000049;
    double vL = 0., vR = 0.;
    double pL = 3.e-2;

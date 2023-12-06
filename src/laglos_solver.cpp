@@ -2824,35 +2824,36 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
-   // Get gfs
-   ParGridFunction rho_gf, sv_gf, v_gf, ste_gf;
-   Vector* sptr = const_cast<Vector*>(&S);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
-   v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
-   ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
-
-   Vector center(dim);
-
-   // Fill density
+   Vector center(dim), U(dim+2);
+   double pressure=0., ss=0., x_val=0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,rho,v\n";
+   fstream_sv << "x,rho,v,ste,p,ss\n";
 
-   
    for (int i = 0; i < NDofs_L2; i++)
    {
+      // compute pressure and sound speed on the fly
+      GetCellStateVector(S, i, U);
+      pressure = pb->pressure(U, pmesh->GetAttribute(i));
+      ss = pb->sound_speed(U);
+      
       pmesh->GetElementCenter(i, center);
-
-      double x_val = 0.;
 
       // We fill the x-coordinate depending on the problem.
       // This really depends on what kind of visualization is needed
       switch (problem)
       {
       // For stacked Sod problem, we only need the x-coord
-      case 1: // Sod
+      case 0:  // Smooth
+      case 1:  // Sod
+      case 2:  // Lax
+      case 3:  // Leblanc
+      case 8:  // Vdw1
+      case 9:  // Vdw2
+      case 10: // Vdw3
+      case 11: // Vdw4
          x_val = center[0];
          break;
       
@@ -2865,9 +2866,12 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          break;
       }
 
-      fstream_sv << x_val << ","
-                 << 1./sv_gf[i] << ","
-                 << v_gf[i] << "\n";
+      fstream_sv << x_val << ","    // x
+                 << 1./U[0] << ","  // rho
+                 << U[1] << ","     // v_x
+                 << U[dim+1] << "," // ste
+                 << pressure << "," // pressure
+                 << ss << "\n";     // sound speed
    }
 }
 

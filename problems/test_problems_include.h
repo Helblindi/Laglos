@@ -17,5 +17,6 @@
 #include "vdw-2.h"
 #include "vdw-3.h"
 #include "vdw-4.h"
+#include "riemann_problem.h"
 #include "test_bcs.h"
 #endif

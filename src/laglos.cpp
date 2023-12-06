@@ -41,6 +41,9 @@
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3 ## Saltzman problem
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2         ## Triple Point
 *
+* --- General Riemann Problem, change riemann_problem.h ---
+* ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis   ## General Riemann Problem
+*
 */
 #include "lambda_max_lagrange.h"
 #include "mfem.hpp"
@@ -364,14 +367,19 @@ int main(int argc, char *argv[]) {
          problem_class = new VdwTest4<dim>();
          break;
       }
-      case 12:
+      case 12: // Triple Point
       {
          problem_class = new TriplePoint<dim>();
          break;
       }
-      case 13:
+      case 13: // Radial Sod
       {
          problem_class = new SodRadial<dim>();
+         break;
+      }
+      case 20: // Riemann Problem
+      {
+         problem_class = new RiemannProblem<dim>();
          break;
       }
       case 100:
@@ -381,8 +389,7 @@ int main(int argc, char *argv[]) {
       }
       default:
       {
-         problem_class = new ProblemTemplate<dim>();
-         break;
+         MFEM_ABORT("Failed to initiate a problem.\n");
       }
    }
 

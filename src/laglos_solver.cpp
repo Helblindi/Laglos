@@ -2845,6 +2845,13 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // This really depends on what kind of visualization is needed
       switch (problem)
       {
+      // Any radial plot, we take the L2 norm of the cell center
+      case 4:  // Noh
+      case 6:  // Sedov
+      case 13: // Sod Radial
+         x_val = center.Norml2();
+         break;
+      
       // For stacked Sod problem, we only need the x-coord
       case 0:  // Smooth
       case 1:  // Sod
@@ -2854,15 +2861,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       case 9:  // Vdw2
       case 10: // Vdw3
       case 11: // Vdw4
-         x_val = center[0];
-         break;
-      
-      // Any radial plot, we take the L2 norm of the cell center
-      case 4:  // Noh
-      case 6:  // Sedov
-      case 13: // Sod Radial
+      case 20:
       default:
-         x_val = center.Norml2();
+         x_val = center[0];
          break;
       }
 

@@ -31,7 +31,7 @@ col = int(sys.argv[2])
 
 def main():
    # fig, axs = plt.subplots(1, 1)
-   flag = 1
+   flag = 0
    for filename in sorted(os.listdir(directory)):
       if flag % 2 == 0:
          f = os.path.join(directory, filename)
@@ -44,31 +44,19 @@ def main():
          # plt.set_xlabel(df.columns[0])
          # plt.set_ylabel("$\rho$")
          if (refinements == "ex"):
-            plt.plot(df[df.columns[0]], df[df.columns[1]], 'k-', label="Exact solution")
+            flag -= 1
+            # plt.plot(df[df.columns[0]], df[df.columns[1]], 'k-', label="Exact solution")
          else:
             num_ref = int(refinements)
-            _label = "# dof = " + str(1 * pow(2,num_ref))
+            _label = str(1 * pow(2,num_ref))
             plt.plot(df[df.columns[0]], df[df.columns[col]], '-', label=_label, linewidth=0.5)
-
-         # plt.xlabel(df.columns[0])
-         # plt.ylabel(df.columns[1])
-         # plt.title("Sod Shocktube")
-
-         # for i, col in enumerate(df.columns):
-         #    if (i == 0): continue # Skip first column
-         #    axs[i-1].set_xlabel(df.columns[0])
-         #    axs[i-1].set_ylabel(col)
-         #    if (refinements == "ex"):
-         #       axs[i-1].plot(df[df.columns[0]], df[col], 'k--', label=refinements)
-         #    else:
-         #       axs[i-1].plot(df[df.columns[0]], df[col], '-', label=refinements)
-
-         # plt.xlabel(df.columns[0])
-         # plt.ylabel(df.columns[1])
-         # plt.title("Sod Shocktube")
       
       flag += 1
+      
+      
    
+   screen_aspect = 1.12 # y_length / x_length
+   plt.gca().set_aspect(screen_aspect / plt.gca().get_data_ratio())
    plt.legend()
    plt.show()
 

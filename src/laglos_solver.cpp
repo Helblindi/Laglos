@@ -862,11 +862,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
             U_i_bdry = U_i;
-            /* Remove */
-            // U_i_bdry[1] = 0., U_i_bdry[2] = 0.;
-            // const DenseMatrix F_i_bdry = pb->flux(U_i_bdry);
-            // F_i_bdry.Mult(c, y_temp);
-            // y_temp_bdry = 0.;
 
             /* Enforce Boundary Conditions */
             // if (pb->get_indicator() == "Sod" && (bdr_attr == 1 || bdr_attr == 3))
@@ -963,164 +958,159 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          sums /= _mass;
          val += sums;
       }
-
-      // cout << "pre BC implementation velocity sv:\n";
-      // val.Print(cout);
-      // cout << "sum:\n";
-      // sums.Print(cout);
       
-      /* Iterate over cell boundaries, i.e. corner cells could have multiple bc flags */
-      // Post processing modify computed values to enforce BCs
-      if (is_boundary_cell)
+      if (pb->has_boundary_conditions())
       {
-         for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
+         /* Iterate over cell boundaries, i.e. corner cells could have multiple bc flags */
+         // Post processing modify computed values to enforce BCs
+         if (is_boundary_cell)
          {
-            int cell_bdr = cell_bdr_arr[cell_bdr_it];
-            Array<int> tmp_dofs(2);
-            tmp_dofs[0] = 1, tmp_dofs[1]=2;
-            Vector tmp_vel(dim), normal(dim);
-            normal = 0.;
-            val.GetSubVector(tmp_dofs, tmp_vel);
-
-            if (pb->get_indicator() == "Sod" && dim > 1)
+            for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
             {
-               if (cell_bdr == 1)
-               {
-                  // bottom
-                  normal[1] = -1.;
-               }
-               else if (cell_bdr == 3)
-               {
-                  // top
-                  normal[1] = 1.;
-               }
+               int cell_bdr = cell_bdr_arr[cell_bdr_it];
+               Array<int> tmp_dofs(2);
+               tmp_dofs[0] = 1, tmp_dofs[1]=2;
+               Vector tmp_vel(dim), normal(dim);
+               normal = 0.;
+               val.GetSubVector(tmp_dofs, tmp_vel);
 
-               double coeff = tmp_vel * normal;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               val.SetSubVector(tmp_dofs, tmp_vel);
-            }
-            else if (pb->get_indicator() == "saltzmann")
-            {
-               if (cell_bdr == 2)
+               if (pb->get_indicator() == "Sod" && dim > 1)
                {
-                  // bottom
-                  normal[1] = -1.;
-               }
-               else if (cell_bdr == 3)
-               {
-                  // right
-                  normal[0] = 1.;
-               }
-               else if (cell_bdr == 4)
-               {
-                  // top
-                  normal[1] = 1.;
-               }
+                  if (cell_bdr == 1)
+                  {
+                     // bottom
+                     normal[1] = -1.;
+                  }
+                  else if (cell_bdr == 3)
+                  {
+                     // top
+                     normal[1] = 1.;
+                  }
 
-               double coeff = tmp_vel * normal;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               val.SetSubVector(tmp_dofs, tmp_vel);
-            }
-            else if (pb->get_indicator() == "TriplePoint" || 
-                     pb->get_indicator() == "SodRadial" ||
-                     pb->get_indicator() == "Sedov")
-            {
-               // cout << "enforcing BCs for TP on cell: " << ci << endl;
-               switch (cell_bdr)
-               {
-               case 0:
-                  // not a boundary cell
-                  continue;
-               case 1:
-                  // bottom
-                  // cout << "indic: " << 1 << endl;
-                  normal[1] = -1.;
-                  break;
-               
-               case 2:
-                  // right
-                  // cout << "indic: " << 2 << endl;
-                  normal[0] = 1.;
-                  break;
-               
-               case 3:
-                  // top
-                  // cout << "indic: " << 3 << endl;
-                  normal[1] = 1.;
-                  break;
-               
-               case 4:
-                  // left
-                  // cout << "indic: " << 4 << endl;
-                  normal[0] = -1;
-                  break;
-               
-               default:
-                  MFEM_ABORT("Not a valid cell_bdr index.\n");
+                  double coeff = tmp_vel * normal;
+                  normal *= coeff;
+                  subtract(tmp_vel, normal, tmp_vel);
+                  val.SetSubVector(tmp_dofs, tmp_vel);
                }
-
-               // cout << "normal: ";
-               // normal.Print(cout);
-               double coeff = tmp_vel * normal;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               coeff = tmp_vel * normal;
-               if (coeff > 1E-12)
+               else if (pb->get_indicator() == "saltzmann")
                {
-                  cout << "Normal component not removed: " << coeff << endl;
-                  tmp_vel.Print(cout);
-                  assert(false);
+                  if (cell_bdr == 2)
+                  {
+                     // bottom
+                     normal[1] = -1.;
+                  }
+                  else if (cell_bdr == 3)
+                  {
+                     // right
+                     normal[0] = 1.;
+                  }
+                  else if (cell_bdr == 4)
+                  {
+                     // top
+                     normal[1] = 1.;
+                  }
+
+                  double coeff = tmp_vel * normal;
+                  normal *= coeff;
+                  subtract(tmp_vel, normal, tmp_vel);
+                  val.SetSubVector(tmp_dofs, tmp_vel);
                }
-               val.SetSubVector(tmp_dofs, tmp_vel);
-            }
-            else if (pb->get_indicator() == "TestBCs")
-            {
-               switch (cell_bdr)
+               else if (pb->get_indicator() == "TriplePoint" || 
+                        pb->get_indicator() == "SodRadial" ||
+                        pb->get_indicator() == "Sedov")
                {
-               case 0:
-                  // not a boundary cell
-                  continue;
-               case 1:
-                  // bottom
-                  // cout << "indic: " << 1 << endl;
-                  normal[1] = -1.;
-                  break;
-               
-               case 2:
-                  // right
-                  // cout << "indic: " << 2 << endl;
-                  normal[0] = 1.;
-                  break;
-               
-               case 3:
-                  // top
-                  // cout << "indic: " << 3 << endl;
-                  normal[1] = 1.;
-                  break;
-               
-               case 4:
-                  // left
-                  // cout << "indic: " << 4 << endl;
-                  normal[0] = -1;
-                  break;
-               
-               default:
-                  MFEM_ABORT("Not a valid cell_bdr index.\n");
+                  // cout << "enforcing BCs for TP on cell: " << ci << endl;
+                  switch (cell_bdr)
+                  {
+                  case 0:
+                     // not a boundary cell
+                     continue;
+                  case 1:
+                     // bottom
+                     // cout << "indic: " << 1 << endl;
+                     normal[1] = -1.;
+                     break;
+                  
+                  case 2:
+                     // right
+                     // cout << "indic: " << 2 << endl;
+                     normal[0] = 1.;
+                     break;
+                  
+                  case 3:
+                     // top
+                     // cout << "indic: " << 3 << endl;
+                     normal[1] = 1.;
+                     break;
+                  
+                  case 4:
+                     // left
+                     // cout << "indic: " << 4 << endl;
+                     normal[0] = -1;
+                     break;
+                  
+                  default:
+                     MFEM_ABORT("Not a valid cell_bdr index.\n");
+                  }
+
+                  // cout << "normal: ";
+                  // normal.Print(cout);
+                  double coeff = tmp_vel * normal;
+                  normal *= coeff;
+                  subtract(tmp_vel, normal, tmp_vel);
+                  coeff = tmp_vel * normal;
+                  if (coeff > 1E-12)
+                  {
+                     cout << "Normal component not removed: " << coeff << endl;
+                     tmp_vel.Print(cout);
+                     assert(false);
+                  }
+                  val.SetSubVector(tmp_dofs, tmp_vel);
                }
+               else if (pb->get_indicator() == "TestBCs")
+               {
+                  switch (cell_bdr)
+                  {
+                  case 0:
+                     // not a boundary cell
+                     continue;
+                  case 1:
+                     // bottom
+                     // cout << "indic: " << 1 << endl;
+                     normal[1] = -1.;
+                     break;
+                  
+                  case 2:
+                     // right
+                     // cout << "indic: " << 2 << endl;
+                     normal[0] = 1.;
+                     break;
+                  
+                  case 3:
+                     // top
+                     // cout << "indic: " << 3 << endl;
+                     normal[1] = 1.;
+                     break;
+                  
+                  case 4:
+                     // left
+                     // cout << "indic: " << 4 << endl;
+                     normal[0] = -1;
+                     break;
+                  
+                  default:
+                     MFEM_ABORT("Not a valid cell_bdr index.\n");
+                  }
 
-               double coeff = tmp_vel * normal;
-               normal *= coeff;
-               subtract(tmp_vel, normal, tmp_vel);
-               val.SetSubVector(tmp_dofs, tmp_vel);
-            }
-         } // End post processing BC application
-      
-      } // End is_bdry_cell
-
-      // cout << "post BC implementation velocity sv:\n";
-      // val.Print(cout);
+                  double coeff = tmp_vel * normal;
+                  normal *= coeff;
+                  subtract(tmp_vel, normal, tmp_vel);
+                  val.SetSubVector(tmp_dofs, tmp_vel);
+               }
+            } // End post processing BC application
+         
+         } // End is_bdry_cell
+      } // End pb->has_boundary_conditions()
 
       // In either case, update the cell state vector
       SetCellStateVector(S_new, ci, val);
@@ -2867,6 +2857,15 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          break;
       }
 
+      // if (abs(x_val - 0.6) < 0.02)
+      // {
+      //    cout << "=============\n"
+      //         << "cell: " << i << endl 
+      //         << "x_val: " << x_val << endl
+      //         << "coords: ";
+      //    center.Print(cout);
+      //    cout << "rho: " << 1./U[0] << endl << endl;
+      // }
       fstream_sv << x_val << ","    // x
                  << 1./U[0] << ","  // rho
                  << U[1] << ","     // v_x

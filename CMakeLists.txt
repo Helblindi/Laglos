@@ -36,26 +36,6 @@ FortranCInterface_VERIFY(CXX)
 # Boost required for filesystem modification
 find_package(Boost REQUIRED COMPONENTS filesystem)
 
-# Find python
-if(APPLE)
-  find_package(Python 3 COMPONENTS Interpreter Development NumPy REQUIRED)
-  set(PYTHON_MAJOR $ENV{Python_VERSION_MAJOR})
-  set(PYTHON_MINOR $ENV{Python_VERSION_MINOR})
-  set(PYTHONLIBS_VERSION_STRING ${Python_VERSION})
-  set(PYTHON_INCLUDE_DIR ${Python_INCLUDE_DIRS})
-  set(PYTHON_LIBRARIES ${Python_LIBRARIES})
-  message("Apple - Using Python:${Python_VERSION_MAJOR} - Libraries:${PYTHON_LIBRARIES} - IncludeDirs: ${PYTHON_INCLUDE_DIR}")
-elseif(UNIX)
-  find_package(PythonLibs 3 REQUIRED)
-else()
-  set(PYTHONLIBS_VERSION_STRING $ENV{PY_VERSION})
-endif()
-
-message(STATUS "Found python: " ${Python_EXECUTABLE})
-message(STATUS "Python include dirs: " ${Python_INCLUDE_DIRS})
-include_directories(${PYTHON_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIR})
-link_libraries(Python::NumPy ${Python_LIBRARIES})
-
 # Load user settings before the defaults - this way the defaults will not
 # overwrite the user set options. If the user has not set all options, we still
 # have the defaults.

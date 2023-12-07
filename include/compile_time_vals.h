@@ -5,11 +5,17 @@ namespace mfem
 {
 namespace hydrodynamics
 {
-class CompileTimeVals
+namespace CompileTimeVals
 {
-public:
+   /* Problem specific */
    const static int dim = 1;
-};
+
+   /**
+    * Directory specific information
+    * Note: Can change this to a local path that you would like results output to. 
+    * */
+   const static std::string results_dir = std::string(LAGLOS_DIR) + "build/results/";
+}
 }
 }
 

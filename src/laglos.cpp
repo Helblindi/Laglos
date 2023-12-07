@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
    // Hypre::Init();
 
    const int dim = CompileTimeVals::dim;
+   const string results_dir = CompileTimeVals::results_dir;
 
    // Parse command line options
    const char *mesh_file_location = "default";
@@ -175,49 +176,51 @@ int main(int argc, char *argv[]) {
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
    {
-      output_path = std::string(LAGLOS_DIR) + "build/results/" + std::string(output_flag) + "/";
-      // We must manually create all corresponding output directories
-      string _convergence = output_path + "convergence";
-      string _temp_output = _convergence + "/temp_output";
-      string _state_vectors = output_path + "state_vectors";
-
-      const char* path = output_path.c_str();
-      boost::filesystem::path output_path_dir(path);
-      boost::filesystem::create_directory(output_path_dir);
-
-      path = _convergence.c_str();
-      boost::filesystem::path convergence_path_dir(path);
-      boost::filesystem::create_directory(convergence_path_dir);
-
-      path = _temp_output.c_str();
-      boost::filesystem::path temp_output_dir(path);
-      boost::filesystem::create_directory(temp_output_dir);
-
-      path = _state_vectors.c_str();
-      boost::filesystem::path state_vectors_dir(path);
-      boost::filesystem::create_directory(state_vectors_dir);
-
-      if (gfprint)
-      {
-         ostringstream gfprint_path_ss;
-         gfprint_path_ss << output_path
-                         << "gfs_r"
-                         << setfill('0') 
-                         << setw(2)
-                         << to_string(rp_levels + rs_levels)
-                         << "/";
-
-         gfprint_path = gfprint_path_ss.str();
-
-         path = gfprint_path.c_str();
-         boost::filesystem::path gfprint_output_dir(path);
-         boost::filesystem::create_directory(gfprint_output_dir);
-      }
+      output_path = results_dir + std::string(output_flag) + "/";
    }
    else
    {
-      output_path = std::string(LAGLOS_DIR) + "build/results/temp/";
+      output_path = results_dir + "temp/";
    }
+
+   // We must manually create all corresponding output directories
+   string _convergence = output_path + "convergence";
+   string _temp_output = _convergence + "/temp_output";
+   string _state_vectors = output_path + "state_vectors";
+
+   const char* path = output_path.c_str();
+   boost::filesystem::path output_path_dir(path);
+   boost::filesystem::create_directory(output_path_dir);
+
+   path = _convergence.c_str();
+   boost::filesystem::path convergence_path_dir(path);
+   boost::filesystem::create_directory(convergence_path_dir);
+
+   path = _temp_output.c_str();
+   boost::filesystem::path temp_output_dir(path);
+   boost::filesystem::create_directory(temp_output_dir);
+
+   path = _state_vectors.c_str();
+   boost::filesystem::path state_vectors_dir(path);
+   boost::filesystem::create_directory(state_vectors_dir);
+
+   if (gfprint)
+   {
+      ostringstream gfprint_path_ss;
+      gfprint_path_ss << output_path
+                        << "gfs_r"
+                        << setfill('0') 
+                        << setw(2)
+                        << to_string(rp_levels + rs_levels)
+                        << "/";
+
+      gfprint_path = gfprint_path_ss.str();
+
+      path = gfprint_path.c_str();
+      boost::filesystem::path gfprint_output_dir(path);
+      boost::filesystem::create_directory(gfprint_output_dir);
+   }
+
    sv_output_prefix = output_path + "state_vectors/";
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the

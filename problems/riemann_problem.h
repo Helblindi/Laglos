@@ -38,7 +38,7 @@ private:
    bool _bcs = false; // Indicator for boundary conditions
    string _indicator = ""; // Possible: saltzmann
 
-   double rhoL = 1., rhoR = 1.;
+   double rhoL = 1., rhoR = .125;
    double vL = 0., vR = 0.;
    double pL = .1, pR = .1;
    double x0 = 0.;

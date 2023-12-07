@@ -510,19 +510,48 @@ int main(int argc, char *argv[]) {
    /* Distort Mesh for Saltzman Problem */
    if (problem_class->get_distort_mesh())
    {
-      Array<double> coords(dim);
-      for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+      switch (problem)
       {
-         for (int i = 0; i < dim; i++)
+      case 7: // Saltzmann
+      {
+         Array<double> coords(dim);
+         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
          {
-            int index = vertex + i * H1FESpace.GetNDofs();
-            coords[i] = x_gf[index];
-         }
-         // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
-         double x_new = coords[0] + (0.1 - coords[1]) * sin(M_PI * coords[0]); // 
+            for (int i = 0; i < dim; i++)
+            {
+               int index = vertex + i * H1FESpace.GetNDofs();
+               coords[i] = x_gf[index];
+            }
+            // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
+            double x_new = coords[0] + (0.1 - coords[1]) * sin(M_PI * coords[0]); // 
 
-         x_gf[vertex] = x_new;
+            x_gf[vertex] = x_new;
+         }
+         break;
       }
+      default: // All others
+      {
+         double mesh_distortion_factor = 0.1;
+         // Random distortion based on min mesh size
+         Array<double> coords(dim);
+         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+         {
+            for (int i = 0; i < dim; i++)
+            {
+               int index = vertex + i * H1FESpace.GetNDofs();
+               coords[i] = x_gf[index];
+
+               // Generate a random number between -1 and 1
+               double random_number = mesh_distortion_factor * (-0.5 + (1.0 * std::rand()) / RAND_MAX);
+
+               // Calculate new coord and store it
+               double coord_new = coords[i] + random_number * hmin;
+               x_gf[index] = coord_new;
+            }
+         }
+         break;
+      }
+      } // switch
 
       // Adjust all face nodes to be averages of their adjacent corners
       mfem::Mesh::FaceInformation FI;
@@ -543,6 +572,8 @@ int main(int argc, char *argv[]) {
             x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
          }
       }
+      // Update pmesh reference grid function
+      pmesh->NewNodes(x_gf, false);
       cout << "Mesh distorted\n";
    }
 

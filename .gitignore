@@ -28,3 +28,6 @@ Fortran/old
 Fortran/vdw/fort*
 Fortran/vdw/vdw.o
 Fortran/vdw/vdw.mod
+
+# System specific files (to ignore future modifications
+include/compile_time_vals.h

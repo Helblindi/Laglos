@@ -91,6 +91,9 @@ list(APPEND LAGLOS_INCLUDE_DIRS "${MFEM_LIBRARIES}")
 set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}/")
 configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 
+# Create compile_time_vals.h file that can be changed but ignored by git
+configure_file("${PROJECT_SOURCE_DIR}/include/compile_time_vals_template.h" "${PROJECT_SOURCE_DIR}/include/compile_time_vals.h" COPYONLY)
+
 ### Include Directories
 INCLUDE_DIRECTORIES(include problems)
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})

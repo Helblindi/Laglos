@@ -1,3 +1,10 @@
+/**
+ * DO NOT MODIFY THIS FILE. This is a template file for your systems
+ * configuration.  CMake copies this file into include/compile_time_vals.h
+ * and edits should be made to that file.  This is a system specific 
+ * configuration file to be ignored by git.
+*/
+
 #ifndef COMPILE_TIME_VALS
 #define COMPILE_TIME_VALS
 
@@ -8,7 +15,7 @@ namespace hydrodynamics
 namespace CompileTimeVals
 {
    /* Problem specific */
-   const static int dim = 1;
+   const static int dim = 2;
 
    /**
     * Directory specific information

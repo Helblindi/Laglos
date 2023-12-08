@@ -55,6 +55,7 @@ protected:
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
+   ParGridFunction cell_bdr_flag_gf;     // Element indexing vector
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
@@ -95,7 +96,7 @@ protected:
    Table * face_element;
    Table * edge_vertex;
    Array<int> block_offsets;
-   Array<int> BdrElementIndexingArray;
+   Array<int> BdrElementIndexingArray; // Array to identify boundary faces
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
    int el_num_faces;
@@ -138,6 +139,8 @@ public:
 
    void CreateBdrElementIndexingArray();
    void CreateBdrVertexIndexingArray();
+   void FillCellBdrFlag();
+   void GetCellBdrFlagGF(ParGridFunction &_cell_bdr_flag_gf) { _cell_bdr_flag_gf = this->cell_bdr_flag_gf; }
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 

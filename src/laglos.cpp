@@ -742,9 +742,9 @@ int main(int argc, char *argv[]) {
       Wy += offy;
 
       // Compute errors
-      ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+      ParGridFunction rho_ex_gf(&L2FESpace);
+      ParGridFunction vel_ex_gf(&H1FESpace);
+      ParGridFunction ste_ex_gf(&L2FESpace);
 
       if (problem_class->has_exact_solution())
       {
@@ -753,25 +753,25 @@ int main(int argc, char *argv[]) {
             problem_class->update(x_gf);
          }
 
-         rho_ex->ProjectCoefficient(rho_coeff);
-         vel_ex->ProjectCoefficient(v_coeff);
-         ste_ex->ProjectCoefficient(ste_coeff);
+         rho_ex_gf.ProjectCoefficient(rho_coeff);
+         vel_ex_gf.ProjectCoefficient(v_coeff);
+         ste_ex_gf.ProjectCoefficient(ste_coeff);
 
          ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-         rho_err -= *rho_ex;
-         vel_err -= *vel_ex;
-         ste_err -= *ste_ex;
+         rho_err -= rho_ex_gf;
+         vel_err -= vel_ex_gf;
+         ste_err -= ste_ex_gf;
 
          // Visualize difference between exact and approx
-         VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+         VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
                         "Exact: Density", Wx, Wy, Ww, Wh);
          
          Wx += offx;
-         VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+         VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
                         "Exact: Velocity", Wx, Wy, Ww, Wh);
          
          Wx += offx;
-         VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+         VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
                         "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
          Wx = 0;
          Wy += offy;
@@ -788,10 +788,6 @@ int main(int argc, char *argv[]) {
          VisualizeField(vis_ste_err, vishost, visport, ste_err,
                         "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
       }
-
-      delete rho_ex;
-      delete vel_ex;
-      delete ste_ex;
    }
 
    // Print initialized mesh and gridfunctions
@@ -1037,9 +1033,9 @@ int main(int argc, char *argv[]) {
             Wy += offy;
             
             // Compute errors
-            ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-            ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-            ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+            ParGridFunction rho_ex_gf(&L2FESpace);
+            ParGridFunction vel_ex_gf(&H1FESpace);
+            ParGridFunction ste_ex_gf(&L2FESpace);
 
             if (problem_class->has_exact_solution())
             {
@@ -1052,26 +1048,26 @@ int main(int argc, char *argv[]) {
                v_coeff.SetTime(t);
                ste_coeff.SetTime(t);
 
-               rho_ex->ProjectCoefficient(rho_coeff);
-               vel_ex->ProjectCoefficient(v_coeff);
-               ste_ex->ProjectCoefficient(ste_coeff);
+               rho_ex_gf.ProjectCoefficient(rho_coeff);
+               vel_ex_gf.ProjectCoefficient(v_coeff);
+               ste_ex_gf.ProjectCoefficient(ste_coeff);
                // }
 
                ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-               rho_err -= *rho_ex;
-               vel_err -= *vel_ex;
-               ste_err -= *ste_ex;
+               rho_err -= rho_ex_gf;
+               vel_err -= vel_ex_gf;
+               ste_err -= ste_ex_gf;
 
                // Visualize difference between exact and approx
-               VisualizeField(vis_rho_ex, vishost, visport, *rho_ex,
+               VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
                               "Exact: Density", Wx, Wy, Ww, Wh);
                
                Wx += offx;
-               VisualizeField(vis_v_ex, vishost, visport, *vel_ex,
+               VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
                               "Exact: Velocity", Wx, Wy, Ww, Wh);
                
                Wx += offx;
-               VisualizeField(vis_ste_ex, vishost, visport, *ste_ex,
+               VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
                               "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
                Wx = 0;
                Wy += offy;
@@ -1090,10 +1086,6 @@ int main(int argc, char *argv[]) {
                VisualizeField(vis_ste_err, vishost, visport, ste_err,
                               "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
             }
-
-            delete rho_ex;
-            delete vel_ex;
-            delete ste_ex;
          }
          
          if (gfprint)
@@ -1324,8 +1316,8 @@ int main(int argc, char *argv[]) {
    {
       // Compute errors
       ParGridFunction *sv_ex = new ParGridFunction(sv_gf.ParFESpace());
-      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+      ParGridFunction *vel_ex_gf = new ParGridFunction(v_gf.ParFESpace());
+      ParGridFunction *ste_ex_gf = new ParGridFunction(ste_gf.ParFESpace());
 
       // Save exact to file as well
       BlockVector S_exact(offset, Device::GetMemoryType());
@@ -1335,8 +1327,8 @@ int main(int argc, char *argv[]) {
       x_gf_exact.MakeRef(&H1FESpace, S_exact, offset[0]);
       mv_gf_exact.MakeRef(&H1FESpace, S_exact, offset[1]);
       sv_ex->MakeRef(&L2FESpace, S_exact, offset[2]);
-      vel_ex->MakeRef(&L2VFESpace, S_exact, offset[3]);
-      ste_ex->MakeRef(&L2FESpace, S_exact, offset[4]);
+      vel_ex_gf->MakeRef(&L2VFESpace, S_exact, offset[3]);
+      ste_ex_gf->MakeRef(&L2FESpace, S_exact, offset[4]);
 
       // Project exact solution
       if (problem_class->get_indicator() == "Vdw1")
@@ -1351,11 +1343,11 @@ int main(int argc, char *argv[]) {
       sv_ex->ProjectCoefficient(sv_coeff);
       sv_ex->SyncAliasMemory(S_exact);
 
-      vel_ex->ProjectCoefficient(v_coeff);
-      vel_ex->SyncAliasMemory(S_exact);
+      vel_ex_gf->ProjectCoefficient(v_coeff);
+      vel_ex_gf->SyncAliasMemory(S_exact);
 
-      ste_ex->ProjectCoefficient(ste_coeff);
-      ste_ex->SyncAliasMemory(S_exact);
+      ste_ex_gf->ProjectCoefficient(ste_coeff);
+      ste_ex_gf->SyncAliasMemory(S_exact);
 
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;
@@ -1387,35 +1379,58 @@ int main(int argc, char *argv[]) {
       }
       
       // Compute errors
-      ParGridFunction *rho_ex = new ParGridFunction(rho_gf.ParFESpace());
-      ParGridFunction *vel_ex = new ParGridFunction(v_gf.ParFESpace());
-      ParGridFunction *ste_ex = new ParGridFunction(ste_gf.ParFESpace());
+      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&H1FESpace), ste_ex_gf(&L2FESpace);
 
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
       ste_coeff.SetTime(t);
 
-      rho_ex->ProjectCoefficient(rho_coeff);
-      vel_ex->ProjectCoefficient(v_coeff);
-      ste_ex->ProjectCoefficient(ste_coeff);
+      rho_ex_gf.ProjectCoefficient(rho_coeff);
+      vel_ex_gf.ProjectCoefficient(v_coeff);
+      ste_ex_gf.ProjectCoefficient(ste_coeff);
+
+      // In the case of the Noh Problem, project 0 on the boundary of approx and exact
+      if (problem_class->get_indicator() == "Noh")
+      {
+         cout << "[Noh] Projecting zero on the boundary cells.\n";
+         ParGridFunction cell_bdr_flag_gf;
+         hydro.GetCellBdrFlagGF(cell_bdr_flag_gf);
+
+         for (int i = 0; i < pmesh->GetNE(); i++)
+         {
+            if (cell_bdr_flag_gf[i] != -1)
+            {
+               // We have a boundary cell
+               rho_gf[i] = 0.;
+               ste_gf[i] = 0.;
+               rho_ex_gf[i] = 0.;
+               ste_ex_gf[i] = 0.;
+               for (int j = 0; j < dim; j++)
+               {
+                  int index = i + j*pmesh->GetNE();
+                  v_gf[index] = 0.;
+                  vel_ex_gf[index] = 0.;
+               }
+            }
+         }
+      }
+
+      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf);
 
       /* Compute relative errors */
-      rho_L1_error_n = rho_gf.ComputeL1Error(rho_coeff) / rho_ex->ComputeL1Error(zero);
-      vel_L1_error_n = v_gf.ComputeL1Error(v_coeff) / vel_ex->ComputeL1Error(zero);
-      ste_L1_error_n = ste_gf.ComputeL1Error(ste_coeff) / ste_ex->ComputeL1Error(zero);
+      rho_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
+      vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
+      ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
 
-      rho_L2_error_n = rho_gf.ComputeL2Error(rho_coeff) / rho_ex->ComputeL2Error(zero);
-      vel_L2_error_n = v_gf.ComputeL2Error(v_coeff) / vel_ex->ComputeL2Error(zero);
-      ste_L2_error_n = ste_gf.ComputeL2Error(ste_coeff) / ste_ex->ComputeL2Error(zero);
+      rho_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
+      vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);
+      ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
 
-      rho_Max_error_n = rho_gf.ComputeMaxError(rho_coeff) / rho_ex->ComputeMaxError(zero);
-      vel_Max_error_n = v_gf.ComputeMaxError(v_coeff) / vel_ex->ComputeMaxError(zero);
-      ste_Max_error_n = ste_gf.ComputeMaxError(ste_coeff) / ste_ex->ComputeMaxError(zero);
-
-      delete rho_ex;
-      delete vel_ex;
-      delete ste_ex;
+      rho_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
+      vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
+      ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
    }
+   
    /* Get composite errors values, will return 0 if exact solution is not known */
    const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
    const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;

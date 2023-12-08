@@ -104,6 +104,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf_corrected(&CR), 
    v_CR_gf_fluxes(&CR),
    v_geo_gf(&H1_L),
+   cell_bdr_flag_gf(&L2),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -155,6 +156,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Similar to BdrElementIndexingArray, set default to -1.
    BdrVertexIndexingArray = -1.;
    CreateBdrVertexIndexingArray();
+
+   // Fill cell boundaries
+   cell_bdr_flag_gf = -1.;
+   FillCellBdrFlag();
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
@@ -603,6 +608,33 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       } // end vertex iterator
 
    } // end boundary elements
+}
+
+
+/****************************************************************************************************
+* Function: FillCellBdrFlag
+*
+* Purpose: 
+*  To fill an L2 gridfunction of size NDofs_L2 (num cells) with a value indicating if the cell
+*  is on the boundary or not.  This ParGridFunction can be retrieved with GetCellBdrFlagGF().
+* 
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::FillCellBdrFlag()
+{
+   for (int i = 0; i < pmesh->GetNBE(); i++)
+   {
+      int bdr_attr = pmesh->GetBdrAttribute(i);
+      int face = pmesh->GetBdrFace(i);
+
+      Array<int> row;
+      // Get cell
+      face_element->GetRow(face, row);
+      
+      // Each face should only have 1 adjacent cell
+      assert(row.Size() == 1);
+      cell_bdr_flag_gf[row[0]] = bdr_attr;
+   }
 }
 
 
@@ -2861,17 +2893,23 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // {
       //    cout << "=============\n"
       //         << "cell: " << i << endl 
+      //         << "attr: " << BdrElementIndexingArray[i] << endl
       //         << "x_val: " << x_val << endl
       //         << "coords: ";
       //    center.Print(cout);
       //    cout << "rho: " << 1./U[0] << endl << endl;
       // }
-      fstream_sv << x_val << ","    // x
-                 << 1./U[0] << ","  // rho
-                 << U[1] << ","     // v_x
-                 << U[dim+1] << "," // ste
-                 << pressure << "," // pressure
-                 << ss << "\n";     // sound speed
+      
+      // Only print interior cell values
+      if (cell_bdr_flag_gf[i] == -1.)
+      {
+         fstream_sv << x_val << ","    // x
+               << 1./U[0] << ","  // rho
+               << U[1] << ","     // v_x
+               << U[dim+1] << "," // ste
+               << pressure << "," // pressure
+               << ss << "\n";     // sound speed
+      }
    }
 }
 

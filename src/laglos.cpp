@@ -742,9 +742,7 @@ int main(int argc, char *argv[]) {
       Wy += offy;
 
       // Compute errors
-      ParGridFunction rho_ex_gf(&L2FESpace);
-      ParGridFunction vel_ex_gf(&H1FESpace);
-      ParGridFunction ste_ex_gf(&L2FESpace);
+      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace);
 
       if (problem_class->has_exact_solution())
       {
@@ -986,7 +984,7 @@ int main(int argc, char *argv[]) {
                            v_gf, "Velocity", Wx, Wy, Ww, Wh);
             Wx += offx;
 
-            if (problem == 12)
+            if (problem == 12) // Triple Point
             {
                // pressure, ste, gamma
                vis_press.precision(8);
@@ -1031,14 +1029,11 @@ int main(int argc, char *argv[]) {
             
             Wx = 0;
             Wy += offy;
-            
-            // Compute errors
-            ParGridFunction rho_ex_gf(&L2FESpace);
-            ParGridFunction vel_ex_gf(&H1FESpace);
-            ParGridFunction ste_ex_gf(&L2FESpace);
 
             if (problem_class->has_exact_solution())
             {
+               ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace);
+
                if (problem_class->get_indicator() == "Vdw1")
                {
                   problem_class->update(x_gf, t);
@@ -1051,7 +1046,6 @@ int main(int argc, char *argv[]) {
                rho_ex_gf.ProjectCoefficient(rho_coeff);
                vel_ex_gf.ProjectCoefficient(v_coeff);
                ste_ex_gf.ProjectCoefficient(ste_coeff);
-               // }
 
                ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
                rho_err -= rho_ex_gf;
@@ -1160,148 +1154,6 @@ int main(int argc, char *argv[]) {
       rho_gf[i] = 1./sv_gf[i];
    } 
 
-   /* Various problem-specific plots */
-   // if (visualization)
-   // {
-   //    switch (problem)
-   //    {
-   //       case 1:
-   //       case 7: /* Plots end y velocity in the case of the Saltzman problem */
-   //       {
-   //          if (dim == 2) {
-   //             /* Prepare data */
-   //             // Velocity plot
-   //             int nv_py = pmesh->GetNV();
-   //             std::vector<double> xgf_py(nv_py), mv_y_py(nv_py);
-
-   //             for(int i = 0; i < nv_py; i++) {
-   //                xgf_py[i] = x_gf[i];
-   //                mv_y_py[i] = mv_gf[i + H1FESpace.GetNDofs()];
-   //             }
-
-   //             // Density plot 
-   //             int nc_py = L2FESpace.GetNE();
-   //             // cout << "nc_py: " << nc_py << endl;
-   //             Vector center(dim);
-   //             std::vector<double> rho_x_py(nc_py), rho_py(nc_py);
-   //             double _min = 0.6, _max = 1.;
-   //             for (int ci = 0; ci < nc_py; ci++) // cell iterator
-   //             {
-   //                pmesh->GetElementCenter(ci, center);
-   //                rho_x_py[ci] = center[0];
-   //                rho_py[ci] = rho_gf[ci];
-   //             }
-
-   //             std::vector<double> rho_x_exact_py(200), rho_exact_py(200);
-   //             double _h = (_max - _min) / 200.;
-   //             for (int i = 0; i < 200; i++)
-   //             {
-   //                rho_x_exact_py[i] = _min + i*_h;
-   //                Vector _x(dim);
-   //                _x = 0.;
-   //                _x[0] = rho_x_exact_py[i];
-   //                rho_exact_py[i] = problem_class->rho0(_x, t);
-   //             }
-
-               
-   //             // Set the size of output image = 1200x780 pixels
-   //             plt::figure_size(1200, 780);
-
-   //             // Plot line from given x and y data. Color is selected automatically.
-   //             // plt::scatter(xgf_py, mv_y_py);
-   //             // plt::scatter(rho_x_py, rho_py);
-
-   //             const long nrows=1, ncols=2;
-   //             long row = 0, col = 0;
-
-   //             plt::subplot2grid(nrows, ncols, row, col);
-   //             plt::scatter(rho_x_py, rho_py);
-   //             plt::named_plot("Exact", rho_x_exact_py, rho_exact_py, "black");
-   //             plt::legend();
-   //             plt::title("Density");
-
-   //             col = 1;
-   //             plt::subplot2grid(nrows, ncols, row, col);
-   //             plt::scatter(xgf_py, mv_y_py);
-   //             plt::title("Y Velocity");
-
-   //             // Plot a red dashed line from given x and y data.
-   //             // plt::plot(x, w,"r--");
-
-   //             // Plot a line whose name will show up as "log(x)" in the legend.
-   //             // plt::named_plot("log(x)", x, z);
-
-   //             // Enable legend.
-   //             plt::show();
-
-   //             // save figure
-   //             // const char* filename = "./basic.png";
-   //             // std::cout << "Saving result to " << filename << std::endl;;
-   //             // plt::save(filename);
-   //          }
-   //          break;
-   //       }
-   //       case 8: /* Plot pressure-specific volume diagram for vdw */
-   //       case 9:
-   //       case 10:
-   //       case 11:
-   //       {
-   //          // Form pressure gf
-   //          ParGridFunction press_gf(&L2FESpace);
-   //          std::vector<double> press_gf_py(pmesh->GetNE()), sv_gf_py(pmesh->GetNE()), x_gf_py(pmesh->GetNE());
-   //          std::vector<double> rho_gf_py(pmesh->GetNE()), ss_gf_py(pmesh->GetNE());
-   //          Vector U(dim+2), center(dim);
-   //          // Compute Density
-   //          for (int i = 0; i < sv_gf.Size(); i++)
-   //          {
-   //             hydro.GetCellStateVector(S, i, U);
-   //             double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
-   //             press_gf[i] = pressure;
-   //             // Form python arrays
-   //             press_gf_py[i] = pressure;
-   //             rho_gf_py[i] = 1./U[0];
-   //             ss_gf_py[i] = problem_class->sound_speed(U);
-
-   //             pmesh->GetElementCenter(i, center);
-   //             x_gf_py[i] = center[0];
-   //          } 
-            
-   //          /* --- Plot stuff --- */
-   //          plt::figure_size(1800, 600);
-
-   //          const long nrows=1, ncols=3;
-   //          long row = 0, col = 0;
-   //          plt::subplot2grid(nrows, ncols, row, col);
-   //          plt::scatter(x_gf_py, rho_gf_py);
-   //          plt::title("Density");
-   //          plt::xlabel("$x$");
-   //          plt::ylabel("Density");
-
-   //          col = 1;
-   //          plt::subplot2grid(nrows, ncols, row, col);
-   //          plt::scatter(x_gf_py, press_gf_py);
-   //          plt::title("Pressure");
-   //          plt::xlabel("$x$");
-   //          plt::ylabel("Pressure $p$");
-
-
-   //          col = 2;
-   //          plt::subplot2grid(nrows, ncols, row, col);
-   //          plt::scatter(x_gf_py, ss_gf_py);
-   //          plt::title("Sound Speed");
-   //          plt::xlabel("$x$");
-   //          plt::ylabel("Sound Speed $c$");
-
-   //          plt::show();
-
-   //          break;
-   //       }
-   //       default: // do nothing for all other problems
-   //       {
-   //       }
-   //    }
-   // }
-
    // Print grid functions to files
    ostringstream sv_filename_suffix;
    sv_filename_suffix << "sv_"
@@ -1314,21 +1166,15 @@ int main(int argc, char *argv[]) {
 
    if (problem_class->has_exact_solution())
    {
-      // Compute errors
-      ParGridFunction *sv_ex = new ParGridFunction(sv_gf.ParFESpace());
-      ParGridFunction *vel_ex_gf = new ParGridFunction(v_gf.ParFESpace());
-      ParGridFunction *ste_ex_gf = new ParGridFunction(ste_gf.ParFESpace());
-
       // Save exact to file as well
       BlockVector S_exact(offset, Device::GetMemoryType());
-
-      ParGridFunction x_gf_exact, mv_gf_exact;
+      ParGridFunction x_gf_exact, mv_gf_exact, sv_ex_gf, vel_ex_gf, ste_ex_gf;
 
       x_gf_exact.MakeRef(&H1FESpace, S_exact, offset[0]);
       mv_gf_exact.MakeRef(&H1FESpace, S_exact, offset[1]);
-      sv_ex->MakeRef(&L2FESpace, S_exact, offset[2]);
-      vel_ex_gf->MakeRef(&L2VFESpace, S_exact, offset[3]);
-      ste_ex_gf->MakeRef(&L2FESpace, S_exact, offset[4]);
+      sv_ex_gf.MakeRef(&L2FESpace, S_exact, offset[2]);
+      vel_ex_gf.MakeRef(&L2VFESpace, S_exact, offset[3]);
+      ste_ex_gf.MakeRef(&L2FESpace, S_exact, offset[4]);
 
       // Project exact solution
       if (problem_class->get_indicator() == "Vdw1")
@@ -1340,14 +1186,14 @@ int main(int argc, char *argv[]) {
       v_coeff.SetTime(t);
       ste_coeff.SetTime(t);
 
-      sv_ex->ProjectCoefficient(sv_coeff);
-      sv_ex->SyncAliasMemory(S_exact);
+      sv_ex_gf.ProjectCoefficient(sv_coeff);
+      sv_ex_gf.SyncAliasMemory(S_exact);
 
-      vel_ex_gf->ProjectCoefficient(v_coeff);
-      vel_ex_gf->SyncAliasMemory(S_exact);
+      vel_ex_gf.ProjectCoefficient(v_coeff);
+      vel_ex_gf.SyncAliasMemory(S_exact);
 
-      ste_ex_gf->ProjectCoefficient(ste_coeff);
-      ste_ex_gf->SyncAliasMemory(S_exact);
+      ste_ex_gf.ProjectCoefficient(ste_coeff);
+      ste_ex_gf.SyncAliasMemory(S_exact);
 
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;
@@ -1379,7 +1225,7 @@ int main(int argc, char *argv[]) {
       }
       
       // Compute errors
-      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&H1FESpace), ste_ex_gf(&L2FESpace);
+      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace);
 
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
@@ -1430,7 +1276,7 @@ int main(int argc, char *argv[]) {
       vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
       ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
    }
-   
+
    /* Get composite errors values, will return 0 if exact solution is not known */
    const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
    const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
@@ -1489,57 +1335,6 @@ int main(int argc, char *argv[]) {
    cout << "Program took " << chrono.RealTime() << "s.\n";
    double time_per_gp_ts = chrono.RealTime() / ti / L2FESpace.GetNE();
    cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
-
-   /* Compare sound speed and max wave speed in dim = 1 case */
-   // if (dim == 1)
-   // {
-   //    std::vector<double> x_gf_py(pmesh->GetNE());
-   //    std::vector<double> faces_x_py(L2FESpace.GetNF());
-   //    std::vector<double> ss_gf_py(pmesh->GetNE());
-   //    Vector lambda_max_vec;
-   //    hydro.BuildDijMatrix(S);
-   //    hydro.GetLambdaMaxVec(lambda_max_vec);
-   //    std::vector<double> lambda_gf_py(L2FESpace.GetNF());
-   //    Vector U(dim+2), center(dim);
-
-   //    for (int i = 0; i < pmesh->GetNE(); i++)
-   //    {
-   //       hydro.GetCellStateVector(S, i, U);
-
-   //       ss_gf_py[i] = problem_class->sound_speed(U);
-
-   //       pmesh->GetElementCenter(i, center);
-   //       x_gf_py[i] = center[0];
-   //    } 
-
-   //    for (int i = 0; i < L2FESpace.GetNF(); i++)
-   //    {
-         
-   //       faces_x_py[i] = x_gf[i];
-   //       lambda_gf_py[i] = lambda_max_vec[i];
-   //    }
-      
-   //    /* --- Plot stuff --- */
-   //    plt::figure_size(1800, 600);
-
-   //    const long nrows=1, ncols=2;
-   //    long row = 0, col = 0;
-   //    plt::subplot2grid(nrows, ncols, row, col);
-   //    plt::scatter(x_gf_py, ss_gf_py);
-   //    plt::scatter(faces_x_py, lambda_gf_py);
-   //    plt::title("Sound Speed");
-   //    plt::xlabel("$x$");
-   //    plt::ylabel("Sound Speed $c$");
-
-   //    col = 1;
-   //    plt::subplot2grid(nrows, ncols, row, col);
-   //    plt::scatter(faces_x_py, lambda_gf_py);
-   //    plt::title("Lambda Max");
-   //    plt::xlabel("$x$");
-   //    plt::ylabel("Lambda Max");
-
-   //    plt::show();  
-   // }
    
    delete pmesh;
    delete m;

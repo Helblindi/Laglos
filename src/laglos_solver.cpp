@@ -2024,15 +2024,17 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
+      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      {
+         // Skip boundary cells
+         continue;
+      }
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
       num += abs((k / U_i[0]) - m);
-      // cout << "[cell " << ci << "] k: " << k << ", rho: " << 1. / U_i[0] << endl;
-      // cout << "\tm: " << m << ", num: " << ((k / U_i[0]) - m) << endl;
       denom += abs(m);
    }
-   // cout << "num: " << num << ", denom: " << denom << endl;
 
    return num / denom;
 }

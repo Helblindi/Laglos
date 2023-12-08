@@ -2,13 +2,13 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 101
-   ny_gridpoints = 6
+   nx_gridpoints = 49
+   ny_gridpoints = 5
 
-   x_arr = np.linspace(0,1,nx_gridpoints)
+   x_arr = np.linspace(-0.5,1,nx_gridpoints)
    y_arr = np.linspace(0,.1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/shocktube.mesh"
+   filename = home_dir + "data/tube-vdw3.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -79,6 +79,6 @@ def main():
    for i in range(0, nx_gridpoints):
       for j in range(0, ny_gridpoints):
          # print("i: %.2f, j: %.2f" % (x_arr[i], y_arr[j]))
-         f.write("%.2f %.2f\n" % (x_arr[i], y_arr[j]))
+         f.write("%.6f %.6f\n" % (x_arr[i], y_arr[j]))
 
 main()

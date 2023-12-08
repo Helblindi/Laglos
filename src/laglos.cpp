@@ -19,30 +19,34 @@
 * Example run time parameters:
 *
 * ----- 1D -----
-* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 8     ## Smooth
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -rs 8    ## Sod
-* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -rs 8    ## Lax
-# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -rs 8   ## Leblanc
+* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 8            ## Smooth
+* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -rs 8           ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -rs 8           ## Lax
+# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -rs 8          ## Leblanc
 *
 * ----- vdw -----
-* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -rs 8 -vis
-* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 8 -vis
-* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 8 -vis
-* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis
+* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -rs 8 -vis    ## Vdw1
+* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 8 -vis  ## Vdw2 
+* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 8 -vis  ## Vdw3 
+* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis ## Vdw4
 *
 * ----- 2D -----
-* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4           ## Smooth wave in 2D
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4         ## Sod in 2D
-* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4   ## Sod Distorted
-* ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4         ## Sod Radial
-* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3       ## Isentropic Vortex
-* ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 0.1 -rs 1                  ## Noh
-* ./Laglos -m data/ref-square.mesh -p 6 -tf 1. -cfl 0.1 -rs 5            ## Sedov
-* ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3 ## Saltzman problem
-* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2         ## Triple Point
+* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4             ## Smooth wave in 2D
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4           ## Sod in 2D
+* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4     ## Sod Distorted
+* ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4           ## Sod Radial
+* ./Laglos -m data/square5c0_vortex.mesh -p 5 -tf 2 -cfl 0.5 -rs 3         ## Isentropic Vortex
+* ./Laglos -m data/noh.mesh -p 4 -tf 0.6 -cfl 1 -rs 4                      ## Noh
+* ./Laglos -m data/ref-square.mesh -p 6 -tf 1. -cfl 0.1 -rs 5              ## Sedov
+* ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
+* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point
 *
+* ----- vdw -----
+* ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
+* ./Laglos -m data/tube-np5-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 2 -vis        ## Vdw3 
+* 
 * --- General Riemann Problem, change riemann_problem.h ---
-* ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis   ## General Riemann Problem
+* ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis     ## General Riemann Problem
 *
 */
 #include "lambda_max_lagrange.h"

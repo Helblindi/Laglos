@@ -1760,8 +1760,9 @@ void LagrangianLOOperator<dim>::
             d = dij_sparse->Elem(c, cp);
 
             // Compute intermediate face velocity
-            Vf = pb->velocity(Uc);
-            Vf += pb->velocity(Ucp);
+            pb->velocity(Uc, Vf);
+            Vector vcp; pb->velocity(Ucp, vcp);
+            Vf.Add(1., vcp);
             Vf *= 0.5;
 
             double coeff = d * (Ucp[0] - Uc[0]) / F;
@@ -1796,7 +1797,7 @@ void LagrangianLOOperator<dim>::
          else 
          {
             assert(FI.IsBoundary());
-            Vf = pb->velocity(Uc);             
+            pb->velocity(Uc, Vf);             
          }
       }
       else 
@@ -2217,8 +2218,8 @@ void LagrangianLOOperator<dim>::
          cp = FI.element[1].index;
          GetCellStateVector(S, c, Uc);
          GetCellStateVector(S, cp, Ucp);
-         cell_c_v = pb->velocity(Uc);
-         cell_cp_v = pb->velocity(Ucp);
+         pb->velocity(Uc, cell_c_v);
+         pb->velocity(Ucp, cell_cp_v);
 
          // Calculate outer normal
          CalcOutwardNormalInt(S, c, face, n_int);
@@ -2557,7 +2558,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
       }
 
       GetCellStateVector(S, ci, Uc);
-      node_v = pb->velocity(Uc);
+      pb->velocity(Uc, node_v);
       
       // Get corresponding velocity from ParGridFunction
       UpdateNodeVelocity(S, cell_vdof, node_v);
@@ -3042,7 +3043,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
          {
             Vector Uc(dim+2);
             GetCellStateVector(S, EDof, Uc);
-            node_v = pb->velocity(Uc);
+            pb->velocity(Uc, node_v);
 
             break;
          }
@@ -3300,7 +3301,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
          {
             Vector Uc(dim+2);
             GetCellStateVector(S, EDof, Uc);
-            node_v = pb->velocity(Uc);
+            pb->velocity(Uc, node_v);
 
             /* Put this velocity into mv_gf */
             UpdateNodeVelocity(S,node,node_v);

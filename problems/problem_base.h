@@ -90,22 +90,20 @@ public:
 
    static double specific_internal_energy(const Vector &U)
    {
-      const Vector v = velocity(U);
+      Vector v;
+      velocity(U, v);
       const double E = U[dim + 1]; // specific total energy
       return E - 0.5 * pow(v.Norml2(), 2);
    }
 
-   static inline Vector velocity(const Vector & U)
+   static inline void velocity(const Vector & U, Vector &vel)
    {
-      Vector v;
-      v.SetSize(dim);
+      vel.SetSize(dim);
       Array<int> dofs;
       for (int i = 0; i < dim; i++)
       {
-         v[i] = U[i+1];
+         vel[i] = U[i+1];
       }
-
-      return v;
    }
 
    inline double compute_lambda_max(const Vector & U_i,
@@ -130,13 +128,16 @@ public:
       else 
       {
          assert(flag == "NA");
+         Vector vi, vj;
 
          in_taul = U_i[0];
-         in_ul = velocity(U_i) * n_ij; 
+         velocity(U_i, vi);
+         in_ul = vi * n_ij; 
          in_el = specific_internal_energy(U_i);
 
          in_taur = U_j[0]; 
-         in_ur = velocity(U_j) * n_ij; 
+         velocity(U_j, vj);
+         in_ur = vj * n_ij; 
          in_er = specific_internal_energy(U_j);
       }
 
@@ -203,7 +204,7 @@ public:
    {
       DenseMatrix result(dim+2, dim);
 
-      const Vector v = velocity(U);
+      Vector v; velocity(U, v);
       const double p = pressure(U);
 
       // * is not overridden for Vector class, but *= is

@@ -1341,6 +1341,8 @@ int main(int argc, char *argv[]) {
    cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
    
    delete pmesh;
+   delete CRFEC;
+   delete problem_class;
    delete m;
 
    return 0;

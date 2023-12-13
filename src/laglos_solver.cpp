@@ -211,7 +211,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 template<int dim>
 LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
-   // delete pmesh, m_lf, m_hpv;
+   delete dij_sparse;
 }
 
 
@@ -2902,15 +2902,21 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       //    cout << "rho: " << 1./U[0] << endl << endl;
       // }
       
-      // Only print interior cell values
-      if (cell_bdr_flag_gf[i] == -1.)
-      {
-         fstream_sv << x_val << ","    // x
+      fstream_sv << x_val << ","    // x
                << 1./U[0] << ","  // rho
                << U[1] << ","     // v_x
                << U[dim+1] << "," // ste
                << pressure << "," // pressure
-               << ss << "\n";     // sound speed
+               << ss << ",";     // sound speed
+
+      // Print flag if interior or bdr
+      if (cell_bdr_flag_gf[i] == -1.)
+      {
+         fstream_sv << "int\n";
+      }
+      else 
+      {
+         fstream_sv << "bdr\n";
       }
    }
 }

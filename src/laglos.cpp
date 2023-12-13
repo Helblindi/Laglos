@@ -208,22 +208,20 @@ int main(int argc, char *argv[]) {
    boost::filesystem::path state_vectors_dir(path);
    boost::filesystem::create_directory(state_vectors_dir);
 
-   if (gfprint)
-   {
-      ostringstream gfprint_path_ss;
-      gfprint_path_ss << output_path
-                        << "gfs_r"
-                        << setfill('0') 
-                        << setw(2)
-                        << to_string(rp_levels + rs_levels)
-                        << "/";
+   // In all cases, set directory to print final grid functions
+   ostringstream gfprint_path_ss;
+   gfprint_path_ss << output_path
+                   << "gfs_r"
+                   << setfill('0') 
+                   << setw(2)
+                   << to_string(rp_levels + rs_levels)
+                   << "/";
 
-      gfprint_path = gfprint_path_ss.str();
+   gfprint_path = gfprint_path_ss.str();
 
-      path = gfprint_path.c_str();
-      boost::filesystem::path gfprint_output_dir(path);
-      boost::filesystem::create_directory(gfprint_output_dir);
-   }
+   path = gfprint_path.c_str();
+   boost::filesystem::path gfprint_output_dir(path);
+   boost::filesystem::create_directory(gfprint_output_dir);
 
    sv_output_prefix = output_path + "state_vectors/";
 
@@ -1167,6 +1165,52 @@ int main(int argc, char *argv[]) {
                       << ".out";
 
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
+
+   // In all cases, print the final grid functions
+   {
+      // Save mesh and gfs to files
+      std::ostringstream mesh_name, rho_name, v_name, ste_name;
+      mesh_name << gfprint_path 
+                << "final.mesh_final";
+      rho_name  << gfprint_path 
+                << "rho_final.gf";
+      v_name << gfprint_path 
+             << "v_final.gf";
+      ste_name << gfprint_path 
+               << "ste_final.gf";
+
+      std::ofstream mesh_ofs(mesh_name.str().c_str());
+      mesh_ofs.precision(8);
+      pmesh->PrintAsOne(mesh_ofs);
+      mesh_ofs.close();
+
+      std::ofstream rho_ofs(rho_name.str().c_str());
+      rho_ofs.precision(8);
+      rho_gf.SaveAsOne(rho_ofs);
+      rho_ofs.close();
+
+      std::ofstream v_ofs(v_name.str().c_str());
+      v_ofs.precision(8);
+      v_gf.SaveAsOne(v_ofs);
+      v_ofs.close();
+
+      std::ofstream ste_ofs(ste_name.str().c_str());
+      ste_ofs.precision(8);
+      ste_gf.SaveAsOne(ste_ofs);
+      ste_ofs.close();
+
+      // Print continuous interpolation of density
+      GridFunctionCoefficient rho_gf_coeff(&rho_gf);
+      ParGridFunction rho_cont_gf(&H1FESpace);
+      rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+      std::ostringstream rho_cont_name;
+      rho_cont_name  << gfprint_path 
+                     << "rho_c_finalgf";
+      std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
+      rho_cont_ofs.precision(8);
+      rho_cont_gf.SaveAsOne(rho_cont_ofs);
+      rho_cont_ofs.close();
+   } // End print final grid functions
 
    if (problem_class->has_exact_solution())
    {

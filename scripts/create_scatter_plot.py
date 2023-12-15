@@ -29,20 +29,19 @@ dofs = int(sys.argv[3])
 
 def main():
    fig, ax = plt.subplots(figsize=(13.5,10)) # Gives ~0.75 aspect ratio
-   df_approx = pd.read_csv(approx_loc, dtype=float).sort_values(by=['x'])
-   df_exact = pd.read_csv(exact_loc, dtype=float).sort_values(by=['x'])
+
+   # Read in interior cells from dataframe and sort by x
+   df_approx = pd.read_csv(approx_loc).query('cell_type != "bdr"').sort_values(by=['x'])
+   df_exact = pd.read_csv(exact_loc).query('cell_type != "bdr"').sort_values(by=['x'])
+
+   # Drop column corresponding to cell_type
+   df_approx = df_approx.drop(columns=['cell_type'], axis=1)
+   df_exact = df_exact.drop(columns=['cell_type'], axis=1)
    
+   # Plot
    ax.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[1]], 'k-', label="Exact solution")
    _label = "# dof = " + str(dofs)
    ax.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[1]], label=_label, s=.1)
-
-   # plt.xlabel(df.columns[0])
-   # plt.ylabel(df.columns[1])
-   # plt.title("Sod Shocktube")
-
-   # plt.xlabel(df.columns[0])
-   # plt.ylabel(df.columns[1])
-   # plt.title("Sod Shocktube")
    
    ax.legend()
    # plt.show()

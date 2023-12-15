@@ -1205,7 +1205,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
       std::ostringstream rho_cont_name;
       rho_cont_name  << gfprint_path 
-                     << "rho_c_finalgf";
+                     << "rho_c_final.gf";
       std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
       rho_cont_ofs.precision(8);
       rho_cont_gf.SaveAsOne(rho_cont_ofs);

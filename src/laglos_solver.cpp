@@ -1099,7 +1099,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   }
                   val.SetSubVector(tmp_dofs, tmp_vel);
                }
-               else if (pb->get_indicator() == "TestBCs")
+               else if (pb->get_indicator() == "TestBCs" ||
+                        pb->get_indicator() == "Vdw1" ||
+                        pb->get_indicator() == "Vdw2" ||
+                        pb->get_indicator() == "Vdw3" ||
+                        pb->get_indicator() == "Vdw4")
                {
                   switch (cell_bdr)
                   {
@@ -1220,6 +1224,8 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
 *
 * Purpose:
 *  Enforces boundary conditions on the mesh velocities according to the problem indicator.
+*
+*  Note that this function assumes dim > 1.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt)
@@ -1227,6 +1233,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    // cout << "========================================\n"
    //      << "     EnforcingMVBoundaryConditions      \n"
    //      << "========================================\n";
+   assert(dim > 1);
 
    if (pb->get_indicator() == "Sod")
    {
@@ -1431,7 +1438,12 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 
       mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
    }
-   else if (pb->get_indicator() == "TestBCs")
+   // Remove normal velocity at ALL boundaries
+   else if (pb->get_indicator() == "TestBCs" ||
+            pb->get_indicator() == "Vdw1" ||
+            pb->get_indicator() == "Vdw2" ||
+            pb->get_indicator() == "Vdw3" ||
+            pb->get_indicator() == "Vdw4")
    {
       int bdr_ind = 0;
       Vector normal(dim), node_v(dim);
@@ -2855,7 +2867,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,rho,v,ste,p,ss\n";
+   fstream_sv << "x,rho,v,ste,p,ss,cell_type\n";
 
    for (int i = 0; i < NDofs_L2; i++)
    {

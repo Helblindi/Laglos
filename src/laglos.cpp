@@ -48,6 +48,15 @@
 * --- General Riemann Problem, change riemann_problem.h ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis     ## General Riemann Problem
 *
+* --- To generate images for movies
+* -of "output-dir" = directory where files should be saved.
+* -print           = flag that ensures the files are saved to the designated directory
+* -vs #            = number of steps between each visualization or saved image
+*
+* --- To generate movies
+* python create_glvis_animation_script.py "/Users/madisonsheridan/Workspace/Laglos/build/vortex/gfs_r03/"
+* glvis -run 
+*
 * --- Current work in progress, new mesh velocity runs ---
 * Current issue is singular matrix on boundary nodes
 * Sod, smooth, 
@@ -803,7 +812,7 @@ int main(int argc, char *argv[]) {
    if (gfprint)
    {
       // Save initial mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name;
+      std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name;
       mesh_name << gfprint_path 
                   << setfill('0') 
                   << setw(6)
@@ -824,6 +833,11 @@ int main(int argc, char *argv[]) {
                << setw(6)
                << 0
                << "_ste.gf";
+      press_name << gfprint_path 
+                 << setfill('0') 
+                 << setw(6)
+                 << 0
+                 << "_press.gf";
 
       std::ofstream mesh_ofs(mesh_name.str().c_str());
       mesh_ofs.precision(8);
@@ -845,7 +859,12 @@ int main(int argc, char *argv[]) {
       ste_gf.SaveAsOne(ste_ofs);
       ste_ofs.close();
 
-      /* Print gamma grid function for Triple Point problem */
+      std::ofstream press_ofs(press_name.str().c_str());
+      press_ofs.precision(8);
+      press_gf.SaveAsOne(press_ofs);
+      press_ofs.close();
+
+      /* Print gamma/pressure grid function for Triple Point problem */
       if (problem == 12) 
       {
          std::ostringstream gamma_name;
@@ -856,6 +875,15 @@ int main(int argc, char *argv[]) {
          gamma_ofs.precision(8);
          gamma_gf.SaveAsOne(gamma_ofs);
          gamma_ofs.close();
+
+         std::ostringstream _press_name;
+         _press_name << gfprint_path 
+                    << "press.gf";
+
+         std::ofstream press_ofs(_press_name.str().c_str());
+         press_ofs.precision(8);
+         press_gf.SaveAsOne(press_ofs);
+         press_ofs.close();
       }
    }
 
@@ -1094,7 +1122,7 @@ int main(int argc, char *argv[]) {
          if (gfprint)
          {
             // Save mesh and gfs to files
-            std::ostringstream mesh_name, rho_name, v_name, ste_name;
+            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name;
             mesh_name << gfprint_path 
                       << setfill('0') 
                       << setw(6)
@@ -1115,6 +1143,11 @@ int main(int argc, char *argv[]) {
                      << setw(6)
                      << ti  
                      << "_ste.gf";
+            press_name << gfprint_path 
+                       << setfill('0') 
+                       << setw(6)
+                       << ti  
+                       << "_press.gf";
 
             std::ofstream mesh_ofs(mesh_name.str().c_str());
             mesh_ofs.precision(8);
@@ -1136,6 +1169,11 @@ int main(int argc, char *argv[]) {
             ste_gf.SaveAsOne(ste_ofs);
             ste_ofs.close();
 
+            std::ofstream press_ofs(press_name.str().c_str());
+            press_ofs.precision(8);
+            press_gf.SaveAsOne(press_ofs);
+            press_ofs.close();
+
             // Print continuous interpolation of density
             GridFunctionCoefficient rho_gf_coeff(&rho_gf);
             ParGridFunction rho_cont_gf(&H1FESpace);
@@ -1149,7 +1187,7 @@ int main(int argc, char *argv[]) {
             std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
             rho_cont_ofs.precision(8);
             rho_cont_gf.SaveAsOne(rho_cont_ofs);
-            rho_cont_ofs.close();
+            rho_cont_ofs.close();         
          }
       }
       // cout << "finished step\n";

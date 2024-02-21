@@ -26,6 +26,7 @@ def main():
    write_glvis_script("rho")
    write_glvis_script("v")
    write_glvis_script("ste")
+   write_glvis_script("press")
 
 
 def gather_files():
@@ -44,6 +45,10 @@ def gather_files():
 def write_glvis_script(_flag):
    print("writing glvis script for ", _flag)
    glvis_filename = directory_path + _flag + ".glvis"
+   if (directory_path == " ."):
+       glvis_filename = directory_path + _flag + ".glvis"
+   print("writing contents to file: ", glvis_filename)
+   print("dir path: ", directory_path)
    f = open(glvis_filename, "w")
 
    f.write("# Visualization window geometry\n")

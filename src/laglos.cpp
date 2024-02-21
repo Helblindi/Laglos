@@ -15,7 +15,7 @@
 // Lagrangian frame using unstructured low-order finite element spatial
 // discretization and forward euler time-stepping.
 
-/*
+/***
 * Example run time parameters:
 *
 * ----- 1D -----
@@ -48,7 +48,14 @@
 * --- General Riemann Problem, change riemann_problem.h ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis     ## General Riemann Problem
 *
-*/
+* --- Current work in progress, new mesh velocity runs ---
+* Current issue is singular matrix on boundary nodes
+* Sod, smooth, 
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4 -mv 3
+*
+* 
+* 
+***/
 #include "lambda_max_lagrange.h"
 #include "mfem.hpp"
 #include "var-config.h"
@@ -146,7 +153,7 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
-                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal");
+                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
                   "Choose how to compute face velocities, 0 - Do nothing, 1 - Mass conservative bubble, 2 - Average, Q1 type");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",

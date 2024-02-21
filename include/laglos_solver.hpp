@@ -8,6 +8,7 @@
 #include <fstream>
 #include <cassert>
 #include <string>
+#include <unordered_set> // For cell face normal velocity function
 
 using namespace std;
 
@@ -202,6 +203,9 @@ public:
    // Raviart-Thomas mesh motion 
    void ComputeGeoVRaviart(Vector &S);
    void ComputeGeoVRaviart2(const Vector &S);
+
+   // Cell Face Normal
+   void ComputeGeoVCellFaceNormal(Vector &S);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);

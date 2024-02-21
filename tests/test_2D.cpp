@@ -6,12 +6,10 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
-#include "matplotlibcpp.h"
 
 using namespace std;
 using namespace mfem;
 using namespace hydrodynamics;
-namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
@@ -36,9 +34,11 @@ double tol = 1e-12;
 const char *mesh_file_location = "/data/ref-square.mesh";
 std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
 const char* mesh_file = result.c_str();
-int mesh_refinements = 5;
+int mesh_refinements = 1;
 bool use_viscosity = true; // Doesn't matter
 bool _mm = true;          // Doesn't matter
+int mv_option = 3;
+int fv_option = 2;
 double CFL = 0.5;          // Doesn't matter
 static int num_procs = 0;
 static int myid = -1;
@@ -49,6 +49,7 @@ int upper_refinement = 7;
 /* ---------------- End Parameters ---------------- */
 
 void velocity_exact(const Vector &x, const double & t, Vector &v);
+int tester();
 int test_flux();
 int test_vel_field_1();
 int test_CSV_getter_setter(); // LagrangianLOOperator::GetCellStateVector tester
@@ -75,13 +76,14 @@ int main(int argc, char *argv[])
    args.Parse();
 
    int d = 0;
-   d += test_flux();
-   d += test_vel_field_1();
-   d += test_CSV_getter_setter();
-   d += test_sod_hydro();
-   d += test_smooth_hydro();
+   d += tester();
+   // d += test_flux();
+   // d += test_vel_field_1();
+   // d += test_CSV_getter_setter();
+   // d += test_sod_hydro();
+   // d += test_smooth_hydro();
 
-   plot_mv_smooth();
+   // plot_mv_smooth();
 
    return d;
 }
@@ -114,6 +116,134 @@ void velocity_exact(const Vector &x, const double & t, Vector &v)
    }
 
    
+}
+
+/*
+Purpose: provide a place for quick tests of Laglos
+*/
+int tester()
+{
+   cout << "=== Running test space function ===\n";
+
+   // Initialize mesh
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+
+   // Refine the mesh
+   for (int lev = 0; lev < mesh_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Construct parmesh object
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   delete mesh;
+
+   // Template FE stuff to construct hydro operator
+   H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
+   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   CrouzeixRaviartFECollection CRFEC;
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, &CRFEC, dim);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Pair with corresponding gridfunctions
+   // Only need position and velocity for testing
+   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction v_cr_gf(&CRFESpace);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+
+   pmesh->SetNodalGridFunction(&x_gf);
+   x_gf.SyncAliasMemory(S);
+
+   Vector one(dim);
+   one = 1.;
+
+   VectorFunctionCoefficient v_exact_coeff(dim, &velocity_exact);
+   mv_gf.ProjectCoefficient(v_exact_coeff);
+   mv_gf.SyncAliasMemory(S);
+
+   // Initialize specific volume, velocity, and specific total energy
+   ConstantCoefficient one_const_coeff(1.0);
+   sv_gf.ProjectCoefficient(one_const_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   VectorConstantCoefficient one_coeff(one);
+   v_gf.ProjectCoefficient(one_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   ste_gf.ProjectCoefficient(one_const_coeff);
+   ste_gf.SyncAliasMemory(S);
+
+   // Just leave templated for hydro construction
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
+   m->Assemble();
+
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   hydro.SetMVOption(mv_option);
+   hydro.SetFVOption(fv_option);
+
+   Vector _vel(dim), vec_res(dim);
+   double t = 0., dt = .0000001;
+   DenseMatrix dm(dim);
+
+   hydro.CalculateTimestep(S);
+   dt = hydro.GetTimestep();
+   cout << "dt: " << dt << endl;
+
+   hydro.ComputeMeshVelocities(S, t, dt);
+   // cout << "Done computing mesh velocities\n";
+
+   // DenseMatrix A(3,2);
+   // A(0,0) = 1.;
+   // A(0,1) = 2.;
+   // A(1,0) = 3.;
+   // A(1,1) = 4.;
+   // A(2,0) = 5.;
+   // A(2,1) = 6.;
+
+   // DenseMatrix AT = A;
+   // AT.Transpose();
+
+   // cout << "mat A:\n";
+   // A.Print(cout);
+   // cout << "mat AT:\n";
+   // AT.Print(cout);
+
+   // DenseMatrix ATA(2,2);
+   // Mult(AT,A,ATA);
+   // cout << "mat ATA:\n";
+   // ATA.Print(cout);
+
+
+   return 0;
 }
 
 /*
@@ -217,6 +347,8 @@ int test_flux()
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   hydro.SetMVOption(mv_option);
+   hydro.SetFVOption(fv_option);
 
    double _error = 0.;
 

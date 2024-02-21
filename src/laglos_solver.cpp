@@ -719,7 +719,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
       }
       else 
       {
-         cout << "mv_option: " << mv_option << endl;
          switch (mv_option)
          {
          case 1:
@@ -1782,8 +1781,18 @@ void LagrangianLOOperator<dim>::
             Vf.Add(1., vcp);
             Vf *= 0.5;
 
-            double coeff = d * (Ucp[0] - Uc[0]) / F;
+            double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+            double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+            double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
+            // double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
+
+            // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
+            // {
+            //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
+            //    cout << "pressure differential: " << pc << endl;
+            //    cout << "coeff: " << coeff << endl;
+            // }
 
             // Switch orientation of Vf based on orientation of faces in mfem
             // Vf_flux = Vf;

@@ -84,9 +84,10 @@ public:
     *********************************************************/
    double rho0(const Vector &x, const double & t) override
    {
-      return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
-         /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
-                                         (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
+      // return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
+      //    /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
+      //                                    (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
+      return (x(0) > 1.0 && x(1) < 1.5) ? 1. : .125;
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
@@ -98,7 +99,7 @@ public:
       if (x[0] <= 1)
       {
          // D_1
-         return 2.;
+         return 1.6;
       }
       else
       {

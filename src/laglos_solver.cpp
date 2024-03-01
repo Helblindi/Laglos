@@ -1091,16 +1091,22 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
                   // cout << "normal: ";
                   // normal.Print(cout);
+                  // cout << "old vel: ";
+                  // tmp_vel.Print(cout);
                   double coeff = tmp_vel * normal;
                   normal *= coeff;
                   subtract(tmp_vel, normal, tmp_vel);
+                  // cout << "new vel: ";
+                  // tmp_vel.Print(cout);
+                  
                   coeff = tmp_vel * normal;
                   if (coeff > 1E-12)
                   {
+                     cout << "coeff: " << coeff << endl;
                      cout << "Normal component not removed: " << coeff << endl;
                      tmp_vel.Print(cout);
                      assert(false);
-                  }
+                  }      
                   val.SetSubVector(tmp_dofs, tmp_vel);
                }
                else if (pb->get_indicator() == "TestBCs" ||
@@ -1780,20 +1786,22 @@ void LagrangianLOOperator<dim>::
             Vector vcp; pb->velocity(Ucp, vcp);
             Vf.Add(1., vcp);
             Vf *= 0.5;
+            if (use_viscosity)
+            {
+               double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+               double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+               // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
+               double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
+               Vf.Add(coeff, n_vec);
 
-            double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-            double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
-            double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
-            // double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
-            Vf.Add(coeff, n_vec);
-
-            // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
-            // {
-            //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
-            //    cout << "pressure differential: " << pc << endl;
-            //    cout << "coeff: " << coeff << endl;
-            // }
-
+               // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
+               // {
+               //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
+               //    cout << "pressure differential: " << pc << endl;
+               //    cout << "coeff: " << coeff << endl;
+               // }
+            }
+            
             // Switch orientation of Vf based on orientation of faces in mfem
             // Vf_flux = Vf;
             // Vf_flux *= F;
@@ -3132,8 +3140,10 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
    std::unordered_set<int> uniqueFaceIndices;
 
    // Iterate over all mesh velocity dofs
+   // cout << "ndofs_h1: " << NDofs_H1 << endl;
    for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
    {
+      // cout << "NODE: " << node << endl;
       node_v = 0.; // Reset node velocity
       GetEntityDof(node, entity, EDof);
       // cout << "EDof: " << EDof << endl;
@@ -3149,8 +3159,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
 
             // Get adjacent cells
             vertex_element->GetRow(node, element_row);
-            cout << "element_row: ";
-            element_row.Print(cout);
+            // cout << "element_row: ";
+            // element_row.Print(cout);
             length_element_row = element_row.Size();
 
             // Set size of overdetermined matrix A depending on number of adjacent cells
@@ -3167,7 +3177,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
                   // TODO: This results in A^TA being a singular matrix
                   num_rows_A = 7;
                   cout << "===== boundary node: " << node << "\n";
-                  break;
+                  continue;
                }
                case 4:
                {
@@ -3184,7 +3194,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
             RHS.SetSize(num_rows_A);
             temp_vec.SetSize(num_rows_A);
 
-            cout << "===== new corner node ===== [at: " << node << "]\n";
+            // cout << "===== new corner node ===== [at: " << node << "]\n";
             /*** Fill matrix representing overdetermined system and RHS vector ***/
             // Iterate over adjacent cells
             for (int element_it = 0; element_it < length_element_row; element_it++)
@@ -3205,7 +3215,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
                      // New face, fill corresponding row in A and RHS
                      uniqueFaceIndices.insert(face_index);
                      row_index = uniqueFaceIndices.size() - 1;
-                     cout << "row_index: " << row_index << endl;
+                     // cout << "row_index: " << row_index << endl;
                      
                      // Get face velocity, outward normal, and face position
                      // n_vec is the outward normal times |F|
@@ -3227,13 +3237,13 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
                      face_x *= 0.5;
                      
                      // Cout info
-                     cout << "Unique face corresponds to el: " << el_index << ", face: " << face_index << endl;
-                     cout << "Vf: ";
-                     Vf.Print(cout);
-                     cout << "nf: ";
-                     n_vec.Print(cout);
-                     cout << "face_x: ";
-                     face_x.Print(cout);
+                     // cout << "Unique face corresponds to el: " << el_index << ", face: " << face_index << endl;
+                     // cout << "Vf: ";
+                     // Vf.Print(cout);
+                     // cout << "nf: ";
+                     // n_vec.Print(cout);
+                     // cout << "face_x: ";
+                     // face_x.Print(cout);
                      // GetNodePosition(S, face_dofs[2], face_x);
 
                      // Fill rows of A
@@ -3246,44 +3256,44 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
 
                      // Fill rows of RHS
                      RHS(row_index) = Vf * n_vec;
-                     cout << endl;
+                     // cout << endl;
                   } // End unique new face
                } // End face iterator
             } // End cell iterator
 
-            cout << "RHS: ";
-            RHS.Print(cout);
+            // cout << "RHS: ";
+            // RHS.Print(cout);
 
             // Solve for vgeo on this node
             AT = A;
             AT.Transpose();
             Mult(AT, A, ATA);
             AT.Mult(RHS, RHS_mod);
-            cout << "A: " << endl;
-            A.Print(cout);
-            cout << "ATA: " << endl;
-            ATA.Print(cout);
+            // cout << "A: " << endl;
+            // A.Print(cout);
+            // cout << "ATA: " << endl;
+            // ATA.Print(cout);
             ATA.Invert();
             ATA.Mult(RHS_mod,res);
 
             // Compute residual
             A.Mult(res, temp_vec);
-            cout << "temp_vec: ";
-            temp_vec.Print(cout);
+            // cout << "temp_vec: ";
+            // temp_vec.Print(cout);
 
             temp_vec -= RHS;
-            cout << "residual: " << temp_vec.Norml2() << endl;
+            // cout << "residual: " << temp_vec.Norml2() << endl;
 
-            cout << "coefficient vector: ";
-            res.Print(cout);
+            // cout << "coefficient vector: ";
+            // res.Print(cout);
 
             node_v(0) = res[0] + res[2]*node_x[0] + res[4]*node_x[1];
             node_v(1) = res[1] + res[3]*node_x[0] + res[5]*node_x[1];
 
-            cout << "node_x: ";
-            node_x.Print(cout);
-            cout << "node_v: ";
-            node_v.Print(cout);
+            // cout << "node_x: ";
+            // node_x.Print(cout);
+            // cout << "node_v: ";
+            // node_v.Print(cout);
 
             // Only update the v_geo_gf in the case of the corners
             // Using Q1 for this velocity field
@@ -3311,6 +3321,12 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
          {
             MFEM_ABORT("Invalid entity\n");
          }
+      }
+      if (node_v.Norml2() > 0.0001)
+      {
+         cout << "node: " << node << endl       
+              << "nodev: ";
+         node_v.Print(cout);
       }
 
       // In every case, update the corresponding nodal velocity in S

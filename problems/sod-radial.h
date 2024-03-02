@@ -159,8 +159,8 @@ public:
    double sie0(const Vector &x, const double & t) override
    {
       double norm_x = x.Norml2();
-      return (norm_x <= x_center) ? pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
-                        : pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+
+      return pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
 }; // End class

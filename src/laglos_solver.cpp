@@ -576,7 +576,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
          if (pb->get_indicator() == "saltzmann")
          {
             // Replace the bdr attribute in the array as long as it is not
-            // the dirichlet condition (For Saltzman Problem)
+            // the dirichlet condition (For Saltzmann Problem)
             // This ensures the left wall vertices have the proper indicator
             if (BdrVertexIndexingArray[index] != 1)
             {
@@ -1053,7 +1053,23 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   double coeff = tmp_vel * normal;
                   normal *= coeff;
                   subtract(tmp_vel, normal, tmp_vel);
+
+                  if (cell_bdr == 1)
+                  {
+                     tmp_vel = 0.;
+                     /* Ramping up to ex */
+                     if (timestep_first == 0.)
+                     {
+                        timestep_first = timestep;
+                     }
+                     double _xi = t / (2*timestep_first);
+                     double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+                     tmp_vel[0] = 1. * _psi;
+                  }
+
                   val.SetSubVector(tmp_dofs, tmp_vel);
+
+
                }
                else if (pb->get_indicator() == "TriplePoint" || 
                         pb->get_indicator() == "SodRadial" ||

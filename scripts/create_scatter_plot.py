@@ -1,8 +1,12 @@
 """
-This python script file plots output from multiple refinements.
+This python script file plots output from a single refinement.  
+It is mainly used to compare a single spatial refinement approximation
+to the exact solution.  
 
 Example:
-> python3 create_refinement_plot.py "/Users/madisonsheridan/Workspace/Laglos/build/results/state_vectors/ 2"
+> python3 create_scatter_plot.py /Users/madisonsheridan/Workspace/Laglos/build/results/state_vectors/sv_05.out
+                                 /Users/madisonsheridan/Workspace/Laglos/build/results/state_vectors/sv_exact.out
+                                 num_dofs
 """
 
 import numpy as np
@@ -22,7 +26,7 @@ params = {'legend.markerscale': 10,
 pylab.rcParams.update(params)
 
 # check command line inputs
-assert len(sys.argv) == 4, "This file needs 3 input arguments: directory, num cols, but " + str(len(sys.argv)) + " were given."
+# assert len(sys.argv) == 4, "This file needs 3 input arguments: directory, num cols, but " + str(len(sys.argv)) + " were given."
 approx_loc = str(sys.argv[1])
 exact_loc = str(sys.argv[2])
 dofs = int(sys.argv[3])
@@ -43,7 +47,7 @@ def main():
    _label = "# dof = " + str(dofs)
    ax.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[1]], label=_label, s=.1)
    
-   ax.legend()
+   # ax.legend()
    # plt.show()
    dpi = fig.get_dpi()
    fig.savefig("Fig1py.png", dpi=dpi)

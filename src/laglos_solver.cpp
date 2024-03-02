@@ -732,6 +732,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          case 3:
             ComputeGeoVCellFaceNormal(S);
             break;
+
+         case 4:
+            ComputeGeoVCAVEAT(S);
+            break;
          
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
@@ -1888,6 +1892,8 @@ void LagrangianLOOperator<dim>::
 *  To set the mesh velocity motion computation type:
 *     1) Raviart-Thomas reconstruction method.
 *     2) Normal vector type
+*     3) Adjacent cell face based mesh movement (LS based)
+*     4) CAVEAT Weighted LS
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::SetMVOption(const int & option)
@@ -3327,6 +3333,172 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
          cout << "node: " << node << endl       
               << "nodev: ";
          node_v.Print(cout);
+      }
+
+      // In every case, update the corresponding nodal velocity in S
+      UpdateNodeVelocity(S, node, node_v);
+
+   } // End node iterator
+}
+
+
+/****************************************************************************************************
+* Function: ComputeGeoVCAVEAT
+* Parameters:
+*  S    - BlockVector corresponding to nth timestep that stores mesh information, 
+*         mesh velocity, and state variables.
+*
+* Purpose:
+*  This function computes the geometric velocity from the face normals and face 
+*  velocities from all adjacent faces following the Caveat weighted least squares
+*  algorithm described in https://www.osti.gov/biblio/5366795.
+*
+*  The weights used for the weighted least squares method is simply the sum of 
+*  the densities across any given face.
+*
+*
+*  Note: Vigeo is only the geometric velocity, and is not the velocity used 
+*        to move the mesh.  For the mesh velocity, one must solve for the 
+*        alpha_i, which process is found in ComputeNodeVelocitiesFromVgeo().
+*
+*  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
+*        in the BlockVector S.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeGeoVCAVEAT(Vector &S)
+{
+   // cout << "==========ComputeGeoVCaveat==========\n";
+   mfem::Mesh::FaceInformation FI;
+   Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), Uc(dim+2), Ucp(dim+2);
+   DenseMatrix A, AT, WA, ATWA(dim,dim), W;
+   Vector rhs, rhs_mod;
+
+   Array<int> faces_row, oris;
+   int faces_length, c, cp;
+   double c_norm, weight;
+
+   DofEntity entity;
+   int EDof;
+
+   // Iterate over all mesh velocity dofs
+   for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
+   {
+      // cout << "\n\t $$$node: " << node << endl;
+      node_v = 0.; // Reset node velocity
+      GetEntityDof(node, entity, EDof);
+
+      switch (entity)
+      {
+         case 0: // corner
+         {
+            node_v = 0.;
+            // Get cell faces
+            vertex_edge.GetRow(node, faces_row);
+            faces_length = faces_row.Size();
+
+            // Set sizes of nodal matrices
+            A.SetSize(faces_length, dim);
+            AT.SetSize(dim, faces_length);
+            W.SetSize(faces_length);
+            WA.SetSize(faces_length, dim);
+            rhs.SetSize(faces_length);
+            rhs_mod.SetSize(faces_length);
+            A = 0., AT = 0., ATWA = 0., W = 0., WA = 0., rhs = 0., rhs_mod = 0.;
+
+            // iterate over adjacent faces
+            for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+            {
+               int face = faces_row[face_it];
+               GetIntermediateFaceVelocity(face, Vf);
+               FI = pmesh->GetFaceInformation(face);
+               c = FI.element[0].index;
+               cp = FI.element[1].index;
+
+               // Retrieve corresponding normal (orientation doesn't matter)
+               CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+               c_norm = n_vec.Norml2();
+               n_vec /= c_norm;
+
+               // Compute weight
+               double rhoc = 0., rhocp = 0.;
+               GetCellStateVector(S, c, Uc);
+               
+               rhoc = 1. / Uc[0];
+               if (FI.IsInterior())
+               {
+                  GetCellStateVector(S, cp, Ucp);
+                  rhocp = 1 / Ucp[0];
+               }
+               weight = rhoc + rhocp;
+
+               // Add in contribution to system
+               A.SetRow(face_it, n_vec);
+               W(face_it, face_it) = weight;
+               double val = n_vec * Vf;
+               rhs[face_it] = weight * val;
+
+               // Print stuff
+               // cout << "face: " << face << ", vf: ";
+               // Vf.Print(cout);
+               // cout << "normal: ";
+               // n_vec.Print(cout);
+               // cout << "weight: " << weight << endl;
+            }
+            // Matrix setup
+            AT = A;
+            AT.Transpose();
+            Mult(W, A, WA);
+            // cout << "WA: ";
+            // WA.Print(cout);
+            Mult(AT,WA,ATWA);
+            // cout << "ATWA:\n";
+            // ATWA.Print(cout);
+            AT.Mult(rhs, rhs_mod);
+
+            // Solve for best fit
+            ATWA.Invert();
+            ATWA.Mult(rhs_mod, node_v);
+
+             // Print stuff
+            // cout << "A:\n";
+            // A.Print(cout);
+            // cout << "AT:\n";
+            // AT.Print(cout);
+            // cout << "W:\n";
+            // W.Print(cout);
+            // cout << "rhs: ";
+            // rhs.Print(cout);
+            // cout << "rhs_mod: ";
+            // rhs_mod.Print(cout);
+            // cout << "node_v: ";
+            // node_v.Print(cout); 
+
+            // Only update the v_geo_gf in the case of the corners
+            // Using Q1 for this velocity field
+            SetViGeo(node, node_v);
+
+            break;
+         }
+         case 1: // face
+         {
+            // face nodes just set to ivf
+            assert(face >= 0);
+            GetIntermediateFaceVelocity(EDof, node_v);
+
+            break;
+         }
+         case 2: // Cell Center
+         {
+            Vector Uc(dim+2);
+            GetCellStateVector(S, EDof, Uc);
+            pb->velocity(Uc, node_v);
+
+            break;
+         }
+         default:
+         {
+            MFEM_ABORT("Invalid entity\n");
+         }
       }
 
       // In every case, update the corresponding nodal velocity in S

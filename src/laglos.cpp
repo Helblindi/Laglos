@@ -62,8 +62,10 @@
 * Sod, smooth, 
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4 -mv 3
 *
-* 
-* 
+* CAVEAT Weight LS method for corner vertex calculation 
+* Sod
+* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4 -mv 4 
+*
 ***/
 #include "lambda_max_lagrange.h"
 #include "mfem.hpp"
@@ -162,7 +164,7 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
-                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal");
+                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal, 4 - CAVEAT Weighted LS");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
                   "Choose how to compute face velocities, 0 - Do nothing, 1 - Mass conservative bubble, 2 - Average, Q1 type");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",

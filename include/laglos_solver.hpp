@@ -206,6 +206,9 @@ public:
 
    // Cell Face Normal
    void ComputeGeoVCellFaceNormal(Vector &S);
+
+   // CAVEAT
+   void ComputeGeoVCAVEAT(Vector &S);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);

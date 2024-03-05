@@ -339,15 +339,15 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          pb->lm_update(b_covolume);
 
          // Compute pressure with given EOS
-         double pl = pb->pressure(Uc);
-         double pr = pb->pressure(Ucp);
+         double pl = pb->pressure(Uc,pmesh->GetAttribute(c));
+         double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
          // cout << "pre compute lambda max\n";
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
          d = lambda_max * c_norm; 
 
-         double ss = pb->sound_speed(Uc);
+         double ss = pb->sound_speed(Uc, pmesh->GetAttribute(c));
 
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
@@ -837,7 +837,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          }
       }
 
-      const DenseMatrix F_i = pb->flux(U_i);
+      const DenseMatrix F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
       sums = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -862,7 +862,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             GetCellStateVector(S, cj, U_j); 
 
             // flux contribution
-            DenseMatrix dm = pb->flux(U_j);
+            DenseMatrix dm = pb->flux(U_j, pmesh->GetAttribute(cj));
             // cout << "flux at cj = " << cj << ":\n";
             // dm.Print(cout);
             dm += F_i; 
@@ -958,7 +958,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                //    {
                //       U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
                //    }
-               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry);
+               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry, pmesh->GetAttribute(i));
                //    F_i_slip.Mult(c, y_temp_bdry);
                //    // y_temp *= 2.;
                //    break;
@@ -2922,7 +2922,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
       pressure = pb->pressure(U, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(U);
+      ss = pb->sound_speed(U, pmesh->GetAttribute(i));
       
       pmesh->GetElementCenter(i, center);
 

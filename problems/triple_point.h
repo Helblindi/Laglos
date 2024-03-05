@@ -54,6 +54,7 @@ public:
 
    /* Override getters */
    double get_gamma(const int &cell_attr) override {
+      assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
       return (cell_attr == 1) ? _gamma_1 : _gamma_2;
    }
 
@@ -73,6 +74,7 @@ public:
       if (cell_attr == 1) { 
          _g = _gamma_1;
       } else {
+         assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::pressure funcalls.\n");
          _g = _gamma_2;
       }
       return (_g - 1.) * this->internal_energy(U);
@@ -84,10 +86,10 @@ public:
     *********************************************************/
    double rho0(const Vector &x, const double & t) override
    {
-      // return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
-      //    /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
-      //                                    (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
-      return (x(0) > 1.0 && x(1) < 1.5) ? 1. : .125;
+      return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
+         /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
+                                         (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
+      // return (dim == 2) ? (x(0) > 1.0 && x(1) < 1.5) ? 1. : .125; // same pressure
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
@@ -99,7 +101,8 @@ public:
       if (x[0] <= 1)
       {
          // D_1
-         return 1.6;
+         return 2.;
+         // return 1.6; // same pressure
       }
       else
       {

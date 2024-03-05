@@ -200,12 +200,12 @@ public:
       // return 0.5;
    }
 
-   inline DenseMatrix flux(const Vector &U)
+   inline DenseMatrix flux(const Vector &U, const int &cell_attr=0)
    {
       DenseMatrix result(dim+2, dim);
 
       Vector v; velocity(U, v);
-      const double p = pressure(U);
+      const double p = pressure(U, cell_attr);
 
       // * is not overridden for Vector class, but *= is
       Vector v_neg = v, vp = v;
@@ -225,12 +225,12 @@ public:
       return result;
    }
 
-   inline double sound_speed(const Vector &U)
+   inline double sound_speed(const Vector &U, const int &cell_attr=0)
    {
-      double _pressure = this->pressure(U);
+      double _pressure = this->pressure(U, cell_attr);
       double density = 1. / U[0];
 
-      double val = this->get_gamma() * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
+      double val = this->get_gamma(cell_attr) * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
       val -= 2. * this->get_a() * density;
       val = pow(val, 0.5);
       return val;

@@ -39,6 +39,8 @@ CONTAINS
       !===EOS initialization
       b_covolume = b_covolume_in
 
+      WRITE(*,*) "b_covolume: ", b_covolume
+
       !===State vars initialiation
       taul = 1.d0/in_rhol
       ul = in_ul
@@ -99,11 +101,13 @@ CONTAINS
       CALL initialize_p1_p2(p1, p2)
 
       IF (.NOT. WANT_ITERATION) THEN   
+         WRITE(*,*) "no iteration"
          pstar = p2
          CALL no_iter_update_lambda(taul, pl, al, gammal, taur, pr, ar, gammar, p2, lambda_maxl_out, lambda_maxr_out)
          RETURN
       ELSE
          !===Iterations
+         WRITE(*,*) "Iteration"
          p1 = MAX(p1, p2 - phi(p2)/phi_prime(p2))
          DO WHILE (.TRUE.)
             CALL update_lambda(taul, pl, al, gammal, taur, pr, ar, gammar, p1, p2, in_tol, &
@@ -136,11 +140,16 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN)  :: tau, e, p
       REAL(KIND=NUMBER), INTENT(OUT) :: gamma, a, alpha, capA, capB, capC, expo
       REAL(KIND=NUMBER) :: x
+      WRITE(*,*) "init"
       x = tau - b_covolume
       !===local gamma (gamma_Z)
+      WRITE(*,*) "e: ", e, ", q: ", q
       gamma = 1.d0 + (p + p_infty)*x/(e - q - p_infty*x)
       !===local sound speed (a_Z)
       a = tau*SQRT(gamma*(p + p_infty)/x)
+      WRITE(*,*) "tau: ", tau, ", gamma: ", gamma
+      WRITE(*,*) "p: ", p, ", p_infty: ", p_infty, ", x: ", x
+      WRITE(*,*) "a: ", a
       !===other relevant constants
       capC = 2.d0*a*x/(tau*(gamma - 1.d0))
       alpha = cc(gamma)*capC
@@ -218,11 +227,16 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN)  :: tau_L, p_L, a_L, gamma_L, tau_R, p_R, a_R, gamma_R, p2
       REAL(KIND=NUMBER), INTENT(OUT) :: lambda_max_L, lambda_max_R
       REAL(KIND=NUMBER) :: v11, v32, lambda_max
+      WRITE(*,*) "no iter update lambda"
+      WRITE(*,*) "tauL: ", tau_L, ", p_L: ", p_L, ", a_L: ", a_L, ", gamma_L: ", gamma_L
+      WRITE(*,*) "tauR: ", tau_R, ", p_R: ", p_R, ", a_R: ", a_R, ", gamma_R: ", gamma_R
       v11 = lambdaz(tau_L, p_L, a_L, gamma_L, p2, -1)
       v32 = lambdaz(tau_R, p_R, a_R, gamma_R, p2, 1)
       lambda_max_L = MAX(-v11, 0.d0)
       lambda_max_R = MAX(v32, 0.d0)
       lambda_max = MAX(lambda_max_L, lambda_max_R)
+      WRITE(*,*) "lambda_max_L: ", lambda_max_L
+      WRITE(*,*) "lambda_max_R: ", lambda_max_R
    END SUBROUTINE no_iter_update_lambda
 
    FUNCTION lambdaz(tauz, pz, az, gammaz, pstar, z) RESULT(vv)
@@ -230,6 +244,8 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN) :: tauz, pz, az, gammaz, pstar
       INTEGER, INTENT(IN) :: z
       REAL(KIND=NUMBER)             :: vv
+      WRITE(*,*) "lambdaz"
+      WRITE(*,*) "tauz: ", tauz, ", pz: ", pz, ", az: ", az, "gammaz: ", gammaz, ", pstar: ", pstar, ", z: ", z
       vv = z*az/tauz*SQRT(1.d0 + MAX((pstar - pz)/(pz + p_infty), 0.d0)*(gammaz + 1.d0)/(2.d0*gammaz))
    END FUNCTION lambdaz
    !===end of code if no iteration

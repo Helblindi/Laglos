@@ -165,6 +165,14 @@ public:
          _b = b_covolume;
       }
 
+      cout << "C++ lambda max call.\n";
+      cout << "nij:\n";
+      n_ij.Print(cout);
+      cout << "b: " << b_covolume << endl;
+      cout << "UL. Density: " << 1./U_i[0] << ", vel: " << U_i[1] << ", ste: " << U_i[dim+1] << ", p: " << in_pl << endl;
+      cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[dim+1] << ", p: " << in_pr << endl;
+           
+
       __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
          &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
          &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);

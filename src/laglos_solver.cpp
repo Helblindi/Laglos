@@ -344,13 +344,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 
          // Finally compute lambda max
          // cout << "pre compute lambda max\n";
-         cout << "c: " << c << ", cp: " << cp << endl;
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
-         if (c == 1 && cp == 4)
-         {
-            cout << "lambda_max: " << lambda_max << endl;
-            assert(false);
-         }
          d = lambda_max * c_norm; 
 
          double ss = pb->sound_speed(Uc, pmesh->GetAttribute(c));

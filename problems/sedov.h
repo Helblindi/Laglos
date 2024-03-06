@@ -76,9 +76,6 @@ public:
     *********************************************************/
    double pressure(const Vector &U, const int &cell_attr=0) override
    {
-      cout << "Sedov::Pressure\n";
-      cout << "gamma: " << this->get_gamma() 
-           << ", ie: " << this->internal_energy(U) << endl;
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
 

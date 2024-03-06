@@ -42,7 +42,7 @@ private:
    // Constants specific to Sedov problem
    double h = 1., cell_vol = 1.;
    // double sedov_energy_initial = 0.979264;
-   double sedov_energy_initial = 0.3;
+   double sedov_energy_initial = 0.25;
    // double sedov_energy_initial = 0.025;
 
 public:

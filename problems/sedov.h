@@ -36,11 +36,14 @@ private:
    double _a = 0., _b = 0., _gamma = 1.4;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = false; // Indicator for boundary conditions
+   bool _bcs = true; // Indicator for boundary conditions
    string _indicator = "Sedov"; // Possible: saltzmann
 
    // Constants specific to Sedov problem
-   double h = 0., cell_vol = 0.;
+   double h = 1., cell_vol = 1.;
+   // double sedov_energy_initial = 0.979264;
+   double sedov_energy_initial = 0.3;
+   // double sedov_energy_initial = 0.025;
 
 public:
    SedovProblem()
@@ -62,9 +65,9 @@ public:
    virtual void update(Vector params, double t) override {
       // params is a vector [hmax, cell_vol]
       if (t <= 1.e-16)
-      {  
+      {
          this->h = params[0];
-         this->cell_vol = params[0];
+         this->cell_vol = params[1];
       }
    }
 
@@ -126,7 +129,8 @@ public:
       {
          // Initial condition
          if (norm <= h) {
-            return 0.979264 / cell_vol;
+            assert(cell_vol > 0.);
+            return sedov_energy_initial / cell_vol;
          }
          else
          {
@@ -145,12 +149,6 @@ public:
    /*********************************************************
     * Sedov specific functions
     *********************************************************/
-   void set_internal_energy_params(double _h, double _cell_vol)
-   {
-      cout << "setting internal energy params.\n";
-      this->h = h;
-      this->cell_vol = _cell_vol;
-   }
 }; // End class
 
 } // ns hydrodynamics

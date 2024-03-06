@@ -531,7 +531,7 @@ void LagrangianLOOperator<dim>::GetEntityDof(const int GDof, DofEntity & entity,
 *  
 * Purpose: 
 *  To fill the Vector BdrElementIndexingArray of size NumFaces. If a face is a boundary face, then
-*  BdrElementIndexingArray[face] = 1, and if the face is an interior face, then we will have
+*  BdrElementIndexingArray[face] = bdr_attr, and if the face is an interior face, then we will have
 *  BdrElementIndexingArray[face] = -1.
 ****************************************************************************************************/
 template<int dim>
@@ -555,6 +555,9 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 *  then CreateBdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
 *  have CreateBdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
 *  grab edges, and fill in the corresponding boundary attribute for the adjacent vertices
+*
+*  Note that this function will label a vertex with 5 if that vertex lies on the corner, indicating 
+*  that the vertex velocity should be set to 0 to preserve the slip BCs on both of its faces.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
@@ -617,7 +620,9 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 * Purpose: 
 *  To fill an L2 gridfunction of size NDofs_L2 (num cells) with a value indicating if the cell
 *  is on the boundary or not.  This ParGridFunction can be retrieved with GetCellBdrFlagGF().
-* 
+*
+*  Note that this function will label a cell with 5 if that cell lies on the corner, indicating 
+*  that the cell velocity should be set to 0 to preserve the slip BCs on both of its faces.
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::FillCellBdrFlag()
@@ -633,7 +638,22 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
       
       // Each face should only have 1 adjacent cell
       assert(row.Size() == 1);
-      cell_bdr_flag_gf[row[0]] = bdr_attr;
+
+      if (cell_bdr_flag_gf[row[0]] != -1 && 
+          (pb->get_indicator() == "TriplePoint" || 
+           pb->get_indicator() == "Sedov" || 
+           pb->get_indicator() == "SodRadial"))
+      {
+         // Corner cell
+         cout << "we have a corner cell: " << row[0] << endl;
+         cell_bdr_flag_gf[row[0]] = 5;
+      }
+      else
+      {
+         cell_bdr_flag_gf[row[0]] = bdr_attr;
+      }
+      
+      // cout << "cell: " << row[0] << ", bdr_attr: " << bdr_attr << endl;
    }
 }
 
@@ -1079,7 +1099,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                         pb->get_indicator() == "SodRadial" ||
                         pb->get_indicator() == "Sedov")
                {
-                  // cout << "enforcing BCs for TP on cell: " << ci << endl;
                   switch (cell_bdr)
                   {
                   case 0:

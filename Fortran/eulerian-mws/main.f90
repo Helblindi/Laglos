@@ -31,7 +31,7 @@ PROGRAM riemann
      READ(21,*) rhol, rhor, ul, ur, pl, pr
      READ(21,*) tol
      !===Testing the covolume EOS
-     b_covolume = 0.1/max(rhol,rhor)
+     b_covolume = 0.1/MAXVAL([rhol,rhor])
      
      el = gamma_law_internal(rhol,pl,gamma)
      er = gamma_law_internal(rhor,pr,gamma)
@@ -47,7 +47,7 @@ PROGRAM riemann
      write(*,*) header
      WRITE(*,'(A,e23.17)') 'CPU ', t2-t1
      WRITE(*,'(2(A,e23.17,x),A,I1)') ' lambda_max=', &
-          max(abs(lambda_maxl),abs(lambda_maxr)), 'pstar=', pstar, 'k=', k
+          MAXVAL([abs(lambda_maxl),abs(lambda_maxr)]), 'pstar=', pstar, 'k=', k
 
      IF (nb_case==1) THEN
         WRITE(*,*) 'gamma', gamma
@@ -55,9 +55,9 @@ PROGRAM riemann
              'rhostarR', rhostar(pstar,rhor,pr,gamma), 'rhor', rhor
         WRITE(*,*) 'uL', ul, 'ustar', ustar(pstar), 'ur', ur
         WRITE(*,*) 'pL', pl, 'pstar', pstar, 'pr', pr
-        WRITE(*,*) 'relative Residual', phi(pstar)/max(abs(phi(pl)),abs(phi(pr))) 
+        WRITE(*,*) 'relative Residual', phi(pstar)/MAXVAL([abs(phi(pl)),abs(phi(pr))]) 
      ELSE
-        WRITE(*,*) 'relative Residual', phi(pstar)/max(abs(phi(pl)),abs(phi(pr))) 
+        WRITE(*,*) 'relative Residual', phi(pstar)/MAXVAL([abs(phi(pl)),abs(phi(pr))]) 
      END IF
   END DO
   CLOSE(21)

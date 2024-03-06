@@ -58,7 +58,7 @@ PROGRAM riemann
       IF (it < 15) THEN 
          gamma = gamma_ideal
          a = 0
-         b = 0.1 / max(rhol, rhor)
+         b = 0.1 / MAXVAL([rhol, rhor])
       ELSE
          gamma = gamma_vdw
          a = a_vdw
@@ -76,8 +76,8 @@ PROGRAM riemann
       WRITE (*, *) header
       !WRITE(*,'(A,e23.17)') 'CPU ', t2-t1
       WRITE (*, '(2(A,e23.17,x),A,I1)') ' lambda_max=', &
-         MAX(ABS(lambda_maxl), ABS(lambda_maxr)), 'pstar=', pstar, 'k=', k
-      WRITE (*, *) 'relative residual', phi(pstar)/MAX(ABS(phi(pl)), ABS(phi(pr)))
+         MAXVAL([ABS(lambda_maxl), ABS(lambda_maxr)]), 'pstar=', pstar, 'k=', k
+      WRITE (*, *) 'relative residual', phi(pstar)/MAXVAL([ABS(phi(pl)), ABS(phi(pr))])
 
    END DO
    CLOSE (21)

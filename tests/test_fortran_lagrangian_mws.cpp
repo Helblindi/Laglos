@@ -11,7 +11,7 @@ using namespace mfem;
 using namespace std;
 
 /* Global variables */
-double gamma = 1.02, a = 0., b = 0.;
+double _gamma = 1.02, a = 0., b = 0.;
 
 // Fortran subroutine from Lagrangian code
 extern "C" {
@@ -93,13 +93,13 @@ int main(int argc, char **argv)
          if (case_num < 15)
          {
             // Run case
-            gamma = gamma_ideal;
+            _gamma = gamma_ideal;
             a = 0.;
             b = .1/(max(rhoL, rhoR));
          }
          else
          {
-            gamma = gamma_vdw;
+            _gamma = gamma_vdw;
             a = a_vdw;
             b = b_vdw;
          }
@@ -138,6 +138,6 @@ int main(int argc, char **argv)
 
 double gamma_law_internal(double rho, double p)
 {
-   cout << "gamma: " << gamma << ", a: " << a << ", b: " << b << endl;
-   return ((p + a * pow(rho,2)) * (1. - b*rho) / (rho * (gamma - 1.))) - a * rho;
+   cout << "gamma: " << _gamma << ", a: " << a << ", b: " << b << endl;
+   return ((p + a * pow(rho,2)) * (1. - b*rho) / (rho * (_gamma - 1.))) - a * rho;
 }

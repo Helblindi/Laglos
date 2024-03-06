@@ -9,6 +9,15 @@
 *  5) Add corresponding problem option to laglos.cpp
 *  6) Add to include header file problems/test_problems_include.h
 *  7) Enforce boundary conditions in laglos_solver.cpp
+*     a) This may require edits to the following functions 
+*        depending on the type of BCs that will be 
+*        implemented
+*        - CreateBdrElementIndexingArray()
+*        - CreateBdrVertexIndexingArray()
+*        - FillCellBdrFlag()
+*        - ComputeStateUpdate()
+*        - EnforceMVBoundaryConditions()
+*  8) Edit SaveStateVecsToFile if the problem is a radial one.
 *********************************************************/
 
 

@@ -104,7 +104,7 @@ CONTAINS
        RETURN
     ELSE
        !===Iterations
-       p1 = MAX(p1,p2-phi(p2)/phi_prime(p2))
+       p1 = MAXVAL([p1,p2-phi(p2)/phi_prime(p2)])
        DO WHILE(.TRUE.)
           CALL update_lambda(ul,pl,al,gammal,ur,pr,ar,gammar,p1,p2,in_tol,&
                lambda_maxl_out,lambda_maxr_out,check)
@@ -208,9 +208,9 @@ CONTAINS
     REAL(KIND=NUMBER) :: v11, v32, lambda_max
     v11 = lambdaz(ul,pl,al,gammal,p2,-1)
     v32 = lambdaz(ur,pr,ar,gammar,p2,1)
-    lambda_maxl = MAX(-v11,zero)
-    lambda_maxr = MAX(v32,zero)
-    lambda_max = MAX(lambda_maxl,lambda_maxr)
+    lambda_maxl = MAXVAL([-v11,zero])
+    lambda_maxr = MAXVAL([v32,zero])
+    lambda_max = MAXVAL([lambda_maxl,lambda_maxr])
   END SUBROUTINE no_iter_update_lambda
 
   FUNCTION lambdaz(uz,pz,az,gammaz,pstar,z) RESULT(vv)
@@ -218,7 +218,7 @@ CONTAINS
     REAL(KIND=NUMBER), INTENT(IN) :: uz,pz,az,gammaz,pstar
     INTEGER,           INTENT(IN) :: z
     REAL(KIND=NUMBER)             :: vv
-    vv = uz + z*az*SQRT(1+MAX((pstar-pz)/pz,zero)*(gammaz+1)/(2*gammaz))
+    vv = uz + z*az*SQRT(1+MAXVAL([(pstar-pz)/pz,zero])*(gammaz+1)/(2*gammaz))
   END FUNCTION lambdaz
   !===end of code if no iteration
 
@@ -234,12 +234,12 @@ CONTAINS
     v12 = lambdaz(ul,pl,al,gammal,p1,-1)
     v31 = lambdaz(ur,pr,ar,gammar,p1,1)
     v32 = lambdaz(ur,pr,ar,gammar,p2,1)
-    lambda_maxl = MAX(-v11,zero)
-    lambda_maxr = MAX(v32,zero)
-    lambda_max = MAX(lambda_maxl,lambda_maxr)
+    lambda_maxl = MAXVAL([-v11,zero])
+    lambda_maxr = MAXVAL([v32,zero])
+    lambda_max = MAXVAL([lambda_maxl,lambda_maxr])
     err3 =  ABS(v32 - v31)/lambda_max
     err1 =  ABS(v12 - v11)/lambda_max
-    IF (MAX(err1,err3).LE.tol) THEN
+    IF (MAXVAL([err1,err3]).LE.tol) THEN
        check = .TRUE.
     ELSE
        check = .FALSE.

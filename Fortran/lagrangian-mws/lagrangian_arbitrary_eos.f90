@@ -104,7 +104,7 @@ CONTAINS
          RETURN
       ELSE
          !===Iterations
-         p1 = MAX(p1, p2 - phi(p2)/phi_prime(p2))
+         p1 = MAXVAL([p1, p2 - phi(p2)/phi_prime(p2)])
          DO WHILE (.TRUE.)
             CALL update_lambda(taul, pl, al, gammal, taur, pr, ar, gammar, p1, p2, in_tol, &
                                lambda_maxl_out, lambda_maxr_out, check)
@@ -220,9 +220,9 @@ CONTAINS
       REAL(KIND=NUMBER) :: v11, v32, lambda_max
       v11 = lambdaz(tau_L, p_L, a_L, gamma_L, p2, -1)
       v32 = lambdaz(tau_R, p_R, a_R, gamma_R, p2, 1)
-      lambda_max_L = MAX(-v11, 0.d0)
-      lambda_max_R = MAX(v32, 0.d0)
-      lambda_max = MAX(lambda_max_L, lambda_max_R)
+      lambda_max_L = MAXVAL([-v11, 0.d0])
+      lambda_max_R = MAXVAL([v32, 0.d0])
+      lambda_max = MAXVAL([lambda_max_L, lambda_max_R])
    END SUBROUTINE no_iter_update_lambda
 
    FUNCTION lambdaz(tauz, pz, az, gammaz, pstar, z) RESULT(vv)
@@ -230,7 +230,7 @@ CONTAINS
       REAL(KIND=NUMBER), INTENT(IN) :: tauz, pz, az, gammaz, pstar
       INTEGER, INTENT(IN) :: z
       REAL(KIND=NUMBER)             :: vv
-      vv = z*az/tauz*SQRT(1.d0 + MAX((pstar - pz)/(pz + p_infty), 0.d0)*(gammaz + 1.d0)/(2.d0*gammaz))
+      vv = z*az/tauz*SQRT(1.d0 + MAXVAL([(pstar - pz)/(pz + p_infty), 0.d0])*(gammaz + 1.d0)/(2.d0*gammaz))
    END FUNCTION lambdaz
    !===end of code if no iteration
 
@@ -247,12 +247,12 @@ CONTAINS
       v12 = lambdaz(tau_L, p_L, a_L, gamma_L, p1, -1)
       v31 = lambdaz(tau_R, p_R, a_R, gamma_R, p1, 1)
       v32 = lambdaz(tau_R, p_R, a_R, gamma_R, p2, 1)
-      lambda_max_L = MAX(-v11, 0.d0)
-      lambda_max_R = MAX(v32, 0.d0)
-      lambda_max = MAX(lambda_max_L, lambda_max_R)
+      lambda_max_L = MAXVAL([-v11, 0.d0])
+      lambda_max_R = MAXVAL([v32, 0.d0])
+      lambda_max = MAXVAL([lambda_max_L, lambda_max_R])
       err3 = ABS(v32 - v31)/lambda_max
       err1 = ABS(v12 - v11)/lambda_max
-      IF (MAX(err1, err3) <= tol) THEN
+      IF (MAXVAL([err1, err3]) <= tol) THEN
          check = .TRUE.
       ELSE
          check = .FALSE.

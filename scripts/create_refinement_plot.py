@@ -33,25 +33,27 @@ def main():
    # fig, axs = plt.subplots(1, 1)
    flag = 0
    for filename in sorted(os.listdir(directory)):
-      if flag % 2 == 0:
-         f = os.path.join(directory, filename)
-         refinements = filename[3:5]
-         
-         print('refinements: ', refinements)
-         df = pd.read_csv(f, dtype=float).sort_values(by=['x'])
-
-         # if (i == 0): continue # Skip first column
-         # plt.set_xlabel(df.columns[0])
-         # plt.set_ylabel("$\rho$")
-         if (refinements == "ex"):
-            flag -= 1
-            # plt.plot(df[df.columns[0]], df[df.columns[1]], 'k-', label="Exact solution")
-         else:
-            num_ref = int(refinements)
-            _label = str(1 * pow(2,num_ref))
-            plt.plot(df[df.columns[0]], df[df.columns[col]], '-', label=_label, linewidth=0.5)
+      # if flag % 1 == 0:
+      f = os.path.join(directory, filename)
+      refinements = filename[3:5]
       
-      flag += 1
+      print('refinements: ', refinements)
+      df = pd.read_csv(f).sort_values(by=['x'])
+      df = df.drop(columns=['cell_type'], axis=1)
+
+      # if (i == 0): continue # Skip first column
+      # plt.set_xlabel(df.columns[0])
+      # plt.set_ylabel("$\rho$")
+      if (refinements == "ex"):
+         flag -= 1
+         plt.plot(df[df.columns[0]], df[df.columns[col]], 'k-', label="Exact solution")
+      else:
+         # num_ref = int(refinements)
+         # _label = str(1 * pow(2,num_ref))
+         _label = refinements
+         plt.scatter(df[df.columns[0]], df[df.columns[col]], label=_label, s=0.3)
+      
+      # flag += 1
       
       
    

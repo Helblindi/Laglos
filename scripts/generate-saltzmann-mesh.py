@@ -2,8 +2,8 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 11
-   ny_gridpoints = 2 
+   nx_gridpoints = 51
+   ny_gridpoints = 6 
 
    x_arr = np.linspace(0,1,nx_gridpoints)
    y_arr = np.linspace(0,0.1,ny_gridpoints)
@@ -33,13 +33,14 @@ def main():
    # ELEMENTS
    f.write("elements\n")
    # Num elements goes here
-   f.write(str(int(nx_gridpoints * ny_gridpoints / 2) - 1) + "\n")
+   f.write(str((nx_gridpoints-1) * (ny_gridpoints-1)) + "\n")
    # List of vertices for each element
    el = 1
-   for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, 2):
-      print("i: ", i)
-      f.write("%d 3 %d %d %d %d\n" % (el, i, i+2, i+3, i+1))
-      el += 1
+   for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
+      for j in range(i, i + ny_gridpoints - 1):
+         print("i: ", i)
+         f.write("%d 3 %d %d %d %d\n" % (el, j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
+         el += 1
    f.write("\n")
 
    # BOUNDARY
@@ -51,22 +52,24 @@ def main():
    bdry_top = 4
    
    # Num boundary faces
-   f.write(str(nx_gridpoints * ny_gridpoints) + "\n")
+   f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")
    # TODO: Vertices connecting boundary edges
-   
-   #LEFT
-   f.write("%d 1 0 1\n" % bdry_left)
 
    #BOTTOM
-   for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, 2):
-      f.write("%d %d %d %d\n" % (bdry_bottom, 1, i, i+2))
+   for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
+      f.write("%d %d %d %d\n" % (bdry_bottom, 1, i, i+ny_gridpoints))
 
    #RIGHT
-   f.write("%d 1 %d %d\n" % (bdry_right, (nx_gridpoints - 1) * ny_gridpoints, nx_gridpoints * ny_gridpoints - 1))
+   for i in range((nx_gridpoints - 1) * ny_gridpoints, nx_gridpoints * ny_gridpoints - 1):
+      f.write("%d %d %d %d\n" % (bdry_right, 1, i, i+1))
 
    #TOP
-   for i in range(nx_gridpoints * ny_gridpoints - 1, 1, -2):
-      f.write("%d %d %d %d\n" % (bdry_top, 1, i, i-2))
+   for i in range(nx_gridpoints * ny_gridpoints - 1, ny_gridpoints, -ny_gridpoints):
+      f.write("%d %d %d %d\n" % (bdry_top, 1, i, i-ny_gridpoints))
+
+   #LEFT
+   for i in range(ny_gridpoints - 1, 0, -1):
+      f.write("%d %d %d %d\n" % (bdry_left, 1, i, i-1))
 
    f.write("\n")
 
@@ -77,6 +80,6 @@ def main():
    for i in range(0, nx_gridpoints):
       for j in range(0, ny_gridpoints):
          # print("i: %.2f, j: %.2f" % (x_arr[i], y_arr[j]))
-         f.write("%.2f %.2f\n" % (x_arr[i], y_arr[j]))
+         f.write("%.6f %.6f\n" % (x_arr[i], y_arr[j]))
 
 main()

@@ -627,23 +627,25 @@ int main(int argc, char *argv[]) {
    // Sync the data location of v_gf with its base, S
    v_gf.SyncAliasMemory(S);
 
+   // While the ste_coeff is not used for initialization in the Sedov case,
+   // it is necessary for plotting the exact solution
    FunctionCoefficient ste_coeff(ste0_static);
-   // if (problem == 6)
-   // {
-   //    double blast_energy = 0.25;
-   //    double blast_position[] = {0.0, 0.0, 0.0};
-   //    DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
-   //                             blast_position[2], blast_energy);
-   //    ste_gf.ProjectCoefficient(e_coeff);
-   //    ste_gf.SyncAliasMemory(S);
-   // }
-   // else
-   // {
-   ste_coeff.SetTime(t_init);
-   ste_gf.ProjectCoefficient(ste_coeff);
+   if (problem == 6)
+   {
+      double blast_energy = 0.25;
+      double blast_position[] = {0.0, 0.0, 0.0};
+      DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
+                               blast_position[2], blast_energy);
+      ste_gf.ProjectCoefficient(e_coeff);
+      cout << "printing initial ste gf:\n";
+      ste_gf.Print(cout);
+   }
+   else
+   {
+      ste_coeff.SetTime(t_init);
+      ste_gf.ProjectCoefficient(ste_coeff);
+   }
    ste_gf.SyncAliasMemory(S);
-   // }
-   
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
@@ -770,6 +772,7 @@ int main(int argc, char *argv[]) {
          {
             problem_class->update(x_gf);
          }
+         ste_coeff.SetTime(0);
 
          rho_ex_gf.ProjectCoefficient(rho_coeff);
          vel_ex_gf.ProjectCoefficient(v_coeff);

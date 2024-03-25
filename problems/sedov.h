@@ -41,9 +41,9 @@ private:
 
    // Constants specific to Sedov problem
    double h = 1., cell_vol = 1.;
+   // double sedov_energy_initial = 1.;
    // double sedov_energy_initial = 0.979264;
    double sedov_energy_initial = 0.25;
-   // double sedov_energy_initial = 0.025;
 
 public:
    SedovProblem()
@@ -76,7 +76,9 @@ public:
     *********************************************************/
    double pressure(const Vector &U, const int &cell_attr=0) override
    {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
+      double val = (this->get_gamma() - 1.) * this->internal_energy(U);
+      // cout << "pressure: " << val << endl;
+      return val;
    }
 
    /*********************************************************
@@ -128,21 +130,28 @@ public:
       if (t < 1.e-16)
       {
          // Initial condition
-         if (norm <= h) {
-            assert(cell_vol > 0.);
-            return sedov_energy_initial / cell_vol;
-         }
-         else
-         {
-            return 0.;
-         }
+         // if (norm <= 2.5*h) {
+         //    cout << "bomb cell\n";
+         //    cout << "h: " << h << endl;
+         //    cout << "cell vol: " << cell_vol << endl;
+         //    cout << "x: ";
+         //    x.Print(cout);
+         //    assert(cell_vol > 0.);
+         //    return sedov_energy_initial;
+         // }
+         // else
+         // {
+         //    return 0.;
+         // }
+         return 0.;
       }
       else
       {
          double xyt[3];
          xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+         double _e = sedov_e(xyt);
 
-         return sedov_e(xyt);
+         return _e;
       }
    }
 

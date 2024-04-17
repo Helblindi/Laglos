@@ -4156,6 +4156,32 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 
 
 /****************************************************************************************************
+* Function: IterativeCornerVelocityMC
+* Parameters:
+*  S    - BlockVector corresponding to nth timestep that stores mesh information, 
+*         mesh velocity, and state variables.
+*
+* Purpose:
+*  This function constitutes one iteration on the previously computed corner node 
+*  velocity to reduce total face motion while still preserving mass conservation.
+*  The idea is that we correct the velocity at the vertices to ensure mass 
+*  conservation and dampen the parachuting effect seen at the faces. This method 
+*  was proposed on 04/03/2024.
+*
+*  Note: This function relies on the mesh velocities having already been computed
+*  and linearized.  One can use whichever mesh velocity computation before 
+*  iteration.
+*
+*  Note: This function will modify mv_gf in the BlockVector S
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S)
+{
+   
+}
+
+
+/****************************************************************************************************
 * Function: ComputeNodeVelocitiesFromVgeo
 * Parameters:
 *  S        - BlockVector representing FiniteElement information

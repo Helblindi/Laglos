@@ -114,6 +114,8 @@ protected:
    bool mm;
    int mv_option = 0;
    int fv_option = 0;
+   bool use_corner_velocity_MC_iteration = false;
+   int corner_velocity_MC_num_iterations = 0;
    int problem = -1;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
@@ -165,6 +167,7 @@ public:
    /* Mesh movement */
    void SetMVOption(const int & option);
    void SetFVOption(const int & option);
+   void SetMVIteration(const int num_iterations);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       

@@ -778,6 +778,16 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          }
 
          ComputeNodeVelocitiesFromVgeo(S, t, dt);
+
+         if (this->use_corner_velocity_MC_iteration)
+         {
+            for (int i = 0; i < corner_velocity_MC_num_iterations; i++)
+            {
+               cout << "iterating on the corner node velocities\n";
+               IterativeCornerVelocityMC(S);
+            }
+         }
+
          EnforceMVBoundaryConditions(S,t,dt);
 
          switch (fv_option)
@@ -1968,6 +1978,23 @@ template<int dim>
 void LagrangianLOOperator<dim>::SetFVOption(const int & option)
 {
    this->fv_option = option;
+}
+
+
+/****************************************************************************************************
+* Function: SetMVIteration
+* Parameters:
+*  num_iterations - integer parameter indicating the number of times to iterate
+*                   on the mesh velocities
+*
+* Purpose:
+*  To enable the use of and set the number of iterations for the 
+*  IterativeCornerVelocityMC() function.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMVIteration(const int num_iterations) { 
+   this->use_corner_velocity_MC_iteration = true;
+   this->corner_velocity_MC_num_iterations = num_iterations; 
 }
 
 
@@ -4185,7 +4212,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S)
 {
-
+   cout << "=====IterativeCornerVelocityMC=====\n";
 }
 
 

@@ -125,6 +125,8 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    int mv_option = 2;
    int fv_option = 2;
+   bool use_mv_iteration = false;
+   int mv_n_iterations = 2;
    bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
@@ -167,6 +169,11 @@ int main(int argc, char *argv[]) {
                   "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal, 4 - CAVEAT Weighted LS, 5 - CAVEAT/Cell Face combo, 6 - 5 with weights");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
                   "Choose how to compute face velocities, 0 - Do nothing, 1 - Mass conservative bubble, 2 - Average, Q1 type");
+   args.AddOption(&use_mv_iteration, "-mv-iter", "--use-mv-iteration", 
+                  "-no-mv-iter", "--no-mv-iteration",
+                  "Enable or disable mesh velocity iteration to reduce parachuting effect.");
+   args.AddOption(&mv_n_iterations, "-mv-iter-n", "--mv-num-iterations",
+                  "Set the number of times to iterate on the corner node mesh velocities.");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
                   "--no-optimize-timestep",
                   "Enable or disable timestep optimization using CFL.");
@@ -664,6 +671,10 @@ int main(int argc, char *argv[]) {
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    hydro.SetProblem(problem);
+   if (use_mv_iteration)
+   {
+      hydro.SetMVIteration(mv_n_iterations);
+   }
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_press, vis_gamma, vis_mc;

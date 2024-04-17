@@ -78,6 +78,7 @@ protected:
    const HYPRE_Int GTVSize_H1;
    const int NDofs_H1;
    const int NVDofs_H1;
+   const int NDofs_H1L;
 
    const int Vsize_L2;
    const int TVSize_L2;

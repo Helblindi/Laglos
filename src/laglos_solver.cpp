@@ -113,6 +113,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    TVSize_H1(H1.TrueVSize()),
    GTVSize_H1(H1.GlobalTrueVSize()),
    NDofs_H1(H1.GetNDofs()),
+   NDofs_H1L(H1_L.GetNDofs()),
    NVDofs_H1(H1.GetNVDofs()), // Scalar vertex dofs
    Vsize_L2(L2.GetVSize()),
    TVSize_L2(L2.TrueVSize()),
@@ -197,6 +198,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    cout << "GTVSize_H1: " << GTVSize_H1 << endl;
    cout << "NDofs_H1: " << NDofs_H1 << endl;
    cout << "NVDofs_H1: " << NVDofs_H1 << endl;
+   cout << "NDofs_H1L: " << NDofs_H1L << endl;
    cout << "NDofs_L2: " << NDofs_L2 << endl;
    cout << "NDofs_L2V: " << NDofs_L2V << endl;
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
@@ -4213,6 +4215,7 @@ template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S)
 {
    cout << "=====IterativeCornerVelocityMC=====\n";
+
 }
 
 

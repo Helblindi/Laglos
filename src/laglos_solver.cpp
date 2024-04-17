@@ -105,6 +105,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf_fluxes(&CR),
    v_geo_gf(&H1_L),
    cell_bdr_flag_gf(&L2),
+   mv_gf_prev_it(&h1),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -723,6 +724,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
    //      << "         ComputeMeshVelocities          \n"
    //      << "========================================\n";
    // chrono_mm.Start();
+   /* Set mesh velocity for the previous iteration before we make 
+   any modifications to the mesh velocity object contained in S */
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction mv_gf;
+   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   mv_gf_prev_it = mv_gf;
+
    if (mm)
    {
       ComputeIntermediateFaceVelocities(S, t);
@@ -4177,7 +4185,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S)
 {
-   
+
 }
 
 

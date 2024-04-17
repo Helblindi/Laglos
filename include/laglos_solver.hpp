@@ -56,7 +56,10 @@ protected:
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
-   ParGridFunction cell_bdr_flag_gf;     // Element indexing vector
+   ParGridFunction cell_bdr_flag_gf;  // Element indexing vector
+   // Stores mesh velocities from the previous iteration
+   // This object is used in IterativeCornerVelocityMC() function
+   ParGridFunction mv_gf_prev_it;     
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;

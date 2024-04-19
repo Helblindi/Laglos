@@ -785,8 +785,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          {
             for (int i = 0; i < corner_velocity_MC_num_iterations; i++)
             {
-               cout << "iterating on the corner node velocities\n";
-               IterativeCornerVelocityMC(S);
+               // cout << "iterating on the corner node velocities\n";
+               IterativeCornerVelocityMC(S, dt);
             }
          }
 
@@ -4212,10 +4212,147 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S)
+void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const double & dt)
 {
-   cout << "=====IterativeCornerVelocityMC=====\n";
+   // cout << "=====IterativeCornerVelocityMC=====\n";
 
+   // We need a palce to store the new mesh velocities that we compute
+   Vector S_new = S;
+
+   // Values needed during iteration
+   Array<int> faces_row, face_dofs_row;
+   int faces_length;
+   mfem::Mesh::FaceInformation FI;
+   H1.ExchangeFaceNbrData();
+   int Vadj_index, c;
+   bool is_v2 = false;
+   double const1 = 0., const2 = 0., F = 0.;
+
+   Vector predicted_node_v(dim), Vf(dim), Vadj(dim), Vnode(dim), Vnode_prev_it(dim);
+   double Vnode_n_comp = 0.; // The quantity we solve for in each face iteration
+   double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
+   Vector n_int(dim), n_vec(dim), n_vec_R(dim);
+
+   /* Iterate over corner nodes */
+   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   {
+      // cout << "\t node: " << node << endl;
+      // Reset new nodal velocity
+      predicted_node_v = 0.;
+
+      // Get current nodal velocity from S
+      // GetNodeVelocity(S, node, node_v);
+      // Get nodal velocity at previous iteration from mv_gf_prev_it
+      for (int i = 0; i < dim; i++)
+      {
+         int index = node + i * NDofs_H1;
+         Vnode_prev_it[i] = mv_gf_prev_it[index];
+      }
+
+      // Get cell faces
+      vertex_edge.GetRow(node, faces_row);
+      faces_length = faces_row.Size();
+
+      /* Iterate over cell faces */
+      for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+      {
+         // Reset flag
+         is_v2 = false;
+
+         // Get face information
+         int face = faces_row[face_it];
+         GetIntermediateFaceVelocity(face, Vf);
+         FI = pmesh->GetFaceInformation(face);
+
+         // Calculate outer normal
+         c = FI.element[0].index;
+         CalcOutwardNormalInt(S, c, face, n_int);
+         n_vec = n_int;
+         F = n_vec.Norml2();
+         n_vec /= F;
+         n_vec_R = n_vec;
+         Orthogonal(n_vec_R);
+
+         // Calculate bmn
+         double bmn = Vf * n_vec;
+         bmn *= F;
+
+         // Get Vnode_prev_it component in tangent direction from previous iteration
+         Vnode_prev_it_nR_comp = Vnode_prev_it * n_vec_R;
+         // if (abs(Vnode_prev_it_nR_comp) > 0.)
+         // {
+         //    cout << "Vnode_prev_it: ";
+         //    Vnode_prev_it.Print(cout);
+         //    cout << "n_vec_R: ";
+         //    n_vec_R.Print(cout);
+         //    cout << "Vnode_prev_it_nR_comp: " << Vnode_prev_it_nR_comp << endl;
+         // }
+
+         /* adjacent corner indices */
+         H1.GetFaceDofs(face, face_dofs_row);
+         int face_vdof1 = face_dofs_row[1], 
+             face_vdof2 = face_dofs_row[0], 
+             face_dof = face_dofs_row[2]; // preserve node orientation where cell to right of face is with lower cell index
+         // cout << "face: " << face << endl
+         //      << "interior cell: " << c << endl
+         //      << "normal: ";
+         // n_vec.Print(cout);
+         // cout << "nR: ";
+         // n_vec_R.Print(cout); 
+         // cout << ", face_vdof1: " << face_vdof1 
+         //      << ", face_vdof2: " << face_vdof2 
+         //      << ", face_dof: " << face_dof << endl;
+
+         // Grab corresponding vertex velocity from S
+         if (node == face_vdof1) {
+            Vadj_index = face_vdof2;
+         } else {
+            Vadj_index = face_vdof1;
+            is_v2 = true;
+         }
+         GetNodeVelocity(S, Vadj_index, Vadj);
+
+         // Get normal and rotated components of Vadj
+         Vadj_n_comp = Vadj * n_vec;
+         Vadj_nR_comp = Vadj * n_vec_R;
+
+         /* Compute predicted \hat{V}_{i,j} */
+         const1 = 0.5*dt*Vnode_prev_it_nR_comp - dt*Vadj_nR_comp;
+         const2 = 0.5*dt*Vadj_nR_comp - dt*Vnode_prev_it_nR_comp;
+
+         // Solve for Vnode_n_comp
+         if (is_v2)
+         {
+            // cout << "solving for V2.\n";
+            Vnode_n_comp = (3*bmn + (const1 - 1.5*F) * Vadj_n_comp) / (const2 + 1.5*F);
+         }
+         else 
+         {
+            Vnode_n_comp = (-3*bmn + (const1 + 1.5*F) * Vadj_n_comp) / (const2 - 1.5*F);
+         }
+
+         Vnode = 0.;
+         Vnode.Add(Vnode_n_comp, n_vec);
+         Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+
+         // cout << "Resulting Vnode: ";
+         // Vnode.Print(cout);
+
+         // Add to predicted node_v
+         predicted_node_v.Add(1., Vnode);
+      }
+
+      // Average node_v
+      predicted_node_v /= faces_length;
+      // cout << "predicted velocity at node " << node << ": ";
+      // predicted_node_v.Print(cout);
+
+      // Put velocity in S_new
+      UpdateNodeVelocity(S_new, node, predicted_node_v);
+   }
+
+   // Once all the predicted node velocities have been computed, set them in S
+   S = S_new;
 }
 
 

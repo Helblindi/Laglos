@@ -224,7 +224,7 @@ public:
    void ComputeGeoVCAVEATCellFaceWeighted(Vector &S);
 
    // Iterative method to update corner velocities, so less mass correction is needed
-   void IterativeCornerVelocityMC(Vector &S);
+   void IterativeCornerVelocityMC(Vector &S, const double & dt);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);

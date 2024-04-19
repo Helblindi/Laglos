@@ -1232,7 +1232,7 @@ int main(int argc, char *argv[]) {
       // Save mesh and gfs to files
       std::ostringstream mesh_name, rho_name, v_name, ste_name;
       mesh_name << gfprint_path 
-                << "final.mesh_final";
+                << "final.mesh";
       rho_name  << gfprint_path 
                 << "rho_final.gf";
       v_name << gfprint_path 

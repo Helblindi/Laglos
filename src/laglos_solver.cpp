@@ -2429,9 +2429,9 @@ void LagrangianLOOperator<dim>::
          V3nperp = -1. * const1 / const2;
 
          /* Option 2 */
-         Vector rt_face_vel(dim);
-         GetNodeVelocity(S, face_dof, rt_face_vel);
-         V3nperp = rt_face_vel * n_vec_perp;
+         // Vector rt_face_vel(dim);
+         // GetNodeVelocity(S, face_dof, rt_face_vel);
+         // V3nperp = rt_face_vel * n_vec_perp;
 
          // Compute V3n (5.11)
          V3n = c1 * V3nperp + c2 + 3. * bmn / D;

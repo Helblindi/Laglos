@@ -1003,7 +1003,7 @@ int main(int argc, char *argv[]) {
                  << sqrt_norm
                  << endl;
          }
-         // Output mass conservation information
+         // Fill grid function with mass information
          hydro.CheckMassConservation(S, mc_gf);
 
          // Turn back on suppression
@@ -1230,7 +1230,7 @@ int main(int argc, char *argv[]) {
    // In all cases, print the final grid functions
    {
       // Save mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name;
+      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name;
       mesh_name << gfprint_path 
                 << "final.mesh";
       rho_name  << gfprint_path 
@@ -1239,6 +1239,9 @@ int main(int argc, char *argv[]) {
              << "v_final.gf";
       ste_name << gfprint_path 
                << "ste_final.gf";
+      // TODO: Save mass loss
+      massC_name << gfprint_path
+                 << "mass_loss.gf";
 
       std::ofstream mesh_ofs(mesh_name.str().c_str());
       mesh_ofs.precision(8);
@@ -1259,6 +1262,11 @@ int main(int argc, char *argv[]) {
       ste_ofs.precision(8);
       ste_gf.SaveAsOne(ste_ofs);
       ste_ofs.close();
+
+      std::ofstream mc_ofs(massC_name.str().c_str());
+      mc_ofs.precision(12); // Need mass loss to machine error precision
+      mc_gf.SaveAsOne(mc_ofs);
+      mc_ofs.close();
 
       // Print continuous interpolation of density
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);

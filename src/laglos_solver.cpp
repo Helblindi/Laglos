@@ -785,7 +785,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          {
             double val = ComputeIterationNorm(S,dt);
             cout << "Starting val: " << val << endl;
-            for (int i = 0; i < corner_velocity_MC_num_iterations; i++)
+            for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityMC(S, dt);
@@ -3176,7 +3176,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
             MFEM_ABORT("Invalid entity\n");
          }
       }
-
+      // cout << "node velocity from mv2 for node (" << node << "): ";
+      // node_v.Print(cout);
       // In every case, update the corresponding nodal velocity in S
       UpdateNodeVelocity(S, node, node_v);
 
@@ -4229,7 +4230,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
    int Vadj_index, c;
-   bool is_v2 = false;
+   bool is_v2 = false, int_face_bdr_node = false;
    double const1 = 0., const2 = 0., F = 0.;
 
    Vector predicted_node_v(dim), Vf(dim), Vadj(dim), Vnode(dim), Vnode_prev_it(dim);
@@ -4237,12 +4238,26 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
    Vector n_int(dim), n_vec(dim), n_vec_R(dim);
 
+   // Averaging
+   DenseMatrix Mi(dim), dm_tmp(dim);
+   Vector Ri(dim), v_tmp(dim);
+
+   int bdr_ind = 0;
+
    /* Iterate over corner nodes */
    for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
    {
-      // cout << "\t node: " << node << endl;
-      // Reset new nodal velocity
+      // Reset new nodal velocity, and averaging objects
+      Mi = 0., Ri = 0.;
       predicted_node_v = 0.;
+
+      // Set corresponding boundary indicator
+      // If node is boundary node, will have to add corresponding correction
+      // node is interior node if bdr_ind == -1
+      bdr_ind = BdrVertexIndexingArray[node];
+      // cout << "\t node: " << node << ", bdr_ind: " << bdr_ind << endl;
+
+      // Get index of face to be reflected
 
       // Get current nodal velocity from S
       // GetNodeVelocity(S, node, node_v);
@@ -4267,6 +4282,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
          FI = pmesh->GetFaceInformation(face);
+
+         // cout << "face: " << face << endl;
 
          // Calculate outer normal
          c = FI.element[0].index;
@@ -4337,17 +4354,40 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
          Vnode = 0.;
          Vnode.Add(Vnode_n_comp, n_vec);
-         Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+         // Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
 
          // cout << "Resulting Vnode: ";
          // Vnode.Print(cout);
 
+         // Add contribution to the averaging objects
+         tensor(n_vec, n_vec, dm_tmp);
+         dm_tmp.Mult(Vnode, v_tmp);
+
          // Add to predicted node_v
-         predicted_node_v.Add(1., Vnode);
+         // In the case of boundary nodes, check if this is an interior face
+         if (bdr_ind != -1 && FI.IsInterior())
+         {
+            // cout << "we have an interior face " << face << " on a boundary node " << node << endl;
+            predicted_node_v.Add(2., Vnode); // double the contribution
+            Mi.Add(2, dm_tmp);
+            Ri.Add(2, v_tmp);
+         }
+         else
+         {
+            predicted_node_v.Add(1., Vnode);
+            Mi += dm_tmp;
+            Ri += v_tmp;
+         }
       }
 
       // Average node_v
-      predicted_node_v /= faces_length;
+      // if (faces_length > 2)
+      // {
+      //    predicted_node_v /= 2;
+      // }
+      Mi.Invert();
+      Mi.Mult(Ri, predicted_node_v);
+      
       // cout << "predicted velocity at node " << node << ": ";
       // predicted_node_v.Print(cout);
 
@@ -4410,96 +4450,97 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       GetNodeVelocity(S, face_vdof1, vdof1_v);
       GetNodeVelocity(S, face_vdof2, vdof2_v);
 
-      if (FI.IsInterior())
+      // if (FI.IsInterior())
+      // {
+      // Get adjacent cell information
+      c = FI.element[0].index;
+      cp = FI.element[1].index;
+      GetCellStateVector(S, c, Uc);
+      GetCellStateVector(S, cp, Ucp);
+      pb->velocity(Uc, cell_c_v);
+      pb->velocity(Ucp, cell_cp_v);
+
+      // Calculate outer normal
+      CalcOutwardNormalInt(S, c, face, n_int);
+      n_vec = n_int;
+      double F = n_vec.Norml2();
+      n_vec /= F;
+
+      assert(1. - n_vec.Norml2() < 1e-12);
+
+      // Calculate new corner locations and half  step locations
+      Vector vdof1_x_new(dim), vdof2_x_new(dim), vdof1_x_half(dim), vdof2_x_half(dim);
+      vdof1_x_new = vdof1_x;
+      vdof1_x_new.Add(dt, vdof1_v);
+      vdof1_x_half = vdof1_x;
+      vdof1_x_half.Add(dt/2., vdof1_v);
+
+      vdof2_x_new = vdof2_x;
+      vdof2_x_new.Add(dt, vdof2_v);
+      vdof2_x_half = vdof2_x;
+      vdof2_x_half.Add(dt/2., vdof2_v);
+
+      // calculate a_{12}^{n+1} (new tangent midpoint)
+      Vector vdof12_x_new(dim);
+      vdof12_x_new = vdof1_x_new;
+      vdof12_x_new += vdof2_x_new;
+      vdof12_x_new /= 2.;
+
+      // Compute D (A.4c)
+      Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
+      n_vec_R = n_vec;
+      Orthogonal(n_vec_R);
+      subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
+      subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
+      Orthogonal(temp_vec_2);
+      double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+
+      // Compute c1 (A.4a)
+      // subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+      // double c1 = ( dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
+
+      // Compute c0 (A.4b)
+      // Vector n_vec_half(dim);
+      // subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
+      // Orthogonal(n_vec_half);
+      GetIntermediateFaceVelocity(face, Vf);
+      
+      double bmn = Vf * n_vec;
+      bmn *= F;
+
+      temp_vec = vdof1_x_half;
+      Orthogonal(temp_vec); // A1R
+      temp_vec_2 = vdof2_x_half;
+      Orthogonal(temp_vec_2); // A2R
+      double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
+      double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
+      
+      temp_vec = face_x;
+      Orthogonal(temp_vec);
+      subtract(vdof2_v, vdof1_v, temp_vec_2);
+      double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
+      double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
+      
+      // Add to val for interior faces only
+      add(vdof1_v, vdof2_v, temp_vec);
+      double fval = (temp_vec * n_vec) / 2.;
+      // if (fval != c0)
+      // {
+      //    cout << "face: " << face 
+      //         << ", fval: " << fval 
+      //         << ", c0: " << c0 << endl;
+      // }
+      fval -= c0;
+
+      if (abs(fval) > 1.e-8)
       {
-         // Get adjacent cell information
-         c = FI.element[0].index;
-         cp = FI.element[1].index;
-         GetCellStateVector(S, c, Uc);
-         GetCellStateVector(S, cp, Ucp);
-         pb->velocity(Uc, cell_c_v);
-         pb->velocity(Ucp, cell_cp_v);
-
-         // Calculate outer normal
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
-         double F = n_vec.Norml2();
-         n_vec /= F;
-
-         assert(1. - n_vec.Norml2() < 1e-12);
-
-         // Calculate new corner locations and half  step locations
-         Vector vdof1_x_new(dim), vdof2_x_new(dim), vdof1_x_half(dim), vdof2_x_half(dim);
-         vdof1_x_new = vdof1_x;
-         vdof1_x_new.Add(dt, vdof1_v);
-         vdof1_x_half = vdof1_x;
-         vdof1_x_half.Add(dt/2., vdof1_v);
-
-         vdof2_x_new = vdof2_x;
-         vdof2_x_new.Add(dt, vdof2_v);
-         vdof2_x_half = vdof2_x;
-         vdof2_x_half.Add(dt/2., vdof2_v);
-
-         // calculate a_{12}^{n+1} (new tangent midpoint)
-         Vector vdof12_x_new(dim);
-         vdof12_x_new = vdof1_x_new;
-         vdof12_x_new += vdof2_x_new;
-         vdof12_x_new /= 2.;
-
-         // Compute D (A.4c)
-         Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
-         n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
-         subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
-         subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         Orthogonal(temp_vec_2);
-         double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
-
-         // Compute c1 (A.4a)
-         // subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-         // double c1 = ( dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
-
-         // Compute c0 (A.4b)
-         // Vector n_vec_half(dim);
-         // subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
-         // Orthogonal(n_vec_half);
-         GetIntermediateFaceVelocity(face, Vf);
-         
-         double bmn = Vf * n_vec;
-         bmn *= F;
-
-         temp_vec = vdof1_x_half;
-         Orthogonal(temp_vec); // A1R
-         temp_vec_2 = vdof2_x_half;
-         Orthogonal(temp_vec_2); // A2R
-         double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
-         double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
-         
-         temp_vec = face_x;
-         Orthogonal(temp_vec);
-         subtract(vdof2_v, vdof1_v, temp_vec_2);
-         double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
-         double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
-         
-         // Add to val for interior faces only
-         add(vdof1_v, vdof2_v, temp_vec);
-         double fval = (temp_vec * n_vec) / 2.;
-         // if (fval != c0)
-         // {
-         //    cout << "face: " << face 
-         //         << ", fval: " << fval 
-         //         << ", c0: " << c0 << endl;
-         // }
-         fval -= c0;
-
-         if (abs(fval) > 1.e-8)
-         {
-            num_broken++;
-         }
-
-         val += abs(fval);
-         total_num++;
+         num_broken++;
+         // cout << "face " << face << " is broken.\n";
       }
+
+      val += abs(fval);
+      total_num++;
+      // }
    }
    double perc_broken = double(num_broken)/double(total_num);
    cout << "percentage of broken faces: " << perc_broken << endl;

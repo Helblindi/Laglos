@@ -790,7 +790,9 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityMC(S, dt);
                double val = ComputeIterationNorm(S,dt);
-               cout << "val at iteration " << i << ": " << val << endl;
+               mv_gf_prev_it = mv_gf;
+               cout << "val at iteration " << i << ": " << val
+                    << ", mv_prev_norm: " << mv_gf_prev_it.Norml2() <<  endl;
             }
          }
 
@@ -4220,6 +4222,7 @@ template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityMC=====\n";
+   double theta = .5;
 
    // We need a palce to store the new mesh velocities that we compute
    Vector S_new = S;
@@ -4241,6 +4244,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    // Averaging
    DenseMatrix Mi(dim), dm_tmp(dim);
    Vector Ri(dim), v_tmp(dim);
+   Vector Vghosted(dim);
 
    int bdr_ind = 0;
 
@@ -4354,7 +4358,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
          Vnode = 0.;
          Vnode.Add(Vnode_n_comp, n_vec);
-         // Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+         Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
 
          // cout << "Resulting Vnode: ";
          // Vnode.Print(cout);
@@ -4362,34 +4366,104 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
          dm_tmp.Mult(Vnode, v_tmp);
+         Mi.Add(1., dm_tmp);
+         Ri.Add(1., v_tmp);
 
-         // Add to predicted node_v
          // In the case of boundary nodes, check if this is an interior face
          if (bdr_ind != -1 && FI.IsInterior())
          {
+            Vghosted = Vnode;
+            // We must add the ghost node contribution
             // cout << "we have an interior face " << face << " on a boundary node " << node << endl;
-            predicted_node_v.Add(2., Vnode); // double the contribution
-            Mi.Add(2, dm_tmp);
-            Ri.Add(2, v_tmp);
-         }
-         else
-         {
-            predicted_node_v.Add(1., Vnode);
-            Mi += dm_tmp;
-            Ri += v_tmp;
-         }
+            // What is done here depends on which boundary face we have 
+            // We will be employing reflective boundary conditions
+
+            // Sod
+            switch (bdr_ind)
+            {
+            case 1: // bottom
+            case 3: // top
+               n_vec[1] *= -1.;
+               Vadj[1] *= -1.;
+               break;
+            
+            case 2: // right
+            case 4: // left
+               n_vec[0] *= -1.;
+               Vadj[0] *= -1.;
+               break;
+            
+            case -1:
+               // Not a boundary vertex
+               continue;
+
+            default:
+               MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+               break;
+            }
+
+            n_vec_R = n_vec;
+            Orthogonal(n_vec_R);
+            Vnode_prev_it_nR_comp = Vnode_prev_it * n_vec_R;
+            // Negate is_v2
+            is_v2 = !is_v2;
+
+            // Get normal and rotated components of Vadj
+            Vadj_n_comp = Vadj * n_vec;
+            Vadj_nR_comp = Vadj * n_vec_R;
+
+            /* Compute predicted \hat{V}_{i,j} */
+            const1 = 0.5*dt*Vnode_prev_it_nR_comp - dt*Vadj_nR_comp;
+            const2 = 0.5*dt*Vadj_nR_comp - dt*Vnode_prev_it_nR_comp;
+
+            // Solve for Vnode_n_comp
+            if (is_v2)
+            {
+               // cout << "solving for V2.\n";
+               Vnode_n_comp = (3*bmn + (const1 - 1.5*F) * Vadj_n_comp) / (const2 + 1.5*F);
+            }
+            else 
+            {
+               Vnode_n_comp = (-3*bmn + (const1 + 1.5*F) * Vadj_n_comp) / (const2 - 1.5*F);
+            }
+
+            Vnode = 0.;
+            Vnode.Add(Vnode_n_comp, n_vec);
+            Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+
+            // cout << "Resulting Vnode: ";
+            // Vnode.Print(cout);
+
+            // Add contribution to the averaging objects
+            tensor(n_vec, n_vec, dm_tmp);
+            dm_tmp.Mult(Vnode, v_tmp);
+            Mi.Add(1., dm_tmp);
+            Ri.Add(1., v_tmp);
+
+            // if (Vghosted.Norml2() > 1e-8)
+            // {
+            //    cout << "---\n";
+            //    cout << "node: " << node 
+            //         << ", bdr ind: " << bdr_ind << endl;
+            //    cout << "v not ghost: ";
+            //    Vghosted.Print(cout);
+            //    cout << "v ghost: ";
+            //    Vnode.Print(cout);
+            //    cout << "---\n";
+            // }
+            
+         } // End ghost node
       }
 
       // Average node_v
-      // if (faces_length > 2)
-      // {
-      //    predicted_node_v /= 2;
-      // }
       Mi.Invert();
       Mi.Mult(Ri, predicted_node_v);
       
       // cout << "predicted velocity at node " << node << ": ";
       // predicted_node_v.Print(cout);
+
+      predicted_node_v *= theta; 
+      predicted_node_v.Add(1. - theta, Vnode_prev_it);
 
       // Put velocity in S_new
       UpdateNodeVelocity(S_new, node, predicted_node_v);

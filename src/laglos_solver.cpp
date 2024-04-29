@@ -4222,6 +4222,7 @@ template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityMC=====\n";
+   bool do_theta_averaging = false;
    double theta = .5;
 
    // We need a palce to store the new mesh velocities that we compute
@@ -4240,6 +4241,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    double Vnode_n_comp = 0.; // The quantity we solve for in each face iteration
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
    Vector n_int(dim), n_vec(dim), n_vec_R(dim);
+   Vector Vnode_x(dim), Vadj_x(dim), face_x(dim);
+   Vector Badj(dim), Bnode(dim);
 
    // Averaging
    DenseMatrix Mi(dim), dm_tmp(dim);
@@ -4260,6 +4263,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       // node is interior node if bdr_ind == -1
       bdr_ind = BdrVertexIndexingArray[node];
       // cout << "\t node: " << node << ", bdr_ind: " << bdr_ind << endl;
+      if (bdr_ind != -1) { continue; }
 
       // Get index of face to be reflected
 
@@ -4271,6 +4275,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          int index = node + i * NDofs_H1;
          Vnode_prev_it[i] = mv_gf_prev_it[index];
       }
+
+      /* Get node position */
+      GetNodePosition(S, node, Vnode_x);
 
       // Get cell faces
       vertex_edge.GetRow(node, faces_row);
@@ -4337,31 +4344,57 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          }
          GetNodeVelocity(S, Vadj_index, Vadj);
 
+         /* Get adj node and face locations */
+         GetNodePosition(S, Vadj_index, Vadj_x);
+         GetNodePosition(S, face_dof, face_x);
+
          // Get normal and rotated components of Vadj
          Vadj_n_comp = Vadj * n_vec;
          Vadj_nR_comp = Vadj * n_vec_R;
 
-         /* Compute predicted \hat{V}_{i,j} */
-         const1 = 0.5*dt*Vnode_prev_it_nR_comp - dt*Vadj_nR_comp;
-         const2 = 0.5*dt*Vadj_nR_comp - dt*Vnode_prev_it_nR_comp;
+         // Compute geometrical vectors
+         Bnode = face_x;
+         Bnode *= -2.;
+         Bnode.Add(-.5, Vadj_x);
+         Bnode.Add(2.5, Vnode_x);
+         Orthogonal(Bnode);
+
+         Badj = face_x;
+         Badj *= -2.;
+         Badj.Add(-.5, Vnode_x);
+         Badj.Add(2.5, Vadj_x);
+         Orthogonal(Badj);
+
+         // Compute dot products
+         double badjn = Badj * n_vec;
+         double badjnr = Badj * n_vec_R;
+         double bnoden = Bnode * n_vec;
+         double bnodenr = Bnode * n_vec_R;
+
+         // Evaluate numerator, which depends on geometric orientation
+         // The center of the cell should be on the right when 
+         // traversing from node 1 to node 2
+         double numer = 0.;
 
          // Solve for Vnode_n_comp
-         if (is_v2)
-         {
-            // cout << "solving for V2.\n";
-            Vnode_n_comp = (3*bmn + (const1 - 1.5*F) * Vadj_n_comp) / (const2 + 1.5*F);
+         if (is_v2) {
+            numer += 3*bmn; 
+         } else {
+            numer -= 3*bmn;  
          }
-         else 
-         {
-            Vnode_n_comp = (-3*bmn + (const1 + 1.5*F) * Vadj_n_comp) / (const2 - 1.5*F);
-         }
+         numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
+         numer += badjnr * Vadj_nR_comp;
+         numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;
+
+         double denom = -dt*Vnode_prev_it_nR_comp + (dt/2)*Vadj_nR_comp + bnoden;
+   
+         Vnode_n_comp = numer / denom;
 
          Vnode = 0.;
          Vnode.Add(Vnode_n_comp, n_vec);
          Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
 
-         // cout << "Resulting Vnode: ";
-         // Vnode.Print(cout);
+
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
@@ -4412,45 +4445,56 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             Vadj_n_comp = Vadj * n_vec;
             Vadj_nR_comp = Vadj * n_vec_R;
 
-            /* Compute predicted \hat{V}_{i,j} */
-            const1 = 0.5*dt*Vnode_prev_it_nR_comp - dt*Vadj_nR_comp;
-            const2 = 0.5*dt*Vadj_nR_comp - dt*Vnode_prev_it_nR_comp;
+            /* Get flipped face_x and vadj_x */
+            Vector face_dx(dim);
+            subtract(Vnode_x, face_x, face_dx);
+            add(Vnode_x, face_dx, face_x);
+            Vector Vadj_dx(dim);
+            subtract(Vnode_x, Vadj_x, Vadj_dx);
+            add(Vnode_x, Vadj_dx, Vadj_x);
+
+            Bnode = face_x;
+            Bnode *= -2.;
+            Bnode.Add(-.5, Vadj_x);
+            Bnode.Add(2.5, Vnode_x);
+            Orthogonal(Bnode);
+
+            Badj = face_x;
+            Badj *= -2.;
+            Badj.Add(-.5, Vnode_x);
+            Badj.Add(2.5, Vadj_x);
+            Orthogonal(Badj);
+
+            double badjn = Badj * n_vec;
+            double badjnr = Badj * n_vec_R;
+            double bnoden = Bnode * n_vec;
+            double bnodenr = Bnode * n_vec_R;
+
+            double numer = 0.;
 
             // Solve for Vnode_n_comp
-            if (is_v2)
-            {
-               // cout << "solving for V2.\n";
-               Vnode_n_comp = (3*bmn + (const1 - 1.5*F) * Vadj_n_comp) / (const2 + 1.5*F);
+            if (is_v2) {
+               numer += 3*bmn; 
+            } else {
+               numer -= 3*bmn;  
             }
-            else 
-            {
-               Vnode_n_comp = (-3*bmn + (const1 + 1.5*F) * Vadj_n_comp) / (const2 - 1.5*F);
-            }
+            numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
+            numer += badjnr * Vadj_nR_comp;
+            numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;
+
+            double denom = -dt*Vnode_prev_it_nR_comp + (dt/2)*Vadj_nR_comp + bnoden;
+      
+            Vnode_n_comp = numer / denom;
 
             Vnode = 0.;
             Vnode.Add(Vnode_n_comp, n_vec);
             Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
-
-            // cout << "Resulting Vnode: ";
-            // Vnode.Print(cout);
 
             // Add contribution to the averaging objects
             tensor(n_vec, n_vec, dm_tmp);
             dm_tmp.Mult(Vnode, v_tmp);
             Mi.Add(1., dm_tmp);
             Ri.Add(1., v_tmp);
-
-            // if (Vghosted.Norml2() > 1e-8)
-            // {
-            //    cout << "---\n";
-            //    cout << "node: " << node 
-            //         << ", bdr ind: " << bdr_ind << endl;
-            //    cout << "v not ghost: ";
-            //    Vghosted.Print(cout);
-            //    cout << "v ghost: ";
-            //    Vnode.Print(cout);
-            //    cout << "---\n";
-            // }
             
          } // End ghost node
       }
@@ -4462,8 +4506,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       // cout << "predicted velocity at node " << node << ": ";
       // predicted_node_v.Print(cout);
 
-      predicted_node_v *= theta; 
-      predicted_node_v.Add(1. - theta, Vnode_prev_it);
+      // Theta average with previous velocity
+      if (do_theta_averaging)
+      {
+         predicted_node_v *= theta; 
+         predicted_node_v.Add(1. - theta, Vnode_prev_it);
+      }
+      
 
       // Put velocity in S_new
       UpdateNodeVelocity(S_new, node, predicted_node_v);

@@ -130,6 +130,7 @@ int main(int argc, char *argv[]) {
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
+   double dm_val = 0.; // Parameter to distort the mesh, overrides file val
    string sv_output_prefix;
    string output_path;
    string gfprint_path;
@@ -182,6 +183,8 @@ int main(int argc, char *argv[]) {
    args.AddOption(&suppress_output, "-so", "--suppress-output", "-no-so",
                   "--no-suppress-output",
                   "Enable or disable output during runtime.");
+   args.AddOption(&dm_val, "-dm", "--distort-mesh",
+                  "Mesh distortion parameter.");
 
    args.Parse();
    if (!args.Good())
@@ -531,10 +534,43 @@ int main(int argc, char *argv[]) {
    x_gf.SyncAliasMemory(S);
 
    /* Distort Mesh for Saltzman Problem */
-   if (problem_class->get_distort_mesh())
+   if (problem_class->get_distort_mesh() || dm_val != 0.)
    {
+      cout << "distort mesh.\n";
       switch (problem)
       {
+      case 1: // Sod
+      {
+         // Random distortion based on min mesh size
+         Array<double> coords(dim);
+         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+         {
+            int index = vertex + H1FESpace.GetNDofs();
+            coords[0] = x_gf[vertex];
+            coords[1] = x_gf[index];
+
+            double dy = 0.;
+            if (coords[1] >= 0.75 ) {
+               dy = -4 * (coords[1] - 1);
+            } else if (coords[1] >= 0.5) {
+               dy = 4. * (coords[1] - 0.5);
+               dy *= -1;
+            } else if (coords[1] >= 0.25) {
+               dy = -4. * (coords[1] - 0.5);
+            } else if (coords[1] >= 0.) {
+               dy = 4. * coords[1];
+               dy *= -1.;
+            }
+            dy *= hmin;
+
+            double y_new = coords[1] + 2 * (1.-coords[0]) * coords[0] * dm_val * dy;
+
+            double x_new = coords[0] + dm_val * hmin * (1. - coords[1]) * sin(M_PI * coords[0]);
+            x_gf[index] = y_new;
+            x_gf[vertex] = x_new;
+         }
+         break;
+      }
       case 7: // Saltzmann
       {
          Array<double> coords(dim);
@@ -595,6 +631,57 @@ int main(int argc, char *argv[]) {
             x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
          }
       }
+
+      // Adjust all cell center to be averages of corners
+      Vector cell_x(dim);
+      Array<int> verts;
+      for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
+      {
+         int cell_vdof;
+         cell_x = 0.;
+         // Get center node dof, average, and update
+         switch (dim)
+         {
+         case 1:
+         {
+            cell_vdof = L2FESpace.GetNF() + ci;
+
+            pmesh->GetElementVertices(ci, verts);
+
+            for (int j = 0; j < verts.Size(); j++)
+            {
+               cell_x[0] += x_gf[verts[j]];
+            }
+            cell_x /= verts.Size();
+            x_gf[cell_vdof] = cell_x[0];
+            break;
+         }
+         case 2:
+         {
+            cell_vdof = H1FESpace.GetNVDofs() + L2FESpace.GetNF() + ci;
+
+            pmesh->GetElementVertices(ci, verts);
+
+            for (int j = 0; j < verts.Size(); j++)
+            {
+               cell_x[0] += x_gf[verts[j]];
+               int index = verts[j] + H1FESpace.GetNDofs();
+               cell_x[1] += x_gf[index];
+            }
+            cell_x /= verts.Size();
+
+            x_gf[cell_vdof] = cell_x[0];
+            int index = cell_vdof + H1FESpace.GetNDofs();
+            x_gf[index] = cell_x[1];
+            break;
+         }
+         default:
+         {
+            MFEM_ABORT("Incorrect dim value provided.\n");
+         }
+         }
+      } // end cell center average
+
       // Update pmesh reference grid function
       pmesh->NewNodes(x_gf, false);
       cout << "Mesh distorted\n";

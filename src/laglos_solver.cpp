@@ -4223,7 +4223,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 {
    // cout << "=====IterativeCornerVelocityMC=====\n";
    bool do_theta_averaging = false;
-   double theta = .5;
+   double theta = 1.;
 
    // We need a palce to store the new mesh velocities that we compute
    Vector S_new = S;
@@ -4263,7 +4263,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       // node is interior node if bdr_ind == -1
       bdr_ind = BdrVertexIndexingArray[node];
       // cout << "\t node: " << node << ", bdr_ind: " << bdr_ind << endl;
-      if (bdr_ind != -1) { continue; }
+      // if (bdr_ind != -1) { continue; }
 
       // Get index of face to be reflected
 
@@ -4411,6 +4411,14 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             // What is done here depends on which boundary face we have 
             // We will be employing reflective boundary conditions
 
+            // Compute vector from node to face 
+            Vector face_dx(dim);
+            subtract(Vnode_x, face_x, face_dx);
+
+            // Compute vector from node to adjacent node
+            Vector Vadj_dx(dim);
+            subtract(Vnode_x, Vadj_x, Vadj_dx);
+
             // Sod
             switch (bdr_ind)
             {
@@ -4418,12 +4426,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             case 3: // top
                n_vec[1] *= -1.;
                Vadj[1] *= -1.;
+               face_dx[0] *= -1.;
+               Vadj_dx[0] *= -1.;
                break;
             
             case 2: // right
             case 4: // left
                n_vec[0] *= -1.;
                Vadj[0] *= -1.;
+               face_dx[1] *= -1.;
+               Vadj_dx[1] *= -1.;
                break;
             
             case -1:
@@ -4446,11 +4458,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             Vadj_nR_comp = Vadj * n_vec_R;
 
             /* Get flipped face_x and vadj_x */
-            Vector face_dx(dim);
-            subtract(Vnode_x, face_x, face_dx);
             add(Vnode_x, face_dx, face_x);
-            Vector Vadj_dx(dim);
-            subtract(Vnode_x, Vadj_x, Vadj_dx);
             add(Vnode_x, Vadj_dx, Vadj_x);
 
             Bnode = face_x;
@@ -4537,7 +4545,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 template<int dim>
 double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double & dt)
 {
-   double val = 0.;
+   double val = 0., denom_val = 0.;
    int num_broken = 0, total_num = 0;
    
    /* Parameters needed for face velocity calculations */
@@ -4647,6 +4655,7 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       // Add to val for interior faces only
       add(vdof1_v, vdof2_v, temp_vec);
       double fval = (temp_vec * n_vec) / 2.;
+      denom_val += abs(fval);
       // if (fval != c0)
       // {
       //    cout << "face: " << face 
@@ -4658,7 +4667,8 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       if (abs(fval) > 1.e-8)
       {
          num_broken++;
-         // cout << "face " << face << " is broken.\n";
+         // cout << "face " << face << " is broken. fval: " << fval << ".\n";
+
       }
 
       val += abs(fval);
@@ -4666,8 +4676,8 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       // }
    }
    double perc_broken = double(num_broken)/double(total_num);
-   cout << "percentage of broken faces: " << perc_broken << endl;
-   return val;
+   // cout << "percentage of broken faces: " << perc_broken << endl;
+   return val / denom_val;
 }
 
 

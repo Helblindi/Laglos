@@ -4697,8 +4697,12 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
       // Compute c1 (A.4a)
-      // subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-      // double c1 = ( dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R) ) / D; // TRYING SOMETHING HERE. WILL NEED CORRECTED
+      subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+      double Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+
+      /* Compute V3nperp using previous iteration */
+      add(0.5, vdof2_v, 0.5, vdof1_v, temp_vec);
+      V3nperp = -1. * (temp_vec * n_vec_R);
 
       // Compute c0 (A.4b)
       // Vector n_vec_half(dim);
@@ -4732,7 +4736,8 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       //         << ", av_nc: " << av_nc 
       //         << ", c0: " << c0 << endl;
       // }
-      double fval = av_nc - c0;
+      double rhs = Dc1 * V3nperp + c0;
+      double fval = av_nc - rhs;
 
       if (abs(fval) > 1.e-8)
       {

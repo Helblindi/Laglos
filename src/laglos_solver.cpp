@@ -4229,7 +4229,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    bool do_theta_averaging = false;
    double theta = 1.;
 
-   bool use_v3perp_correction = false;
+   bool use_v3perp_correction = true;
 
    // We need a palce to store the new mesh velocities that we compute
    Vector S_new = S;
@@ -4240,7 +4240,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
    int Vadj_index, c;
-   bool is_v2 = false, int_face_bdr_node = false;
+   bool int_face_bdr_node = false;
    double const1 = 0., const2 = 0., F = 0.;
 
    Vector predicted_node_v(dim), Vf(dim), Vnode_np1(dim), Vnode_prev_it(dim);
@@ -4336,7 +4336,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             // Get adj index
             Vadj_index = face_vdof1;
             // Node matches v2
-            // is_v2 = true;
          }
 
          GetNodeVelocity(S, Vadj_index, Vadj_n);
@@ -4396,29 +4395,15 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             a12_xnp1 = Vadj_xnp1;
             a12_xnp1 += Vnode_xnp1;
             a12_xnp1 *= 0.5;
-            
-            if (is_v2)
-            {
-               subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
-               subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
-            }
-            else
-            {
-               subtract(Vnode_n, Vadj_n, temp_vec); // V1 - V2 = temp_vec
-               subtract(Vadj_half, Vnode_half, temp_vec_2); // A2-A1
-            }
-            
+
+            subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
+            subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
+
             Orthogonal(temp_vec_2);
             D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
             // Compute c1 (A.4a)
-            if (is_v2)
-            {
-               subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-            } else {
-               subtract(Vadj_n, Vnode_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-            }
-            
+            subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
             Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
 
             /* Compute V3nperp using previous iteration */
@@ -4455,21 +4440,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // traversing from node 1 to node 2
          double numer = 0.;
 
+         numer = 3. * bmn;
          // Solve for Vnode_n_comp
-         // if (is_v2) {
-         //    numer += 3*bmn; 
-         //    if (use_v3perp_correction)
-         //    {
-         //       numer += Dc1*V3nperp; 
-         //    }
-         // } else {
-         //    numer -= 3*bmn;  
-         //    if (use_v3perp_correction)
-         //    {
-         //       numer -= Dc1*V3nperp; 
-         //    }
-         // }
-         numer = 3*bmn;
+
+         if (use_v3perp_correction)
+         {
+            numer += Dc1*V3nperp;
+         }
          numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
          numer += badjnr * Vadj_nR_comp;
          numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;
@@ -4544,7 +4521,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             Orthogonal(n_vec_R);
             Vnode_prev_it_nR_comp = Vnode_prev_it * n_vec_R;
 
-
             // Get normal and rotated components of Vadj_n
             Vadj_n_comp = Vadj_n * n_vec;
             Vadj_nR_comp = Vadj_n * n_vec_R;
@@ -4577,52 +4553,29 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
                // will use the same Vnode_half
                Vadj_half = Vadj_x;
                Vadj_half.Add(dt/2., Vadj_n);
-               if (is_v2)
-               {
-                  subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
-                  subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
-               }
-               else
-               {
-                  subtract(Vnode_n, Vadj_n, temp_vec); // V1 - V2 = temp_vec
-                  subtract(Vadj_half, Vnode_half, temp_vec_2); // A2-A1
-               }
+
+               subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
+               subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
                
                Orthogonal(temp_vec_2);
                D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
                // Compute c1 (A.4a)
-               if (is_v2)
-               {
-                  subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-               } else {
-                  subtract(Vadj_n, Vnode_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-               }
+               subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
                
                Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
                V3nperp = -1. * (Vface_n * n_vec_R);
                /////////// End new stuff
             }
-            numer = 0.;
+
+            numer = 3. * bmn;
             // Solve for Vnode_n_comp
-            // if (is_v2) {
-            //    numer += 3*bmn;
-            //    if (use_v3perp_correction)
-            //    {
-            //       numer += Dc1*V3nperp;
-            //    } 
-            // } else {
-            //    numer -= 3*bmn; 
-            //    if (use_v3perp_correction)
-            //    {
-            //       numer -= Dc1*V3nperp;
-            //    } 
-            // }
-            numer = 3*bmn;
-            // if (use_v3perp_correction)
-            // {
-            //    numer += Dc1*V3nperp;
-            // }
+
+            if (use_v3perp_correction)
+            {
+               numer += Dc1*V3nperp;
+            }
+
             numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
             numer += badjnr * Vadj_nR_comp;
             numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;

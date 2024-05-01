@@ -4229,7 +4229,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    bool do_theta_averaging = false;
    double theta = 1.;
 
-   bool use_v3perp_correction = true;
+   bool use_v3perp_correction = false;
 
    // We need a palce to store the new mesh velocities that we compute
    Vector S_new = S;
@@ -4301,9 +4301,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       /* Iterate over cell faces */
       for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
       {
-         // Reset flag
-         is_v2 = false;
-
          // Get face information
          int face = faces_row[face_it];
          selected_faces[face] = 1.;
@@ -4311,14 +4308,41 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          GetIntermediateFaceVelocity(face, Vf);
          FI = pmesh->GetFaceInformation(face);
 
-         // cout << "face: " << face << endl;
-
          // Calculate outer normal
          c = FI.element[0].index;
          CalcOutwardNormalInt(S, c, face, n_int);
          n_vec = n_int;
          F = n_vec.Norml2();
          n_vec /= F;
+
+         /* adjacent corner indices */
+         // preserve node orientation where cell to right 
+         // of face is with lower cell index
+         H1.GetFaceDofs(face, face_dofs_row);
+         int face_vdof1 = face_dofs_row[1], 
+             face_vdof2 = face_dofs_row[0], 
+             face_dof = face_dofs_row[2]; 
+
+         // Grab corresponding vertex velocity from S
+         // We are always solving for V2. 
+         // If the index for Vnode does not match that
+         // for V2, we must flip the normal.
+         if (node == face_vdof1) {
+            // Get adj index
+            Vadj_index = face_vdof2;
+            // Flip normal vector
+            n_vec *= -1.;
+         } else {
+            // Get adj index
+            Vadj_index = face_vdof1;
+            // Node matches v2
+            // is_v2 = true;
+         }
+
+         GetNodeVelocity(S, Vadj_index, Vadj_n);
+         GetNodeVelocity(S, face_dof, Vface_n);
+
+         // Perpendicular vector
          n_vec_R = n_vec;
          Orthogonal(n_vec_R);
 
@@ -4338,11 +4362,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // }
 
 
-         /* adjacent corner indices */
-         H1.GetFaceDofs(face, face_dofs_row);
-         int face_vdof1 = face_dofs_row[1], 
-             face_vdof2 = face_dofs_row[0], 
-             face_dof = face_dofs_row[2]; // preserve node orientation where cell to right of face is with lower cell index
+         
          // cout << "face: " << face << endl
          //      << "interior cell: " << c << endl
          //      << "normal: ";
@@ -4353,15 +4373,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          //      << ", face_vdof2: " << face_vdof2 
          //      << ", face_dof: " << face_dof << endl;
 
-         // Grab corresponding vertex velocity from S
-         if (node == face_vdof1) {
-            Vadj_index = face_vdof2;
-         } else {
-            Vadj_index = face_vdof1;
-            is_v2 = true;
-         }
-         GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
+
          
          // cout << "node: " << node << ", adj: " << Vadj_index << ", nR prev: " << Vnode_prev_it_nR_comp << endl;
 
@@ -4444,19 +4456,20 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          double numer = 0.;
 
          // Solve for Vnode_n_comp
-         if (is_v2) {
-            numer += 3*bmn; 
-            if (use_v3perp_correction)
-            {
-               numer += Dc1*V3nperp; 
-            }
-         } else {
-            numer -= 3*bmn;  
-            if (use_v3perp_correction)
-            {
-               numer -= Dc1*V3nperp; 
-            }
-         }
+         // if (is_v2) {
+         //    numer += 3*bmn; 
+         //    if (use_v3perp_correction)
+         //    {
+         //       numer += Dc1*V3nperp; 
+         //    }
+         // } else {
+         //    numer -= 3*bmn;  
+         //    if (use_v3perp_correction)
+         //    {
+         //       numer -= Dc1*V3nperp; 
+         //    }
+         // }
+         numer = 3*bmn;
          numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
          numer += badjnr * Vadj_nR_comp;
          numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;
@@ -4500,7 +4513,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             {
             case 1: // bottom
             case 3: // top
-               n_vec[1] *= -1.;
+               n_vec[0] *= -1.; // preserves orientation of face
                Vadj_n[1] *= -1.;
                face_dx[0] *= -1.;
                Vadj_dx[0] *= -1.;
@@ -4508,7 +4521,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             
             case 2: // right
             case 4: // left
-               n_vec[0] *= -1.;
+               n_vec[1] *= -1.; // preserves orientation of face
                Vadj_n[0] *= -1.;
                face_dx[1] *= -1.;
                Vadj_dx[1] *= -1.;
@@ -4523,11 +4536,14 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
                break;
             }
 
+            // Recompute bmn for face
+            double bmn = Vf * n_vec;
+            bmn *= F;
+
             n_vec_R = n_vec;
             Orthogonal(n_vec_R);
             Vnode_prev_it_nR_comp = Vnode_prev_it * n_vec_R;
-            // Negate is_v2
-            is_v2 = !is_v2;
+
 
             // Get normal and rotated components of Vadj_n
             Vadj_n_comp = Vadj_n * n_vec;
@@ -4554,8 +4570,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             double badjnr = Badj * n_vec_R;
             double bnoden = Bnode * n_vec;
             double bnodenr = Bnode * n_vec_R;
-
-            double numer = 0.;
 
             if (use_v3perp_correction)
             {
@@ -4589,21 +4603,26 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
                V3nperp = -1. * (Vface_n * n_vec_R);
                /////////// End new stuff
             }
-
+            numer = 0.;
             // Solve for Vnode_n_comp
-            if (is_v2) {
-               numer += 3*bmn;
-               if (use_v3perp_correction)
-               {
-                  numer += Dc1*V3nperp;
-               } 
-            } else {
-               numer -= 3*bmn; 
-               if (use_v3perp_correction)
-               {
-                  numer -= Dc1*V3nperp;
-               } 
-            }
+            // if (is_v2) {
+            //    numer += 3*bmn;
+            //    if (use_v3perp_correction)
+            //    {
+            //       numer += Dc1*V3nperp;
+            //    } 
+            // } else {
+            //    numer -= 3*bmn; 
+            //    if (use_v3perp_correction)
+            //    {
+            //       numer -= Dc1*V3nperp;
+            //    } 
+            // }
+            numer = 3*bmn;
+            // if (use_v3perp_correction)
+            // {
+            //    numer += Dc1*V3nperp;
+            // }
             numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
             numer += badjnr * Vadj_nR_comp;
             numer += ((dt/2) * Vadj_n_comp - bnodenr)*Vnode_prev_it_nR_comp;
@@ -4640,7 +4659,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       }
 
       // Put velocity in S
-      // Gauss-Seidel > Jacovi
+      // Gauss-Seidel > Jacobi
       UpdateNodeVelocity(S, node, predicted_node_v);
    }
 

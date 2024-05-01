@@ -4229,6 +4229,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    bool do_theta_averaging = false;
    double theta = 1.;
 
+   bool use_v3perp_correction = true;
+
    // We need a palce to store the new mesh velocities that we compute
    Vector S_new = S;
 
@@ -4241,17 +4243,23 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    bool is_v2 = false, int_face_bdr_node = false;
    double const1 = 0., const2 = 0., F = 0.;
 
-   Vector predicted_node_v(dim), Vf(dim), Vadj(dim), Vnode(dim), Vnode_prev_it(dim);
+   Vector predicted_node_v(dim), Vf(dim), Vnode_np1(dim), Vnode_prev_it(dim);
    double Vnode_n_comp = 0.; // The quantity we solve for in each face iteration
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
    Vector n_int(dim), n_vec(dim), n_vec_R(dim);
    Vector Vnode_x(dim), Vadj_x(dim), face_x(dim);
+   Vector Vnode_xnp1(dim), Vadj_xnp1(dim), face_xnp1(dim), a12_xnp1(dim);
    Vector Badj(dim), Bnode(dim);
+
+   Vector Vnode_n(dim), Vadj_n(dim), Vface_n(dim);
+   Vector Vnode_half(dim), Vadj_half(dim), n_vec_half(dim);
+   Vector temp_vec(dim), temp_vec_2(dim);
+   double D = 0., c1 = 0., c0 = 0., V3nperp = 0.;
+   double Dc1 = 0.;
 
    // Averaging
    DenseMatrix Mi(dim), dm_tmp(dim);
    Vector Ri(dim), v_tmp(dim);
-   Vector Vghosted(dim);
 
    int bdr_ind = 0;
 
@@ -4286,6 +4294,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       // Get cell faces
       vertex_edge.GetRow(node, faces_row);
       faces_length = faces_row.Size();
+
+      // Get nodal velocity for explicit term
+      GetNodeVelocity(S, node, Vnode_n);
 
       /* Iterate over cell faces */
       for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
@@ -4325,7 +4336,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          //    n_vec_R.Print(cout);
          //    cout << "Vnode_prev_it_nR_comp: " << Vnode_prev_it_nR_comp << endl;
          // }
-         
+
 
          /* adjacent corner indices */
          H1.GetFaceDofs(face, face_dofs_row);
@@ -4349,16 +4360,64 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             Vadj_index = face_vdof1;
             is_v2 = true;
          }
-         GetNodeVelocity(S, Vadj_index, Vadj);
+         GetNodeVelocity(S, Vadj_index, Vadj_n);
+         GetNodeVelocity(S, face_dof, Vface_n);
+         
          // cout << "node: " << node << ", adj: " << Vadj_index << ", nR prev: " << Vnode_prev_it_nR_comp << endl;
 
          /* Get adj node and face locations */
          GetNodePosition(S, Vadj_index, Vadj_x);
          GetNodePosition(S, face_dof, face_x);
 
-         // Get normal and rotated components of Vadj
-         Vadj_n_comp = Vadj * n_vec;
-         Vadj_nR_comp = Vadj * n_vec_R;
+         /////////// TODO:: ADD V3Nperp explicitly
+         if (use_v3perp_correction)
+         {
+            // Calculate D and c1 (perturbations only need to be handled explicitly)
+            Vnode_half = Vnode_x;
+            Vnode_half.Add(dt/2., Vnode_n);
+            Vnode_xnp1 = Vnode_x;
+            Vnode_xnp1.Add(dt, Vnode_n);
+            Vadj_half = Vadj_x;
+            Vadj_half.Add(dt/2., Vadj_n);
+            Vadj_xnp1 = Vadj_x;
+            Vadj_xnp1.Add(dt, Vadj_n);
+            a12_xnp1 = Vadj_xnp1;
+            a12_xnp1 += Vnode_xnp1;
+            a12_xnp1 *= 0.5;
+            
+            if (is_v2)
+            {
+               subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
+               subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
+            }
+            else
+            {
+               subtract(Vnode_n, Vadj_n, temp_vec); // V1 - V2 = temp_vec
+               subtract(Vadj_half, Vnode_half, temp_vec_2); // A2-A1
+            }
+            
+            Orthogonal(temp_vec_2);
+            D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+
+            // Compute c1 (A.4a)
+            if (is_v2)
+            {
+               subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+            } else {
+               subtract(Vadj_n, Vnode_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+            }
+            
+            Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+
+            /* Compute V3nperp using previous iteration */
+            V3nperp = -1 * (Vface_n * n_vec_R); // minus since n_vec_R = -n_vec_perp
+
+            /////////// End new stuff
+         }
+
+         // Get normal and rotated components of Vadj_n
+         Vadj_n_comp = Vadj_n * n_vec;
+         Vadj_nR_comp = Vadj_n * n_vec_R;
 
          // Compute geometrical vectors
          Bnode = face_x;
@@ -4387,8 +4446,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // Solve for Vnode_n_comp
          if (is_v2) {
             numer += 3*bmn; 
+            if (use_v3perp_correction)
+            {
+               numer += Dc1*V3nperp; 
+            }
          } else {
             numer -= 3*bmn;  
+            if (use_v3perp_correction)
+            {
+               numer -= Dc1*V3nperp; 
+            }
          }
          numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
          numer += badjnr * Vadj_nR_comp;
@@ -4398,24 +4465,23 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    
          Vnode_n_comp = numer / denom;
 
-         Vnode = 0.;
-         Vnode.Add(Vnode_n_comp, n_vec);
-         Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+         Vnode_np1 = 0.;
+         Vnode_np1.Add(Vnode_n_comp, n_vec);
+         Vnode_np1.Add(Vnode_prev_it_nR_comp, n_vec_R);
 
-         // predicted_node_v = Vnode;
+         // predicted_node_v = Vnode_np1;
          // continue;
          // assert(false);
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
-         dm_tmp.Mult(Vnode, v_tmp);
+         dm_tmp.Mult(Vnode_np1, v_tmp);
          Mi.Add(1., dm_tmp);
          Ri.Add(1., v_tmp);
 
          // In the case of boundary nodes, check if this is an interior face
          if (bdr_ind != -1 && FI.IsInterior())
          {
-            Vghosted = Vnode;
             // We must add the ghost node contribution
             // cout << "we have an interior face " << face << " on a boundary node " << node << endl;
             // What is done here depends on which boundary face we have 
@@ -4435,7 +4501,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             case 1: // bottom
             case 3: // top
                n_vec[1] *= -1.;
-               Vadj[1] *= -1.;
+               Vadj_n[1] *= -1.;
                face_dx[0] *= -1.;
                Vadj_dx[0] *= -1.;
                break;
@@ -4443,7 +4509,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             case 2: // right
             case 4: // left
                n_vec[0] *= -1.;
-               Vadj[0] *= -1.;
+               Vadj_n[0] *= -1.;
                face_dx[1] *= -1.;
                Vadj_dx[1] *= -1.;
                break;
@@ -4463,14 +4529,15 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             // Negate is_v2
             is_v2 = !is_v2;
 
-            // Get normal and rotated components of Vadj
-            Vadj_n_comp = Vadj * n_vec;
-            Vadj_nR_comp = Vadj * n_vec_R;
+            // Get normal and rotated components of Vadj_n
+            Vadj_n_comp = Vadj_n * n_vec;
+            Vadj_nR_comp = Vadj_n * n_vec_R;
 
             /* Get flipped face_x and vadj_x */
             add(Vnode_x, face_dx, face_x);
             add(Vnode_x, Vadj_dx, Vadj_x);
 
+            // Compute vector constants for ghost node
             Bnode = face_x;
             Bnode *= -2.;
             Bnode.Add(-.5, Vadj_x);
@@ -4490,11 +4557,52 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
             double numer = 0.;
 
+            if (use_v3perp_correction)
+            {
+               // Calculate D and c1 (handling perturbation explicitly)
+               // will use the same Vnode_half
+               Vadj_half = Vadj_x;
+               Vadj_half.Add(dt/2., Vadj_n);
+               if (is_v2)
+               {
+                  subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
+                  subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
+               }
+               else
+               {
+                  subtract(Vnode_n, Vadj_n, temp_vec); // V1 - V2 = temp_vec
+                  subtract(Vadj_half, Vnode_half, temp_vec_2); // A2-A1
+               }
+               
+               Orthogonal(temp_vec_2);
+               D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+
+               // Compute c1 (A.4a)
+               if (is_v2)
+               {
+                  subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+               } else {
+                  subtract(Vadj_n, Vnode_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+               }
+               
+               Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+               V3nperp = -1. * (Vface_n * n_vec_R);
+               /////////// End new stuff
+            }
+
             // Solve for Vnode_n_comp
             if (is_v2) {
-               numer += 3*bmn; 
+               numer += 3*bmn;
+               if (use_v3perp_correction)
+               {
+                  numer += Dc1*V3nperp;
+               } 
             } else {
-               numer -= 3*bmn;  
+               numer -= 3*bmn; 
+               if (use_v3perp_correction)
+               {
+                  numer -= Dc1*V3nperp;
+               } 
             }
             numer += (badjn - dt * Vadj_nR_comp) * Vadj_n_comp;
             numer += badjnr * Vadj_nR_comp;
@@ -4504,13 +4612,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       
             Vnode_n_comp = numer / denom;
 
-            Vnode = 0.;
-            Vnode.Add(Vnode_n_comp, n_vec);
-            Vnode.Add(Vnode_prev_it_nR_comp, n_vec_R);
+            Vnode_np1 = 0.;
+            Vnode_np1.Add(Vnode_n_comp, n_vec);
+            Vnode_np1.Add(Vnode_prev_it_nR_comp, n_vec_R);
 
             // Add contribution to the averaging objects
             tensor(n_vec, n_vec, dm_tmp);
-            dm_tmp.Mult(Vnode, v_tmp);
+            dm_tmp.Mult(Vnode_np1, v_tmp);
             Mi.Add(1., dm_tmp);
             Ri.Add(1., v_tmp);
             

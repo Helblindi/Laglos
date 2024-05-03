@@ -99,7 +99,6 @@ public:
    static inline void velocity(const Vector & U, Vector &vel)
    {
       vel.SetSize(dim);
-      Array<int> dofs;
       for (int i = 0; i < dim; i++)
       {
          vel[i] = U[i+1];

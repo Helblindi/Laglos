@@ -2213,6 +2213,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
    double current_mass = 0., current_mass_sum = 0.;
    double num = 0., denom = 0.;
    double temp_num = 0., temp_denom = 0., val = 0.;
+   double interior_num = 0., interior_denom = 0.;
    
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
@@ -2228,8 +2229,15 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
       denom += temp_denom;
       current_mass_sum += current_mass;
 
-      val = temp_num / temp_denom;
+      // Increment internal mass loss values
+      if (cell_bdr_flag_gf[ci] == -1)
+      {
+         // Have interior node
+         interior_num += temp_num;
+         interior_denom += temp_denom;
+      }
 
+      val = temp_num / temp_denom;
       if (val > pow(10, -8))
       {
          counter++;
@@ -2252,6 +2260,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
         << "Initial mass sum: " << denom 
         << ", Current mass sum: " << current_mass_sum << endl
         << "Mass Error: " << num / denom << endl
+        << "Interior Mass Error: " << interior_num / interior_denom << endl
         << "--------------------------------------\n";
 }
 

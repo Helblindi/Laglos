@@ -1990,6 +1990,31 @@ void LagrangianLOOperator<dim>::SetFVOption(const int & option)
 
 
 /****************************************************************************************************
+* Function: SetMVIterationOption
+* Parameters:
+*  option - integer parameter indicating which mesh velocity iteration type to use.
+*
+* Purpose:
+*  To set the mesh velocity motion computation type:
+*     1) Option 1 - Assume V3nperp = 0. Regular V3perp in corrective face velocity.
+*                   c0 is evaluated implicitly.
+*     2) Option 2 - In addition to the above, assume V3nperp is the perpendicular 
+*                   component of the average of the two adjacent corner velocities. 
+*                   c0 is still evaluated implicitly, c1 and V3nperp are evaluated 
+*                   explicitly. Regular V3perp in corrective face velocity. 
+*     3) Option 3 - The same as option 2 except the V3nperp in the corrective face 
+*                   velocity is set to the average of the two adjacent corner 
+*                   velocities.
+*     4) Default  - No mesh iteration.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMVIterationOption(const int &option)
+{
+   this->mv_it_option = option;
+}
+
+
+/****************************************************************************************************
 * Function: SetMVIteration
 * Parameters:
 *  num_iterations - integer parameter indicating the number of times to iterate
@@ -2417,6 +2442,10 @@ void LagrangianLOOperator<dim>::
           *              Raviart-Thomas velocity.
           *    Option 3) Take to be average of tangential components
           *              of V1 and V2.
+          * 
+          * When it comes to the mesh velocity iteration algorithm,
+          * mv_it_options 1 and 2 use V3nperp option 1. mv_it_option 3
+          * used V3nperp option 3.
           * */ 
 
          // Necessary quantity for either calculation
@@ -2424,26 +2453,32 @@ void LagrangianLOOperator<dim>::
          n_vec_perp = n_vec_R;
          n_vec_perp *= -1.;
 
-         /* Option 1 */ 
-         // subtract(vdof2_x_new, vdof1_x_new, temp_vec);
-         // subtract(face_x, vdof12_x_new, temp_vec_2);
-         // temp_vec_2.Add((c2+ (3. * bmn / D))*dt, n_vec);
-         // const1 = temp_vec * temp_vec_2; // numerator
-         // temp_vec_2 = n_vec_R;
-         // temp_vec_2 *= -1.;
-         // temp_vec_2.Add(c1, n_vec);
-         // const2 = temp_vec * temp_vec_2;
-         // const2 *= dt; // denominator
-         // V3nperp = -1. * const1 / const2;
+         V3nperp = 0.;
+         if (mv_it_option == 3)
+         {
+            /* Option 3*/
+            add(0.5, vdof2_v, 0.5, vdof1_v, temp_vec);
+            V3nperp = temp_vec * n_vec_perp;
+         }
+         else 
+         {
+            /* Option 1 */ 
+            subtract(vdof2_x_new, vdof1_x_new, temp_vec);
+            subtract(face_x, vdof12_x_new, temp_vec_2);
+            temp_vec_2.Add((c2+ (3. * bmn / D))*dt, n_vec);
+            const1 = temp_vec * temp_vec_2; // numerator
+            temp_vec_2 = n_vec_R;
+            temp_vec_2 *= -1.;
+            temp_vec_2.Add(c1, n_vec);
+            const2 = temp_vec * temp_vec_2;
+            const2 *= dt; // denominator
+            V3nperp = -1. * const1 / const2;
+         }
 
          /* Option 2 */
          // Vector rt_face_vel(dim);
          // GetNodeVelocity(S, face_dof, rt_face_vel);
          // V3nperp = rt_face_vel * n_vec_perp;
-
-         /* Option 3*/
-         add(0.5, vdof2_v, 0.5, vdof1_v, temp_vec);
-         V3nperp = temp_vec * n_vec_perp;
 
          // Compute V3n (5.11)
          V3n = c1 * V3nperp + c2 + 3. * bmn / D;
@@ -4396,8 +4431,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // The center of the cell should be on the right when 
          // traversing from adj node to node.
          double numer = 3. * bmn;
+
          // Add in Dc1V3nper contribution (explicit)
-         if (use_v3perp_correction)
+         // V3nperp is set to 0 in option 1.
+         if (mv_it_option == 2 || mv_it_option == 3)
          {
             // Calculate D and c1 (perturbations only need to be handled explicitly)
             subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
@@ -4536,7 +4573,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             /* Solve for Vnode_n_comp */
             numer = 3. * bmn;
             // Add in Dc1V3nper contribution (explicit)
-            if (use_v3perp_correction)
+            // V3nperp is set to 0 in option 1.
+            if (mv_it_option == 2 || mv_it_option == 3)
             {
                add(Vadj_x, dt/2., Vadj_n, Vadj_half);
 
@@ -4698,7 +4736,7 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
 
       // Compute c1 (A.4a)
       subtract(vdof2_v, vdof1_v, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-      double Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+      double c1 = (1./D) * (dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R)); 
 
       /* Compute V3nperp using previous iteration */
       add(0.5, vdof2_v, 0.5, vdof1_v, temp_vec);
@@ -4730,13 +4768,12 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       add(vdof1_v, vdof2_v, temp_vec);
       double av_nc = (temp_vec * n_vec) / 2.;
       
-      // if (av_nc != c0)
-      // {
-      //    cout << "face: " << face 
-      //         << ", av_nc: " << av_nc 
-      //         << ", c0: " << c0 << endl;
-      // }
-      double rhs = Dc1 * V3nperp + c0;
+      double rhs = c0;
+      // RHS is more than just c0 in mv_it_option 2/3
+      if (mv_it_option == 2 || mv_it_option == 3)
+      {
+         rhs += c1 * V3nperp;
+      }
       double fval = av_nc - rhs;
 
       if (abs(fval) > 1.e-8)

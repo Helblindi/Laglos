@@ -1231,7 +1231,7 @@ int main(int argc, char *argv[]) {
          if (gfprint)
          {
             // Save mesh and gfs to files
-            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name;
+            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name, mass_name;
             mesh_name << gfprint_path 
                       << setfill('0') 
                       << setw(6)
@@ -1257,6 +1257,11 @@ int main(int argc, char *argv[]) {
                        << setw(6)
                        << ti  
                        << "_press.gf";
+            mass_name << gfprint_path 
+                      << setfill('0') 
+                      << setw(6)
+                      << ti  
+                      << "_mass_loss.gf";
 
             std::ofstream mesh_ofs(mesh_name.str().c_str());
             mesh_ofs.precision(8);
@@ -1282,6 +1287,12 @@ int main(int argc, char *argv[]) {
             press_ofs.precision(8);
             press_gf.SaveAsOne(press_ofs);
             press_ofs.close();
+
+            // Print mass loss
+            std::ofstream mass_ofs(mass_name.str().c_str());
+            mass_ofs.precision(8);
+            mc_gf.SaveAsOne(mass_ofs);
+            mass_ofs.close();
 
             // Print continuous interpolation of density
             GridFunctionCoefficient rho_gf_coeff(&rho_gf);

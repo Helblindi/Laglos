@@ -231,7 +231,7 @@ public:
    double ComputeIterationNormSF(Vector &S, const Vector &SF, const double & dt);
    
    // Convert from geometric velocity to mesh velocity
-   void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d);
+   void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);
    void ComputeCiGeo(const int & node, DenseMatrix & res);
    void IntGrad(const int cell, DenseMatrix & res);
    void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);

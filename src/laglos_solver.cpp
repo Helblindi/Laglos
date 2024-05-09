@@ -2268,9 +2268,10 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
 /****************************************************************************************************
 * Function: ComputeDeterminant
 * Parameters:
-*  C     - Dense matrix representing C_i^geo from section 5.
-*  dt    - Timestep (assumes full timestep is given, not half step)
-*  alpha - Smallest postivie value satisfying equation (5.12) in [1]
+*  C         - Dense matrix representing C_i^geo from section 5.
+*  dt        - Timestep (assumes full timestep is given, not half step)
+*  alpha     - Smallest postivie value satisfying equation (5.12) in [1]
+*  obj_index - Nodal index, mostly to report where failure occurs
 *
 * Purpose:
 *  This function computes the quantity given by equation (5.12) in [1].  Specifically, this function
@@ -2278,7 +2279,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
 *        det(alpha_i\mathbb{I} - \frac{dt}{2}C_i) = alpha_i^{d-1}
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const double &dt, double & alpha)
+void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const double &dt, double & alpha, int obj_index)
 {
    // cout << "=====================\n";
    // cout << "Computing determinant\n";
@@ -2302,6 +2303,7 @@ void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const d
 
    if (alpha <= 0.)
    {
+      cout << "Failure in ComputeDeterminant at node: " << obj_index << endl;
       cout << "Dense Matrix:\n";
       C.Print(cout);
       cout << "trace: " << trace << ", det: " << det << endl;
@@ -2606,7 +2608,7 @@ void LagrangianLOOperator<dim>::
 
          // Compute alpha_i
          double alpha_i;
-         ComputeDeterminant(Ci, dt, alpha_i);
+         ComputeDeterminant(Ci, dt, alpha_i, face);
 
          // Compute flux
          Vector face_flux(dim);
@@ -4950,8 +4952,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
          
          // chrono_temp.Clear();
          // chrono_temp.Start();
-         // cout << "node: " << node << endl;
-         ComputeDeterminant(Ci, dt, d);
+         ComputeDeterminant(Ci, dt, d, node);
          // chrono_temp.Stop();
 
          // Compute V_i^n

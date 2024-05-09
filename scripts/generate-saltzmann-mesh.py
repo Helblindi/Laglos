@@ -45,11 +45,11 @@ def main():
 
    # BOUNDARY
    f.write("boundary\n")
-   d_bdry = 1 # Dirichlet BCs for left side.  v = e_x
+   d_bdry = 4 # Dirichlet BCs for left side.  v = e_x
    bdry_left = d_bdry
-   bdry_bottom = 2
-   bdry_right = 3
-   bdry_top = 4
+   bdry_bottom = 1
+   bdry_right = 2
+   bdry_top = 3
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")

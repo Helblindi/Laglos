@@ -584,7 +584,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
             // Replace the bdr attribute in the array as long as it is not
             // the dirichlet condition (For Saltzmann Problem)
             // This ensures the left wall vertices have the proper indicator
-            if (BdrVertexIndexingArray[index] != 1)
+            if (BdrVertexIndexingArray[index] != 4)
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
@@ -977,7 +977,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
                switch (bdr_attribute)
                {
-               case 1:
+               case 4:
+               // Left wall
                {
                   double _rho = 3.9992502342988532;
                   double _p = 1.3334833281256551;
@@ -999,9 +1000,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   F_i_bdry.Mult(c, y_temp_bdry);
                   break;
                }
+               // case 1:
                // case 2:
                // case 3:
-               // case 4:
                // {
                //    // Negate velocity
                //    for (int _it = 0; _it < dim; _it++)
@@ -1088,17 +1089,17 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                }
                else if (pb->get_indicator() == "saltzmann")
                {
-                  if (cell_bdr == 2)
+                  if (cell_bdr == 1)
                   {
                      // bottom
                      normal[1] = -1.;
                   }
-                  else if (cell_bdr == 3)
+                  else if (cell_bdr == 2)
                   {
                      // right
                      normal[0] = 1.;
                   }
-                  else if (cell_bdr == 4)
+                  else if (cell_bdr == 3)
                   {
                      // top
                      normal[1] = 1.;
@@ -1108,8 +1109,9 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   normal *= coeff;
                   subtract(tmp_vel, normal, tmp_vel);
 
-                  if (cell_bdr == 1)
+                  if (cell_bdr == 4)
                   {
+                     // left
                      tmp_vel = 0.;
                      /* Ramping up to ex */
                      if (timestep_first == 0.)
@@ -1462,22 +1464,22 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          /* Get corresponding normal vector */
          switch (bdr_ind)
          {
-         case 1:
+         case 4:
             // left
             UpdateNodeVelocity(S,i,ex);
             continue;
          
-         case 2:
+         case 1:
             // bottom
             normal[0] = 0., normal[1] = -1.;
             break;
          
-         case 3:
+         case 2:
             // right
             normal[0] = 1., normal[1] = 0.;
             break;
          
-         case 4:
+         case 3:
             // top
             normal[0] = 0., normal[1] = 1.;
             break;
@@ -1495,7 +1497,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          {
             MFEM_ABORT("Dont correct interior vertices.\n");
          }
-         else if (bdr_ind == 1)
+         else if (bdr_ind == 4)
          {
             MFEM_ABORT("Left wall BCs already handled.\n");
          }

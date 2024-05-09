@@ -4632,12 +4632,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       Mi.Invert();
       Mi.Mult(Ri, predicted_node_v);
 
-      // Change only the direction of the velocity, not the magnitude
-      if (predicted_node_v.Norml2() != 0.)
-      {
-         predicted_node_v *= Vnode_n.Norml2() / predicted_node_v.Norml2();
-      }
-
       // Theta average with previous velocity
       if (do_theta_averaging)
       {

@@ -113,6 +113,7 @@ protected:
 
    bool use_viscosity;
    bool mm;
+   bool check_mesh;
    int mv_option = 0;
    int fv_option = 0;
    int mv_it_option = 0;
@@ -142,6 +143,7 @@ public:
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
+   void SetMeshCheck(const bool _check_mesh) { this->check_mesh = _check_mesh; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -152,7 +154,7 @@ public:
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
-   void MakeTimeStep(Vector &S, const double & t, double & dt);
+   void MakeTimeStep(Vector &S, const double & t, double & dt, bool &isCollapsed);
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
    void InitializeDijMatrix();
@@ -204,6 +206,9 @@ public:
 
    // Compute mesh velocities
    void ComputeMeshVelocities(Vector &S, const double &t, double &dt);
+
+   // Check Jacobians to ensure mesh hasn't collapsed
+   bool IsMeshCollapsed();
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);

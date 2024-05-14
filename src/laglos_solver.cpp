@@ -674,12 +674,14 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
 *     conservation to ensure this is preserved locally.   
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double & dt)
+void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double & dt, bool &isCollapsed)
 {
    // cout << "========================================\n"
    //      << "             MakeTimeStep               \n"
    //      << "========================================\n";
+   // chrono_mm.Start();
    ComputeMeshVelocities(S, t, dt);
+   // chrono_mm.Stop();
 
    // Update state variables contained in S_new
    // chrono_state.Start();
@@ -691,21 +693,19 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    ParGridFunction x_gf, mv_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-
-   // cout << "Printing select nodal velocities.\n";
-   // Vector tmp_vel(dim);
-   // Array<int> des_nodes({49,50,51,52,53,54,55});
-   // for (int i = 0; i < des_nodes.Size(); i++)
-   // {
-   //    cout << "nodal velocity at " << des_nodes[i] << " is: ";
-   //    GetNodeVelocity(S, des_nodes[i], tmp_vel);
-   //    tmp_vel.Print(cout);
-   // }
-
    add(x_gf, dt, mv_gf, x_gf);
    pmesh->NewNodes(x_gf, false);
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
    // cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
+   
+   /*
+   Check if mesh has tangled. If so, modify isCollapsed parameter
+   to stop computation and print final data
+   */
+   if (check_mesh)
+   {
+      isCollapsed = IsMeshCollapsed();
+   }
 } 
 
 
@@ -817,6 +817,49 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
       FillCenterVelocitiesWithAvg(S);
    }
    // chrono_mm.Stop();
+}
+
+
+/****************************************************************************************************
+* Function: IsMeshCollapsed
+*
+* Purpose:
+*     Verify if the mesh has collapsed. If collapsed, return true.
+*     The Jacobian is checked at the following quadrature points:
+*        (.211, .211)
+*        (.789, .211)
+*        (.789, .789)
+*        (.211, .789)
+*     If the determinant of the Jacobian at any of the above points
+*     is negative, this means that our element transformation has 
+*     reversed orientation, or twisted, and thus the mesh has 
+*     collapsed.
+****************************************************************************************************/
+template<int dim>
+bool LagrangianLOOperator<dim>::IsMeshCollapsed()
+{
+   ElementTransformation * trans;
+
+   for (int el = 0; el < L2.GetNE(); el++)
+   {
+      trans = pmesh->GetElementTransformation(el);
+      /* Iterate over 4 integration points */
+      for (int i = 0; i < RT_ir.GetNPoints(); i++)
+      {
+         const IntegrationPoint &ip = RT_ir.IntPoint(i);
+         trans->SetIntPoint(&ip);
+         double detJ = trans->Weight();
+         if (detJ < 0.)
+         {
+            cout << "\t---Mesh collapsed---\n";
+            cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << endl;
+            cout << "Negative Jacobian at cell: " << el << " at ip: " << i << endl;
+            return true;
+         }
+      }
+   }
+
+   return false;
 }
 
 

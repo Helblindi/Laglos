@@ -124,6 +124,7 @@ int main(int argc, char *argv[]) {
    bool mc = false;
    bool use_viscosity = true;
    bool mm = true;
+   bool check_mesh = true;
    int mv_option = 2;
    int fv_option = 2;
    int mv_it_option = 0;
@@ -167,6 +168,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable the use of artificial viscosity.");
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
+   args.AddOption(&check_mesh, "-cm", "-check-mesh", "-no-cm", "-no-check-mesh",
+                  "Enable or disable checking if the mesh has twisted.");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal, 4 - CAVEAT Weighted LS, 5 - CAVEAT/Cell Face combo, 6 - 5 with weights");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
@@ -758,6 +761,7 @@ int main(int argc, char *argv[]) {
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    hydro.SetProblem(problem);
+   hydro.SetMeshCheck(check_mesh);
    if (mv_n_iterations != 0)
    {
       // If an iterative method is desired for computation of the mesh velocity
@@ -1036,6 +1040,8 @@ int main(int argc, char *argv[]) {
    }
 
    int ti = 1;
+   // If at any point the mesh twists, break out of the loop and output results
+   bool isCollapsed = false;
    for (; !last_step; ti++)
    {
       hydro.BuildDijMatrix(S);
@@ -1064,8 +1070,14 @@ int main(int argc, char *argv[]) {
 
       S_old = S;
       
-      hydro.MakeTimeStep(S, t, dt);
+      hydro.MakeTimeStep(S, t, dt, isCollapsed);
       t += dt;
+
+      /* End iteration if the mesh has collapsed */
+      if (isCollapsed)
+      {
+         last_step = true;
+      }
       
       if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
 

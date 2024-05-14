@@ -922,7 +922,7 @@ int main(int argc, char *argv[]) {
    if (gfprint)
    {
       // Save initial mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name;
+      std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name, mv_name;
       mesh_name << gfprint_path 
                   << setfill('0') 
                   << setw(6)
@@ -948,6 +948,11 @@ int main(int argc, char *argv[]) {
                  << setw(6)
                  << 0
                  << "_press.gf";
+      mv_name << gfprint_path 
+              << setfill('0') 
+              << setw(6)
+              << 0
+              << "_mv.gf";
 
       std::ofstream mesh_ofs(mesh_name.str().c_str());
       mesh_ofs.precision(8);
@@ -973,6 +978,11 @@ int main(int argc, char *argv[]) {
       press_ofs.precision(8);
       press_gf.SaveAsOne(press_ofs);
       press_ofs.close();
+
+      std::ofstream mv_ofs(mv_name.str().c_str());
+      mv_ofs.precision(8);
+      mv_gf.SaveAsOne(mv_ofs);
+      mv_ofs.close();
 
       /* Print gamma/pressure grid function for Triple Point problem */
       if (problem == 12) 
@@ -1232,7 +1242,7 @@ int main(int argc, char *argv[]) {
          if (gfprint)
          {
             // Save mesh and gfs to files
-            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name, mass_name;
+            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name, mass_name, mv_name;
             mesh_name << gfprint_path 
                       << setfill('0') 
                       << setw(6)
@@ -1263,6 +1273,11 @@ int main(int argc, char *argv[]) {
                       << setw(6)
                       << ti  
                       << "_mass_loss.gf";
+            mv_name << gfprint_path 
+                    << setfill('0') 
+                    << setw(6)
+                    << ti 
+                    << "_mv.gf";
 
             std::ofstream mesh_ofs(mesh_name.str().c_str());
             mesh_ofs.precision(8);
@@ -1294,6 +1309,11 @@ int main(int argc, char *argv[]) {
             mass_ofs.precision(8);
             mc_gf.SaveAsOne(mass_ofs);
             mass_ofs.close();
+
+            std::ofstream mv_ofs(mv_name.str().c_str());
+            mv_ofs.precision(8);
+            mv_gf.SaveAsOne(mv_ofs);
+            mv_ofs.close();
 
             // Print continuous interpolation of density
             GridFunctionCoefficient rho_gf_coeff(&rho_gf);
@@ -1335,7 +1355,7 @@ int main(int argc, char *argv[]) {
    // In all cases, print the final grid functions
    {
       // Save mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name;
+      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
       mesh_name << gfprint_path 
                 << "final.mesh";
       rho_name  << gfprint_path 
@@ -1344,9 +1364,10 @@ int main(int argc, char *argv[]) {
              << "v_final.gf";
       ste_name << gfprint_path 
                << "ste_final.gf";
-      // TODO: Save mass loss
       massC_name << gfprint_path
                  << "mass_loss.gf";
+      mv_name << gfprint_path 
+             << "mv_final.gf";
 
       std::ofstream mesh_ofs(mesh_name.str().c_str());
       mesh_ofs.precision(8);
@@ -1372,6 +1393,11 @@ int main(int argc, char *argv[]) {
       mc_ofs.precision(12); // Need mass loss to machine error precision
       mc_gf.SaveAsOne(mc_ofs);
       mc_ofs.close();
+
+      std::ofstream mv_ofs(mv_name.str().c_str());
+      mv_ofs.precision(8);
+      mv_gf.SaveAsOne(mv_ofs);
+      mv_ofs.close();
 
       // Print continuous interpolation of density
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);

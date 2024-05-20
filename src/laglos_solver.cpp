@@ -784,15 +784,15 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          if (this->use_corner_velocity_MC_iteration)
          {
             double val = ComputeIterationNorm(S,dt);
-            cout << "Starting val: " << val << endl;
+            // cout << "Starting val: " << val << endl;
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityMC(S, dt);
                double val = ComputeIterationNorm(S,dt);
                mv_gf_prev_it = mv_gf;
-               cout << "val at iteration " << i << ": " << val
-                    << ", mv_norm: " << mv_gf.Norml2() <<  endl;
+               // cout << "val at iteration " << i << ": " << val
+               //      << ", mv_norm: " << mv_gf.Norml2() <<  endl;
             }
          }
 

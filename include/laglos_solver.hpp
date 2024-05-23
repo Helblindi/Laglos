@@ -187,6 +187,7 @@ public:
 
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
+   void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel);
    void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
    void GetNodePosition(const Vector &S, const int & node, Vector & x);
    
@@ -232,8 +233,11 @@ public:
 
    // Iterative method to update corner velocities, so less mass correction is needed
    void IterativeCornerVelocityMC(Vector &S, const double & dt);
-   double ComputeIterationNorm(Vector &S, const double & dt);
-   double ComputeIterationNormSF(Vector &S, const Vector &SF, const double & dt);
+   double ComputeIterationNormMC(Vector &S, const double & dt);
+
+   // Iterative method using least squares
+   void IterativeCornerVelocityLS(Vector &S, const double & dt);
+   double ComputeIterationNormLS(Vector &S, const double & dt);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

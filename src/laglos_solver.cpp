@@ -731,7 +731,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   mv_gf_prev_it = mv_gf;
 
    if (mm)
    {
@@ -783,6 +782,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
 
          if (this->use_corner_velocity_MC_iteration)
          {
+            mv_gf_prev_it = mv_gf;
             // double val = ComputeIterationNormMC(S,dt);
             // cout << "Starting val: " << val << endl;
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
@@ -4898,7 +4898,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 {
    // cout << "=====IterativeCornerVelocityMC=====\n";
    // Optional run time parameters
-   bool do_theta_averaging = false;
+   bool do_theta_averaging = true;
    double theta = 0.5;
    bool use_v3perp_correction = true;
    Vector S_new = S;
@@ -5090,7 +5090,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
          // Add contribution to the averaging objects
          double Mcoeff = 2. * pow(aFi, 2);
-         double Rcoeff = aFj*Vadj_n_comp - bmn;
+         double Rcoeff = aFj*Vadj_n_comp - bF;
          Rcoeff *= -2. * aFi;
          tensor(n_vec, n_vec, dm_tmp);
 
@@ -5247,7 +5247,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
             // Add contribution to the averaging objects
             double Mcoeff = 2. * pow(aFi, 2);
-            double Rcoeff = aFj*Vadj_n_comp - bmn;
+            double Rcoeff = aFj*Vadj_n_comp - bF;
             Rcoeff *= -2. * aFi;
             tensor(n_vec, n_vec, dm_tmp);
 
@@ -5260,20 +5260,23 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
       Mi.Invert();
       Mi.Mult(Ri, predicted_node_v);
 
-      // cout << "node: " << node << endl;
-      // cout << "Mi: ";
-      // Mi.Print(cout);
-      // cout << "Ri: ";
-      // Ri.Print(cout);
-      // cout << "predicted v: ";
-      // predicted_node_v.Print(cout);
-
       // Theta average with previous velocity
       if (do_theta_averaging)
       {
          predicted_node_v *= theta; 
          predicted_node_v.Add(1. - theta, Vnode_n);
       }
+
+      // if (node == 99)
+      // {
+      //    cout << "node: " << node << endl;
+      //    cout << "Mi inverse: ";
+      //    Mi.Print(cout);
+      //    cout << "Ri: ";
+      //    Ri.Print(cout);
+      //    cout << "predicted v: ";
+      //    predicted_node_v.Print(cout);
+      // }
 
       // Put velocity in S
       // Gauss-Seidel > Jacobi

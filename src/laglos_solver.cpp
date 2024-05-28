@@ -783,14 +783,15 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          if (this->use_corner_velocity_MC_iteration)
          {
             mv_gf_prev_it = mv_gf;
-            // double val = ComputeIterationNormMC(S,dt);
-            // cout << "Starting val: " << val << endl;
+            // double val = ComputeIterationNormLS(S,dt);
+            // cout << "0," << val << endl;
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityLS(S, dt);
                double val = ComputeIterationNormLS(S,dt);
                mv_gf_prev_it = mv_gf;
+               // cout << i << "," << val << endl;
                cout << "val at iteration " << i << ": " << val << endl;
                //      << ", mv_norm: " << mv_gf.Norml2() <<  endl;
             }
@@ -4346,7 +4347,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    // Optional run time parameters
    bool do_theta_averaging = false;
    double theta = 1.;
-   bool use_v3perp_correction = true;
 
    // Values needed during iteration
    Array<int> faces_row, face_dofs_row;
@@ -4896,11 +4896,10 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
 template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const double & dt)
 {
-   // cout << "=====IterativeCornerVelocityMC=====\n";
+   // cout << "=====IterativeCornerVelocityLS=====\n";
    // Optional run time parameters
    bool do_theta_averaging = true;
    double theta = 0.5;
-   bool use_v3perp_correction = true;
    Vector S_new = S;
 
    // Values needed during iteration

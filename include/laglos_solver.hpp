@@ -238,6 +238,9 @@ public:
    // Iterative method using least squares
    void IterativeCornerVelocityLS(Vector &S, const double & dt);
    double ComputeIterationNormLS(Vector &S, const double & dt);
+
+   // Average Velocities
+   void ComputeAverageVelocities(Vector &S);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

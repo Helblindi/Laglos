@@ -789,6 +789,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             {
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityLS(S, dt);
+               ComputeAverageVelocities(S);
                double val = ComputeIterationNormLS(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
@@ -5330,6 +5331,94 @@ double LagrangianLOOperator<dim>::ComputeIterationNormLS(Vector &S, const double
    return numer / denom;
 }
 
+
+/****************************************************************************************************
+* Function: ComputeAverageVelocities
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*
+* Purpose: Compute average of adjacent corner velocities for interior nodes and average this with 
+*          current velocity at each node.  This addition restriction on the nodal velocities was 
+*          discussed on 06/03/2024.
+* 
+*  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
+{
+   cout << "=====ComputeAverageVelocities=====\n";
+   double theta = 0.01;
+   Vector S_new = S;
+   Array<int> faces_row, face_dofs_row;
+   int faces_length;
+   mfem::Mesh::FaceInformation FI;
+   Vector Vnode(dim), Vadj(dim), Vpred(dim);
+   Vector n_int(dim), n_vec(dim);
+   int Vadj_index;
+
+   for (int node = 0; node < NDofs_H1L; node++)
+   {
+      Vpred = 0.;
+      GetNodeVelocity(S, node, Vnode);
+
+      // Only average for interior nodes
+      int bdr_ind = BdrVertexIndexingArray[node];
+      if (bdr_ind == -1)
+      {
+         // Get cell faces
+         vertex_edge.GetRow(node, faces_row);
+         faces_length = faces_row.Size();
+         assert(faces_length == 4);
+         /* Iterate over cell faces */
+         for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+         {
+            // Get face information
+            int face = faces_row[face_it];
+            FI = pmesh->GetFaceInformation(face);
+
+            // Weight with F
+            int c = FI.element[0].index;
+            CalcOutwardNormalInt(S, c, face, n_int);
+            n_vec = n_int;
+            double F = n_vec.Norml2();
+
+            /* adjacent corner indices */
+            // preserve node orientation where cell to right 
+            // of face is with lower cell index
+            H1.GetFaceDofs(face, face_dofs_row);
+            int face_vdof1 = face_dofs_row[1], 
+               face_vdof2 = face_dofs_row[0], 
+               face_dof = face_dofs_row[2]; 
+
+            // Grab corresponding vertex velocity from S
+            // We are always solving for V2. 
+            // If the index for Vnode does not match that
+            // for V2, we must flip the normal.
+            if (node == face_vdof1) {
+               // Get adj index
+               Vadj_index = face_vdof2;
+            } else {
+               // Get adj index
+               Vadj_index = face_vdof1;
+            }
+
+            /* Get face and adj node velocity and position */
+            GetNodeVelocity(S, Vadj_index, Vadj);
+
+            // Vpred += Vadj;
+            Vpred.Add(F, Vadj);
+         }
+
+         // Average 
+         Vpred /=  faces_length;
+
+         // Add in viscosity
+         add(1. - theta, Vnode, theta, Vpred, Vnode);
+         UpdateNodeVelocity(S_new, node, Vnode);
+      } // End interior node
+   } // End node iteration
+   S = S_new;
+}
 
 /****************************************************************************************************
 * Function: ComputeNodeVelocitiesFromVgeo

@@ -241,6 +241,9 @@ public:
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);
+
+   // Trying Flux on LHS
+   void IterativeCornerVelocityFLUXLS(Vector &S, const double & dt);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

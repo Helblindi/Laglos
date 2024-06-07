@@ -5374,9 +5374,9 @@ double LagrangianLOOperator<dim>::ComputeIterationNormLS(Vector &S, const double
 template<int dim>
 void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const double & dt)
 {
-   cout << "=====IterativeCornerVelocityTNLS=====\n";
+   // cout << "=====IterativeCornerVelocityTNLS=====\n";
    // Optional run time parameters
-   bool do_theta_averaging = false;
+   bool do_theta_averaging = true;
    double theta = 0.5;
    Vector S_new = S;
 
@@ -5387,7 +5387,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
    H1.ExchangeFaceNbrData();
    int Vadj_index, c, bdr_ind = 0;
    double F = 0.;
-   double Vadj_n_comp = 0., Vadj_tau_comp = 0.;
+   double Vadj_n_comp = 0., Vadj_tau_comp = 0., vnode_tau_comp_prev = 0.;
 
    Vector predicted_node_v(dim), Vf(dim);
    Vector n_int(dim), n_vec(dim), tau_vec(dim);
@@ -5395,7 +5395,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
    Vector anode_np1(dim), aadj_np1(dim);
    Vector Badj(dim), Bnode(dim);
 
-   Vector Vnode_n(dim), Vadj_n(dim), Vface_n(dim);
+   Vector Vnode_n(dim), Vadj_n(dim);
    Vector Anode(dim), Aadj(dim);
    Vector n_vec_half(dim), tau_vec_half(dim);
    Vector temp_vec(dim);
@@ -5468,7 +5468,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
 
          /* Get face and adj node velocity and position */
          GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
          GetNodePosition(S, Vadj_index, aadj_n);
          GetNodePosition(S, face_dof, a3n);
 
@@ -5481,9 +5480,18 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
          add(aadj_n, dt/2., Vadj_n, Aadj);
          // add(aadj_n, dt, Vadj_n, aadj_np1);
 
+         // Compute half
+         subtract(Anode, Aadj, tau_vec_half);
+         double Fhalf = tau_vec_half.Norml2();
+         tau_vec_half /= Fhalf;
+         n_vec_half = tau_vec_half;
+         Orthogonal(n_vec_half);
+
          // Get normal and tangential components of Vadj_n
          Vadj_n_comp = Vadj_n * n_vec;
          Vadj_tau_comp = Vadj_n * tau_vec;
+         // tangent component of Vnode_n at prev it
+         vnode_tau_comp_prev = Vnode_n * tau_vec;
          
          // Compute geometrical vectors
          Bnode = 0.;
@@ -5506,9 +5514,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
          double vadjbadj = Vadj_n * Badj;
 
          // Compute alphas and betas
-         double alpha1 = bnoden - (dt/2.) * Vadj_tau_comp + (1./3.) * F;
-         double alpha2 = bnodetau + (dt/2.) * Vadj_n_comp;
-         double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp;
+         double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+         double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+         double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
 
          temp_vec = 0.;
          temp_vec.Add(0.5, Anode);
@@ -5524,147 +5532,172 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
          double beta3 = Vadj_n * temp_vec;
 
          // Compute afx-cfy
-         subtract(Anode, Aadj, tau_vec_half);
-         double Fhalf = tau_vec_half.Norml2();
-         tau_vec_half /= Fhalf;
-         n_vec_half = tau_vec_half;
-         Orthogonal(n_vec_half);
          add(alpha1, n_vec_half, beta1, tau_vec_half, temp_vec);
+         temp_vec /= Fhalf;
          double afx = temp_vec[0], afy = temp_vec[1];
+
          add(alpha2, n_vec_half, beta2, tau_vec_half, temp_vec);
+         temp_vec /= Fhalf;
          double bfx = temp_vec[0], bfy = temp_vec[1];
+
          add(alpha3, n_vec_half, beta3, tau_vec_half, temp_vec);
-         temp_vec.Add(-1. * Fhalf, Vf);
+         temp_vec /= Fhalf;
+         temp_vec.Add(-1., Vf); 
          double cfx = temp_vec[0], cfy = temp_vec[1];
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
-         Mi.Add(2 * (pow(afx,2) + pow(afy,2)), dm_tmp);
+         Mi.Add(pow(afx,2) + pow(afy,2), dm_tmp);
+
          tensor(tau_vec, tau_vec, dm_tmp);
-         Mi.Add(2 * (pow(bfx,2) + pow(bfy,2)), dm_tmp);
+         Mi.Add(pow(bfx,2) + pow(bfy,2), dm_tmp);
+
          tensor(n_vec, tau_vec, dm_tmp);
          tensor(tau_vec, n_vec, dm_tmp2);
          dm_tmp.Add(1., dm_tmp2);
-         Mi.Add(2 * (afx*bfx + afy*bfy), dm_tmp);
+         Mi.Add(afx*bfx + afy*bfy, dm_tmp);
 
          Ri.Add(afx*cfx + afy*cfy, n_vec);
          Ri.Add(bfx*cfx + bfy*cfy, tau_vec);
-         Ri *= -2.;
+         Ri *= -1.;
+
+         // cout << "node: " << node << ", adj_node: " << Vadj_index << endl;
+         // cout << "normal: ";
+         // n_vec.Print(cout);
+         // cout << "tan: ";
+         // tau_vec.Print(cout);
 
          // In the case of boundary nodes, check if this is an interior face
-         // if (bdr_ind != -1 && FI.IsInterior())
-         // {
-         //    // We must add the ghost node contribution 
-         //    // We will be employing reflective boundary conditions
+         if (bdr_ind != -1 && FI.IsInterior())
+         {
+            // We must add the ghost node contribution 
+            // We will be employing reflective boundary conditions
 
-         //    // Compute vector from node to face 
-         //    Vector face_dx(dim);
-         //    subtract(anode_n, a3n, face_dx);
+            // Compute vector from node to face 
+            Vector face_dx(dim);
+            subtract(anode_n, a3n, face_dx);
 
-         //    // Compute vector from node to adjacent node
-         //    Vector Vadj_dx(dim);
-         //    subtract(anode_n, aadj_n, Vadj_dx);
+            // Compute vector from node to adjacent node
+            Vector Vadj_dx(dim);
+            subtract(anode_n, aadj_n, Vadj_dx);
 
-         //    // Sod
-         //    switch (bdr_ind)
-         //    {
-         //    case 1: // bottom
-         //    case 3: // top
-         //       n_vec[0] *= -1.; // preserves orientation of face
-         //       face_dx[0] *= -1.;
-         //       Vadj_dx[0] *= -1.;
-         //       Vadj_n[1] *= -1.;
-         //       Vface_n[1] *= -1.;
-         //       break;
+            // Sod
+            switch (bdr_ind)
+            {
+            case 1: // bottom
+            case 3: // top
+               n_vec[0] *= -1.; // preserves orientation of face
+               tau_vec[1] *= -1.;
+               face_dx[0] *= -1.;
+               Vadj_dx[0] *= -1.;
+               Vadj_n[1] *= -1.;
+               break;
             
-         //    case 2: // right
-         //    case 4: // left
-         //       n_vec[1] *= -1.; // preserves orientation of face
-         //       face_dx[1] *= -1.;
-         //       Vadj_dx[1] *= -1.;
-         //       Vadj_n[0] *= -1.;
-         //       Vface_n[0] *= -1.;
-         //       break;
+            case 2: // right
+            case 4: // left
+               n_vec[1] *= -1.; // preserves orientation of face
+               tau_vec[0] *= -1.;
+               face_dx[1] *= -1.;
+               Vadj_dx[1] *= -1.;
+               Vadj_n[0] *= -1.;
+               break;
             
-         //    case -1:
-         //       // Not a boundary vertex
-         //       continue;
+            case -1:
+               // Not a boundary vertex
+               continue;
 
-         //    default:
-         //       MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
-         //       break;
-         //    }
+            default:
+               MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+               break;
+            }
 
-         //    // Recompute bmn for face
-         //    double bmn = Vf * n_vec;
-         //    bmn *= F;
-
-         //    n_vec_R = n_vec;
-         //    Orthogonal(n_vec_R);
-
-         //    // Get normal and rotated components of Vadj_n
-         //    Vadj_n_comp = Vadj_n * n_vec;
-         //    Vadj_nR_comp = Vadj_n * n_vec_R;
+            // Get normal and rotated components of Vadj_n
+            Vadj_n_comp = Vadj_n * n_vec;
+            Vadj_tau_comp = Vadj_n * tau_vec;
+            // tangent component of Vnode_n at prev it
+            vnode_tau_comp_prev = Vnode_n * tau_vec;
             
-         //    /* Get flipped a3n and vadj_x */
-         //    add(anode_n, face_dx, a3n);
-         //    add(anode_n, Vadj_dx, aadj_n);
-         //    // and half location
-         //    add(aadj_n, dt/2., Vadj_n, Aadj);
+            /* Get flipped a3n and vadj_x */
+            add(anode_n, face_dx, a3n);
+            add(anode_n, Vadj_dx, aadj_n);
+            // and half location
+            add(aadj_n, dt/2., Vadj_n, Aadj);
 
-         //    // Compute vector constants for ghost node
-         //    Bnode = a3n;
-         //    Bnode *= -2.;
-         //    Bnode.Add(-.5, aadj_n);
-         //    Bnode.Add(2.5, anode_n);
-         //    Orthogonal(Bnode);
+            // Compute geometrical vectors
+            Bnode = 0.;
+            Bnode.Add(1./6., aadj_n);
+            Bnode.Add(0.5, anode_n);
+            Bnode.Add(-2./3., a3n);
+            Orthogonal(Bnode);
 
-         //    Badj = a3n;
-         //    Badj *= -2.;
-         //    Badj.Add(-.5, anode_n);
-         //    Badj.Add(2.5, aadj_n);
-         //    Orthogonal(Badj);
+            Badj = 0.;
+            Badj.Add(0.5, aadj_n);
+            Badj.Add(1./6., anode_n);
+            Badj.Add(-2./3., a3n);
+            Orthogonal(Badj);
 
-         //    // Compute dot products
-         //    double badjn = Badj * n_vec;
-         //    double badjnr = Badj * n_vec_R;
-         //    double bnoden = Bnode * n_vec;
-         //    double bnodenr = Bnode * n_vec_R;
+            // Compute dot products
+            double badjn = Badj * n_vec;
+            double badjtau = Badj * tau_vec;
+            double bnoden = Bnode * n_vec;
+            double bnodetau = Bnode * tau_vec;
+            double vadjbadj = Vadj_n * Badj;
 
-         //    // Add in Dc1V3nper contribution (explicit)
-         //    // V3nperp is set to 0 in option 1.
-         //    if (mv_it_option == 2 || mv_it_option == 3)
-         //    {
-         //       add(aadj_n, dt/2., Vadj_n, Aadj);
+            // Compute alphas and betas
+            double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+            double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+            double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
 
-         //       subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
-         //       subtract(Anode, Aadj, temp_vec_2); // A2-A1
-               
-         //       Orthogonal(temp_vec_2);
-         //       D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+            temp_vec = 0.;
+            temp_vec.Add(0.5, Anode);
+            temp_vec.Add(1./6., aadj_n);
+            temp_vec.Add(-2./3., a3n);
+            double beta1 = n_vec * temp_vec;
+            double beta2 = tau_vec * temp_vec + (1./3.) * F;
+            temp_vec = 0.;
+            temp_vec.Add(2./3., a3n);
+            temp_vec.Add(F/3., tau_vec);
+            temp_vec.Add(-1./2., Aadj);
+            temp_vec.Add(-1./6., aadj_n);
+            double beta3 = Vadj_n * temp_vec;
 
-         //       // Compute c1 (A.4a)
-         //       subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
-               
-         //       Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+            // Compute afx-cfy
+            add(alpha1, n_vec_half, beta1, tau_vec_half, temp_vec);
+            temp_vec /= Fhalf;
+            double afx = temp_vec[0], afy = temp_vec[1];
 
-         //       /* Compute V3nperp using previous iteration */
-         //       add(0.5, Vnode_n, 0.5, Vadj_n, temp_vec);
-         //       V3nperp = -1. * (temp_vec * n_vec_R);
+            add(alpha2, n_vec_half, beta2, tau_vec_half, temp_vec);
+            temp_vec /= Fhalf;
+            double bfx = temp_vec[0], bfy = temp_vec[1];
 
-         //       /* Add in Dc1 explicitly at k to bF */
-         //       bF += Dc1*V3nperp;
-         //    }
+            add(alpha3, n_vec_half, beta3, tau_vec_half, temp_vec);
+            temp_vec /= Fhalf;
+            temp_vec.Add(-1., Vf);
 
-         //    // Add contribution to the averaging objects
-         //    double Mcoeff = 2. * pow(aFi, 2);
-         //    double Rcoeff = aFj*Vadj_n_comp - bF;
-         //    Rcoeff *= -2. * aFi;
-         //    tensor(n_vec, n_vec, dm_tmp);
+            double cfx = temp_vec[0], cfy = temp_vec[1];
 
-         //    Mi.Add(Mcoeff, dm_tmp);
-         //    Ri.Add(Rcoeff, n_vec);
-         // } // End ghost node
+            // Add contribution to the averaging objects
+            tensor(n_vec, n_vec, dm_tmp);
+            Mi.Add(pow(afx,2) + pow(afy,2), dm_tmp);
+
+            tensor(tau_vec, tau_vec, dm_tmp);
+            Mi.Add(pow(bfx,2) + pow(bfy,2), dm_tmp);
+
+            tensor(n_vec, tau_vec, dm_tmp);
+            tensor(tau_vec, n_vec, dm_tmp2);
+            dm_tmp.Add(1., dm_tmp2);
+            Mi.Add(afx*bfx + afy*bfy, dm_tmp);
+
+            Ri.Add(afx*cfx + afy*cfy, n_vec);
+            Ri.Add(bfx*cfx + bfy*cfy, tau_vec);
+            Ri *= -1.;
+
+            // cout << "node: " << node << ", adj_node ghost: " << Vadj_index << endl;
+            // cout << "normal: ";
+            // n_vec.Print(cout);
+            // cout << "tan: ";
+            // tau_vec.Print(cout);
+         } // End ghost node
       }
 
       // Average node_v
@@ -5678,8 +5711,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
          predicted_node_v.Add(1. - theta, Vnode_n);
       }
 
-      cout << "Predicted node velocity for node " << node << ": ";
-      predicted_node_v.Print(cout);
+      // cout << "Predicted node velocity for node " << node << ": ";
+      // predicted_node_v.Print(cout);
       // Put velocity in S
       // Gauss-Seidel > Jacobi
       // UpdateNodeVelocity(S, node, predicted_node_v);

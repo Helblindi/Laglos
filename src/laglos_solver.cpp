@@ -791,6 +791,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityTNLS(S, dt);
                // ComputeAverageVelocities(S);
+               EnforceMVBoundaryConditions(S,t,dt);
                double val = ComputeIterationNormTNLS(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
@@ -798,7 +799,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             }
          }
 
-         EnforceMVBoundaryConditions(S,t,dt);
+         // EnforceMVBoundaryConditions(S,t,dt);
 
          switch (fv_option)
          {
@@ -5515,33 +5516,36 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
 
          // Compute alphas and betas
          double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+         alpha1 /= Fhalf;
          double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+         alpha2 /= Fhalf;
          double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
+         alpha3 /= Fhalf;
 
          temp_vec = 0.;
          temp_vec.Add(0.5, Anode);
          temp_vec.Add(1./6., aadj_n);
          temp_vec.Add(-2./3., a3n);
          double beta1 = n_vec * temp_vec;
+         beta1 /= Fhalf;
          double beta2 = tau_vec * temp_vec + (1./3.) * F;
+         beta2 /= Fhalf;
          temp_vec = 0.;
          temp_vec.Add(2./3., a3n);
          temp_vec.Add(F/3., tau_vec);
          temp_vec.Add(-1./2., Aadj);
          temp_vec.Add(-1./6., aadj_n);
          double beta3 = Vadj_n * temp_vec;
+         beta3 /= Fhalf;
 
          // Compute afx-cfy
          add(alpha1, n_vec_half, beta1, tau_vec_half, temp_vec);
-         temp_vec /= Fhalf;
          double afx = temp_vec[0], afy = temp_vec[1];
 
          add(alpha2, n_vec_half, beta2, tau_vec_half, temp_vec);
-         temp_vec /= Fhalf;
          double bfx = temp_vec[0], bfy = temp_vec[1];
 
          add(alpha3, n_vec_half, beta3, tau_vec_half, temp_vec);
-         temp_vec /= Fhalf;
          temp_vec.Add(-1., Vf); 
          double cfx = temp_vec[0], cfy = temp_vec[1];
 
@@ -5573,11 +5577,11 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
             // We must add the ghost node contribution 
             // We will be employing reflective boundary conditions
 
-            // Compute vector from node to face 
+            // Compute vector from face to node 
             Vector face_dx(dim);
             subtract(anode_n, a3n, face_dx);
 
-            // Compute vector from node to adjacent node
+            // Compute vector from adjacent node to node
             Vector Vadj_dx(dim);
             subtract(anode_n, aadj_n, Vadj_dx);
 
@@ -5623,6 +5627,21 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
             // and half location
             add(aadj_n, dt/2., Vadj_n, Aadj);
 
+            // Compute half
+            // cout << "ghost node at node " << node << ".\n";
+            // cout << "Anode: ";
+            // Anode.Print(cout);
+            // cout << "Aadj: ";
+            // Aadj.Print(cout);
+            // cout << "Vadj: ";
+            // Vadj_n.Print(cout);
+
+            subtract(Anode, Aadj, tau_vec_half);
+            double Fhalf = tau_vec_half.Norml2();
+            tau_vec_half /= Fhalf;
+            n_vec_half = tau_vec_half;
+            Orthogonal(n_vec_half);
+
             // Compute geometrical vectors
             Bnode = 0.;
             Bnode.Add(1./6., aadj_n);
@@ -5645,33 +5664,36 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const dou
 
             // Compute alphas and betas
             double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+            alpha1 /= Fhalf;
             double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+            alpha2 /= Fhalf;
             double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
+            alpha3 /= Fhalf;
 
             temp_vec = 0.;
             temp_vec.Add(0.5, Anode);
             temp_vec.Add(1./6., aadj_n);
             temp_vec.Add(-2./3., a3n);
             double beta1 = n_vec * temp_vec;
+            beta1 /= Fhalf;
             double beta2 = tau_vec * temp_vec + (1./3.) * F;
+            beta2 /= Fhalf;
             temp_vec = 0.;
             temp_vec.Add(2./3., a3n);
             temp_vec.Add(F/3., tau_vec);
             temp_vec.Add(-1./2., Aadj);
             temp_vec.Add(-1./6., aadj_n);
             double beta3 = Vadj_n * temp_vec;
+            beta3 /= Fhalf;
 
             // Compute afx-cfy
             add(alpha1, n_vec_half, beta1, tau_vec_half, temp_vec);
-            temp_vec /= Fhalf;
             double afx = temp_vec[0], afy = temp_vec[1];
 
             add(alpha2, n_vec_half, beta2, tau_vec_half, temp_vec);
-            temp_vec /= Fhalf;
             double bfx = temp_vec[0], bfy = temp_vec[1];
 
             add(alpha3, n_vec_half, beta3, tau_vec_half, temp_vec);
-            temp_vec /= Fhalf;
             temp_vec.Add(-1., Vf);
 
             double cfx = temp_vec[0], cfy = temp_vec[1];

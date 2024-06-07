@@ -244,6 +244,7 @@ public:
    // Iterative method using least squares (tangent and normal)
    void IterativeCornerVelocityTNLS(Vector &S, const double & dt);
    double ComputeIterationNormTNLS(Vector &S, const double & dt);
+   void IterativeCornerVelocityTNLSnoncart(Vector &S, const double & dt);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

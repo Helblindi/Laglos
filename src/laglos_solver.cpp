@@ -5915,11 +5915,11 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          double vadjbadj = Vadj_n * Badj;
 
          // Compute alphas and betas
-         double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+         double alpha1 = bnoden - (dt/2.) * Vadj_tau_comp + (1./3.) * F;
          alpha1 /= Fhalf;
-         double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+         double alpha2 = bnodetau + (dt/2.) * Vadj_n_comp;
          alpha2 /= Fhalf;
-         double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
+         double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp;
          alpha3 /= Fhalf;
 
          temp_vec = 0.;
@@ -6055,11 +6055,11 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             double vadjbadj = Vadj_n * Badj;
 
             // Compute alphas and betas
-            double alpha1 = bnoden - (dt/6.) * Vadj_tau_comp + (1./3.) * F + (dt / 3.) * vnode_tau_comp_prev;
+            double alpha1 = bnoden - (dt/2.) * Vadj_tau_comp + (1./3.) * F;
             alpha1 /= Fhalf;
-            double alpha2 = bnodetau + (dt/6.) * Vadj_n_comp;
+            double alpha2 = bnodetau + (dt/2.) * Vadj_n_comp;
             alpha2 /= Fhalf;
-            double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp - (dt / 3.) * Vadj_n_comp * Vadj_tau_comp;
+            double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp;
             alpha3 /= Fhalf;
 
             temp_vec = 0.;

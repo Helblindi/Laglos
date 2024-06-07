@@ -694,6 +694,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
+   UpdateMesh(S);
    pmesh->NewNodes(x_gf, false);
    // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
    // cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
@@ -794,7 +795,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
                cout << "val at iteration " << i << ": " << val << endl;
-               //      << ", mv_norm: " << mv_gf.Norml2() <<  endl;
             }
          }
 
@@ -3079,6 +3079,25 @@ void LagrangianLOOperator<dim>::GetNodePosition(const Vector &S, const int & nod
       int index = node + i * NDofs_H1;
       x[i] = x_gf[index];
    }
+}
+
+
+/****************************************************************************************************
+* Function: UpdateMesh
+* Parameters:
+*   S    - BlockVector representing FiniteElement information
+*
+* Purpose:
+*  This function returns the cartesian location corresponding to a global node.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::UpdateMesh(const Vector & S) const 
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf;
+   x_gf.MakeRef(&H1, *sptr, 0);
+   H1.GetMesh()->NewNodes(x_gf, false);
+   L2.GetMesh()->NewNodes(x_gf, false);
 }
 
 

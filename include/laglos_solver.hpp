@@ -190,6 +190,8 @@ public:
    void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel);
    void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
    void GetNodePosition(const Vector &S, const int & node, Vector & x);
+
+   void UpdateMesh(const Vector &S) const;
    
    // Face velocity functions
    void ComputeIntermediateFaceVelocities(const Vector &S, 

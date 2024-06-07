@@ -789,9 +789,9 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
-               IterativeCornerVelocityFLUXLS(S, dt);
+               IterativeCornerVelocityTNLS(S, dt);
                // ComputeAverageVelocities(S);
-               double val = ComputeIterationNormLS(S,dt);
+               double val = ComputeIterationNormTNLS(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
                cout << "val at iteration " << i << ": " << val << endl;
@@ -4938,7 +4938,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
    Vector Badj(dim), Bnode(dim);
 
    Vector Vnode_n(dim), Vadj_n(dim), Vface_n(dim);
-   Vector Vnode_half(dim), Vadj_half(dim), n_vec_half(dim);
+   Vector Vnode_half(dim), Vadj_half(dim);
    Vector temp_vec(dim), temp_vec_2(dim);
    double D = 0., c1 = 0., c0 = 0., V3nperp = 0., Dc1 = 0.;
 
@@ -5352,6 +5352,389 @@ double LagrangianLOOperator<dim>::ComputeIterationNormLS(Vector &S, const double
 
 
 /****************************************************************************************************
+* Function: IterativeCornerVelocityTNLS
+* Parameters:
+*  S    - BlockVector corresponding to nth timestep that stores mesh information, 
+*         mesh velocity, and state variables.
+*  dt   - Current timestep size
+*
+* Purpose:
+*  This function constitutes one iteration on the previously computed corner node 
+*  velocity to reduce total face motion while still preserving mass conservation.
+*  The idea is an addition to the LS iteration method, where now we solve a 
+*  least squares system composed of both the normal and tangential components.
+*  This method was initially discussed on 06/05/2024.
+*
+*  Note: This function relies on the mesh velocities having already been computed
+*  and possibly linearized.  One can use whichever mesh velocity computation before 
+*  iteration.
+*
+*  Note: This function will modify mv_gf in the BlockVector S
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLS(Vector &S, const double & dt)
+{
+   cout << "=====IterativeCornerVelocityTNLS=====\n";
+   // Optional run time parameters
+   bool do_theta_averaging = false;
+   double theta = 0.5;
+   Vector S_new = S;
+
+   // Values needed during iteration
+   Array<int> faces_row, face_dofs_row;
+   int faces_length;
+   mfem::Mesh::FaceInformation FI;
+   H1.ExchangeFaceNbrData();
+   int Vadj_index, c, bdr_ind = 0;
+   double F = 0.;
+   double Vadj_n_comp = 0., Vadj_tau_comp = 0.;
+
+   Vector predicted_node_v(dim), Vf(dim);
+   Vector n_int(dim), n_vec(dim), tau_vec(dim);
+   Vector anode_n(dim), aadj_n(dim), a3n(dim);
+   Vector anode_np1(dim), aadj_np1(dim);
+   Vector Badj(dim), Bnode(dim);
+
+   Vector Vnode_n(dim), Vadj_n(dim), Vface_n(dim);
+   Vector Anode(dim), Aadj(dim);
+   Vector n_vec_half(dim), tau_vec_half(dim);
+   Vector temp_vec(dim);
+
+   // Averaging
+   DenseMatrix Mi(dim), dm_tmp(dim), dm_tmp2(dim);
+   Vector Ri(dim);
+
+   /* Iterate over corner nodes */
+   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   {
+      // Reset new nodal velocity, and averaging objects
+      Mi = 0., Ri = 0.;
+      predicted_node_v = 0.;
+
+      // Set corresponding boundary indicator
+      // If node is boundary node, will have to add corresponding correction
+      // node is interior node if bdr_ind == -1
+      bdr_ind = BdrVertexIndexingArray[node];
+
+      // Get current nodal velocity and position 
+      GetNodeVelocity(S, node, Vnode_n);
+      GetNodePosition(S, node, anode_n);
+
+      // Compute An and an+1 for node
+      add(anode_n, dt/2., Vnode_n, Anode);
+      // add(anode_n, dt, Vnode_n, anode_np1);
+
+      // Get cell faces
+      vertex_edge.GetRow(node, faces_row);
+      faces_length = faces_row.Size();
+
+      /* Iterate over cell faces */
+      for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+      {
+         // Get face information
+         int face = faces_row[face_it];
+         GetIntermediateFaceVelocity(face, Vf);
+         FI = pmesh->GetFaceInformation(face);
+
+         // Calculate outer normal
+         c = FI.element[0].index;
+         CalcOutwardNormalInt(S, c, face, n_int);
+         n_vec = n_int;
+         F = n_vec.Norml2();
+         n_vec /= F;
+
+         /* adjacent corner indices */
+         // preserve node orientation where cell to right 
+         // of face is with lower cell index
+         H1.GetFaceDofs(face, face_dofs_row);
+         int face_vdof1 = face_dofs_row[1], 
+             face_vdof2 = face_dofs_row[0], 
+             face_dof = face_dofs_row[2]; 
+
+         // Grab corresponding vertex velocity from S
+         // We are always solving for V2. 
+         // If the index for Vnode does not match that
+         // for V2, we must flip the normal.
+         if (node == face_vdof1) {
+            // Get adj index
+            Vadj_index = face_vdof2;
+            // Flip normal vector
+            n_vec *= -1.;
+         } else {
+            // Get adj index
+            Vadj_index = face_vdof1;
+            // Node matches v2
+         }
+
+         /* Get face and adj node velocity and position */
+         GetNodeVelocity(S, Vadj_index, Vadj_n);
+         GetNodeVelocity(S, face_dof, Vface_n);
+         GetNodePosition(S, Vadj_index, aadj_n);
+         GetNodePosition(S, face_dof, a3n);
+
+         // Get tau vec
+         subtract(anode_n, aadj_n, tau_vec);
+         double F_tau = tau_vec.Norml2();
+         tau_vec /= F_tau;
+
+         // Compute future face and adjacent node locations
+         add(aadj_n, dt/2., Vadj_n, Aadj);
+         // add(aadj_n, dt, Vadj_n, aadj_np1);
+
+         // Get normal and tangential components of Vadj_n
+         Vadj_n_comp = Vadj_n * n_vec;
+         Vadj_tau_comp = Vadj_n * tau_vec;
+         
+         // Compute geometrical vectors
+         Bnode = 0.;
+         Bnode.Add(1./6., aadj_n);
+         Bnode.Add(0.5, anode_n);
+         Bnode.Add(-2./3., a3n);
+         Orthogonal(Bnode);
+
+         Badj = 0.;
+         Badj.Add(0.5, aadj_n);
+         Badj.Add(1./6., anode_n);
+         Badj.Add(-2./3., a3n);
+         Orthogonal(Badj);
+
+         // Compute dot products
+         double badjn = Badj * n_vec;
+         double badjtau = Badj * tau_vec;
+         double bnoden = Bnode * n_vec;
+         double bnodetau = Bnode * tau_vec;
+         double vadjbadj = Vadj_n * Badj;
+
+         // Compute alphas and betas
+         double alpha1 = bnoden - (dt/2.) * Vadj_tau_comp + (1./3.) * F;
+         double alpha2 = bnodetau + (dt/2.) * Vadj_n_comp;
+         double alpha3 = -1. * vadjbadj + (1./3.) * F * Vadj_n_comp;
+
+         temp_vec = 0.;
+         temp_vec.Add(0.5, Anode);
+         temp_vec.Add(1./6., aadj_n);
+         temp_vec.Add(-2./3., a3n);
+         double beta1 = n_vec * temp_vec;
+         double beta2 = tau_vec * temp_vec + (1./3.) * F;
+         temp_vec = 0.;
+         temp_vec.Add(2./3., a3n);
+         temp_vec.Add(F/3., tau_vec);
+         temp_vec.Add(-1./2., Aadj);
+         temp_vec.Add(-1./6., aadj_n);
+         double beta3 = Vadj_n * temp_vec;
+
+         // Compute afx-cfy
+         subtract(Anode, Aadj, tau_vec_half);
+         double Fhalf = tau_vec_half.Norml2();
+         tau_vec_half /= Fhalf;
+         n_vec_half = tau_vec_half;
+         Orthogonal(n_vec_half);
+         add(alpha1, n_vec_half, beta1, tau_vec_half, temp_vec);
+         double afx = temp_vec[0], afy = temp_vec[1];
+         add(alpha2, n_vec_half, beta2, tau_vec_half, temp_vec);
+         double bfx = temp_vec[0], bfy = temp_vec[1];
+         add(alpha3, n_vec_half, beta3, tau_vec_half, temp_vec);
+         temp_vec.Add(-1. * Fhalf, Vf);
+         double cfx = temp_vec[0], cfy = temp_vec[1];
+
+         // Add contribution to the averaging objects
+         tensor(n_vec, n_vec, dm_tmp);
+         Mi.Add(2 * (pow(afx,2) + pow(afy,2)), dm_tmp);
+         tensor(tau_vec, tau_vec, dm_tmp);
+         Mi.Add(2 * (pow(bfx,2) + pow(bfy,2)), dm_tmp);
+         tensor(n_vec, tau_vec, dm_tmp);
+         tensor(tau_vec, n_vec, dm_tmp2);
+         dm_tmp.Add(1., dm_tmp2);
+         Mi.Add(2 * (afx*bfx + afy*bfy), dm_tmp);
+
+         Ri.Add(afx*cfx + afy*cfy, n_vec);
+         Ri.Add(bfx*cfx + bfy*cfy, tau_vec);
+         Ri *= -2.;
+
+         // In the case of boundary nodes, check if this is an interior face
+         // if (bdr_ind != -1 && FI.IsInterior())
+         // {
+         //    // We must add the ghost node contribution 
+         //    // We will be employing reflective boundary conditions
+
+         //    // Compute vector from node to face 
+         //    Vector face_dx(dim);
+         //    subtract(anode_n, a3n, face_dx);
+
+         //    // Compute vector from node to adjacent node
+         //    Vector Vadj_dx(dim);
+         //    subtract(anode_n, aadj_n, Vadj_dx);
+
+         //    // Sod
+         //    switch (bdr_ind)
+         //    {
+         //    case 1: // bottom
+         //    case 3: // top
+         //       n_vec[0] *= -1.; // preserves orientation of face
+         //       face_dx[0] *= -1.;
+         //       Vadj_dx[0] *= -1.;
+         //       Vadj_n[1] *= -1.;
+         //       Vface_n[1] *= -1.;
+         //       break;
+            
+         //    case 2: // right
+         //    case 4: // left
+         //       n_vec[1] *= -1.; // preserves orientation of face
+         //       face_dx[1] *= -1.;
+         //       Vadj_dx[1] *= -1.;
+         //       Vadj_n[0] *= -1.;
+         //       Vface_n[0] *= -1.;
+         //       break;
+            
+         //    case -1:
+         //       // Not a boundary vertex
+         //       continue;
+
+         //    default:
+         //       MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+         //       break;
+         //    }
+
+         //    // Recompute bmn for face
+         //    double bmn = Vf * n_vec;
+         //    bmn *= F;
+
+         //    n_vec_R = n_vec;
+         //    Orthogonal(n_vec_R);
+
+         //    // Get normal and rotated components of Vadj_n
+         //    Vadj_n_comp = Vadj_n * n_vec;
+         //    Vadj_nR_comp = Vadj_n * n_vec_R;
+            
+         //    /* Get flipped a3n and vadj_x */
+         //    add(anode_n, face_dx, a3n);
+         //    add(anode_n, Vadj_dx, aadj_n);
+         //    // and half location
+         //    add(aadj_n, dt/2., Vadj_n, Aadj);
+
+         //    // Compute vector constants for ghost node
+         //    Bnode = a3n;
+         //    Bnode *= -2.;
+         //    Bnode.Add(-.5, aadj_n);
+         //    Bnode.Add(2.5, anode_n);
+         //    Orthogonal(Bnode);
+
+         //    Badj = a3n;
+         //    Badj *= -2.;
+         //    Badj.Add(-.5, anode_n);
+         //    Badj.Add(2.5, aadj_n);
+         //    Orthogonal(Badj);
+
+         //    // Compute dot products
+         //    double badjn = Badj * n_vec;
+         //    double badjnr = Badj * n_vec_R;
+         //    double bnoden = Bnode * n_vec;
+         //    double bnodenr = Bnode * n_vec_R;
+
+         //    // Add in Dc1V3nper contribution (explicit)
+         //    // V3nperp is set to 0 in option 1.
+         //    if (mv_it_option == 2 || mv_it_option == 3)
+         //    {
+         //       add(aadj_n, dt/2., Vadj_n, Aadj);
+
+         //       subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
+         //       subtract(Anode, Aadj, temp_vec_2); // A2-A1
+               
+         //       Orthogonal(temp_vec_2);
+         //       D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
+
+         //       // Compute c1 (A.4a)
+         //       subtract(Vnode_n, Vadj_n, temp_vec); // only change temp_vec, since temp_vec_2 is same from D calculation (half step representation)
+               
+         //       Dc1 = dt * (temp_vec * n_vec) + 2. * (temp_vec_2 * n_vec_R); 
+
+         //       /* Compute V3nperp using previous iteration */
+         //       add(0.5, Vnode_n, 0.5, Vadj_n, temp_vec);
+         //       V3nperp = -1. * (temp_vec * n_vec_R);
+
+         //       /* Add in Dc1 explicitly at k to bF */
+         //       bF += Dc1*V3nperp;
+         //    }
+
+         //    // Add contribution to the averaging objects
+         //    double Mcoeff = 2. * pow(aFi, 2);
+         //    double Rcoeff = aFj*Vadj_n_comp - bF;
+         //    Rcoeff *= -2. * aFi;
+         //    tensor(n_vec, n_vec, dm_tmp);
+
+         //    Mi.Add(Mcoeff, dm_tmp);
+         //    Ri.Add(Rcoeff, n_vec);
+         // } // End ghost node
+      }
+
+      // Average node_v
+      Mi.Invert();
+      Mi.Mult(Ri, predicted_node_v);
+
+      // Theta average with previous velocity
+      if (do_theta_averaging)
+      {
+         predicted_node_v *= theta; 
+         predicted_node_v.Add(1. - theta, Vnode_n);
+      }
+
+      cout << "Predicted node velocity for node " << node << ": ";
+      predicted_node_v.Print(cout);
+      // Put velocity in S
+      // Gauss-Seidel > Jacobi
+      // UpdateNodeVelocity(S, node, predicted_node_v);
+      // Try Jacobi
+      UpdateNodeVelocity(S_new, node, predicted_node_v);
+   } // End node iterator
+   S = S_new;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeIterationNormTNLS
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  dt       - Current time step
+*
+* Purpose:
+* 
+*  NOTE: Interior faces. 
+*  
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeIterationNormTNLS(Vector &S, const double & dt)
+{
+   Vector Vi_prev(dim), Vi_next(dim), temp_vec(dim);
+   double numer = 0., denom = 0.;
+   /* Iterate over corner nodes */
+   for (int node = 0; node < NDofs_H1L; node++)
+   { 
+      // Check if node is on boundary
+      int bdr_ind = BdrVertexIndexingArray[node];
+
+      if (bdr_ind == -1)
+      {
+         // Get updated iterated velocity and old velocity
+         GetNodeVelocity(S, node, Vi_next);
+         GetNodeVelocity(mv_gf_prev_it, node, Vi_prev);
+         subtract(Vi_next, Vi_prev, temp_vec);
+         numer += temp_vec.Norml2();
+         denom += Vi_next.Norml2();
+         // if (temp_vec.Norml2() > 1.E-12)
+         // {
+         //    cout << "iter norm node " << node << ", v_prev: ";
+         //    Vi_prev.Print(cout);
+         //    cout << "Vi next: ";
+         //    Vi_next.Print(cout);
+         // }
+      }
+      
+   }
+   return numer / denom;
+}
+
+
+/****************************************************************************************************
 * Function: ComputeAverageVelocities
 * Parameters:
 *  S        - BlockVector representing FiniteElement information
@@ -5468,7 +5851,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
    Vector Badj(dim), Bnode(dim);
 
    Vector Vnode_n(dim), Vadj_n(dim), Vface_n(dim);
-   Vector Vnode_half(dim), Vadj_half(dim), n_vec_half(dim);
+   Vector Vnode_half(dim), Vadj_half(dim);
    Vector temp_vec(dim), temp_vec_2(dim);
    double D = 0., c1 = 0., c0 = 0., V3nperp = 0., Dc1 = 0.;
 

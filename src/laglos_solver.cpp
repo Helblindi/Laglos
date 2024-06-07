@@ -5777,6 +5777,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    double theta = 0.5;
    Vector S_new = S;
 
+   // Optionally weight the normal and the tangent contributions
+   double wn = 1.;
+   double wt = 0.;
+
    // Values needed during iteration
    Array<int> faces_row, face_dofs_row;
    int faces_length;
@@ -5939,18 +5943,18 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
-         Mi.Add(pow(alpha1,2) + pow(beta1,2), dm_tmp);
+         Mi.Add(wn*pow(alpha1,2) + wt*pow(beta1,2), dm_tmp);
 
          tensor(tau_vec, tau_vec, dm_tmp);
-         Mi.Add(pow(alpha2,2) + pow(beta2,2), dm_tmp);
+         Mi.Add(wn*pow(alpha2,2) + wt*pow(beta2,2), dm_tmp);
 
          tensor(n_vec, tau_vec, dm_tmp);
          tensor(tau_vec, n_vec, dm_tmp2);
          dm_tmp.Add(1., dm_tmp2);
-         Mi.Add(alpha1*alpha2 + beta1*beta2, dm_tmp);
+         Mi.Add(wn*alpha1*alpha2 + wt*beta1*beta2, dm_tmp);
 
-         Ri.Add(alpha1*cn + beta1*ctau, n_vec);
-         Ri.Add(alpha2*cn + beta2*ctau, tau_vec);
+         Ri.Add(wn*alpha1*cn + wt*beta1*ctau, n_vec);
+         Ri.Add(wn*alpha2*cn + wt*beta2*ctau, tau_vec);
          Ri *= -1.;
 
          // cout << "node: " << node << ", adj_node: " << Vadj_index << endl;
@@ -6079,18 +6083,18 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 
             // Add contribution to the averaging objects
             tensor(n_vec, n_vec, dm_tmp);
-            Mi.Add(pow(alpha1,2) + pow(beta1,2), dm_tmp);
+            Mi.Add(wn*pow(alpha1,2) + wt*pow(beta1,2), dm_tmp);
 
             tensor(tau_vec, tau_vec, dm_tmp);
-            Mi.Add(pow(alpha2,2) + pow(beta2,2), dm_tmp);
+            Mi.Add(wn*pow(alpha2,2) + wt*pow(beta2,2), dm_tmp);
 
             tensor(n_vec, tau_vec, dm_tmp);
             tensor(tau_vec, n_vec, dm_tmp2);
             dm_tmp.Add(1., dm_tmp2);
-            Mi.Add(alpha1*alpha2 + beta1*beta2, dm_tmp);
+            Mi.Add(wn*alpha1*alpha2 + wt*beta1*beta2, dm_tmp);
 
-            Ri.Add(alpha1*cn + beta1*ctau, n_vec);
-            Ri.Add(alpha2*cn + beta2*ctau, tau_vec);
+            Ri.Add(wn*alpha1*cn + wt*beta1*ctau, n_vec);
+            Ri.Add(wn*alpha2*cn + wt*beta2*ctau, tau_vec);
             Ri *= -1.;
 
             // cout << "node: " << node << ", adj_node ghost: " << Vadj_index << endl;

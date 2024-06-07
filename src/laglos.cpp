@@ -521,8 +521,6 @@ int main(int argc, char *argv[]) {
    offset[5] = offset[4] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
-   cout << "Block Vector constructed\n";
-
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
@@ -533,12 +531,8 @@ int main(int argc, char *argv[]) {
    v_gf.MakeRef(&L2VFESpace, S, offset[3]);
    ste_gf.MakeRef(&L2FESpace, S, offset[4]);
 
-   cout << "grid functions associated\n";
-
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
-   // Sync the data location of x_gf with its base, S
-   x_gf.SyncAliasMemory(S);
 
    /* Distort Mesh for Saltzman Problem */
    if (problem_class->get_distort_mesh() || dm_val != 0.)
@@ -692,13 +686,11 @@ int main(int argc, char *argv[]) {
       // Update pmesh reference grid function
       pmesh->NewNodes(x_gf, false);
       cout << "Mesh distorted\n";
-   }
+   } // End distort mesh
 
    // Initialize mesh velocity
    ConstantCoefficient zero(0.0);
    mv_gf.ProjectCoefficient(zero);
-   // Sync the data location of mv_gf with its base, S
-   mv_gf.SyncAliasMemory(S);
 
    // Change class variables into static std::functions since virtual static member functions are not an option
    // and Coefficient class requires std::function arguments
@@ -716,13 +708,10 @@ int main(int argc, char *argv[]) {
    FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(t_init);
    sv_gf.ProjectCoefficient(sv_coeff);
-   sv_gf.SyncAliasMemory(S);
 
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
    v_gf.ProjectCoefficient(v_coeff);
-   // Sync the data location of v_gf with its base, S
-   v_gf.SyncAliasMemory(S);
 
    // While the ste_coeff is not used for initialization in the Sedov case,
    // it is necessary for plotting the exact solution
@@ -742,7 +731,6 @@ int main(int argc, char *argv[]) {
       ste_coeff.SetTime(t_init);
       ste_gf.ProjectCoefficient(ste_coeff);
    }
-   ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
@@ -751,11 +739,8 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
-   cout << "GridFunctions initiated.\n";
-
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
-   cout << "Solver created.\n";
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -1059,7 +1044,6 @@ int main(int argc, char *argv[]) {
          dt = hydro.GetTimestep();
       }
 
-
       if (t + dt >= t_final)
       {
          dt = t_final - t;
@@ -1080,15 +1064,6 @@ int main(int argc, char *argv[]) {
       }
       
       if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
-
-      // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
-      // data in S. This operation simply updates the Memory validity flags of
-      // the sub-vectors to match those of S.
-      x_gf.SyncAliasMemory(S);
-      mv_gf.SyncAliasMemory(S);
-      sv_gf.SyncAliasMemory(S);
-      v_gf.SyncAliasMemory(S);
-      ste_gf.SyncAliasMemory(S);
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -1447,13 +1422,8 @@ int main(int argc, char *argv[]) {
       ste_coeff.SetTime(t);
 
       sv_ex_gf.ProjectCoefficient(sv_coeff);
-      sv_ex_gf.SyncAliasMemory(S_exact);
-
       vel_ex_gf.ProjectCoefficient(v_coeff);
-      vel_ex_gf.SyncAliasMemory(S_exact);
-
       ste_ex_gf.ProjectCoefficient(ste_coeff);
-      ste_ex_gf.SyncAliasMemory(S_exact);
 
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;

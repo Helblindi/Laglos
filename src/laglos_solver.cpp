@@ -589,7 +589,8 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
                BdrVertexIndexingArray[index] = bdr_attr;
             }
          }
-         else if (pb->get_indicator() == "TriplePoint" || 
+         else if (pb->get_indicator() == "Sod" ||
+                  pb->get_indicator() == "TriplePoint" || 
                   pb->get_indicator() == "Sedov" || 
                   pb->get_indicator() == "SodRadial")
          {
@@ -643,7 +644,8 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
       assert(row.Size() == 1);
 
       if (cell_bdr_flag_gf[row[0]] != -1 && 
-          (pb->get_indicator() == "TriplePoint" || 
+          (pb->get_indicator() == "Sod" || 
+           pb->get_indicator() == "TriplePoint" || 
            pb->get_indicator() == "Sedov" || 
            pb->get_indicator() == "SodRadial"))
       {
@@ -790,7 +792,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityTNLSnoncart(S, dt);
                // ComputeAverageVelocities(S);
-               // EnforceMVBoundaryConditions(S,t,dt);
+               EnforceMVBoundaryConditions(S,t,dt);
                double val = ComputeIterationNorm(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
@@ -1114,25 +1116,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                normal = 0.;
                val.GetSubVector(tmp_dofs, tmp_vel);
 
-               if (pb->get_indicator() == "Sod" && dim > 1)
-               {
-                  if (cell_bdr == 1)
-                  {
-                     // bottom
-                     normal[1] = -1.;
-                  }
-                  else if (cell_bdr == 3)
-                  {
-                     // top
-                     normal[1] = 1.;
-                  }
-
-                  double coeff = tmp_vel * normal;
-                  normal *= coeff;
-                  subtract(tmp_vel, normal, tmp_vel);
-                  val.SetSubVector(tmp_dofs, tmp_vel);
-               }
-               else if (pb->get_indicator() == "saltzmann")
+               if (pb->get_indicator() == "saltzmann")
                {
                   if (cell_bdr == 1)
                   {
@@ -1172,7 +1156,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
 
                }
-               else if (pb->get_indicator() == "TriplePoint" || 
+               else if (pb->get_indicator() == "Sod" ||
+                        pb->get_indicator() == "TriplePoint" || 
                         pb->get_indicator() == "SodRadial" ||
                         pb->get_indicator() == "Sedov")
                {
@@ -1365,61 +1350,10 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
    //      << "========================================\n";
    assert(dim > 1);
 
-   if (pb->get_indicator() == "Sod")
-   {
-      int bdr_ind = 0;
-      Vector normal(dim), node_v(dim);
-      for (int i = 0; i < NVDofs_H1; i++)
-      {
-         bdr_ind = BdrVertexIndexingArray[i];
-         /* Get corresponding normal vector */
-         switch (bdr_ind)
-         {
-         case 1:
-            // bottom
-            normal[0] = 0., normal[1] = -1.;
-            break;
-         
-         case 2:
-            // right
-            normal[0] = 1., normal[1] = 0.;
-            continue;
-         
-         case 3:
-            // top
-            normal[0] = 0., normal[1] = 1.;
-            break;
-         
-         case 4:
-            // left
-            normal[0] = -1., normal[1] = 0.;
-            continue;
-         
-         case -1:
-            // Not a boundary vertex
-            continue;
-
-         default:
-            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
-            break;
-         }
-
-         if (bdr_ind == -1) 
-         {
-            MFEM_ABORT("Dont correct interior vertices.\n");
-         }
-         /* Correct node velocity accordingly */
-         GetNodeVelocity(S, i, node_v);
-
-         double coeff = node_v * normal;
-         node_v.Add(-coeff, normal);
-
-         UpdateNodeVelocity(S, i, node_v);
-      }
-   }
-   else if (pb->get_indicator() == "TriplePoint" ||
-            pb->get_indicator() == "Sedov" ||
-            pb->get_indicator() == "SodRadial")
+   if (pb->get_indicator() == "Sod" ||
+      pb->get_indicator() == "TriplePoint" ||
+      pb->get_indicator() == "Sedov" ||
+      pb->get_indicator() == "SodRadial")
    {
       int bdr_ind = 0;
       Vector normal(dim), node_v(dim);

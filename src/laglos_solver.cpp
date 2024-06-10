@@ -5703,7 +5703,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    // cout << "=====IterativeCornerVelocityTNLSnoncart=====\n";
    // Optional run time parameters
    bool do_theta_averaging = true;
-   double theta = 0.5;
+   double theta = 0.99; // Works best for distorted sod.
    Vector S_new = S;
 
    // Optionally weight the normal and thI ame tangent contributions
@@ -5805,7 +5805,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          tau_vec_half /= Fhalf;
          n_vec_half = tau_vec_half;
          Orthogonal(n_vec_half);
-         Fhalf = F;
 
          // Get normal and tangential components of Vadj_n
          Vadj_n_comp = Vadj_n * n_vec;
@@ -5851,12 +5850,12 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          temp_vec.Add(2./3., a3n);
          temp_vec.Add(F/3., tau_vec);
          temp_vec.Add(-1./2., Aadj);
-         temp_vec.Add(-1./6., aadj_n);
+         temp_vec.Add(-1./6., anode_n);
          double beta3 = Vadj_n * temp_vec;
          beta3 /= Fhalf;
 
-         double cn = alpha3 - Vf * n_vec;
-         double ctau = beta3 - Vf * tau_vec;
+         double cn = alpha3 - Vf * n_vec_half;
+         double ctau = beta3 - Vf * tau_vec_half;
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
@@ -5933,7 +5932,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             tau_vec_half /= Fhalf;
             n_vec_half = tau_vec_half;
             Orthogonal(n_vec_half);
-            Fhalf = F;
 
             // Compute geometrical vectors
             Bnode = 0.;
@@ -5975,12 +5973,12 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             temp_vec.Add(2./3., a3n);
             temp_vec.Add(F/3., tau_vec);
             temp_vec.Add(-1./2., Aadj);
-            temp_vec.Add(-1./6., aadj_n);
+            temp_vec.Add(-1./6., anode_n);
             double beta3 = Vadj_n * temp_vec;
             beta3 /= Fhalf;
 
-            double cn = alpha3 - Vf * n_vec;
-            double ctau = beta3 - Vf * tau_vec;
+            double cn = alpha3 - Vf * n_vec_half;
+            double ctau = beta3 - Vf * tau_vec_half;
 
             // Add contribution to the averaging objects
             tensor(n_vec, n_vec, dm_tmp);

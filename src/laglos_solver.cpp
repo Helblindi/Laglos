@@ -784,22 +784,21 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          if (this->use_corner_velocity_MC_iteration)
          {
             mv_gf_prev_it = mv_gf;
-            // double val = ComputeIterationNormLS(S,dt);
-            // cout << "0," << val << endl;
+
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
                IterativeCornerVelocityTNLSnoncart(S, dt);
                // ComputeAverageVelocities(S);
-               EnforceMVBoundaryConditions(S,t,dt);
-               double val = ComputeIterationNormTNLS(S,dt);
+               // EnforceMVBoundaryConditions(S,t,dt);
+               double val = ComputeIterationNorm(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
                cout << "val at iteration " << i << ": " << val << endl;
             }
          }
 
-         // EnforceMVBoundaryConditions(S,t,dt);
+         EnforceMVBoundaryConditions(S,t,dt);
 
          switch (fv_option)
          {
@@ -1383,6 +1382,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          
          case 2:
             // right
+            normal[0] = 1., normal[1] = 0.;
             continue;
          
          case 3:
@@ -1392,6 +1392,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          
          case 4:
             // left
+            normal[0] = -1., normal[1] = 0.;
             continue;
          
          case -1:
@@ -5309,18 +5310,21 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
 
 /****************************************************************************************************
-* Function: ComputeIterationNormLS
+* Function: ComputeIterationNorm
 * Parameters:
 *  S        - BlockVector representing FiniteElement information
 *  dt       - Current time step
 *
 * Purpose:
-* 
-*  NOTE: Interior faces. 
-*  
+*  Checks how well the iterative corner velocity methods are as converging
+*  the corner velocities.  Computes
+*                        | V_i^(k+1) - V_i^(k) |
+*                 SUM_i  -----------------------
+*                              | V_i^(k) |
+*  NOTE: Interior vertices. 
 ****************************************************************************************************/
 template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterationNormLS(Vector &S, const double & dt)
+double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double & dt)
 {
    Vector Vi_prev(dim), Vi_next(dim), temp_vec(dim);
    double numer = 0., denom = 0.;
@@ -5337,16 +5341,8 @@ double LagrangianLOOperator<dim>::ComputeIterationNormLS(Vector &S, const double
          GetNodeVelocity(mv_gf_prev_it, node, Vi_prev);
          subtract(Vi_next, Vi_prev, temp_vec);
          numer += temp_vec.Norml2();
-         denom += Vi_next.Norml2();
-         // if (temp_vec.Norml2() > 1.E-12)
-         // {
-         //    cout << "iter norm node " << node << ", v_prev: ";
-         //    Vi_prev.Print(cout);
-         //    cout << "Vi next: ";
-         //    Vi_next.Print(cout);
-         // }
+         denom += Vi_prev.Norml2();
       }
-      
    }
    return numer / denom;
 }
@@ -5776,9 +5772,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    double theta = 0.5;
    Vector S_new = S;
 
-   // Optionally weight the normal and the tangent contributions
-   double wn = .5;
-   double wt = .5;
+   // Optionally weight the normal and thI ame tangent contributions
+   double wn = 1.;
+   double wt = 1.;
 
    // Values needed during iteration
    Array<int> faces_row, face_dofs_row;
@@ -5805,7 +5801,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    Vector Ri(dim);
 
    /* Iterate over corner nodes */
-   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   for (int node = 0; node < NDofs_H1L; node++)
    {
       // Reset new nodal velocity, and averaging objects
       Mi = 0., Ri = 0.;
@@ -5820,9 +5816,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
       GetNodeVelocity(S, node, Vnode_n);
       GetNodePosition(S, node, anode_n);
 
-      // Compute An and an+1 for node
+      // Compute An for node
       add(anode_n, dt/2., Vnode_n, Anode);
-      // add(anode_n, dt, Vnode_n, anode_np1);
 
       // Get cell faces
       vertex_edge.GetRow(node, faces_row);
@@ -5860,16 +5855,15 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          GetNodePosition(S, Vadj_index, aadj_n);
          GetNodePosition(S, face_dof, a3n);
 
-         // Get tau vec
+         // Get n, tau, and F
          subtract(anode_n, aadj_n, tau_vec);
          F = tau_vec.Norml2();
          tau_vec /= F;
          n_vec = tau_vec;
          Orthogonal(n_vec);
 
-         // Compute future face and adjacent node locations
+         // Compute future adjacent node locations
          add(aadj_n, dt/2., Vadj_n, Aadj);
-         // add(aadj_n, dt, Vadj_n, aadj_np1);
 
          // Compute half
          subtract(Anode, Aadj, tau_vec_half);
@@ -5998,15 +5992,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             // and half location
             add(aadj_n, dt/2., Vadj_n, Aadj);
 
-            // Compute half
-            // cout << "ghost node at node " << node << ".\n";
-            // cout << "Anode: ";
-            // Anode.Print(cout);
-            // cout << "Aadj: ";
-            // Aadj.Print(cout);
-            // cout << "Vadj: ";
-            // Vadj_n.Print(cout);
-
+            /* Compute n, tau, F at half */
             subtract(Anode, Aadj, tau_vec_half);
             double Fhalf = tau_vec_half.Norml2();
             tau_vec_half /= Fhalf;
@@ -6074,12 +6060,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 
             Ri.Add(wn*alpha1*cn + wt*beta1*ctau, n_vec);
             Ri.Add(wn*alpha2*cn + wt*beta2*ctau, tau_vec);
-
-            // cout << "node: " << node << ", adj_node ghost: " << Vadj_index << endl;
-            // cout << "normal: ";
-            // n_vec.Print(cout);
-            // cout << "tan: ";
-            // tau_vec.Print(cout);
          } // End ghost node
       }
 
@@ -6104,50 +6084,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
       UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
-}
-
-
-/****************************************************************************************************
-* Function: ComputeIterationNormTNLS
-* Parameters:
-*  S        - BlockVector representing FiniteElement information
-*  dt       - Current time step
-*
-* Purpose:
-* 
-*  NOTE: Interior faces. 
-*  
-****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterationNormTNLS(Vector &S, const double & dt)
-{
-   Vector Vi_prev(dim), Vi_next(dim), temp_vec(dim);
-   double numer = 0., denom = 0.;
-   /* Iterate over corner nodes */
-   for (int node = 0; node < NDofs_H1L; node++)
-   { 
-      // Check if node is on boundary
-      int bdr_ind = BdrVertexIndexingArray[node];
-
-      if (bdr_ind == -1)
-      {
-         // Get updated iterated velocity and old velocity
-         GetNodeVelocity(S, node, Vi_next);
-         GetNodeVelocity(mv_gf_prev_it, node, Vi_prev);
-         subtract(Vi_next, Vi_prev, temp_vec);
-         numer += temp_vec.Norml2();
-         denom += Vi_next.Norml2();
-         // if (temp_vec.Norml2() > 1.E-12)
-         // {
-         //    cout << "iter norm node " << node << ", v_prev: ";
-         //    Vi_prev.Print(cout);
-         //    cout << "Vi next: ";
-         //    Vi_next.Print(cout);
-         // }
-      }
-      
-   }
-   return numer / denom;
 }
 
 

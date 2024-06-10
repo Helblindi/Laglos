@@ -5805,6 +5805,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          tau_vec_half /= Fhalf;
          n_vec_half = tau_vec_half;
          Orthogonal(n_vec_half);
+         Fhalf = F;
 
          // Get normal and tangential components of Vadj_n
          Vadj_n_comp = Vadj_n * n_vec;
@@ -5854,8 +5855,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          double beta3 = Vadj_n * temp_vec;
          beta3 /= Fhalf;
 
-         double cn = alpha3 - Vf * n_vec_half;
-         double ctau = beta3 - Vf * tau_vec_half;
+         double cn = alpha3 - Vf * n_vec;
+         double ctau = beta3 - Vf * tau_vec;
 
          // Add contribution to the averaging objects
          tensor(n_vec, n_vec, dm_tmp);
@@ -5932,6 +5933,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             tau_vec_half /= Fhalf;
             n_vec_half = tau_vec_half;
             Orthogonal(n_vec_half);
+            Fhalf = F;
 
             // Compute geometrical vectors
             Bnode = 0.;
@@ -5977,8 +5979,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             double beta3 = Vadj_n * temp_vec;
             beta3 /= Fhalf;
 
-            double cn = alpha3 - Vf * n_vec_half;
-            double ctau = beta3 - Vf * tau_vec_half;
+            double cn = alpha3 - Vf * n_vec;
+            double ctau = beta3 - Vf * tau_vec;
 
             // Add contribution to the averaging objects
             tensor(n_vec, n_vec, dm_tmp);

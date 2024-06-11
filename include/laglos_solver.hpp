@@ -239,6 +239,12 @@ public:
 
    // Iterative method using least squares
    void IterativeCornerVelocityLS(Vector &S, const double & dt);
+   double compute_alpha(const Vector &Vadj, const Vector &aadj, 
+                        const Vector &Vnode, const Vector &anode, 
+                        const Vector &V3n, const Vector &a3n, 
+                        const Vector &n_vec, const Vector &tau_vec,
+                        const double &dt, const double &F);
+   double ComputeIterativeLSGamma(Vector &S, const double & dt);
    double ComputeIterationNorm(Vector &S, const double & dt);
    double ComputeFaceSecantNorm(Vector &S, const double & dt);
 

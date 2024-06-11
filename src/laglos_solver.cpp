@@ -794,9 +794,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                IterativeCornerVelocityLS(S, dt);
                // ComputeAverageVelocities(S);
                double val = ComputeIterationNorm(S,dt);
+               // double val = ComputeIterativeLSGamma(S, dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
-               // cout << "val at iteration " << i << ": " << val << endl;
+               cout << "val at iteration " << i << ": " << val << endl;
             }
          }
 
@@ -817,8 +818,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             break;
          } // End face velocity switch case
       }
-      double _val = ComputeFaceSecantNorm(S,dt);
-      cout << "face secant norm: " << _val << endl;
+      // double _val = ComputeFaceSecantNorm(S,dt);
+      // cout << "face secant norm: " << _val << endl;
+      // double val = ComputeIterativeLSGamma(S, dt);
+      // cout << "Gamma: " << val << endl;
       
       FillCenterVelocitiesWithAvg(S);
    }
@@ -5215,6 +5218,153 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
       UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
+}
+
+
+/****************************************************************************************************
+* Function: compute_alpha
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::compute_alpha(const Vector &Vadj, const Vector &AadjR, 
+                                                const Vector &Vnode, const Vector &AnodeR, 
+                                                const Vector &V3n, const Vector &a3nR, 
+                                                const Vector &n_vec, const Vector &tau_vec,
+                                                const double &dt, const double &F)
+{
+   double ret_val = 0.;
+
+   Vector tmp_vec(dim);
+   double tmp1, tmp2, tmp3;
+   tmp1 = Vnode * AnodeR - Vadj * AadjR;
+   tmp2 = Vadj * AnodeR - Vnode * AadjR; 
+   subtract(Vadj, Vnode, tmp_vec); // Va - Vn
+   tmp3 = tmp_vec * a3nR;
+   ret_val = 0.5 * tmp1 - (1./6.) * tmp2 + (2./3.) * tmp3;
+
+   double tau_comp = tmp_vec * n_vec;
+   tau_comp *= 2. * dt / 3.;
+   double V3n_tau = V3n * tau_vec;
+   ret_val += tau_comp * V3n_tau;
+
+   tmp_vec *= -1; // Vn - Va
+   double n_comp = tmp_vec * tau_vec;
+   n_comp *= dt;
+   n_comp += F;
+   n_comp *= 2./3.;
+   double V3n_norm = V3n * n_vec;
+   ret_val += n_comp * V3n_norm;
+
+   return ret_val;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeIterativeLSGamma
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  dt       - Current time step
+*
+* Purpose:
+*  Compute object we are trying to minimize, to include viscosity.
+*  NOTE: Interior vertices. 
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const double & dt)
+{
+   double ret_val = 0.;
+   double vw = 1., wn = 1., wt = 0.;
+   Vector Vnode(dim), Vadj(dim), Vface(dim);
+   Vector anode(dim), aadj(dim), a3n(dim);
+   Vector AadjR(dim), AnodeR(dim), a3nR(dim);
+   Vector n_vec(dim), tau_vec(dim);
+   mfem::Mesh::FaceInformation FI;
+   Vector Vf(dim);
+   double bmn = 0., F = 0.;
+   Array<int> faces_row, face_dofs_row;
+
+   int Vadj_index;
+   /* Iterate over corner nodes */
+   for (int node = 0; node < NDofs_H1L; node++)
+   { 
+      // Check if node is on boundary
+      int bdr_ind = BdrVertexIndexingArray[node];
+
+      // Get current nodal velocity and position 
+      GetNodeVelocity(S, node, Vnode);
+      GetNodePosition(S, node, anode);
+
+      // Get cell faces
+      vertex_edge.GetRow(node, faces_row);
+      int faces_length = faces_row.Size();
+
+      if (bdr_ind == -1)
+      {
+         /* Iterate over cell faces */
+         for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+         {
+            // Get face information
+            int face = faces_row[face_it];
+            GetIntermediateFaceVelocity(face, Vf);
+            FI = pmesh->GetFaceInformation(face);
+
+            /* adjacent corner indices */
+            // preserve node orientation where cell to right 
+            // of face is with lower cell index
+            H1.GetFaceDofs(face, face_dofs_row);
+            int face_vdof1 = face_dofs_row[1], 
+               face_vdof2 = face_dofs_row[0], 
+               face_dof = face_dofs_row[2]; 
+
+            // Grab corresponding vertex velocity from S
+            // We are always solving for V2. 
+            // If the index for Vnode does not match that
+            // for V2, we must flip the normal.
+            if (node == face_vdof1) {
+               // Get adj index
+               Vadj_index = face_vdof2;
+            } else {
+               // Get adj index
+               Vadj_index = face_vdof1;
+               // Node matches v2
+            }
+
+            /* Get face and adj node velocity and position */
+            GetNodeVelocity(S, Vadj_index, Vadj);
+            // GetNodeVelocity(S, face_dof, Vface);
+            add(0.5, Vnode, 0.5, Vadj, Vface);
+            GetNodePosition(S, Vadj_index, aadj);
+            GetNodePosition(S, face_dof, a3n);
+
+            // Get n, tau, and F
+            subtract(anode, aadj, tau_vec);
+            F = tau_vec.Norml2();
+            tau_vec /= F;
+            n_vec = tau_vec;
+            Orthogonal(n_vec);
+
+            // Compute AadjR, AnodeR, a3nR
+            add(1., aadj, dt / 2., Vadj, AadjR);
+            Orthogonal(AadjR);
+            add(1., anode, dt/2., Vnode, AnodeR);
+            Orthogonal(AnodeR);
+            a3nR = a3n;
+            Orthogonal(a3nR);
+
+            double alpha = compute_alpha(Vadj, AadjR, Vnode, AnodeR, Vface, a3nR, n_vec, tau_vec, dt, F);
+
+            double Vnode_n = Vnode * n_vec;
+            double Vnode_t = Vnode * tau_vec;
+            double Vadj_n = Vadj * n_vec;
+            double Vadj_t = Vadj * tau_vec;
+            ret_val += pow(alpha - bmn, 2) + vw * pow(F,2) * (wn * pow(Vnode_n - Vadj_n, 2) + wt * pow(Vnode_t - Vadj_t, 2));
+         }
+      }
+   }
+
+   return ret_val;
 }
 
 

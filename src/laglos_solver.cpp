@@ -796,7 +796,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
                double val = ComputeIterationNorm(S,dt);
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
-               cout << "val at iteration " << i << ": " << val << endl;
+               // cout << "val at iteration " << i << ": " << val << endl;
             }
          }
 
@@ -817,6 +817,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             break;
          } // End face velocity switch case
       }
+      double _val = ComputeFaceSecantNorm(S,dt);
+      cout << "face secant norm: " << _val << endl;
       
       FillCenterVelocitiesWithAvg(S);
    }
@@ -5252,6 +5254,63 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double &
       }
    }
    return numer / denom;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeFaceSecantNorm
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  dt       - Current time step
+*
+* Purpose:
+*  Checks how close the corrective face velocity is to the average of the adjacent 
+*  corner node velocities.
+
+*  NOTE: Interior vertices. 
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double & D)
+{
+   double num = 0., denom = 0.;
+   int num_broken = 0, total_num = 0;
+   
+   /* Parameters needed for face velocity calculations */
+   mfem::Mesh::FaceInformation FI;
+   Vector Vdof1_n(dim), Vdof2_n(dim), Vface_n(dim), temp_vec(dim);
+   Array<int> row;
+
+   // Iterate over faces
+   for (int face = 0; face < num_faces; face++) // face iterator
+   {
+      FI = pmesh->GetFaceInformation(face);
+      if (FI.IsInterior())
+      {
+         /* adjacent corner indices */
+         H1.GetFaceDofs(face, row);
+         int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
+
+         // retrieve corner velocities
+         GetNodeVelocity(S, face_vdof1, Vdof1_n);
+         GetNodeVelocity(S, face_vdof2, Vdof2_n);
+         GetNodeVelocity(S, face_dof, Vface_n);
+
+         add(0.5, Vdof1_n, 0.5, Vdof2_n, temp_vec);
+         denom += temp_vec.Norml2();
+         temp_vec -= Vface_n;
+         double val = temp_vec.Norml2();
+         num += val;
+         if (val > 1e-12)
+         {
+            num_broken++;
+         }
+
+         total_num++;
+      }
+   }
+   double perc_broken = double(num_broken)/double(total_num);
+   // cout << "percentage of broken faces: " << perc_broken << endl;
+   return num / denom;
 }
 
 

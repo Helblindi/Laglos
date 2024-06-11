@@ -790,12 +790,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
-               IterativeCornerVelocityTNLSnoncart(S, dt);
+               // IterativeCornerVelocityTNLSnoncart(S, dt);
+               IterativeCornerVelocityLS(S, dt);
                // ComputeAverageVelocities(S);
                double val = ComputeIterationNorm(S,dt);
                mv_gf_prev_it = mv_gf;
-               cout << i << "," << val << endl;
-               // cout << "val at iteration " << i << ": " << val << endl;
+               // cout << i << "," << val << endl;
+               cout << "val at iteration " << i << ": " << val << endl;
             }
          }
 
@@ -4853,11 +4854,14 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 {
    // cout << "=====IterativeCornerVelocityLS=====\n";
    // Optional run time parameters
-   bool do_theta_averaging = true;
+   bool do_theta_averaging = false;
    double theta = 0.5;
-   Vector S_new = S;
+   bool _add_viscosity = true;
+   double visc_weight = 1.;
+   double visc_wn = 1., visc_wt = 0.;
 
    // Values needed during iteration
+   Vector S_new = S;
    Array<int> faces_row, face_dofs_row;
    int faces_length;
    mfem::Mesh::FaceInformation FI;
@@ -4867,7 +4871,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
 
    Vector predicted_node_v(dim), Vf(dim), Vnode_np1(dim), Vnode_prev_it(dim);
-   Vector n_int(dim), n_vec(dim), n_vec_R(dim);
+   Vector tau_vec(dim), n_int(dim), n_vec(dim), n_vec_R(dim);
    Vector Vnode_x(dim), Vadj_x(dim), face_x(dim);
    Vector Vnode_xnp1(dim), Vadj_xnp1(dim), face_xnp1(dim), a12_xnp1(dim);
    Vector Badj(dim), Bnode(dim);
@@ -4878,7 +4882,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
    double D = 0., c1 = 0., c0 = 0., V3nperp = 0., Dc1 = 0.;
 
    // Averaging
-   DenseMatrix Mi(dim), dm_tmp(dim);
+   DenseMatrix Mi(dim), dm_tmp(dim), dm_tmp2(dim);
    Vector Ri(dim);
 
    /* Iterate over corner nodes */
@@ -4913,13 +4917,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          GetIntermediateFaceVelocity(face, Vf);
          FI = pmesh->GetFaceInformation(face);
 
-         // Calculate outer normal
-         c = FI.element[0].index;
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
-         F = n_vec.Norml2();
-         n_vec /= F;
-
          /* adjacent corner indices */
          // preserve node orientation where cell to right 
          // of face is with lower cell index
@@ -4935,8 +4932,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          if (node == face_vdof1) {
             // Get adj index
             Vadj_index = face_vdof2;
-            // Flip normal vector
-            n_vec *= -1.;
          } else {
             // Get adj index
             Vadj_index = face_vdof1;
@@ -4949,25 +4944,12 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          GetNodePosition(S, Vadj_index, Vadj_x);
          GetNodePosition(S, face_dof, face_x);
 
-         // Check to make sure orientation is correct
-         // This part is mostly for assertion
-         Vector ttvec(dim);
-         subtract(Vnode_x, Vadj_x, ttvec);
-         Orthogonal(ttvec);
-         double _val = ttvec * n_vec;
-         // Vector should be pointing in same direction
-         if (_val < 1E-6)
-         {
-            cout << "interior analysis:\n";
-            cout << "node: " << node << endl;
-            cout << "nodex: ";
-            Vnode_x.Print();
-            cout << "Vadj_x: ";
-            Vadj_x.Print(cout);
-            cout << "nvec: ";
-            n_vec.Print(cout);
-            assert(false);
-         }
+         // Get n, tau, and F
+         subtract(Vnode_x, Vadj_x, tau_vec);
+         F = tau_vec.Norml2();
+         tau_vec /= F;
+         n_vec = tau_vec;
+         Orthogonal(n_vec);
 
          // Compute future face and adjacent node locations
          add(Vadj_x, dt/2., Vadj_n, Vadj_half);
@@ -5051,19 +5033,21 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          Mi.Add(Mcoeff, dm_tmp);
          Ri.Add(Rcoeff, n_vec);
 
-         // if (node == 99)
-         // {
-         //    cout << "node 99 it, face: " << face << endl;
-         //    cout << "nvec: ";
-         //    n_vec.Print(cout);
-         //    cout << "Mi: ";
-         //    Mi.Print(cout);
-         //    cout << "Ri: ";
-         //    Ri.Print(cout);
-         //    cout << "Mcoeff: " << Mcoeff << ", Rcoeff: " << Rcoeff << endl;
-         //    cout << "Vadj_n_comp: " << Vadj_n_comp << ", bmn: " << bmn << endl;
-         //    cout << "aFi: " << aFi << ", aFj: " << aFj << endl;
-         // }
+         /* Optionally, add viscosity to the system */
+         if (_add_viscosity)
+         {
+            // Add to Mi
+            double _w = 2 * visc_weight * pow(F, 2);
+            Mi.Add(_w * visc_wn, dm_tmp);
+            tensor(tau_vec, tau_vec, dm_tmp2);
+            Mi.Add(_w * visc_wt, dm_tmp2);
+
+            // Add to Ri
+            dm_tmp.Mult(Vadj_n, temp_vec);
+            dm_tmp2.Mult(Vadj_n, temp_vec_2);
+            Ri.Add(_w * visc_wn, temp_vec);
+            Ri.Add(_w * visc_wt, temp_vec_2);
+         }
 
          // In the case of boundary nodes, check if this is an interior face
          if (bdr_ind != -1 && FI.IsInterior())
@@ -5085,6 +5069,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             case 1: // bottom
             case 3: // top
                n_vec[0] *= -1.; // preserves orientation of face
+               tau_vec[1] *= -1.;
                face_dx[0] *= -1.;
                Vadj_dx[0] *= -1.;
                Vadj_n[1] *= -1.;
@@ -5094,6 +5079,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             case 2: // right
             case 4: // left
                n_vec[1] *= -1.; // preserves orientation of face
+               tau_vec[0] *= -1.;
                face_dx[1] *= -1.;
                Vadj_dx[1] *= -1.;
                Vadj_n[0] *= -1.;
@@ -5126,23 +5112,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             add(Vnode_x, Vadj_dx, Vadj_x);
             // and half location
             add(Vadj_x, dt/2., Vadj_n, Vadj_half);
-
-            Vector ttvec(dim);
-            subtract(Vnode_x, Vadj_x, ttvec);
-            Orthogonal(ttvec);
-            double _val = ttvec * n_vec;
-            if (_val < 1E-6)
-            {
-               cout << "boundary analysis:\n";
-               cout << "node: " << node << endl;
-               cout << "nodex: ";
-               Vnode_x.Print();
-               cout << "Vadj_x: ";
-               Vadj_x.Print(cout);
-               cout << "nvec: ";
-               n_vec.Print(cout);
-               assert(false);
-            }
 
             // Compute vector constants for ghost node
             Bnode = face_x;
@@ -5207,6 +5176,22 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
             Mi.Add(Mcoeff, dm_tmp);
             Ri.Add(Rcoeff, n_vec);
+
+            /* Optionally, add viscosity to the system */
+            if (_add_viscosity)
+            {
+               // Add to Mi
+               double _w = 2 * visc_weight * pow(F, 2);
+               Mi.Add(_w * visc_wn, dm_tmp);
+               tensor(tau_vec, tau_vec, dm_tmp2);
+               Mi.Add(_w * visc_wt, dm_tmp2);
+
+               // Add to Ri
+               dm_tmp.Mult(Vadj_n, temp_vec);
+               dm_tmp2.Mult(Vadj_n, temp_vec_2);
+               Ri.Add(_w * visc_wn, temp_vec);
+               Ri.Add(_w * visc_wt, temp_vec_2);
+            }
          } // End ghost node
       }
 
@@ -5220,17 +5205,6 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          predicted_node_v *= theta; 
          predicted_node_v.Add(1. - theta, Vnode_n);
       }
-
-      // if (node == 99)
-      // {
-      //    cout << "node: " << node << endl;
-      //    cout << "Mi inverse: ";
-      //    Mi.Print(cout);
-      //    cout << "Ri: ";
-      //    Ri.Print(cout);
-      //    cout << "predicted v: ";
-      //    predicted_node_v.Print(cout);
-      // }
 
       // Put velocity in S
       // Gauss-Seidel > Jacobi

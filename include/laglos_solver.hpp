@@ -242,7 +242,6 @@ public:
    double ComputeIterationNorm(Vector &S, const double & dt);
 
    // Iterative method using least squares (tangent and normal)
-   void IterativeCornerVelocityTNLS(Vector &S, const double & dt);
    void IterativeCornerVelocityTNLSnoncart(Vector &S, const double & dt);
 
    // Average Velocities

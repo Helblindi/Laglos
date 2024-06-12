@@ -790,8 +790,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
-               // IterativeCornerVelocityTNLSnoncart(S, dt);
-               IterativeCornerVelocityLS(S, dt);
+               IterativeCornerVelocityTNLSnoncart(S, dt);
+               // IterativeCornerVelocityLS(S, dt);
                // ComputeAverageVelocities(S);
                double val = ComputeIterationNorm(S,dt);
                // double val = ComputeIterativeLSGamma(S, dt);
@@ -1811,7 +1811,8 @@ void LagrangianLOOperator<dim>::
    
    mfem::Mesh::FaceInformation FI;
    int c, cp;
-   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim), Vf(dim), Vf_flux(dim); 
+   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), Vf(dim), Vf_flux(dim); 
+   Vector n_vec(dim), tau_vec(dim);
    double d, c_norm, F;
 
    Array<int> row;
@@ -1833,6 +1834,9 @@ void LagrangianLOOperator<dim>::
          n_vec = n_int;
          F = n_vec.Norml2();
          n_vec /= F;
+         tau_vec = n_vec;
+         Orthogonal(tau_vec);
+         tau_vec *= -1.;
          assert(1. - n_vec.Norml2() < 1e-12);
 
          if (FI.IsInterior())
@@ -1854,6 +1858,7 @@ void LagrangianLOOperator<dim>::
                // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
                Vf.Add(coeff, n_vec);
+               Vf.Add(coeff, tau_vec);
 
                // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
                // {
@@ -5492,10 +5497,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    // cout << "=====IterativeCornerVelocityTNLSnoncart=====\n";
    // Optional run time parameters
    bool do_theta_averaging = true;
-   double theta = 0.99; // Works best for distorted sod.
+   double theta = 0.5; // Works best for distorted sod.
    Vector S_new = S;
 
-   // Optionally weight the normal and thI ame tangent contributions
+   // Optionally weight the normal and the tangent contributions
    double wn = 1.;
    double wt = 1.;
 

@@ -1784,6 +1784,29 @@ void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
 
 
 /****************************************************************************************************
+* Function: Perpendicular
+* Parameters:
+*     v - Vector to be rotated
+*
+* Purpose:
+*     Rotate a vector clockwise of angle pi/2.
+*
+* Example:
+*  (1,0) ---> (0,-1)
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::Perpendicular(Vector &v)
+{
+   if (dim == 2)
+   {
+      double x = v(0), y = v(1);
+      v(0) = y;
+      v(1) = -1. * x;
+   }
+}
+
+
+/****************************************************************************************************
 * Function: ComputeIntermediateFaceVelocities
 * Parameters:
 *  S        - BlockVector representing FiniteElement information
@@ -5812,6 +5835,95 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
       UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
+}
+
+
+/****************************************************************************************************
+* Function: IterativeCornerVelocityLSCellVolume
+* Parameters:
+*  S    - BlockVector corresponding to nth timestep that stores mesh information, 
+*         mesh velocity, and state variables.
+*  dt   - Current timestep size
+*
+* Purpose:
+*  This function constitutes one iteration on the previously computed corner node 
+*  velocity to reduce total face motion while still preserving mass conservation.
+*  The idea is to minimize the local change in mass for each adjacent cell to a 
+*  given vertex, with some optional viscosity defined on all the adjacent faces.
+*
+*  This method was initially discussed on 06/12/2024.
+*
+*  Note: This function relies on the mesh velocities having already been computed
+*  and possibly linearized.  One can use whichever mesh velocity computation before 
+*  iteration.
+*  Note: This function will modify mv_gf in the BlockVector S
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, const double &dt)
+{
+   // cout << "=====IterativeCornerVelocityLSCellVolume=====\n";
+   /* Optional run time parameters */
+   bool do_theta_averaging = true;
+   double theta = 0.5;
+   bool _add_viscosity = true;
+   double vw = 1.;
+
+   /* Objects needed for function */
+   Vector S_new = S;
+   Vector predicted_node_v(dim);
+   Vector anode_n(dim), al1_n(dim), al2_n(dim), al3_n(dim);
+   Vector Vl1(dim), Vl2(dim), Vl3(dim);
+   Vector al1_np1(dim), al2_np1(dim), al3_np1(dim);
+
+   Array<int> faces_row, faces_dofs_row, cells_row;
+   int faces_length, cells_length;
+   int bdr_ind;
+
+   DenseMatrix Mi(dim);
+   Vector Ri(dim);
+
+   /* Iterate over interior nodes */
+   for (int node = 0; node < NDofs_H1L; node++)
+   {
+      /* Reset values for new node */
+      Mi = 0., Ri = 0., predicted_node_v = 0.;
+
+      /* bdr_ind = -1 for interior nodes */
+      bdr_ind = BdrVertexIndexingArray[node];
+
+      /* Get adjacent cells and faces */
+      vertex_element->GetRow(node, cells_row);
+      vertex_edge.GetRow(node, faces_row);
+      cells_length = cells_row.Size();
+      faces_length = faces_row.Size();
+
+      /* Get nodal position */
+      GetNodePosition(S, node, anode_n);
+
+      /* Iterate over adjacent cells */ 
+      for (int cell_it = 0; cell_it < cells_length; cell_it++)
+      {
+         /* Get remaining node locations and velocities */
+
+         /* Compute nodal locations at next time step */
+
+         /* Compute Bj, c, and b vector */
+
+         /* Add contribution to Mi and Ri */
+      }
+
+      /* Iterate over adjacent faces */
+      for (int face_it = 0; face_it < faces_length; face_it++)
+      {
+         /* Get face normal and adjacent velocity */
+
+         /* Add contribution to Mi and Ri */
+      }
+
+      /* Solve for Vnode */
+
+   }
+   
 }
 
 

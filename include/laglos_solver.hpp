@@ -167,6 +167,7 @@ public:
    /* cij comp */
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
    void Orthogonal(Vector &v);
+   void Perpendicular(Vector &v);
 
    /* Mesh movement */
    void SetMVOption(const int & option);
@@ -250,6 +251,10 @@ public:
 
    // Iterative method using least squares (tangent and normal)
    void IterativeCornerVelocityTNLSnoncart(Vector &S, const double & dt);
+
+   // Iterative method to compute the corner velocities using Least Squares
+   // that minimizes the change in mass, plus some optional viscosity
+   void IterativeCornerVelocityLSCellVolume(Vector &S, const double &dt);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

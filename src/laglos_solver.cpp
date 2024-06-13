@@ -105,7 +105,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf_fluxes(&CR),
    v_geo_gf(&H1_L),
    cell_bdr_flag_gf(&L2),
-   mv_gf_prev_it(&h1),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -682,17 +681,22 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
    //      << "             MakeTimeStep               \n"
    //      << "========================================\n";
    // chrono_mm.Start();
-   ComputeMeshVelocities(S, t, dt);
-   // chrono_mm.Stop();
+   ParGridFunction x_gf, mv_gf;
+
+   // Get sv from current timestep before update
+   // This value is used to move the mesh and we want to ensure it remains unchanged.
+   Vector S_old = S;
 
    // Update state variables contained in S_new
    // chrono_state.Start();
    ComputeStateUpdate(S, t, dt);
    // chrono_state.Stop();
 
+   ComputeMeshVelocities(S, S_old, t, dt);
+   // chrono_mm.Stop();
+
    // Move the mesh
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction x_gf, mv_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
@@ -723,7 +727,8 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, double
 *     Determine the velocity with which to move the mesh.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t, double &dt)
+void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S_old, 
+                                                      const double &t, double &dt)
 {
    // cout << "========================================\n"
    //      << "         ComputeMeshVelocities          \n"
@@ -732,12 +737,12 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
    /* Set mesh velocity for the previous iteration before we make 
    any modifications to the mesh velocity object contained in S */
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf;
+   ParGridFunction mv_gf, mv_gf_prev_it;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
    if (mm)
    {
-      ComputeIntermediateFaceVelocities(S, t);
+      ComputeIntermediateFaceVelocities(S_old, t);
       
       if (dim == 1)
       {
@@ -786,18 +791,21 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const double &t
          if (this->use_corner_velocity_MC_iteration)
          {
             mv_gf_prev_it = mv_gf;
+            double loss = ComputeCellVolumeNorm(S, S_old, dt);
+            cout << "starting mass loss at iteration: " << loss << endl;
 
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
-               IterativeCornerVelocityTNLSnoncart(S, dt);
+               // IterativeCornerVelocityTNLSnoncart(S, dt);
                // IterativeCornerVelocityLS(S, dt);
+               IterativeCornerVelocityLSCellVolume(S, S_old, dt);
                // ComputeAverageVelocities(S);
-               double val = ComputeIterationNorm(S,dt);
-               // double val = ComputeIterativeLSGamma(S, dt);
+               // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
+               loss = ComputeCellVolumeNorm(S, S_old, dt);
+               cout << "val at iteration " << i << ": " << loss << endl;
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
-               cout << "val at iteration " << i << ": " << val << endl;
             }
          }
 
@@ -5399,8 +5407,9 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
 /****************************************************************************************************
 * Function: ComputeIterationNorm
 * Parameters:
-*  S        - BlockVector representing FiniteElement information
-*  dt       - Current time step
+*  S             - BlockVector representing FiniteElement information
+*  mv_gf_prev_it - mesh velocity grid function from the previous iteration 
+*  dt            - Current time step
 *
 * Purpose:
 *  Checks how well the iterative corner velocity methods are as converging
@@ -5411,7 +5420,7 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
 *  NOTE: Interior vertices. 
 ****************************************************************************************************/
 template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterationNorm(Vector &S, const double & dt)
+double LagrangianLOOperator<dim>::ComputeIterationNorm(const Vector &S, const ParGridFunction &mv_gf_prev_it, const double & dt)
 {
    Vector Vi_prev(dim), Vi_next(dim), temp_vec(dim);
    double numer = 0., denom = 0.;
@@ -5857,9 +5866,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 *  and possibly linearized.  One can use whichever mesh velocity computation before 
 *  iteration.
 *  Note: This function will modify mv_gf in the BlockVector S
+*  Note: This function assumes ComputeStateUpdate has been run.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, const double &dt)
+void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolume=====\n";
    /* Optional run time parameters */
@@ -5869,17 +5879,26 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, c
    double vw = 1.;
 
    /* Objects needed for function */
+   Vector* sptr_old = const_cast<Vector*>(&S_old);
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction sv_gf, sv_old_gf;
+   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+
    Vector S_new = S;
    Vector predicted_node_v(dim);
    Vector anode_n(dim), al1_n(dim), al2_n(dim), al3_n(dim);
-   Vector Vl1(dim), Vl2(dim), Vl3(dim);
+   Vector Vnode_n(dim), Vl1(dim), Vl2(dim), Vl3(dim);
    Vector al1_np1(dim), al2_np1(dim), al3_np1(dim);
+   Vector temp_vec(dim), temp_vec2(dim), bj_vec(dim);
 
-   Array<int> faces_row, faces_dofs_row, cells_row;
+   double Bj, cj;
+
+   Array<int> faces_row, faces_dofs_row, cells_row, verts;
    int faces_length, cells_length;
    int bdr_ind;
 
-   DenseMatrix Mi(dim);
+   DenseMatrix Mi(dim), dm_temp(dim);
    Vector Ri(dim);
 
    /* Iterate over interior nodes */
@@ -5890,40 +5909,235 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, c
 
       /* bdr_ind = -1 for interior nodes */
       bdr_ind = BdrVertexIndexingArray[node];
+      // cout << "dt: " << dt << ", node: " << node << ", bdr_ind: " << bdr_ind << endl;
 
-      /* Get adjacent cells and faces */
-      vertex_element->GetRow(node, cells_row);
-      vertex_edge.GetRow(node, faces_row);
-      cells_length = cells_row.Size();
-      faces_length = faces_row.Size();
-
-      /* Get nodal position */
-      GetNodePosition(S, node, anode_n);
-
-      /* Iterate over adjacent cells */ 
-      for (int cell_it = 0; cell_it < cells_length; cell_it++)
+      if (bdr_ind == -1)
       {
-         /* Get remaining node locations and velocities */
+         /* Get adjacent cells and faces */
+         vertex_element->GetRow(node, cells_row);
+         vertex_edge.GetRow(node, faces_row);
+         cells_length = cells_row.Size();
+         faces_length = faces_row.Size();
 
-         /* Compute nodal locations at next time step */
+         /* Get nodal position */
+         GetNodePosition(S, node, anode_n);
+         GetNodeVelocity(S, node, Vnode_n);
 
-         /* Compute Bj, c, and b vector */
+         /* Iterate over adjacent cells */ 
+         for (int cell_it = 0; cell_it < cells_length; cell_it++)
+         {
+            int el_index = cells_row[cell_it];
+            // cout << "cell: " << el_index << endl;
+            // cout << "cell: " << el_index << endl;
+            /* Get remaining node locations and velocities */
+            pmesh->GetElementVertices(el_index, verts);
+            int verts_length = verts.Size();
+            int node_index = verts.Find(node);
+            int l2_vi = verts[(node_index + 1) % verts_length],
+               l3_vi = verts[(node_index + 2) % verts_length],
+               l1_vi = verts[(node_index + 3) % verts_length];
 
-         /* Add contribution to Mi and Ri */
-      }
+            GetNodePosition(S, l1_vi, al1_n);
+            GetNodePosition(S, l2_vi, al2_n);
+            GetNodePosition(S, l3_vi, al3_n);
 
-      /* Iterate over adjacent faces */
-      for (int face_it = 0; face_it < faces_length; face_it++)
+            GetNodeVelocity(S, l1_vi, Vl1);
+            GetNodeVelocity(S, l2_vi, Vl2);
+            GetNodeVelocity(S, l3_vi, Vl3);
+            
+            // cout << "cell: " << el_index << ", node: " << node << ", index: " << node_index << endl;
+            // cout << "\tl1_i: " << l1_vi << endl;
+            // cout << "\tl2_i: " << l2_vi << endl;
+            // cout << "\tl3_i: " << l3_vi << endl;
+
+            /* Compute nodal locations at next time step */
+            add(1., al1_n, dt, Vl1, al1_np1);
+            add(1., al2_n, dt, Vl2, al2_np1);
+            add(1., al3_n, dt, Vl3, al3_np1);
+
+            /* Compute Bj, c, and b vector */
+            // Bj
+            // cout << "Elem: " << el_index << endl;
+            // cout << "Vol: " << pmesh->GetElementVolume(el_index);
+            // cout << ", old sv: " << sv_old_gf.Elem(el_index);
+            // cout << ", new sv: " << sv_gf.Elem(el_index) << endl;
+            Bj = sv_gf.Elem(el_index) * pmesh->GetElementVolume(el_index) / sv_old_gf.Elem(el_index);
+
+            // c and bvec
+            subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
+            Perpendicular(temp_vec);
+            subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
+
+            // cout << "al1_n: ";
+            // al1_n.Print(cout);
+            // cout << "Vl1: ";
+            // Vl1.Print(cout);
+            // cout << "al1_np1: ";
+            // al1_np1.Print(cout);
+
+            // cout << "al2_n: ";
+            // al2_n.Print(cout);
+            // cout << "Vl2: ";
+            // Vl2.Print(cout);
+            // cout << "al2_np1: ";
+            // al2_np1.Print(cout);
+
+            // cout << "(al2_np1 - al1_np1)^perp: ";
+            // temp_vec.Print(cout);
+         
+            cj = temp_vec * temp_vec2;
+            cj *= 0.5;
+
+            bj_vec = temp_vec;
+            bj_vec *= dt / 2.;
+
+            /* Add contribution to Mi and Ri */
+            tensor(bj_vec, bj_vec, dm_temp);
+            Mi.Add(1., dm_temp);
+
+            Ri.Add(Bj - cj, bj_vec);
+         } // End adjacent cells
+
+         /* Iterate over adjacent faces */
+         // for (int face_it = 0; face_it < faces_length; face_it++)
+         // {
+         //    /* Get face normal and adjacent velocity */
+
+         //    /* Add contribution to Mi and Ri */
+         // }
+
+         /* Solve for Vnode */
+         // cout << "Mi for node: " << node << endl;
+         // Mi.Print(cout);
+         Mi.Invert();
+         Mi.Mult(Ri, predicted_node_v);
+
+         /* Theta average with previous velocity */
+         if (do_theta_averaging)
+         {
+            predicted_node_v *= theta; 
+            predicted_node_v.Add(1. - theta, Vnode_n);
+         }
+
+         // Put velocity in S
+         // Gauss-Seidel > Jacobi
+         // UpdateNodeVelocity(S, node, predicted_node_v);
+         // Try Jacobi
+         UpdateNodeVelocity(S_new, node, predicted_node_v);
+      } // End interior node
+
+   } // End node iterator
+   S = S_new;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeCellVolume
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  cell     - Cell to comput volume at
+*
+* Purpose: 
+*  To compute the volume of a given cell according to Despres paper.  This is a Q1
+*  computation and assumes the faces do not move for conservation.
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &cell)
+{
+   Array<int> verts;
+   switch (dim)
+   {
+      case 1:
       {
-         /* Get face normal and adjacent velocity */
-
-         /* Add contribution to Mi and Ri */
+         MFEM_ABORT("Dimension 1 not implemented.\n");
+         return 0.;
       }
+      case 2:
+      {
+         // Get element nodes and positions
+         pmesh->GetElementVertices(cell, verts);
+         int verts_length = verts.Size();
+         Vector a0(dim), a1(dim), a2(dim), a3(dim);
+         GetNodePosition(S, verts[0], a0);
+         GetNodePosition(S, verts[1], a1);
+         GetNodePosition(S, verts[2], a2);
+         GetNodePosition(S, verts[3], a3);
 
-      /* Solve for Vnode */
-
+         // Compute area of square
+         Vector temp_vec1(dim), temp_vec2(dim);
+         subtract(a3, a1, temp_vec1);
+         Perpendicular(temp_vec1);
+         subtract(a2, a0, temp_vec2);
+         double area = temp_vec1 * temp_vec2;
+         area *= 0.5;
+         return area;
+      }
+      case 3:
+      {
+         MFEM_ABORT("Dimension 3 not implemented.\n");
+         return 0.;
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid dimension value provided.\n");
+         return 0.;
+      }
    }
+}
+
+
+/****************************************************************************************************
+* Function: ComputeAverageVelocities
+* Parameters:
+*  S        - BlockVector representing FiniteElement information at tn+1
+*  S_old    - BlockVector representing FiniteElement information at tn
+*  dt       - Timestep
+*
+* Purpose: 
+* 
+*  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
+****************************************************************************************************/
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
+{
+   Vector* sptr_old = const_cast<Vector*>(&S_old);
+
+   ParGridFunction sv_gf, sv_old_gf, x_gf, mv_gf;
+   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+
+   // Move vertices of S_temp to compute cell volume norm
+   Vector S_temp = S;
+   Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
+   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
+   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[2]);
+   add(x_gf, dt, mv_gf, x_gf);
+
+   double num = 0., denom = 0.;
+
+   // Sum over all cells
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      {
+         // Skip boundary cells
+         continue;
+      }
+
+      double Kn = ComputeCellVolume(S_old, ci);
+      double Knp1 = ComputeCellVolume(S_temp, ci);
+      double Tn = sv_old_gf.Elem(ci);
+      double Tnp1 = sv_gf.Elem(ci);
+
+      double tmp_val = pow((Kn / Tn) - (Knp1 / Tnp1), 2);
+      num += tmp_val;
+      denom += pow(Kn / Tn, 2);
+   }
+
+
+   // Add viscosity 
    
+   return num / denom;
 }
 
 

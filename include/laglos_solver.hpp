@@ -57,9 +57,7 @@ protected:
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    ParGridFunction cell_bdr_flag_gf;  // Element indexing vector
-   // Stores mesh velocities from the previous iteration
-   // This object is used in IterativeCornerVelocityMC() function
-   ParGridFunction mv_gf_prev_it;     
+   // Stores mesh velocities from the previous iteration 
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *pmesh;
@@ -209,7 +207,7 @@ public:
    void FillCenterVelocitiesWithAvg(Vector &S);
 
    // Compute mesh velocities
-   void ComputeMeshVelocities(Vector &S, const double &t, double &dt);
+   void ComputeMeshVelocities(Vector &S, const Vector &S_old, const double &t, double &dt);
 
    // Check Jacobians to ensure mesh hasn't collapsed
    bool IsMeshCollapsed();
@@ -246,7 +244,7 @@ public:
                         const Vector &n_vec, const Vector &tau_vec,
                         const double &dt, const double &F);
    double ComputeIterativeLSGamma(Vector &S, const double & dt);
-   double ComputeIterationNorm(Vector &S, const double & dt);
+   double ComputeIterationNorm(const Vector &S, const ParGridFunction &mv_gf_prev_it, const double & dt);
    double ComputeFaceSecantNorm(Vector &S, const double & dt);
 
    // Iterative method using least squares (tangent and normal)
@@ -254,7 +252,9 @@ public:
 
    // Iterative method to compute the corner velocities using Least Squares
    // that minimizes the change in mass, plus some optional viscosity
-   void IterativeCornerVelocityLSCellVolume(Vector &S, const double &dt);
+   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt);
+   double ComputeCellVolume(const Vector &S, const int &cell);
+   double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

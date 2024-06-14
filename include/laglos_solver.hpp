@@ -252,9 +252,9 @@ public:
 
    // Iterative method to compute the corner velocities using Least Squares
    // that minimizes the change in mass, plus some optional viscosity
-   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt);
+   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt, double mm_vsc = 0);
    double ComputeCellVolume(const Vector &S, const int &cell);
-   double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
+   double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt, double mm_visc = 0.);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

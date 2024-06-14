@@ -5914,156 +5914,156 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, c
       bdr_ind = BdrVertexIndexingArray[node];
       // cout << "dt: " << dt << ", node: " << node << ", bdr_ind: " << bdr_ind << endl;
 
-      if (bdr_ind == -1)
+      // if (bdr_ind == -1)
+      // {
+      /* Get adjacent cells and faces */
+      vertex_element->GetRow(node, cells_row);
+      vertex_edge.GetRow(node, faces_row);
+      cells_length = cells_row.Size();
+      faces_length = faces_row.Size();
+
+      /* Get nodal position */
+      GetNodePosition(S, node, anode_n);
+      GetNodeVelocity(S, node, Vnode_n);
+
+      /* Iterate over adjacent cells */ 
+      for (int cell_it = 0; cell_it < cells_length; cell_it++)
       {
-         /* Get adjacent cells and faces */
-         vertex_element->GetRow(node, cells_row);
-         vertex_edge.GetRow(node, faces_row);
-         cells_length = cells_row.Size();
-         faces_length = faces_row.Size();
+         int el_index = cells_row[cell_it];
+         // cout << "cell: " << el_index << endl;
+         // cout << "cell: " << el_index << endl;
+         /* Get remaining node locations and velocities */
+         pmesh->GetElementVertices(el_index, verts);
+         int verts_length = verts.Size();
+         int node_index = verts.Find(node);
+         int l2_vi = verts[(node_index + 1) % verts_length],
+            l3_vi = verts[(node_index + 2) % verts_length],
+            l1_vi = verts[(node_index + 3) % verts_length];
 
-         /* Get nodal position */
-         GetNodePosition(S, node, anode_n);
-         GetNodeVelocity(S, node, Vnode_n);
+         GetNodePosition(S, l1_vi, al1_n);
+         GetNodePosition(S, l2_vi, al2_n);
+         GetNodePosition(S, l3_vi, al3_n);
 
-         /* Iterate over adjacent cells */ 
-         for (int cell_it = 0; cell_it < cells_length; cell_it++)
-         {
-            int el_index = cells_row[cell_it];
-            // cout << "cell: " << el_index << endl;
-            // cout << "cell: " << el_index << endl;
-            /* Get remaining node locations and velocities */
-            pmesh->GetElementVertices(el_index, verts);
-            int verts_length = verts.Size();
-            int node_index = verts.Find(node);
-            int l2_vi = verts[(node_index + 1) % verts_length],
-               l3_vi = verts[(node_index + 2) % verts_length],
-               l1_vi = verts[(node_index + 3) % verts_length];
-
-            GetNodePosition(S, l1_vi, al1_n);
-            GetNodePosition(S, l2_vi, al2_n);
-            GetNodePosition(S, l3_vi, al3_n);
-
-            GetNodeVelocity(S, l1_vi, Vl1);
-            GetNodeVelocity(S, l2_vi, Vl2);
-            GetNodeVelocity(S, l3_vi, Vl3);
-            
-            // cout << "cell: " << el_index << ", node: " << node << ", index: " << node_index << endl;
-            // cout << "\tl1_i: " << l1_vi << endl;
-            // cout << "\tl2_i: " << l2_vi << endl;
-            // cout << "\tl3_i: " << l3_vi << endl;
-
-            /* Compute nodal locations at next time step */
-            add(1., al1_n, dt, Vl1, al1_np1);
-            add(1., al2_n, dt, Vl2, al2_np1);
-            add(1., al3_n, dt, Vl3, al3_np1);
-
-            /* Compute Bj, c, and b vector */
-            // Bj
-            // cout << "Elem: " << el_index << endl;
-            // cout << "Vol: " << pmesh->GetElementVolume(el_index);
-            // cout << ", old sv: " << sv_old_gf.Elem(el_index);
-            // cout << ", new sv: " << sv_gf.Elem(el_index) << endl;
-            Bj = sv_gf.Elem(el_index) * pmesh->GetElementVolume(el_index) / sv_old_gf.Elem(el_index);
-
-            // c and bvec
-            subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
-            Perpendicular(temp_vec);
-            subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
-
-            // cout << "al1_n: ";
-            // al1_n.Print(cout);
-            // cout << "Vl1: ";
-            // Vl1.Print(cout);
-            // cout << "al1_np1: ";
-            // al1_np1.Print(cout);
-
-            // cout << "al2_n: ";
-            // al2_n.Print(cout);
-            // cout << "Vl2: ";
-            // Vl2.Print(cout);
-            // cout << "al2_np1: ";
-            // al2_np1.Print(cout);
-
-            // cout << "(al2_np1 - al1_np1)^perp: ";
-            // temp_vec.Print(cout);
+         GetNodeVelocity(S, l1_vi, Vl1);
+         GetNodeVelocity(S, l2_vi, Vl2);
+         GetNodeVelocity(S, l3_vi, Vl3);
          
-            cj = temp_vec * temp_vec2;
-            cj *= 0.5;
+         // cout << "cell: " << el_index << ", node: " << node << ", index: " << node_index << endl;
+         // cout << "\tl1_i: " << l1_vi << endl;
+         // cout << "\tl2_i: " << l2_vi << endl;
+         // cout << "\tl3_i: " << l3_vi << endl;
 
-            bj_vec = temp_vec;
-            bj_vec *= dt / 2.;
+         /* Compute nodal locations at next time step */
+         add(1., al1_n, dt, Vl1, al1_np1);
+         add(1., al2_n, dt, Vl2, al2_np1);
+         add(1., al3_n, dt, Vl3, al3_np1);
 
-            /* Add contribution to Mi and Ri */
-            tensor(bj_vec, bj_vec, dm_temp);
-            Mi.Add(1., dm_temp);
+         /* Compute Bj, c, and b vector */
+         // Bj
+         // cout << "Elem: " << el_index << endl;
+         // cout << "Vol: " << pmesh->GetElementVolume(el_index);
+         // cout << ", old sv: " << sv_old_gf.Elem(el_index);
+         // cout << ", new sv: " << sv_gf.Elem(el_index) << endl;
+         Bj = sv_gf.Elem(el_index) * pmesh->GetElementVolume(el_index) / sv_old_gf.Elem(el_index);
 
-            Ri.Add(Bj - cj, bj_vec);
-         } // End adjacent cells
+         // c and bvec
+         subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
+         Perpendicular(temp_vec);
+         subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
 
-         if (mm_visc != 0.)
+         // cout << "al1_n: ";
+         // al1_n.Print(cout);
+         // cout << "Vl1: ";
+         // Vl1.Print(cout);
+         // cout << "al1_np1: ";
+         // al1_np1.Print(cout);
+
+         // cout << "al2_n: ";
+         // al2_n.Print(cout);
+         // cout << "Vl2: ";
+         // Vl2.Print(cout);
+         // cout << "al2_np1: ";
+         // al2_np1.Print(cout);
+
+         // cout << "(al2_np1 - al1_np1)^perp: ";
+         // temp_vec.Print(cout);
+      
+         cj = temp_vec * temp_vec2;
+         cj *= 0.5;
+
+         bj_vec = temp_vec;
+         bj_vec *= dt / 2.;
+
+         /* Add contribution to Mi and Ri */
+         tensor(bj_vec, bj_vec, dm_temp);
+         Mi.Add(1., dm_temp);
+
+         Ri.Add(Bj - cj, bj_vec);
+      } // End adjacent cells
+
+      if (mm_visc != 0.)
+      {
+         visc_contr = 0.;
+         visci_vec = 0.;
+         /* Iterate over adjacent faces */
+         for (int face_it = 0; face_it < faces_length; face_it++)
          {
-            visc_contr = 0.;
-            visci_vec = 0.;
-            /* Iterate over adjacent faces */
-            for (int face_it = 0; face_it < faces_length; face_it++)
-            {
-               int face = faces_row[face_it];
-               /* Get face normal and adjacent velocity */
-               FI = pmesh->GetFaceInformation(face);
+            int face = faces_row[face_it];
+            /* Get face normal and adjacent velocity */
+            FI = pmesh->GetFaceInformation(face);
 
-               H1.GetFaceDofs(face, face_dofs_row);
-               int face_vdof1 = face_dofs_row[1],
-                  face_vdof2 = face_dofs_row[0],
-                  face_dof = face_dofs_row[2];
+            H1.GetFaceDofs(face, face_dofs_row);
+            int face_vdof1 = face_dofs_row[1],
+               face_vdof2 = face_dofs_row[0],
+               face_dof = face_dofs_row[2];
 
-               // Grab corresponding vertex velocity from S
-               if (node == face_vdof1) {
-                  // Get adj index
-                  Vadj_index = face_vdof2;
-               } else {
-                  // Get adj index
-                  Vadj_index = face_vdof1;
-               }
-               GetNodePosition(S, Vadj_index, aadj_n);
-               GetNodeVelocity(S, Vadj_index, Vadj_n);
-
-               // Compute F
-               subtract(anode_n, aadj_n, temp_vec);
-               double F = temp_vec.Norml2();
-               double F2 = pow(F,2);
-
-               /* Collect contibution from viscosity */
-               visc_contr += F2;
-               visci_vec.Add(F2, Vadj_n);
-            } // End adjacent faces iteration
-            // Add contribution from viscosity to Mi and Ri
-            for (int i = 0; i < dim; i++)
-            {
-               Mi.Elem(i,i) += visc_contr * mm_visc * pow(dt,2);
+            // Grab corresponding vertex velocity from S
+            if (node == face_vdof1) {
+               // Get adj index
+               Vadj_index = face_vdof2;
+            } else {
+               // Get adj index
+               Vadj_index = face_vdof1;
             }
-            Ri.Add(mm_visc*pow(dt,2), visci_vec);
-         } // End add viscosity
+            GetNodePosition(S, Vadj_index, aadj_n);
+            GetNodeVelocity(S, Vadj_index, Vadj_n);
 
-         /* Solve for Vnode */
-         // cout << "Mi for node: " << node << endl;
-         // Mi.Print(cout);
-         Mi.Invert();
-         Mi.Mult(Ri, predicted_node_v);
+            // Compute F
+            subtract(anode_n, aadj_n, temp_vec);
+            double F = temp_vec.Norml2();
+            double F2 = pow(F,2);
 
-         /* Theta average with previous velocity */
-         if (do_theta_averaging)
+            /* Collect contibution from viscosity */
+            visc_contr += F2;
+            visci_vec.Add(F2, Vadj_n);
+         } // End adjacent faces iteration
+         // Add contribution from viscosity to Mi and Ri
+         for (int i = 0; i < dim; i++)
          {
-            predicted_node_v *= theta; 
-            predicted_node_v.Add(1. - theta, Vnode_n);
+            Mi.Elem(i,i) += visc_contr * mm_visc * pow(dt,2);
          }
+         Ri.Add(mm_visc*pow(dt,2), visci_vec);
+      } // End add viscosity
 
-         // Put velocity in S
-         // Gauss-Seidel > Jacobi
-         // UpdateNodeVelocity(S, node, predicted_node_v);
-         // Try Jacobi
-         UpdateNodeVelocity(S_new, node, predicted_node_v);
-      } // End interior node
+      /* Solve for Vnode */
+      // cout << "Mi for node: " << node << endl;
+      // Mi.Print(cout);
+      Mi.Invert();
+      Mi.Mult(Ri, predicted_node_v);
+
+      /* Theta average with previous velocity */
+      if (do_theta_averaging)
+      {
+         predicted_node_v *= theta; 
+         predicted_node_v.Add(1. - theta, Vnode_n);
+      }
+
+      // Put velocity in S
+      // Gauss-Seidel > Jacobi
+      // UpdateNodeVelocity(S, node, predicted_node_v);
+      // Try Jacobi
+      UpdateNodeVelocity(S_new, node, predicted_node_v);
+      // } // End interior node
 
    } // End node iterator
    S = S_new;

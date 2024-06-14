@@ -114,7 +114,7 @@ protected:
    bool check_mesh;
    int mv_option = 0;
    int fv_option = 0;
-   int mv_it_option = 0;
+   int mv_it_option = 2;
    bool use_corner_velocity_MC_iteration = false;
    int corner_velocity_MC_num_iterations = 0;
    int problem = -1;

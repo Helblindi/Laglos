@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
    bool check_mesh = true;
    int mv_option = 2;
    int fv_option = 2;
-   int mv_it_option = 0;
+   int mv_it_option = 2;
    int mv_n_iterations = 0;
    bool optimize_timestep = true;
    bool convergence_testing = false;

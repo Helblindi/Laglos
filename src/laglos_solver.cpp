@@ -739,7 +739,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf, mv_gf_prev_it;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   double mm_visc = 0.;
+   double mm_visc = 1.;
 
    if (mm)
    {
@@ -792,7 +792,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          if (this->use_corner_velocity_MC_iteration)
          {
             mv_gf_prev_it = mv_gf;
-            double loss = ComputeCellVolumeNorm(S, S_old, dt, mm_visc);
+            double loss = ComputeCellVolumeNorm(S, S_old, dt);
             cout << "starting mass loss at iteration: " << loss << endl;
 
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
@@ -803,7 +803,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                IterativeCornerVelocityLSCellVolume(S, S_old, dt, mm_visc);
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
-               loss = ComputeCellVolumeNorm(S, S_old, dt, mm_visc);
+               loss = ComputeCellVolumeNorm(S, S_old, dt);
                cout << "val at iteration " << i << ": " << loss << endl;
                mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
@@ -6137,7 +6137,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
 *  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
 ****************************************************************************************************/
 template<int dim>
-double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt, double mm_visc)
+double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
 {
    Vector* sptr_old = const_cast<Vector*>(&S_old);
 
@@ -6173,44 +6173,8 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
       num += tmp_val;
       denom += pow(Kn / Tn, 2);
    }
-   cell_val = sqrt(num/denom);
 
-   // Add viscosity 
-   if (mm_visc != 0.)
-   {
-      num = 0., denom = 0.;
-      double l2norm2 = 0.;
-      Array<int> face_dofs_row;
-      Vector aadj_n(dim), anode_n(dim), Vadj_n(dim), Vnode_n(dim), temp_vec(dim);
-      // /* Iterate over adjacent faces */
-      for (int face = 0; face < num_faces; face++)
-      {
-         H1.GetFaceDofs(face, face_dofs_row);
-         int face_vdof1 = face_dofs_row[1],
-             face_vdof2 = face_dofs_row[0],
-             face_dof = face_dofs_row[2];
-
-         GetNodePosition(S, face_vdof1, aadj_n);
-         GetNodeVelocity(S, face_vdof1, Vadj_n);
-         GetNodePosition(S, face_vdof2, anode_n);
-         GetNodeVelocity(S, face_vdof2, Vnode_n);
-
-         // Compute F
-         subtract(anode_n, aadj_n, temp_vec);
-         double F = temp_vec.Norml2();
-         double F2 = pow(F,2);
-
-         // Compute l2norm
-         subtract(Vnode_n, Vadj_n, temp_vec);
-         l2norm2 = pow(temp_vec.Norml2(), 2);
-
-         /* Collect contibution from viscosity */
-         // TODO: Add up viscosity contribution to Gamma
-         face_val += F2 * l2norm2;
-      }
-   }
-   
-   return cell_val + face_val;
+   return sqrt(num/denom);
 }
 
 

@@ -739,7 +739,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf, mv_gf_prev_it;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   double mm_visc = 1.;
+   double mm_visc = 0.;
 
    if (mm)
    {

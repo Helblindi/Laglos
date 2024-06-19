@@ -32,6 +32,7 @@ mv_option=2
 fv_option=2
 mv_it_op=2
 mv_iter_n=2
+mm_visc=0.
 output_location="Notes/cellvol-20240614/it2/noh/cflp5-novisc"
 output_file="${bin_dir}/out-noh-novisc-r"
 ########
@@ -40,6 +41,7 @@ options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
 options+="-mv ${mv_option} -fv ${fv_option} "
 options+="-mv-it-op ${mv_it_op} -mv-iter-n ${mv_iter_n} " 
+options+="-mmv ${mm_visc} "
 options+="-of ${output_location} "
 
 echo $options

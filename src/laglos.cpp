@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
    int fv_option = 2;
    int mv_it_option = 2;
    int mv_n_iterations = 0;
+   double mm_visc = 0.;
    bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
@@ -178,6 +179,8 @@ int main(int argc, char *argv[]) {
                   "Set the desired type of mesh velocity iteration to use");
    args.AddOption(&mv_n_iterations, "-mv-iter-n", "--mv-num-iterations",
                   "Set the number of times to iterate on the corner node mesh velocities.");
+   args.AddOption(&mm_visc, "-mmv", "--mesh-motion-viscosity-coefficient",
+                  "Set the amount of viscosity to add to the mesh motion iteration.");
    args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
                   "--no-optimize-timestep",
                   "Enable or disable timestep optimization using CFL.");
@@ -757,6 +760,7 @@ int main(int argc, char *argv[]) {
       }
       hydro.SetMVIterationOption(mv_it_option);
       hydro.SetMVIteration(mv_n_iterations);
+      hydro.SetMMViscosity(mm_visc);
    }
 
    /* Set up visualiztion object */

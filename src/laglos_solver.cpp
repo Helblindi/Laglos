@@ -739,7 +739,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf, mv_gf_prev_it;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   double mm_visc = 0.;
 
    if (mm)
    {
@@ -800,7 +799,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                // cout << "iterating on the corner node velocities\n";
                // IterativeCornerVelocityTNLSnoncart(S, dt);
                // IterativeCornerVelocityLS(S, dt);
-               IterativeCornerVelocityLSCellVolume(S, S_old, dt, mm_visc);
+               IterativeCornerVelocityLSCellVolume(S, S_old, dt);
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
                loss = ComputeCellVolumeNorm(S, S_old, dt);
@@ -2053,6 +2052,22 @@ template<int dim>
 void LagrangianLOOperator<dim>::SetMVIteration(const int num_iterations) { 
    this->use_corner_velocity_MC_iteration = true;
    this->corner_velocity_MC_num_iterations = num_iterations; 
+}
+
+
+/****************************************************************************************************
+* Function: SetMMViscosity
+* Parameters:
+*  mm_visc - Sets the amount of viscosity to add to the mesh velocity iteration
+*
+* Purpose:
+*  To enable the use of and set the amount of viscosity to add to the 
+*  cell-area based corner node mesh velocity iteration.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMMViscosity(const double mm_visc)
+{
+   this->mm_visc = mm_visc;
 }
 
 
@@ -5870,7 +5885,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 *  Note: This function assumes ComputeStateUpdate has been run.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt, double mm_visc)
+void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolume=====\n";
    /* Optional run time parameters */

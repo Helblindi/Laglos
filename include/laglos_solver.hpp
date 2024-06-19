@@ -117,6 +117,7 @@ protected:
    int mv_it_option = 2;
    bool use_corner_velocity_MC_iteration = false;
    int corner_velocity_MC_num_iterations = 0;
+   double mm_visc = 0.;
    int problem = -1;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
@@ -172,6 +173,7 @@ public:
    void SetFVOption(const int & option);
    void SetMVIterationOption(const int &option);
    void SetMVIteration(const int num_iterations);
+   void SetMMViscosity(const double mm_visc);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
@@ -252,7 +254,7 @@ public:
 
    // Iterative method to compute the corner velocities using Least Squares
    // that minimizes the change in mass, plus some optional viscosity
-   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt, double mm_vsc = 0);
+   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt);
    double ComputeCellVolume(const Vector &S, const int &cell);
    double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
 

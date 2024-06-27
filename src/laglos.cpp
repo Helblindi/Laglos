@@ -414,6 +414,11 @@ int main(int argc, char *argv[]) {
          problem_class = new SodRadial<dim>();
          break;
       }
+      case 14: // ICF
+      {
+         problem_class = new ICFProblem<dim>();
+         break;
+      }
       case 20: // Riemann Problem
       {
          problem_class = new RiemannProblem<dim>();

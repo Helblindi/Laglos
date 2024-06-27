@@ -153,7 +153,7 @@ public:
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
-   void MakeTimeStep(Vector &S, const double & t, double & dt, bool &isCollapsed);
+   void MakeTimeStep(Vector &S, const double & t, const double & dt, bool &isCollapsed);
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
    void InitializeDijMatrix();
@@ -209,7 +209,7 @@ public:
    void FillCenterVelocitiesWithAvg(Vector &S);
 
    // Compute mesh velocities
-   void ComputeMeshVelocities(Vector &S, const Vector &S_old, const double &t, double &dt);
+   void ComputeMeshVelocities(Vector &S, const Vector &S_old, const double &t, const double &dt);
 
    // Check Jacobians to ensure mesh hasn't collapsed
    bool IsMeshCollapsed();
@@ -254,9 +254,11 @@ public:
 
    // Iterative method to compute the corner velocities using Least Squares
    // that minimizes the change in mass, plus some optional viscosity
-   void IterativeCornerVelocityLSCellVolume(Vector &S, const Vector &S_old, const double &dt);
+   void IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S, const Vector &S_old, const double &dt);
+   void IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt);
    double ComputeCellVolume(const Vector &S, const int &cell);
    double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
+   double ComputeNodeVelocityNorm(const Vector &S);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

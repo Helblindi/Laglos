@@ -256,9 +256,11 @@ public:
    // that minimizes the change in mass, plus some optional viscosity
    void IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S, const Vector &S_old, const double &dt);
    void IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt);
+   void IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt);
    double ComputeCellVolume(const Vector &S, const int &cell);
    double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
    void compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it);
+   void compare_gamma_mv2(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

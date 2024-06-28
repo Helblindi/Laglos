@@ -258,7 +258,7 @@ public:
    void IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt);
    double ComputeCellVolume(const Vector &S, const int &cell);
    double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
-   double ComputeNodeVelocityNorm(const Vector &S);
+   void compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

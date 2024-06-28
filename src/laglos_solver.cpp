@@ -785,6 +785,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
          }
+         // mv_gf = 0.;
 
          // ComputeNodeVelocitiesFromVgeo(S, t, dt);
 
@@ -792,20 +793,19 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          {
             mv_gf_prev_it = mv_gf;
             double loss = ComputeCellVolumeNorm(S, S_old, dt);
-            cout << "starting mass loss at iteration: " << loss << endl;
+            cout << "starting loss: " << loss << endl;
 
             for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
             {
                // cout << "iterating on the corner node velocities\n";
-               // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
                IterativeCornerVelocityLSCellVolumeCellVisc(S, S_old, dt);
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
                loss = ComputeCellVolumeNorm(S, S_old, dt);
-               // loss = ComputeNodeVelocityNorm(S);
                cout << "val at iteration " << i << ": " << loss << endl;
-               mv_gf_prev_it = mv_gf;
                // cout << i << "," << val << endl;
+               compare_gamma2(S, S_old, dt, i);
+               mv_gf_prev_it = mv_gf;
             }
          }
 
@@ -6138,15 +6138,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
    int cells_length, bdr_ind;
    Vector Vcell_np1(dim), Uc(dim+2);
 
-   DenseMatrix Mi(dim), dm_temp(dim), Mi_v(dim);
-   Vector Ri(dim), Ri_v(dim);
+   DenseMatrix Mi(dim), dm_temp(dim);
+   Vector Ri(dim), sum_vk(dim);
+   double sum_k = 0.;
 
    /* Iterate over interior nodes */
    for (int node = 0; node < NDofs_H1L; node++)
    {
       /* Reset values for new node */
       Mi = 0., Ri = 0., predicted_node_v = 0.;
-      Mi_v = 0., Ri_v = 0.;
+      sum_k = 0., sum_vk = 0.;
       bdr_ind = BdrVertexIndexingArray[node];
 
       /* bdr_ind = -1 for interior nodes */
@@ -6212,7 +6213,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
             Ri.Add(Bj - cj, bj_vec);
 
             // Since the viscosity is defined according to adjacent cells, 
-            // we add in its contribution inside the cell loop
+            // we compute its contribution in the cell loop
             if (mm_visc != 0.)
             {
                // Retrieve cell velocity
@@ -6220,31 +6221,19 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
                pb->velocity(Uc, Vcell_np1);
                // cout << "cell: " << el_index << "vel: ";
                // Vcell_np1.Print(cout);
-               
-               // Add contribution from viscosity to Mi and Ri
-               for (int i = 0; i < dim; i++)
-               {
-                  Mi.Elem(i,i) += mm_visc * pow(dt,2) * Kcn;
-                  Mi_v.Elem(i,i) += mm_visc * pow(dt,2) * Kcn;
-               }
-               Ri.Add(mm_visc*pow(dt,2)*Kcn, Vcell_np1);
-               Ri_v.Add(mm_visc*pow(dt,2)*Kcn, Vcell_np1);
+               sum_k += Kcn;
+               sum_vk.Add(1., Vcell_np1);
             } // End add viscosity contribution from cell
          } // End adjacent cells
 
-         // cout << "\t node: " << node << endl;
-         // cout << "Mi_v: ";
-         // Mi_v.Print(cout);
-         // cout << "Ri_v: ";
-         // Ri_v.Print(cout);
-         // cout << "---\n";
-         // cout << "Mi: ";
-         // Mi.Print(cout);
-         // cout << "Ri: ";
-         // Ri.Print(cout);
-         /* Solve for Vnode */
-         // cout << "Mi for node: " << node << endl;
-         // Mi.Print(cout);
+         // Add in contribution of viscosity
+         for (int i = 0; i < dim; i++)
+         {
+            Mi.Elem(i,i) += mm_visc * pow(dt,2) * sum_k * pow(cells_length, 2);
+         }
+         Ri.Add(mm_visc*pow(dt,2)*sum_k*cells_length, sum_vk);
+
+         // Solve
          Mi.Invert();
          Mi.Mult(Ri, predicted_node_v);
 
@@ -6323,15 +6312,14 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
 
 
 /****************************************************************************************************
-* Function: ComputeAverageVelocities
+* Function: ComputeCellVolumeNorm
 * Parameters:
 *  S        - BlockVector representing FiniteElement information at tn+1
 *  S_old    - BlockVector representing FiniteElement information at tn
 *  dt       - Timestep
 *
 * Purpose: 
-* 
-*  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
+*  Compute the sum of the change in mass over all cells in the mesh.
 ****************************************************************************************************/
 template<int dim>
 double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
@@ -6376,33 +6364,64 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
 
 
 /****************************************************************************************************
-* Function: ComputeNodeVelocityNorm
+* Function: compare_gamma
 * Parameters:
 *  S        - BlockVector representing FiniteElement information at tn+1
 *  S_old    - BlockVector representing FiniteElement information at tn
 *  dt       - Timestep
+*  it       - Iteration number
 *
 * Purpose: 
+*  Compare the value being minimized and the amound of viscosity being added.
 * 
 *  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
 ****************************************************************************************************/
 template<int dim>
-double LagrangianLOOperator<dim>::ComputeNodeVelocityNorm(const Vector &S)
+void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it)
 {
-   double num = 0., denom = 0.;
-   int bdr_ind = 0, cells_length = 0;
+   Vector* sptr_old = const_cast<Vector*>(&S_old);
+   double alphaF = 0., alphaV = 0., denom = 0.;
+
+   ParGridFunction sv_gf, sv_old_gf, x_gf, mv_gf;
+   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+
+   // Move vertices of S_temp to compute cell volume norm
+   Vector S_temp = S;
+   Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
+   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
+   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[2]);
+   add(x_gf, dt, mv_gf, x_gf);
 
    Array<int> cells_row;
+   double sum_k = 0., Kcn = 0.;
+   Vector Uc(dim+2), Vcell(dim), Vnode(dim), sum_vk(dim), temp_vec(dim);
+   int bdr_ind, cells_length;
 
-   Vector Vnode(dim), Uc(dim+2), Vcell(dim), sum_kvk(dim), temp_vec(dim);
-   double Kcn = 0., sum_k = 0.;
+   // Sum over all cells
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      {
+         // Skip boundary cells
+         continue;
+      }
 
+      double Kn = ComputeCellVolume(S_old, ci);
+      double Knp1 = ComputeCellVolume(S_temp, ci);
+      double Tn = sv_old_gf.Elem(ci);
+      double Tnp1 = sv_gf.Elem(ci);
+
+      double tmp_val = pow((Kn / Tn) - (Knp1 / Tnp1), 2);
+      alphaF += tmp_val;
+      denom += pow(Kn/Tn, 2);
+   }
 
    // Iterate over all geometric nodes
    for (int node = 0; node < NDofs_H1L; node++)
    {
       sum_k = 0.;
-      sum_kvk = 0.;
+      sum_vk = 0.;
       bdr_ind = BdrVertexIndexingArray[node];
 
       // All nodes minus corner nodes will contribute
@@ -6422,14 +6441,17 @@ double LagrangianLOOperator<dim>::ComputeNodeVelocityNorm(const Vector &S)
             pb->velocity(Uc, Vcell);
 
             sum_k += Kcn;
-            sum_kvk.Add(Kcn, Vcell);
+            sum_vk.Add(1, Vcell);
          }
-         add(sum_k, Vnode, 1., sum_kvk, temp_vec);
-         num += pow(temp_vec.Norml2(), 2) / sum_k;
+         add(cells_length, Vnode, -1., sum_vk, temp_vec);
+         alphaV += sum_k * pow(temp_vec.Norml2(), 2);
       }
    }
 
-   return num;
+   cout << "it: " << it 
+        <<  ", minimized quantity: " << sqrt(alphaF/denom) 
+        << ", viscosity added: " << sqrt(mm_visc*pow(dt,2)*alphaV/denom) << endl;
+
 }
 
 

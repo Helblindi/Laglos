@@ -117,7 +117,7 @@ protected:
    int mv_it_option = 2;
    bool use_corner_velocity_MC_iteration = false;
    int corner_velocity_MC_num_iterations = 0;
-   double mm_visc = 0.;
+   double mm_visc_face = 0., mm_cell = 0.;
    int problem = -1;
 
    StopWatch chrono_mm, chrono_state, chrono_temp;
@@ -173,7 +173,8 @@ public:
    void SetFVOption(const int & option);
    void SetMVIterationOption(const int &option);
    void SetMVIteration(const int num_iterations);
-   void SetMMViscosity(const double mm_visc);
+   void SetMMViscFace(const double mm_visc);
+   void SetMMCell(const double mm_consistency);
    void GetIntermediateFaceVelocity(const int & face, Vector & vel);
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
@@ -257,10 +258,11 @@ public:
    void IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S, const Vector &S_old, const double &dt);
    void IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt);
    void IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt);
+   void IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt);
+   void VerifyContributions(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it);
    double ComputeCellVolume(const Vector &S, const int &cell);
    double ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt);
    void compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it);
-   void compare_gamma_mv2(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it);
 
    // Average Velocities
    void ComputeAverageVelocities(Vector &S);

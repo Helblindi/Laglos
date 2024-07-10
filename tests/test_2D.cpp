@@ -218,7 +218,7 @@ int tester()
    dt = hydro.GetTimestep();
    cout << "dt: " << dt << endl;
 
-   hydro.ComputeMeshVelocities(S, t, dt);
+   hydro.ComputeMeshVelocities(S, S, t, dt); // For now just use S as S_old. Will need to replace
    // cout << "Done computing mesh velocities\n";
 
    // DenseMatrix A(3,2);
@@ -512,7 +512,7 @@ int test_vel_field_1()
    cout << "dt: " << dt << endl;
 
    // hydro.ComputeMeshVelocities(S, t, dt, flag, &velocity_exact);
-   hydro.ComputeMeshVelocities(S, t, dt);
+   hydro.ComputeMeshVelocities(S, S, t, dt); // For now just use S as S_old. Will need to replace
    cout << "Done computing mesh velocities\n";
 
    /* ************************
@@ -867,6 +867,7 @@ int test_sod_hydro()
 
    cout << "Done constructing hydro op\n";
 
+   bool is_collapsed = false;
    for (int ts = 1; ts < ms; ts++)
    {
       // Verify hardcoded timestep is small enough
@@ -877,7 +878,7 @@ int test_sod_hydro()
          MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
       }
 
-      hydro_1d.MakeTimeStep(S_1d, t, dt_1d);
+      hydro_1d.MakeTimeStep(S_1d, t, dt_1d, is_collapsed);
 
       // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
       // data in S. This operation simply updates the Memory validity flags of
@@ -1031,6 +1032,8 @@ int test_sod_hydro()
 
    cout << "Done constructing hydro op\n";
 
+   is_collapsed = false;
+
    for (int ts = 1; ts < ms; ts++)
    {
       // Verify hardcoded timestep is small enough
@@ -1041,7 +1044,7 @@ int test_sod_hydro()
          MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
       }
 
-      hydro_2d.MakeTimeStep(S_2d, t, dt_2d);
+      hydro_2d.MakeTimeStep(S_2d, t, dt_2d, is_collapsed);
 
       // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
       // data in S. This operation simply updates the Memory validity flags of
@@ -1296,7 +1299,8 @@ int test_smooth_hydro()
       MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
    }
 
-   hydro_1d.MakeTimeStep(S_1d, t, dt_1d);
+   bool is_collapsed = false;
+   hydro_1d.MakeTimeStep(S_1d, t, dt_1d, is_collapsed);
 
    // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
    // data in S. This operation simply updates the Memory validity flags of
@@ -1457,7 +1461,8 @@ int test_smooth_hydro()
       MFEM_ABORT("Sod hydro :: 1D Too big timestep\n");
    }
 
-   hydro_2d.MakeTimeStep(S_2d, t, dt_2d);
+   is_collapsed = false;
+   hydro_2d.MakeTimeStep(S_2d, t, dt_2d, is_collapsed);
 
    // Ensure the sub-vectors x_gf, v_gf, and ste_gf know the location of the
    // data in S. This operation simply updates the Memory validity flags of
@@ -1679,7 +1684,7 @@ void plot_mv_smooth()
    dt = hydro.GetTimestep();
    cout << "dt: " << dt << endl;
 
-   hydro.ComputeMeshVelocities(S, t, dt);
+   hydro.ComputeMeshVelocities(S, S, t, dt); // For now just use S as S_old. Will need to replace
    cout << "Done computing mesh velocities\n";
 
    /* ************************

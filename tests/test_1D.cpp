@@ -6,12 +6,10 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
-#include "matplotlibcpp.h"
 
 using namespace std;
 using namespace mfem;
 using namespace hydrodynamics;
-namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field

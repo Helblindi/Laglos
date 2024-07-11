@@ -7454,6 +7454,51 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
    S = S_new;
 }
 
+
+/****************************************************************************************************
+* Function: ComputeWeightedCellAverageVelocityAtNode
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  node     - Node on which to compute the weighted average cell velocities
+*  node_v   - Averaged velocity on node
+*
+* Purpose:
+*  To compute the weighted average of the adjacent cell velocities.
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v)
+{
+   Array<int> cells_row;
+   Vector Uc(dim+2), Vcell(dim);
+
+   double sum_k = 0.;
+   node_v = 0.;
+
+   // Get adjacent cells
+   vertex_element->GetRow(node, cells_row);
+   int cells_length = cells_row.Size();
+
+   // Iterate over adjacent cells
+   for (int cell_it = 0; cell_it < cells_length; cell_it++)
+   {
+      // Get cell index and volume
+      int el_index = cells_row[cell_it];
+      double Kcn = pmesh->GetElementVolume(el_index);
+
+      // Retrieve cell velocity
+      GetCellStateVector(S, el_index, Uc);
+      pb->velocity(Uc, Vcell);
+      sum_k += Kcn;
+      // Add the weighted contribution
+      node_v.Add(Kcn, Vcell);
+   }
+
+   // Finally, take the average
+   node_v /= sum_k;
+}
+
+
 /****************************************************************************************************
 * Function: ComputeNodeVelocitiesFromVgeo
 * Parameters:

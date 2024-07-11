@@ -26,8 +26,12 @@ add_executable(TestFortran EXCLUDE_FROM_ALL test_fortran.cpp "${MFEM_DIR}" "${PR
 target_link_libraries(TestFortran PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
 add_test(NAME TestFortran COMMAND TestFortran)
 
+add_executable(TestMM EXCLUDE_FROM_ALL test_mm.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+target_link_libraries(TestMM PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
+add_test(NAME TestMM COMMAND TestMM)
+
 # Validate Fortran Max Wave Speed calculations
-add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
 add_test(NAME TestEulerianMWS
          COMMAND TestEulerianMWS "${PROJECT_SOURCE_DIR}/build/tests/eulerian-mws-output.txt")
@@ -37,7 +41,7 @@ add_test(NAME EulerMWSCompare
                "${PROJECT_SOURCE_DIR}/Fortran/eulerian-mws/output_ref_c")
 
 # TODO: Lagrangian Fortran Subroutine still does not return correct values
-add_executable(TestLagrangianMWS EXCLUDE_FROM_ALL test_fortran_lagrangian_mws.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
+add_executable(TestLagrangianMWS EXCLUDE_FROM_ALL test_fortran_lagrangian_mws.cpp)
 target_link_libraries(TestLagrangianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian)
 add_test(NAME TestLagrangianMWS
          COMMAND TestLagrangianMWS "${PROJECT_SOURCE_DIR}/build/tests/lagrangian-mws-output.txt")
@@ -53,4 +57,4 @@ add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
 # add_dependencies(build_tests TestRTvel TestRaviart Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
-add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
+add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran TestMM)

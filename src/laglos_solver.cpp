@@ -1781,7 +1781,8 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 *     Rotate a vector counterclockwise of angle pi/2.
 *
 * Example:
-*  (0,-1) ---> (1,0)
+*  (-1,1) ---> (-1,-1)
+*  (x, y) ---> (-y, x)
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
@@ -7496,6 +7497,61 @@ void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const V
 
    // Finally, take the average
    node_v /= sum_k;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeRotatedDiagonalForCellArea
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  cell     - Cell to compute diagonal vector on
+*  node     - Diagonal not attached to this node will be computed
+*  vec      - Vector representing the rotate diagonal vector
+*
+* Purpose:
+*  This is a helper function to compute cell area using the method described in
+*  Bruno Despres' Paper
+*     "Moving grids and cell volume calculations"
+*  The goal is to compute the rotated diagonal line as depcted in the following
+*
+*     I---(I-1)
+*     |    /|
+*     |   / |
+*     |  /  |        Function computed (a_{I+1} - a_{I-1})^{perp}
+*     | /   |           where
+*     |/    |         perp = 90 deg counter clockwise rotation
+*   (I+1)---X
+*
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, Vector &vec)
+{
+   Array<int> verts;
+   pmesh->GetElementVertices(cell, verts);
+   int verts_length = verts.Size(), node_ip1, node_im1;
+   Vector node_x_ip1(dim), node_x_im1(dim);
+
+   // Get index of node in verts
+   int node_index = verts.Find(node);
+
+   // Check if node is adjacent to given cell
+   if (node_index == -1)
+   {
+      cout << "Node " << node << " is not adjacent to cell " << cell << ".\n";
+      MFEM_ABORT("Node is not adjacent to cell.\n");
+   }
+
+   // Get index of verts that corresponds to i+1 and i-1 nodes
+   node_ip1 = (node_index + 1) % verts_length;
+   node_im1 = (node_index - 1) % verts_length;
+
+   // Get the corresponding position of those nodes
+   GetNodePosition(S, verts[node_ip1], node_x_ip1);
+   GetNodePosition(S, verts[node_im1], node_x_im1);
+
+   // Compute rotated diagonal
+   subtract(node_x_ip1, node_x_im1, vec);
+   Orthogonal(vec);
 }
 
 

@@ -272,6 +272,7 @@ public:
 
    // Lagrange Multipliers implementation
    void ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v);
+   void ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, Vector &vec);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

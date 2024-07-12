@@ -274,8 +274,8 @@ public:
    // Lagrange Multipliers implementation
    void ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v);
    void ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, const double &dt, Vector &vec);
-   void ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &dt, double &l_mult, Vector &node_v);
-   void IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &dt);
+   void ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v);
+   void IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);
@@ -288,6 +288,7 @@ public:
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                              const double &dt, Vector & state_val);
    void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
+   void ComputeCorrectedNodalVelocityOnBoundary(const Vector &S, const int &node, const double &t, const double &dt, Vector &vel);
    
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

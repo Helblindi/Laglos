@@ -812,7 +812,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                // cout << "iterating on the corner node velocities\n";
                // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
                // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
-               IterativeLagrangeMultiplier(S, S_old, dt);
+               IterativeLagrangeMultiplier(S, S_old, t, dt);
                
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
@@ -1589,6 +1589,157 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 
          UpdateNodeVelocity(S, i, node_v);
       }
+   }
+}
+
+
+/****************************************************************************************************
+* Function: ComputeCorrectNodalVelocityOnBoundary
+* Parameters:
+*  S    - BlockVector that stores mesh information, mesh velocity, and state variables
+*  t    - Current time
+*  dt   - Current timestep
+*  vel  - Geometric velocity on boundary that must be corrected
+*
+* Purpose:
+*  Correct the given nodal velocity according to the prescribed boundary conditions.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeCorrectedNodalVelocityOnBoundary(const Vector &S, const int & node, const double &t, const double &dt, Vector &vel)
+{
+   assert(dim > 1);
+   int bdr_ind = BdrVertexIndexingArray[node];
+   Vector normal(dim);
+
+   if (bdr_ind == -1)
+   {
+      MFEM_ABORT("Not a boundary vertex.\n");
+   }
+
+   if (pb->get_indicator() == "Sod" ||
+       pb->get_indicator() == "TriplePoint" ||
+       pb->get_indicator() == "Sedov" ||
+       pb->get_indicator() == "SodRadial")
+   {
+      switch (bdr_ind)
+      {
+         case 1:
+            // bottom
+            normal[0] = 0., normal[1] = -1.;
+            /* code */
+            break;
+         
+         case 2:
+            // right
+            normal[0] = 1., normal[1] = 0.;
+            break;
+            
+         case 3:
+            // top
+            normal[0] = 0., normal[1] = 1.;
+            break;
+         
+         case 4:
+            // left
+            normal[0] = -1., normal[1] = 0.;
+            break;
+
+         case 5:
+            vel = 0.;
+            return;
+
+         default:
+            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+            break;
+      }
+
+      /* Correct node velocity accordingly */
+      double coeff = vel * normal;
+      vel.Add(-coeff, normal);
+      return;
+   } // End Sod, TP, Sedov, SodRadial
+   else if (pb->get_indicator() == "saltzmann")
+   {
+      /* Get corresponding normal vector */
+      switch (bdr_ind)
+      {
+      case 4: {
+         // left
+         vel = 0.;
+         /* Ramping up to ex */
+         if (timestep_first == 0.)
+         {
+            timestep_first = timestep;
+         }
+         double _xi = t / (2*timestep_first);
+         double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+         vel[0] = 1. * _psi;
+
+         break;
+      }
+      
+      case 1:
+         // bottom
+         normal[0] = 0., normal[1] = -1.;
+         break;
+      
+      case 2:
+         // right
+         normal[0] = 1., normal[1] = 0.;
+         break;
+      
+      case 3:
+         // top
+         normal[0] = 0., normal[1] = 1.;
+         break;
+
+      default:
+         MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+         break;
+      }
+
+      double coeff = vel * normal;
+      vel.Add(-coeff, normal);
+   } // End Saltzmann
+   else if (pb->get_indicator() == "IsentropicVortex")
+   {
+      vel = 0.;
+      return;
+   } // End IsentropicVortex
+   else if (pb->get_indicator() == "TestBCs" ||
+            pb->get_indicator() == "Vdw1" ||
+            pb->get_indicator() == "Vdw2" ||
+            pb->get_indicator() == "Vdw3" ||
+            pb->get_indicator() == "Vdw4")
+   {
+      switch (bdr_ind)
+      {
+      case 1:
+         // bottom
+         normal[0] = 0., normal[1] = -1.;
+         break;
+      
+      case 2:
+         // right
+         normal[0] = 1., normal[1] = 0.;
+         break;
+      
+      case 3:
+         // top
+         normal[0] = 0., normal[1] = 1.;
+         break;
+      
+      case 4:
+         // left
+         normal[0] = -1., normal[1] = 0.;
+         break;
+
+      default:
+         MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+         break;
+      }
+      double coeff = vel * normal;
+      vel.Add(-coeff, normal);
    }
 }
 
@@ -7590,7 +7741,7 @@ void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &
 *  velocity with which to move the mesh from the geometric velocity.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &dt, double &l_mult, Vector &node_v)
+void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v)
 {
    // cout << "ComputeLagrangeMultiplierAndNodeVelocity\n";
    /* Necessary variables*/
@@ -7637,6 +7788,8 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
       }
    } // end cell iterator
 
+   cout << "R: ";
+   R.Print(cout);
    cout << "\tvec_sum: ";
    vec_sum_other_cell.Print(cout);
    cout << "vbar: ";
@@ -7653,13 +7806,16 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
       cout << "Node " << node << " is not adjacent to cell " << cell << ".\n";
       MFEM_ABORT("Node is not adjacent to cell.\n");
    }
+   cout << "verts:";
+   verts.Print(cout);
+   cout << "node " << node << " at index: " << node_index << endl;
    // Get index of verts for opposite node
    int node_op = (node_index + 2) % verts_length;
    Vector anode_op_n(dim), anode_op_np1(dim), Vnode_op(dim), anode_i_n(dim);
    GetNodePosition(S, verts[node_op], anode_op_n);
    GetNodeVelocity(S, verts[node_op], Vnode_op);
    add(anode_op_n, dt, Vnode_op, anode_op_np1);
-   GetNodePosition(S, node_index, anode_i_n);
+   GetNodePosition(S, node, anode_i_n);
    temp_vec.Add(1., anode_i_n);
    temp_vec.Add(-1., anode_op_np1);
    cout << "anode_i_n: ";
@@ -7683,10 +7839,16 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
    /***
    * Compute new velocity
    * ***/
-   node_v = 0.;
    node_v = vbar;
    node_v.Add(dt*l_mult/(4*Tnp1), R);
    node_v.Add(dt/4, vec_sum_other_cell);
+
+   // If Boundary node, correct the velocity according to BCs
+   if (BdrVertexIndexingArray[node] != -1)
+   {
+      ComputeCorrectedNodalVelocityOnBoundary(S, node, t, dt, node_v);
+   }
+
    cout << "cell: " << cell << ", l_mult: " << l_mult << endl;
    cout << "node: " << node << ", nodev: ";
    node_v.Print(cout);
@@ -7704,7 +7866,7 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
 *  Iterates over all cells and computes mesh LagrangeMultiplier and mesh velocity.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &dt)
+void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt)
 {
    cout << "iterative Lagrange Multiplier\n";
    /* Optional run time parameters */
@@ -7720,14 +7882,14 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
    /* Iterate over all cells */
    for (int cell = 0; cell < num_elements; cell++)
    {
-      cout << "cell: " << cell << endl;
+      cout << "\ncell: " << cell << endl;
       /* Get index of bottom left corner node */
       pmesh->GetElementVertices(cell, verts);
       // Does verts[0] always correspond to the bottom left node? ---> YES
       node = verts[0];
       // Get current node velocity
       GetNodeVelocity(S, node, Vnode_n);
-      ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, dt, l_mult, predicted_node_v);
+      ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, t, dt, l_mult, predicted_node_v);
 
       if (do_theta_averaging)
       {

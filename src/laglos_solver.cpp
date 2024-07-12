@@ -105,6 +105,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    v_CR_gf_fluxes(&CR),
    v_geo_gf(&H1_L),
    cell_bdr_flag_gf(&L2),
+   LagrangeMultipliers(&L2),
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
@@ -161,6 +162,9 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Fill cell boundaries
    cell_bdr_flag_gf = -1.;
    FillCellBdrFlag();
+
+   // Initialize LagrangeMultipliers
+   LagrangeMultipliers = 0; // TODO: Play with different value here for initialization???
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
@@ -781,6 +785,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 6:
             ComputeGeoVCAVEATCellFaceWeighted(S);
             break;
+
+         case 7: // Lagrange Multiplier
+            if (!this->use_corner_velocity_MC_iteration)
+            {
+               MFEM_ABORT("Must use iteration if computing the mesh velocity with Lagrange Multiplier method.\n");
+            }
+            break;
          
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
@@ -800,7 +811,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             {
                // cout << "iterating on the corner node velocities\n";
                // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
-               IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
+               // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
+               IterativeLagrangeMultiplier(S, S_old, dt);
                
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
@@ -809,7 +821,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                // cout << i << "," << val << endl;
                // compare_gamma2(S, S_old, dt, i);
                // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
-               VerifyContributions(S, S_old, mv2_gf, dt, i);
+               // VerifyContributions(S, S_old, mv2_gf, dt, i);
                mv_gf_prev_it = mv_gf;
             }
          }
@@ -7470,6 +7482,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v)
 {
+   // cout << "ComputeWeightedCellAverageVelocityAtNode\n";
    Array<int> cells_row;
    Vector Uc(dim+2), Vcell(dim);
 
@@ -7506,6 +7519,7 @@ void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const V
 *  S        - BlockVector representing FiniteElement information
 *  cell     - Cell to compute diagonal vector on
 *  node     - Diagonal not attached to this node will be computed
+*  dt       - Current timestep
 *  vec      - Vector representing the rotate diagonal vector
 *
 * Purpose:
@@ -7524,12 +7538,15 @@ void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const V
 *
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, Vector &vec)
+void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, const double &dt, Vector &vec)
 {
+   // cout << "ComputeRotatedDiagonalForCellArea\n";
    Array<int> verts;
    pmesh->GetElementVertices(cell, verts);
    int verts_length = verts.Size(), node_ip1, node_im1;
-   Vector node_x_ip1(dim), node_x_im1(dim);
+   Vector anode_ip1_n(dim), anode_im1_n(dim);
+   Vector Vnode_ip1_n(dim), Vnode_im1_n(dim);
+   Vector anode_ip1_np1(dim), anode_im1_np1(dim);
 
    // Get index of node in verts
    int node_index = verts.Find(node);
@@ -7543,15 +7560,185 @@ void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &
 
    // Get index of verts that corresponds to i+1 and i-1 nodes
    node_ip1 = (node_index + 1) % verts_length;
-   node_im1 = (node_index - 1) % verts_length;
+   node_im1 = (node_index - 1 + verts_length) % verts_length; // ensure index > 0
 
-   // Get the corresponding position of those nodes
-   GetNodePosition(S, verts[node_ip1], node_x_ip1);
-   GetNodePosition(S, verts[node_im1], node_x_im1);
+   // Get the corresponding position of those nodes at time np1
+   GetNodePosition(S, verts[node_ip1], anode_ip1_n);
+   GetNodePosition(S, verts[node_im1], anode_im1_n);
+   GetNodeVelocity(S, verts[node_ip1], Vnode_ip1_n);
+   GetNodeVelocity(S, verts[node_im1], Vnode_im1_n);
+   add(anode_ip1_n, dt, Vnode_ip1_n, anode_ip1_np1);
+   add(anode_im1_n, dt, Vnode_im1_n, anode_im1_np1);
 
    // Compute rotated diagonal
-   subtract(node_x_ip1, node_x_im1, vec);
+   subtract(anode_ip1_np1, anode_im1_np1, vec);
    Orthogonal(vec);
+}
+
+
+/****************************************************************************************************
+* Function: ComputeLagrangeMultiplierAndNodeVelocity
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  t        - Current time
+*  dt       - Current time step
+*  flag     - Flag used to indicate testing, can be "testing" or "NA"
+*  test_vel - Velocity used for testing
+*
+* Purpose:
+*  This function iterates over all Serendipity nodes and computes the
+*  velocity with which to move the mesh from the geometric velocity.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &dt, double &l_mult, Vector &node_v)
+{
+   // cout << "ComputeLagrangeMultiplierAndNodeVelocity\n";
+   /* Necessary variables*/
+   Vector vbar(dim), R(dim), vec_sum_other_cell(dim), temp_vec(dim), rotated_diagonal_s(dim);
+   Array<int> element_row, verts;
+   Vector *sptr = const_cast<Vector*>(&S);
+   Vector *sptr_old = const_cast<Vector*>(&S_old);
+   ParGridFunction sv_gf, sv_gf_old;
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_gf_old.MakeRef(&L2, *sptr_old, block_offsets[2]);
+
+   /* Compute averaged V */
+   ComputeWeightedCellAverageVelocityAtNode(S, node, vbar);
+
+   /* Compute vector R corresponding to current cell */
+   ComputeRotatedDiagonalForCellArea(S, cell, node, dt, R);
+
+   /* Get cells adjacent to node */
+   vertex_element->GetRow(node, element_row);
+   int element_row_size = element_row.Size();
+
+   /***
+    * Compute Lagrange multiplier for given cell, then compute nodal velocity
+    * Iterate over cells adjacent to node and add contributions
+    * ***/
+
+   /* Form temp vec to dot with R */
+   l_mult = 0.;
+   vec_sum_other_cell = 0.;
+   for (int cell_it = 0; cell_it < element_row_size; cell_it++)
+   {
+      int cell_index = element_row[cell_it];
+      if (cell_index == cell)
+      {
+         continue;
+      }
+      else
+      {
+         // cout << "other cell index: " << cell_index << endl;
+         double lambda_s = LagrangeMultipliers.Elem(cell_index);
+         double Ts = sv_gf.Elem(cell_index);
+         ComputeRotatedDiagonalForCellArea(S, cell_index, node, dt, rotated_diagonal_s);
+         vec_sum_other_cell.Add(lambda_s / Ts, rotated_diagonal_s);
+      }
+   } // end cell iterator
+
+   cout << "\tvec_sum: ";
+   vec_sum_other_cell.Print(cout);
+   cout << "vbar: ";
+   vbar.Print(cout);
+
+   add(0.25*pow(dt,2), vec_sum_other_cell, dt, vbar, temp_vec);
+
+   // Get unrotated diagonal from ai to ao
+   pmesh->GetElementVertices(cell, verts);
+   int verts_length = verts.Size();
+   int node_index = verts.Find(node);
+   if (node_index == -1)
+   {
+      cout << "Node " << node << " is not adjacent to cell " << cell << ".\n";
+      MFEM_ABORT("Node is not adjacent to cell.\n");
+   }
+   // Get index of verts for opposite node
+   int node_op = (node_index + 2) % verts_length;
+   Vector anode_op_n(dim), anode_op_np1(dim), Vnode_op(dim), anode_i_n(dim);
+   GetNodePosition(S, verts[node_op], anode_op_n);
+   GetNodeVelocity(S, verts[node_op], Vnode_op);
+   add(anode_op_n, dt, Vnode_op, anode_op_np1);
+   GetNodePosition(S, node_index, anode_i_n);
+   temp_vec.Add(1., anode_i_n);
+   temp_vec.Add(-1., anode_op_np1);
+   cout << "anode_i_n: ";
+   anode_i_n.Print(cout);
+   cout << "anode_op_np1: ";
+   anode_op_np1.Print(cout);
+
+   l_mult = R * temp_vec;
+   cout << "r*temp_vec: " << l_mult << endl;
+   double Kn = ComputeCellVolume(S_old, cell);
+   double Tnp1 = sv_gf.Elem(cell);
+   double Tn = sv_gf_old.Elem(cell);
+   cout << "Tnp1: " << Tnp1 << ", Kn: " << Kn << ", Tn: " << Tn << endl;
+
+   l_mult += 2 * Tnp1 * Kn / Tn;
+   double temp_val = R * R;
+   cout << "R^2: " << temp_val << endl;
+   cout << "dt^2: " << pow(dt,2) << endl;
+   l_mult *= 4 * Tnp1 / (pow(dt,2) * temp_val);
+
+   /***
+   * Compute new velocity
+   * ***/
+   node_v = 0.;
+   node_v = vbar;
+   node_v.Add(dt*l_mult/(4*Tnp1), R);
+   node_v.Add(dt/4, vec_sum_other_cell);
+   cout << "cell: " << cell << ", l_mult: " << l_mult << endl;
+   cout << "node: " << node << ", nodev: ";
+   node_v.Print(cout);
+}
+
+
+/****************************************************************************************************
+* Function: IterativeLagrangeMultiplier
+* Parameters:
+*  S        - BlockVector representing FiniteElement information
+*  S_old    - S from previous timestep
+*  dt       - Current time step
+*
+* Purpose:
+*  Iterates over all cells and computes mesh LagrangeMultiplier and mesh velocity.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &dt)
+{
+   cout << "iterative Lagrange Multiplier\n";
+   /* Optional run time parameters */
+   bool do_theta_averaging = true;
+   double theta = 0.5;
+
+   // Needed variables
+   Array<int> verts;
+   int node;
+   double l_mult;
+   Vector predicted_node_v(dim), Vnode_n(dim);
+
+   /* Iterate over all cells */
+   for (int cell = 0; cell < num_elements; cell++)
+   {
+      cout << "cell: " << cell << endl;
+      /* Get index of bottom left corner node */
+      pmesh->GetElementVertices(cell, verts);
+      // Does verts[0] always correspond to the bottom left node? ---> YES
+      node = verts[0];
+      // Get current node velocity
+      GetNodeVelocity(S, node, Vnode_n);
+      ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, dt, l_mult, predicted_node_v);
+
+      if (do_theta_averaging)
+      {
+         predicted_node_v *= theta;
+         predicted_node_v.Add(1. - theta, Vnode_n);
+      }
+
+      /* Replace Lagrange Multiplier and nodal velocity */
+      UpdateNodeVelocity(S, node, predicted_node_v);
+      LagrangeMultipliers[cell] = l_mult;
+   }
 }
 
 

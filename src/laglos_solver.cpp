@@ -816,8 +816,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                
                // ComputeAverageVelocities(S);
                // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
-               // loss = ComputeCellVolumeNorm(S, S_old, dt);
-               // cout << "val at iteration " << i << ": " << loss << endl;
+               loss = ComputeCellVolumeNorm(S, S_old, dt);
+               cout << "val at iteration " << i << ": " << loss << endl;
                // cout << i << "," << val << endl;
                // compare_gamma2(S, S_old, dt, i);
                // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
@@ -1941,7 +1941,7 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 *     v - Vector to be rotated
 *
 * Purpose:
-*     Rotate a vector counterclockwise of angle pi/2.
+*     Rotate a vector counter-clockwise of angle pi/2.
 *
 * Example:
 *  (-1,1) ---> (-1,-1)
@@ -7682,9 +7682,9 @@ void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const V
 *     I---(I-1)
 *     |    /|
 *     |   / |
-*     |  /  |        Function computed (a_{I+1} - a_{I-1})^{perp}
+*     |  /  |        Function computes (a_{I+1} - a_{I-1})^{perp}
 *     | /   |           where
-*     |/    |         perp = 90 deg counter clockwise rotation
+*     |/    |         perp = 90 deg counter-clockwise rotation
 *   (I+1)---X
 *
 ****************************************************************************************************/
@@ -7771,9 +7771,12 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
    /* Form temp vec to dot with R */
    l_mult = 0.;
    vec_sum_other_cell = 0.;
+   // cout << "adj cell it\n";
+   // cout << "cell: " << cell << ", node: " << node << endl;
    for (int cell_it = 0; cell_it < element_row_size; cell_it++)
    {
       int cell_index = element_row[cell_it];
+      
       if (cell_index == cell)
       {
          continue;
@@ -7784,16 +7787,22 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
          double lambda_s = LagrangeMultipliers.Elem(cell_index);
          double Ts = sv_gf.Elem(cell_index);
          ComputeRotatedDiagonalForCellArea(S, cell_index, node, dt, rotated_diagonal_s);
+         // cout << "cell_index: " << cell_index << ", contribution: ";
+         // rotated_diagonal_s.Print();
+         // cout << "times " << lambda_s / Ts << endl;
          vec_sum_other_cell.Add(lambda_s / Ts, rotated_diagonal_s);
       }
+
+      // cout << "vec sum: ";
+      // vec_sum_other_cell.Print(cout);
    } // end cell iterator
 
-   cout << "R: ";
-   R.Print(cout);
-   cout << "\tvec_sum: ";
-   vec_sum_other_cell.Print(cout);
-   cout << "vbar: ";
-   vbar.Print(cout);
+   // cout << "R: ";
+   // R.Print(cout);
+   // cout << "\tvec_sum: ";
+   // vec_sum_other_cell.Print(cout);
+   // cout << "vbar: ";
+   // vbar.Print(cout);
 
    add(0.25*pow(dt,2), vec_sum_other_cell, dt, vbar, temp_vec);
 
@@ -7806,9 +7815,9 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
       cout << "Node " << node << " is not adjacent to cell " << cell << ".\n";
       MFEM_ABORT("Node is not adjacent to cell.\n");
    }
-   cout << "verts:";
-   verts.Print(cout);
-   cout << "node " << node << " at index: " << node_index << endl;
+   // cout << "verts:";
+   // verts.Print(cout);
+   // cout << "node " << node << " at index: " << node_index << endl;
    // Get index of verts for opposite node
    int node_op = (node_index + 2) % verts_length;
    Vector anode_op_n(dim), anode_op_np1(dim), Vnode_op(dim), anode_i_n(dim);
@@ -7818,23 +7827,26 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
    GetNodePosition(S, node, anode_i_n);
    temp_vec.Add(1., anode_i_n);
    temp_vec.Add(-1., anode_op_np1);
-   cout << "anode_i_n: ";
-   anode_i_n.Print(cout);
-   cout << "anode_op_np1: ";
-   anode_op_np1.Print(cout);
+   // cout << "anode_i_n: ";
+   // anode_i_n.Print(cout);
+   // cout << "anode_op_np1: ";
+   // anode_op_np1.Print(cout);
 
    l_mult = R * temp_vec;
-   cout << "r*temp_vec: " << l_mult << endl;
+   l_mult *= -1.;
+   // cout << "r*temp_vec: " << l_mult << endl;
    double Kn = ComputeCellVolume(S_old, cell);
    double Tnp1 = sv_gf.Elem(cell);
    double Tn = sv_gf_old.Elem(cell);
-   cout << "Tnp1: " << Tnp1 << ", Kn: " << Kn << ", Tn: " << Tn << endl;
+   // cout << "Tnp1: " << Tnp1 << ", Kn: " << Kn << ", Tn: " << Tn << endl;
 
    l_mult += 2 * Tnp1 * Kn / Tn;
    double temp_val = R * R;
-   cout << "R^2: " << temp_val << endl;
-   cout << "dt^2: " << pow(dt,2) << endl;
+   // cout << "R^2: " << temp_val << endl;
+   // cout << "dt^2: " << pow(dt,2) << endl;
    l_mult *= 4 * Tnp1 / (pow(dt,2) * temp_val);
+
+   cout << "cell: " << cell << ", lmult: " << l_mult << endl;
 
    /***
    * Compute new velocity
@@ -7849,9 +7861,9 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
       ComputeCorrectedNodalVelocityOnBoundary(S, node, t, dt, node_v);
    }
 
-   cout << "cell: " << cell << ", l_mult: " << l_mult << endl;
-   cout << "node: " << node << ", nodev: ";
-   node_v.Print(cout);
+   // cout << "cell: " << cell << ", l_mult: " << l_mult << endl;
+   // cout << "node: " << node << ", nodev: ";
+   // node_v.Print(cout);
 }
 
 
@@ -7868,7 +7880,8 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
 template<int dim>
 void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt)
 {
-   cout << "iterative Lagrange Multiplier\n";
+   // cout << "iterative Lagrange Multiplier\n";
+   Vector S_new = S;
    /* Optional run time parameters */
    bool do_theta_averaging = true;
    double theta = 0.5;
@@ -7882,25 +7895,47 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
    /* Iterate over all cells */
    for (int cell = 0; cell < num_elements; cell++)
    {
-      cout << "\ncell: " << cell << endl;
+      // cout << "\ncell: " << cell << endl;
       /* Get index of bottom left corner node */
       pmesh->GetElementVertices(cell, verts);
-      // Does verts[0] always correspond to the bottom left node? ---> YES
-      node = verts[0];
-      // Get current node velocity
-      GetNodeVelocity(S, node, Vnode_n);
-      ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, t, dt, l_mult, predicted_node_v);
-
-      if (do_theta_averaging)
+      // for (int i = 0; i < verts.Size(); i++)
+      for (int i = 0; i < 1; i++)
       {
-         predicted_node_v *= theta;
-         predicted_node_v.Add(1. - theta, Vnode_n);
-      }
+         // Does verts[0] always correspond to the bottom left node? ---> YES
+         node = verts[i];
+         // Get current node velocity
+         GetNodeVelocity(S, node, Vnode_n);
+         // cout << "\t\t computing for node: " << node << ", cell: " << cell << endl;
+         ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, t, dt, l_mult, predicted_node_v);
 
-      /* Replace Lagrange Multiplier and nodal velocity */
-      UpdateNodeVelocity(S, node, predicted_node_v);
-      LagrangeMultipliers[cell] = l_mult;
+         if (do_theta_averaging)
+         {
+            predicted_node_v *= theta;
+            predicted_node_v.Add(1. - theta, Vnode_n);
+         }
+
+         /* Replace Lagrange Multiplier and nodal velocity */
+         UpdateNodeVelocity(S, node, predicted_node_v);
+         LagrangeMultipliers[cell] = l_mult;
+
+         // Try Jacobi
+         // UpdateNodeVelocity(S_new, node, predicted_node_v);
+      }
    }
+
+   // Try Jacobi
+   // S = S_new;
+
+   // Vector* sptr = const_cast<Vector*>(&S);
+   // ParGridFunction x_gf, mv_gf;
+   // x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+
+   // cout << "x_gf: ";
+   // x_gf.Print(cout);
+   // cout << "----------\n";
+   // cout << "mv_gf: ";
+   // mv_gf.Print(cout);
 }
 
 

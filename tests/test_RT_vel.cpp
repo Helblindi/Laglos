@@ -1081,7 +1081,7 @@ int test_IntGradRT_quadratic()
    {
       // Compute true gradient as it will not be constant across mesh
       int cell_vdof = cell_it + H1FESpace.GetNVDofs() + L2FESpace.GetNF();
-      hydro.GetNodePosition(S, cell_vdof, cell_x);
+      hydro.GetNodePositionFromBV(S, cell_vdof, cell_x);
       true_grad(0,0) = cell_x[0] + 2.;
       true_grad(0,1) = 3.*cell_x[1] + 4.;
       true_grad(1,0) = 5.*cell_x[0] + 8.;
@@ -1419,7 +1419,7 @@ void plot_velocities()
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      // hydro.GetNodePosition(S, node_it, x);
+      // hydro.GetNodePositionFromBV(S, node_it, x);
       // cout << "node position for node: " << node << endl;
       // x.Print(cout);
 
@@ -1485,9 +1485,9 @@ void plot_velocities()
 
    //       H1FESpace.GetFaceDofs(fids[j], row);
    //       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
-   //       hydro.GetNodePosition(S, face_vdof1, vdof1_x);
-   //       hydro.GetNodePosition(S, face_vdof2, vdof2_x);
-   //       hydro.GetNodePosition(S, face_dof, face_x);
+   //       hydro.GetNodePositionFromBV(S, face_vdof1, vdof1_x);
+   //       hydro.GetNodePositionFromBV(S, face_vdof2, vdof2_x);
+   //       hydro.GetNodePositionFromBV(S, face_dof, face_x);
          
    //       velocity_exact(face_x, t, Vf);
 

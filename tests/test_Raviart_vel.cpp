@@ -379,7 +379,7 @@ void plot_velocities()
    bool is_dt_changed = false;
    for (int node_it = 0; node_it < H1FESpace.GetNDofs() - L2FESpace.GetNDofs(); node_it++)
    {
-      // hydro.GetNodePosition(S, node_it, x);
+      // hydro.GetNodePositionFromBV(S, node_it, x);
       // cout << "node position for node: " << node << endl;
       // x.Print(cout);
 
@@ -445,9 +445,9 @@ void plot_velocities()
 
    //       H1FESpace.GetFaceDofs(fids[j], row);
    //       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2];
-   //       hydro.GetNodePosition(S, face_vdof1, vdof1_x);
-   //       hydro.GetNodePosition(S, face_vdof2, vdof2_x);
-   //       hydro.GetNodePosition(S, face_dof, face_x);
+   //       hydro.GetNodePositionFromBV(S, face_vdof1, vdof1_x);
+   //       hydro.GetNodePositionFromBV(S, face_vdof2, vdof2_x);
+   //       hydro.GetNodePositionFromBV(S, face_dof, face_x);
          
    //       velocity_exact(face_x, t, Vf);
 

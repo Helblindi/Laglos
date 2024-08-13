@@ -4,6 +4,8 @@
 #include "mfem.hpp"
 // #include "initial_vals.hpp"
 #include "problem_base.h"
+#include "geometry.hpp" // Mesh information
+#include "lagrange_multiplier.hpp"
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -67,6 +69,9 @@ protected:
 
    // Problem specific
    ProblemBase<dim> * pb;
+
+   // Geometric
+   Geometric<dim> geom;
 
    // Matrix to hold max wavespeed values dij
    SparseMatrix * dij_sparse;
@@ -133,6 +138,7 @@ public:
                         ParFiniteElementSpace &cr,
                         ParLinearForm *m,
                         ProblemBase<dim> *_pb,
+                        Array<int> offset,
                         bool use_viscosity,
                         bool mm,
                         double CFL);
@@ -166,8 +172,6 @@ public:
 
    /* cij comp */
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
-   void Orthogonal(Vector &v);
-   void Perpendicular(Vector &v);
 
    /* Mesh movement */
    void SetMVOption(const int & option);
@@ -188,11 +192,11 @@ public:
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
 
-   void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
-   void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
-   void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel);
-   void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
-   void GetNodePosition(const Vector &S, const int & node, Vector & x);
+   // void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
+   // void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
+   // void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel);
+   // void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
+   // void GetNodePosition(const Vector &S, const int & node, Vector & x);
 
    void UpdateMesh(const Vector &S) const;
    
@@ -276,6 +280,11 @@ public:
    void ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, const double &dt, Vector &vec);
    void ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v);
    void IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt);
+
+   // HiOp Lagrange Multipliers implementation
+   void CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec);
+   void CalcCellAveragedCornerVelocityVector(const Vector &S, Vector &Vbar);
+   void SolveHiOp(Vector &S, const Vector &S_old, const double &dt);
    
    // Convert from geometric velocity to mesh velocity
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

@@ -113,6 +113,7 @@ public:
                                     double b_covolume=-1.,
                                     const string flag="NA")
    {
+      // cout << "compute_lambda_max\n";
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
       if (flag == "testing")
       {

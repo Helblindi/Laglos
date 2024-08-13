@@ -1,23 +1,29 @@
-# add the executable
-add_executable(Laglos laglos.cpp laglos_solver.cpp)
-set(EXECUTABLE_OUTPUT_PATH "../")
+list(APPEND HEADERS
+   "${PROJECT_SOURCE_DIR}/include/compile_time_vals.h"
+   "${PROJECT_SOURCE_DIR}/include/initial_vals.hpp"
+   "${PROJECT_SOURCE_DIR}/include/laglos_solver.hpp"
+   "${PROJECT_SOURCE_DIR}/include/riemann1D.hpp"
+   "${PROJECT_SOURCE_DIR}/include/lambda_max_lagrange.h"
+   "${PROJECT_SOURCE_DIR}/include/sedov_exact.hpp"
+   "${PROJECT_SOURCE_DIR}/include/geometry.hpp"
+   "${PROJECT_SOURCE_DIR}/include/lagrange_multiplier.hpp"
+   "${PROJECT_SOURCE_DIR}/../mfem-git/build/mfem.hpp")
 
-# Add fortran
-message(STATUS "src message")
-message(STATUS "LAGLOS_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
-message(STATUS "MFEM_LIBRARIES=${MFEM_DIR}")
+list(APPEND SOURCES 
+   laglos.cpp
+   laglos_solver.cpp
+   # lagrange_multiplier.cpp
+   geometry.cpp)
 
-# Link MFEM
-target_link_libraries(Laglos "${MFEM_LIBRARIES}")
 
-# Include libraries needed by lboost_filesystem
-# https://stackoverflow.com/questions/9235679/create-a-directory-if-it-doesnt-exist
+MESSAGE(STATUS "_laglos_libraries: ${_laglos_libraries}")
+MESSAGE(STATUS "_laglos_include_dirs: ${_laglos_include_dirs}")
+MESSAGE(STATUS "HEADERS: ${HEADERS}")
+MESSAGE(STATUS "SOURCES: ${SOURCES}")
 
-target_link_libraries(Laglos Boost::filesystem)
+add_library(laglos ${SOURCES} ${HEADERS})
 
-# set(LBOOST_COMPILE_FLAGS "-lboost_system")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LBOOST_COMPILE_FLAGS}")
-
-# Specify Include directories for target
-target_include_directories(Laglos PUBLIC ${MFEM_DIR} "${MFEM_INCLUDE_DIRS}")
-target_link_libraries(Laglos comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
+target_compile_definitions(laglos PUBLIC "${_laglos_compile_defs}")
+target_compile_options(laglos PUBLIC "${_laglos_compile_opts}")
+target_include_directories(laglos SYSTEM PUBLIC "${_laglos_include_dirs}")
+target_link_libraries(laglos PUBLIC "${_laglos_libraries}")

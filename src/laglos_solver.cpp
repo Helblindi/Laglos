@@ -90,6 +90,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
                                                 ParFiniteElementSpace &cr,
                                                 ParLinearForm *m,
                                                 ProblemBase<dim> *_pb,
+                                                Array<int> offset,
                                                 bool use_viscosity,
                                                 bool mm, 
                                                 double CFL) :
@@ -109,6 +110,8 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    pmesh(H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
+   block_offsets(offset),
+   geom(offset, H1),
    Vsize_H1(H1.GetVSize()),
    TVSize_H1(H1.TrueVSize()),
    GTVSize_H1(H1.GlobalTrueVSize()),
@@ -123,7 +126,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    TVSize_L2V(L2V.TrueVSize()),
    GTVSize_L2V(L2V.GlobalTrueVSize()),
    NDofs_L2V(L2V.GetNDofs()),
-   block_offsets(6),
+   // block_offsets(offset),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
    num_elements(L2.GetNE()),
@@ -143,12 +146,15 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    Transpose(*edge_vertex, vertex_edge);
 
    cout << "Instantiating hydro op\n";
-   block_offsets[0] = 0;
-   block_offsets[1] = block_offsets[0] + Vsize_H1;
-   block_offsets[2] = block_offsets[1] + Vsize_H1;
-   block_offsets[3] = block_offsets[2] + Vsize_L2;
-   block_offsets[4] = block_offsets[3] + Vsize_L2V;
-   block_offsets[5] = block_offsets[4] + Vsize_L2;
+   cout << "block offsets: ";
+   block_offsets.Print(cout);
+   assert(false);
+   // block_offsets[0] = 0;
+   // block_offsets[1] = block_offsets[0] + Vsize_H1;
+   // block_offsets[2] = block_offsets[1] + Vsize_H1;
+   // block_offsets[3] = block_offsets[2] + Vsize_L2;
+   // block_offsets[4] = block_offsets[3] + Vsize_L2V;
+   // block_offsets[5] = block_offsets[4] + Vsize_L2;
 
    // This way all face indices that do not correspond to bdr elements will have val -1.
    // I.e. if global face index k corresponds to an interior face, then BdrElementIndexingArray[k] = -1.
@@ -755,7 +761,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          {
             Vector _vel(dim);
             GetIntermediateFaceVelocity(face, _vel);
-            UpdateNodeVelocity(S, face, _vel);
+            geom.UpdateNodeVelocity(S, face, _vel);
          }
       }
       else 
@@ -787,43 +793,46 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             break;
 
          case 7: // Lagrange Multiplier
-            if (!this->use_corner_velocity_MC_iteration)
+         {
+            if (this->use_corner_velocity_MC_iteration)
+            {
+               mv_gf_prev_it = mv_gf;
+               double loss = ComputeCellVolumeNorm(S, S_old, dt);
+               cout << "starting loss: " << loss << endl;
+
+               for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
+               {
+                  // cout << "iterating on the corner node velocities\n";
+                  // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
+                  // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
+                  IterativeLagrangeMultiplier(S, S_old, t, dt);
+                  
+                  // ComputeAverageVelocities(S);
+                  // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
+                  loss = ComputeCellVolumeNorm(S, S_old, dt);
+                  cout << "val at iteration " << i << ": " << loss << endl;
+                  // cout << i << "," << val << endl;
+                  // compare_gamma2(S, S_old, dt, i);
+                  // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
+                  // VerifyContributions(S, S_old, mv2_gf, dt, i);
+                  mv_gf_prev_it = mv_gf;
+               }
+            }
+            else
             {
                MFEM_ABORT("Must use iteration if computing the mesh velocity with Lagrange Multiplier method.\n");
             }
             break;
+         }
+         case 8: // HiOp Solver for optimization problem
+         {
+            ComputeGeoVNormal(S);
+            SolveHiOp(S, S_old, dt);
+            break;
+         }
          
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
-         }
-         // mv_gf = 0.;
-         const ParGridFunction mv2_gf = mv_gf;
-
-         // ComputeNodeVelocitiesFromVgeo(S, t, dt);
-
-         if (this->use_corner_velocity_MC_iteration)
-         {
-            mv_gf_prev_it = mv_gf;
-            double loss = ComputeCellVolumeNorm(S, S_old, dt);
-            cout << "starting loss: " << loss << endl;
-
-            for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
-            {
-               // cout << "iterating on the corner node velocities\n";
-               // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
-               // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
-               IterativeLagrangeMultiplier(S, S_old, t, dt);
-               
-               // ComputeAverageVelocities(S);
-               // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
-               loss = ComputeCellVolumeNorm(S, S_old, dt);
-               cout << "val at iteration " << i << ": " << loss << endl;
-               // cout << i << "," << val << endl;
-               // compare_gamma2(S, S_old, dt, i);
-               // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
-               // VerifyContributions(S, S_old, mv2_gf, dt, i);
-               mv_gf_prev_it = mv_gf;
-            }
          }
 
          if (pb->has_boundary_conditions())
@@ -1345,7 +1354,7 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
       }
    }
 
-   GetNodePosition(S, cell_vdof, cell_x);
+   geom.GetNodePositionFromBV(S, cell_vdof, cell_x);
 
    // Fill in val with exact solution
    state_val[0] = pb->sv0(cell_x, t+dt);
@@ -1416,7 +1425,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 
          case 5:
             node_v = 0.;
-            UpdateNodeVelocity(S, i, node_v);
+            geom.UpdateNodeVelocity(S, i, node_v);
             continue;
          
          case -1:
@@ -1433,10 +1442,10 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
             MFEM_ABORT("Dont correct interior vertices.\n");
          }
          /* Correct node velocity accordingly */
-         GetNodeVelocity(S, i, node_v);
+         geom.GetNodeVelocity(S, i, node_v);
          double coeff = node_v * normal;
          node_v.Add(-coeff, normal);
-         UpdateNodeVelocity(S, i, node_v);
+         geom.UpdateNodeVelocity(S, i, node_v);
       }
    }
    else if (pb->get_indicator() == "saltzmann")
@@ -1476,7 +1485,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
          {
          case 4:
             // left
-            UpdateNodeVelocity(S,i,ex);
+            geom.UpdateNodeVelocity(S,i,ex);
             continue;
          
          case 1:
@@ -1512,12 +1521,12 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
             MFEM_ABORT("Left wall BCs already handled.\n");
          }
          /* Correct node velocity accordingly */
-         GetNodeVelocity(S, i, node_v);
+         geom.GetNodeVelocity(S, i, node_v);
 
          double coeff = node_v * normal;
 
          node_v.Add(-coeff, normal);
-         UpdateNodeVelocity(S, i, node_v);
+         geom.UpdateNodeVelocity(S, i, node_v);
       }
    }
    else if (pb->get_indicator() == "IsentropicVortex")
@@ -1582,12 +1591,12 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
             MFEM_ABORT("Dont correct interior vertices.\n");
          }
          /* Correct node velocity accordingly */
-         GetNodeVelocity(S, i, node_v);
+         geom.GetNodeVelocity(S, i, node_v);
 
          double coeff = node_v * normal;
          node_v.Add(-coeff, normal);
 
-         UpdateNodeVelocity(S, i, node_v);
+         geom.UpdateNodeVelocity(S, i, node_v);
       }
    }
 }
@@ -1882,8 +1891,8 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
          vertex_element->GetRow(face, row);
 
          int cell_gdof = cell + num_faces;
-         GetNodePosition(S, cell_gdof, cell_center_x);
-         GetNodePosition(S, face, face_x);
+         geom.GetNodePositionFromBV(S, cell_gdof, cell_center_x);
+         geom.GetNodePositionFromBV(S, face, face_x);
 
          subtract(face_x, cell_center_x, res);
          res *= 1. / res.Norml2();
@@ -1892,20 +1901,20 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
       case 2:
       {
          H1.GetFaceDofs(face, row);
-
          int face_vdof1 = row[1], face_vdof2 = row[0];
          face_dof = row[2];
 
          Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
-         GetNodePosition(S, face_dof, face_x);
-         GetNodePosition(S, face_vdof1, vdof1_x);
-         GetNodePosition(S, face_vdof2, vdof2_x);
+
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
+         geom.GetNodePositionFromBV(S, face_vdof1, vdof1_x);
+         geom.GetNodePositionFromBV(S, face_vdof2, vdof2_x);
 
          Vector secant(dim);
          subtract(vdof2_x, vdof1_x, secant);
 
          res = secant;
-         Orthogonal(res);
+         geom.Orthogonal(res);
 
          /* Ensure orientation of normal */
          if (FI.IsInterior()) // Interior face
@@ -1934,52 +1943,6 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
    }
 }
 
-
-/****************************************************************************************************
-* Function: Orthogonal
-* Parameters:
-*     v - Vector to be rotated
-*
-* Purpose:
-*     Rotate a vector counter-clockwise of angle pi/2.
-*
-* Example:
-*  (-1,1) ---> (-1,-1)
-*  (x, y) ---> (-y, x)
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::Orthogonal(Vector &v)
-{
-   if (dim == 2)
-   {
-      double x = v(0), y = v(1);
-      v(0) = -1. * y;
-      v(1) = x;
-   }
-}
-
-
-/****************************************************************************************************
-* Function: Perpendicular
-* Parameters:
-*     v - Vector to be rotated
-*
-* Purpose:
-*     Rotate a vector clockwise of angle pi/2.
-*
-* Example:
-*  (1,0) ---> (0,-1)
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::Perpendicular(Vector &v)
-{
-   if (dim == 2)
-   {
-      double x = v(0), y = v(1);
-      v(0) = y;
-      v(1) = -1. * x;
-   }
-}
 
 
 /****************************************************************************************************
@@ -2034,7 +1997,7 @@ void LagrangianLOOperator<dim>::
          F = n_vec.Norml2();
          n_vec /= F;
          tau_vec = n_vec;
-         Orthogonal(tau_vec);
+         geom.Orthogonal(tau_vec);
          tau_vec *= -1.;
          assert(1. - n_vec.Norml2() < 1e-12);
 
@@ -2130,7 +2093,7 @@ void LagrangianLOOperator<dim>::
             }
          }
 
-         GetNodePosition(S, face_dof, face_x);
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
          test_vel(face_x, t, Vf);
       }
 
@@ -2589,13 +2552,13 @@ void LagrangianLOOperator<dim>::
 
       // retrieve old face and corner locations
       Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
-      GetNodePosition(S, face_dof, face_x);
-      GetNodePosition(S, face_vdof1, vdof1_x);
-      GetNodePosition(S, face_vdof2, vdof2_x);
+      geom.GetNodePositionFromBV(S, face_dof, face_x);
+      geom.GetNodePositionFromBV(S, face_vdof1, vdof1_x);
+      geom.GetNodePositionFromBV(S, face_vdof2, vdof2_x);
 
       // retrieve corner velocities
-      GetNodeVelocity(S, face_vdof1, vdof1_v);
-      GetNodeVelocity(S, face_vdof2, vdof2_v);
+      geom.GetNodeVelocity(S, face_vdof1, vdof1_v);
+      geom.GetNodeVelocity(S, face_vdof2, vdof2_v);
 
       if (FI.IsInterior())
       {
@@ -2636,10 +2599,10 @@ void LagrangianLOOperator<dim>::
          // Compute D (A.4c)
          Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
          n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
+         geom.Orthogonal(n_vec_R);
          subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
          subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         Orthogonal(temp_vec_2);
+         geom.Orthogonal(temp_vec_2);
          double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
          // Compute c1 (A.4a)
@@ -2649,21 +2612,21 @@ void LagrangianLOOperator<dim>::
          // Compute c0 (A.4b)
          Vector n_vec_half(dim);
          subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
-         Orthogonal(n_vec_half);
+         geom.Orthogonal(n_vec_half);
          GetIntermediateFaceVelocity(face, Vf);
          
          double bmn = Vf * n_vec;
          bmn *= F;
 
          temp_vec = vdof1_x_half;
-         Orthogonal(temp_vec); // A1R
+         geom.Orthogonal(temp_vec); // A1R
          temp_vec_2 = vdof2_x_half;
-         Orthogonal(temp_vec_2); // A2R
+         geom.Orthogonal(temp_vec_2); // A2R
          double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
          double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
          
          temp_vec = face_x;
-         Orthogonal(temp_vec);
+         geom.Orthogonal(temp_vec);
          subtract(vdof2_v, vdof1_v, temp_vec_2);
          double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
          double c2 = (3. / D) * (const1 / 2. + const2 / 6. + 2. * const3 / 3.);
@@ -2712,7 +2675,7 @@ void LagrangianLOOperator<dim>::
 
          /* Option 2 */
          // Vector rt_face_vel(dim);
-         // GetNodeVelocity(S, face_dof, rt_face_vel);
+         // geom.GetNodeVelocity(S, face_dof, rt_face_vel);
          // V3nperp = rt_face_vel * n_vec_perp;
 
          // Compute V3n (5.11)
@@ -2760,7 +2723,7 @@ void LagrangianLOOperator<dim>::
 
       // cout << "compute corrective face velocity face (" << face << ") dof: " << face_dof << ": ";
       // face_velocity.Print(cout);
-      UpdateNodeVelocity(S, face_dof, face_velocity);
+      geom.UpdateNodeVelocity(S, face_dof, face_velocity);
       SetCorrectedFaceVelocity(face, face_velocity);
    }
 }
@@ -2901,13 +2864,13 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 
       for (int j = 0; j < verts.Size(); j++)
       {
-         GetNodePosition(S, verts[j], node_x);
+         geom.GetNodePositionFromBV(S, verts[j], node_x);
          cell_x += node_x;
       }
 
       cell_x /= verts.Size();
 
-      UpdateNodePosition(S, cell_vdof, cell_x);
+      geom.UpdateNodePosition(S, cell_vdof, cell_x);
    }
 }
 
@@ -2965,7 +2928,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
       pb->velocity(Uc, node_v);
       
       // Get corresponding velocity from ParGridFunction
-      UpdateNodeVelocity(S, cell_vdof, node_v);
+      geom.UpdateNodeVelocity(S, cell_vdof, node_v);
    }
 }
 
@@ -3023,7 +2986,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(S, verts[j], node_v);
             Vc += node_v;
          }
          Vc /= verts.Size();
@@ -3034,14 +2997,14 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(S, verts[j], node_v);
             Vc += node_v;
          }
 
          Vc /= verts.Size();
       }
 
-      UpdateNodeVelocity(S, cell_vdof, Vc);
+      geom.UpdateNodeVelocity(S, cell_vdof, Vc);
    }
 }
 
@@ -3081,11 +3044,11 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(Vector &S, const strin
       Vector face_x(dim), vdof1_v(dim), vdof2_v(dim);
 
       // Get face location
-      GetNodePosition(S, face_dof, face_x);
+      geom.GetNodePositionFromBV(S, face_dof, face_x);
 
       // retrieve corner velocities
-      GetNodeVelocity(S, face_vdof1, vdof1_v);
-      GetNodeVelocity(S, face_vdof2, vdof2_v);
+      geom.GetNodeVelocity(S, face_vdof1, vdof1_v);
+      geom.GetNodeVelocity(S, face_vdof2, vdof2_v);
 
       // Average nodal velocities
       for (int j = 0; j < dim; j++)
@@ -3094,77 +3057,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(Vector &S, const strin
       }
 
       // Lastly, put face velocity into gridfunction object
-      UpdateNodeVelocity(S, face_dof, face_velocity);
-   }
-}
-
-
-/****************************************************************************************************
-* Function: UpdateNodeVelocity
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   vel  - Velocity computed at node to be used to move the mesh
-* Purpose:
-*   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel)
-{
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf;
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-
-   for (int i = 0; i < dim; i++)
-   {
-      int index = node + i * NDofs_H1;
-      mv_gf[index] = vel[i];
-   }
-}
-
-
-/****************************************************************************************************
-* Function: GetNodeVelocity
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   vel  - Velocity at given node
-*
-* Purpose:
-*  This function returns the velocity at the given global node.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector & vel)
-{
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf;
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-
-   for (int i = 0; i < dim; i++)
-   {
-      int index = node + i * NDofs_H1;
-      vel[i] = mv_gf[index];
-   }
-}  
-
-
-/****************************************************************************************************
-* Function: GetNodeVelocityGF
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   vel  - Velocity at given node
-*
-* Purpose:
-*  This function returns the velocity at the given global node.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel)
-{
-   for (int i = 0; i < dim; i++)
-   {
-      int index = node + i * NDofs_H1;
-      vel[i] = mv_gf[index];
+      geom.UpdateNodeVelocity(S, face_dof, face_velocity);
    }
 }
 
@@ -3210,54 +3103,54 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 }
 
 
-/****************************************************************************************************
-* Function: UpdateNodePosition
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   x    - Coordinate position at given node.
-*
-* Purpose:
-*  This function updates the cartesian location corresponding to a global node.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::UpdateNodePosition(Vector &S, const int & node, const Vector &x)
-{
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction x_gf;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+// /****************************************************************************************************
+// * Function: geom.UpdateNodePosition
+// * Parameters:
+// *   S    - BlockVector representing FiniteElement information
+// *   node - Global index of node in question.
+// *   x    - Coordinate position at given node.
+// *
+// * Purpose:
+// *  This function updates the cartesian location corresponding to a global node.
+// ****************************************************************************************************/
+// template<int dim>
+// void LagrangianLOOperator<dim>::geom.UpdateNodePosition(Vector &S, const int & node, const Vector &x)
+// {
+//    Vector* sptr = const_cast<Vector*>(&S);
+//    ParGridFunction x_gf;
+//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
 
-   for (int i = 0; i < dim; i++)
-   {
-      int index = node + i * NDofs_H1;
-      x_gf[index] = x[i];
-   }
-}
+//    for (int i = 0; i < dim; i++)
+//    {
+//       int index = node + i * NDofs_H1;
+//       x_gf[index] = x[i];
+//    }
+// }
 
 
-/****************************************************************************************************
-* Function: GetNodePosition
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   x    - Coordinate position at given node.
-*
-* Purpose:
-*  This function returns the cartesian location corresponding to a global node.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetNodePosition(const Vector &S, const int & node, Vector & x)
-{
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction x_gf;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+// /****************************************************************************************************
+// * Function: geom.GetNodePosition
+// * Parameters:
+// *   S    - BlockVector representing FiniteElement information
+// *   node - Global index of node in question.
+// *   x    - Coordinate position at given node.
+// *
+// * Purpose:
+// *  This function returns the cartesian location corresponding to a global node.
+// ****************************************************************************************************/
+// template<int dim>
+// void LagrangianLOOperator<dim>::geom.GetNodePosition(const Vector &S, const int & node, Vector & x)
+// {
+//    Vector* sptr = const_cast<Vector*>(&S);
+//    ParGridFunction x_gf;
+//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
 
-   for (int i = 0; i < dim; i++)
-   {
-      int index = node + i * NDofs_H1;
-      x[i] = x_gf[index];
-   }
-}
+//    for (int i = 0; i < dim; i++)
+//    {
+//       int index = node + i * NDofs_H1;
+//       x[i] = x_gf[index];
+//    }
+// }
 
 
 /****************************************************************************************************
@@ -3500,7 +3393,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
       // cout << "node velocity from mv2 for node (" << node << "): ";
       // node_v.Print(cout);
       // In every case, update the corresponding nodal velocity in S
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
    } // End node iterator
 }
@@ -3567,7 +3460,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
             // Reset vals
             uniqueFaceIndices.clear();
             F = 0.;
-            GetNodePosition(S, node, node_x);
+            geom.GetNodePositionFromBV(S, node, node_x);
 
             // Get adjacent cells
             vertex_element->GetRow(node, element_row);
@@ -3642,8 +3535,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
 
                      // Get average of face edge nodes
                      H1.GetFaceDofs(face_index, face_dofs);
-                     GetNodePosition(S, face_dofs[1], vdof1_x);
-                     GetNodePosition(S, face_dofs[0], vdof2_x);
+                     geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
+                     geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                      face_x = vdof1_x;
                      face_x.Add(1., vdof2_x);
                      face_x *= 0.5;
@@ -3656,7 +3549,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
                      // n_vec.Print(cout);
                      // cout << "face_x: ";
                      // face_x.Print(cout);
-                     // GetNodePosition(S, face_dofs[2], face_x);
+                     // geom.GetNodePositionFromBV(S, face_dofs[2], face_x);
 
                      // Fill rows of A
                      A(row_index, 0) = n_vec(0);
@@ -3742,7 +3635,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
       // }
 
       // In every case, update the corresponding nodal velocity in S
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
    } // End node iterator
 }
@@ -3908,7 +3801,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEAT(Vector &S)
       }
 
       // In every case, update the corresponding nodal velocity in S
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
    } // End node iterator
 }
@@ -3973,7 +3866,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
             uniqueFaceIndices.clear();
             F = 0.;
             node_v = 0.;
-            GetNodePosition(S, node, node_x);
+            geom.GetNodePositionFromBV(S, node, node_x);
 
             // Get adjacent cells
             vertex_element->GetRow(node, element_row);
@@ -4116,8 +4009,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
 
                            // Get average of face edge nodes
                            H1.GetFaceDofs(face_index, face_dofs);
-                           GetNodePosition(S, face_dofs[1], vdof1_x);
-                           GetNodePosition(S, face_dofs[0], vdof2_x);
+                           geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
+                           geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                            face_x = vdof1_x;
                            face_x.Add(1., vdof2_x);
                            face_x *= 0.5;
@@ -4190,7 +4083,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
       } // end entity switch
 
       // In every case, update the corresponding nodal velocity in S
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
    } // End node iterator
 }
@@ -4255,7 +4148,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
             uniqueFaceIndices.clear();
             F = 0.;
             node_v = 0.;
-            GetNodePosition(S, node, node_x);
+            geom.GetNodePositionFromBV(S, node, node_x);
 
             // Get adjacent cells
             vertex_element->GetRow(node, element_row);
@@ -4423,8 +4316,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 
                            // Get average of face edge nodes
                            H1.GetFaceDofs(face_index, face_dofs);
-                           GetNodePosition(S, face_dofs[1], vdof1_x);
-                           GetNodePosition(S, face_dofs[0], vdof2_x);
+                           geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
+                           geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                            face_x = vdof1_x;
                            face_x.Add(1., vdof2_x);
                            face_x *= 0.5;
@@ -4512,7 +4405,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
       } // end entity switch
 
       // In every case, update the corresponding nodal velocity in S
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
    } // End node iterator
 }
@@ -4574,7 +4467,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    Vector Ri(dim), v_tmp(dim);
 
    /* Iterate over corner nodes */
-   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   for (int node = 0; node < NVDofs_H1; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
    {
       // Reset new nodal velocity, and averaging objects
       Mi = 0., Ri = 0.;
@@ -4587,8 +4480,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
       bdr_ind = BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
-      GetNodeVelocity(S, node, Vnode_n);
-      GetNodePosition(S, node, Vnode_x);
+      geom.GetNodeVelocity(S, node, Vnode_n);
+      geom.GetNodePositionFromBV(S, node, Vnode_x);
 
       // Compute An and an+1 for node
       add(Vnode_x, dt/2., Vnode_n, Vnode_half);
@@ -4639,16 +4532,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          }
 
          /* Get face and adj node velocity and position */
-         GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
-         GetNodePosition(S, Vadj_index, Vadj_x);
-         GetNodePosition(S, face_dof, face_x);
+         geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
+         geom.GetNodeVelocity(S, face_dof, Vface_n);
+         geom.GetNodePositionFromBV(S, Vadj_index, Vadj_x);
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
 
          // Check to make sure orientation is correct
          // This part is mostly for assertion
          Vector ttvec(dim);
          subtract(Vnode_x, Vadj_x, ttvec);
-         Orthogonal(ttvec);
+         geom.Orthogonal(ttvec);
          double _val = ttvec * n_vec;
          // Vector should be pointing in same direction
          if (_val < 1E-6)
@@ -4671,7 +4564,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
          // Perpendicular vector
          n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
+         geom.Orthogonal(n_vec_R);
 
          // Calculate bmn
          double bmn = Vf * n_vec;
@@ -4689,13 +4582,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          Bnode *= -2.;
          Bnode.Add(-.5, Vadj_x);
          Bnode.Add(2.5, Vnode_x);
-         Orthogonal(Bnode);
+         geom.Orthogonal(Bnode);
 
          Badj = face_x;
          Badj *= -2.;
          Badj.Add(-.5, Vnode_x);
          Badj.Add(2.5, Vadj_x);
-         Orthogonal(Badj);
+         geom.Orthogonal(Badj);
 
          // Compute dot products
          double badjn = Badj * n_vec;
@@ -4716,7 +4609,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
             subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
 
-            Orthogonal(temp_vec_2);
+            geom.Orthogonal(temp_vec_2);
             D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
             // Compute c1 (A.4a)
@@ -4798,7 +4691,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             bmn *= F;
 
             n_vec_R = n_vec;
-            Orthogonal(n_vec_R);
+            geom.Orthogonal(n_vec_R);
             Vnode_prev_it_nR_comp = Vnode_n * n_vec_R;
 
             // Get normal and rotated components of Vadj_n
@@ -4813,7 +4706,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
             Vector ttvec(dim);
             subtract(Vnode_x, Vadj_x, ttvec);
-            Orthogonal(ttvec);
+            geom.Orthogonal(ttvec);
             double _val = ttvec * n_vec;
             if (_val < 1E-6)
             {
@@ -4833,13 +4726,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
             Bnode *= -2.;
             Bnode.Add(-.5, Vadj_x);
             Bnode.Add(2.5, Vnode_x);
-            Orthogonal(Bnode);
+            geom.Orthogonal(Bnode);
 
             Badj = face_x;
             Badj *= -2.;
             Badj.Add(-.5, Vnode_x);
             Badj.Add(2.5, Vadj_x);
-            Orthogonal(Badj);
+            geom.Orthogonal(Badj);
 
             double badjn = Badj * n_vec;
             double badjnr = Badj * n_vec_R;
@@ -4857,7 +4750,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
                subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
                subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
                
-               Orthogonal(temp_vec_2);
+               geom.Orthogonal(temp_vec_2);
                D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
                // Compute c1 (A.4a)
@@ -4904,7 +4797,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 
       // Put velocity in S
       // Gauss-Seidel > Jacobi
-      UpdateNodeVelocity(S, node, predicted_node_v);
+      geom.UpdateNodeVelocity(S, node, predicted_node_v);
    }
 }
 
@@ -4953,13 +4846,13 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
 
          // retrieve old face and corner locations
          Vector face_x(dim), vdof1_x(dim), vdof2_x(dim), vdof1_v(dim), vdof2_v(dim);
-         GetNodePosition(S, face_dof, face_x);
-         GetNodePosition(S, face_vdof1, vdof1_x);
-         GetNodePosition(S, face_vdof2, vdof2_x);
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
+         geom.GetNodePositionFromBV(S, face_vdof1, vdof1_x);
+         geom.GetNodePositionFromBV(S, face_vdof2, vdof2_x);
 
          // retrieve corner velocities
-         GetNodeVelocity(S, face_vdof1, vdof1_v);
-         GetNodeVelocity(S, face_vdof2, vdof2_v);
+         geom.GetNodeVelocity(S, face_vdof1, vdof1_v);
+         geom.GetNodeVelocity(S, face_vdof2, vdof2_v);
 
          // cout << "node 1 velocity (" << face_vdof1 << "): ";
          // vdof1_v.Print(cout);
@@ -5005,10 +4898,10 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
          // Compute D (A.4c)
          Vector n_vec_R(dim), temp_vec(dim), temp_vec_2(dim);
          n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
+         geom.Orthogonal(n_vec_R);
          subtract(vdof1_v, vdof2_v, temp_vec); // V1 - V2 = temp_vec
          subtract(vdof2_x_half, vdof1_x_half, temp_vec_2); // A2-A1
-         Orthogonal(temp_vec_2);
+         geom.Orthogonal(temp_vec_2);
          double D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
          // Compute c1 (A.4a)
@@ -5022,21 +4915,21 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
          // Compute c0 (A.4b)
          // Vector n_vec_half(dim);
          // subtract(vdof2_x_half, vdof1_x_half, n_vec_half);
-         // Orthogonal(n_vec_half);
+         // geom.Orthogonal(n_vec_half);
          GetIntermediateFaceVelocity(face, Vf);
          
          double bmn = Vf * n_vec;
          bmn *= F;
 
          temp_vec = vdof1_x_half;
-         Orthogonal(temp_vec); // A1R
+         geom.Orthogonal(temp_vec); // A1R
          temp_vec_2 = vdof2_x_half;
-         Orthogonal(temp_vec_2); // A2R
+         geom.Orthogonal(temp_vec_2); // A2R
          double const1 = vdof1_v * temp_vec - vdof2_v * temp_vec_2; // V1*A1R - V2*A2R
          double const2 = vdof1_v * temp_vec_2 - vdof2_v * temp_vec; // V1*A2R - V2*A1R
          
          temp_vec = face_x;
-         Orthogonal(temp_vec);
+         geom.Orthogonal(temp_vec);
          subtract(vdof2_v, vdof1_v, temp_vec_2);
          double const3 = temp_vec_2 * temp_vec; // (V2 - V1) * a3nR
          double c0 = (3. / D) * (bmn + const1 / 2. + const2 / 6. + 2. * const3 / 3.);
@@ -5128,7 +5021,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
    Vector Ri(dim);
 
    /* Iterate over corner nodes */
-   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   for (int node = 0; node < NVDofs_H1; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
    {
       // Reset new nodal velocity, and averaging objects
       Mi = 0., Ri = 0.;
@@ -5140,8 +5033,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
       bdr_ind = BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
-      GetNodeVelocity(S, node, Vnode_n);
-      GetNodePosition(S, node, Vnode_x);
+      geom.GetNodeVelocity(S, node, Vnode_n);
+      geom.GetNodePositionFromBV(S, node, Vnode_x);
 
       // Compute An and an+1 for node
       add(Vnode_x, dt/2., Vnode_n, Vnode_half);
@@ -5181,17 +5074,17 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          }
 
          /* Get face and adj node velocity and position */
-         GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
-         GetNodePosition(S, Vadj_index, Vadj_x);
-         GetNodePosition(S, face_dof, face_x);
+         geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
+         geom.GetNodeVelocity(S, face_dof, Vface_n);
+         geom.GetNodePositionFromBV(S, Vadj_index, Vadj_x);
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
 
          // Get n, tau, and F
          subtract(Vnode_x, Vadj_x, tau_vec);
          F = tau_vec.Norml2();
          tau_vec /= F;
          n_vec = tau_vec;
-         Orthogonal(n_vec);
+         geom.Orthogonal(n_vec);
 
          // Compute future face and adjacent node locations
          add(Vadj_x, dt/2., Vadj_n, Vadj_half);
@@ -5200,7 +5093,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
          // Perpendicular vector
          n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
+         geom.Orthogonal(n_vec_R);
 
          // Calculate bmn
          double bmn = Vf * n_vec;
@@ -5218,13 +5111,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          Bnode *= -2.;
          Bnode.Add(-.5, Vadj_x);
          Bnode.Add(2.5, Vnode_x);
-         Orthogonal(Bnode);
+         geom.Orthogonal(Bnode);
 
          Badj = face_x;
          Badj *= -2.;
          Badj.Add(-.5, Vnode_x);
          Badj.Add(2.5, Vadj_x);
-         Orthogonal(Badj);
+         geom.Orthogonal(Badj);
 
          // Compute dot products
          double badjn = Badj * n_vec;
@@ -5251,7 +5144,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
             subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
 
-            Orthogonal(temp_vec_2);
+            geom.Orthogonal(temp_vec_2);
             D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
             // Compute c1 (A.4a)
@@ -5342,7 +5235,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             bmn *= F;
 
             n_vec_R = n_vec;
-            Orthogonal(n_vec_R);
+            geom.Orthogonal(n_vec_R);
             Vnode_prev_it_nR_comp = Vnode_n * n_vec_R;
 
             // Get normal and rotated components of Vadj_n
@@ -5360,13 +5253,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
             Bnode *= -2.;
             Bnode.Add(-.5, Vadj_x);
             Bnode.Add(2.5, Vnode_x);
-            Orthogonal(Bnode);
+            geom.Orthogonal(Bnode);
 
             Badj = face_x;
             Badj *= -2.;
             Badj.Add(-.5, Vnode_x);
             Badj.Add(2.5, Vadj_x);
-            Orthogonal(Badj);
+            geom.Orthogonal(Badj);
 
             // Compute dot products
             double badjn = Badj * n_vec;
@@ -5394,7 +5287,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
                subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
                subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
                
-               Orthogonal(temp_vec_2);
+               geom.Orthogonal(temp_vec_2);
                D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
                // Compute c1 (A.4a)
@@ -5450,9 +5343,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 
       // Put velocity in S
       // Gauss-Seidel > Jacobi
-      // UpdateNodeVelocity(S, node, predicted_node_v);
+      // geom.UpdateNodeVelocity(S, node, predicted_node_v);
       // Try Jacobi
-      UpdateNodeVelocity(S_new, node, predicted_node_v);
+      geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
 }
@@ -5530,8 +5423,8 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
       int bdr_ind = BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
-      GetNodeVelocity(S, node, Vnode);
-      GetNodePosition(S, node, anode);
+      geom.GetNodeVelocity(S, node, Vnode);
+      geom.GetNodePositionFromBV(S, node, anode);
 
       // Get cell faces
       vertex_edge.GetRow(node, faces_row);
@@ -5569,26 +5462,26 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
             }
 
             /* Get face and adj node velocity and position */
-            GetNodeVelocity(S, Vadj_index, Vadj);
-            // GetNodeVelocity(S, face_dof, Vface);
+            geom.GetNodeVelocity(S, Vadj_index, Vadj);
+            // geom.GetNodeVelocity(S, face_dof, Vface);
             add(0.5, Vnode, 0.5, Vadj, Vface);
-            GetNodePosition(S, Vadj_index, aadj);
-            GetNodePosition(S, face_dof, a3n);
+            geom.GetNodePositionFromBV(S, Vadj_index, aadj);
+            geom.GetNodePositionFromBV(S, face_dof, a3n);
 
             // Get n, tau, and F
             subtract(anode, aadj, tau_vec);
             F = tau_vec.Norml2();
             tau_vec /= F;
             n_vec = tau_vec;
-            Orthogonal(n_vec);
+            geom.Orthogonal(n_vec);
 
             // Compute AadjR, AnodeR, a3nR
             add(1., aadj, dt / 2., Vadj, AadjR);
-            Orthogonal(AadjR);
+            geom.Orthogonal(AadjR);
             add(1., anode, dt/2., Vnode, AnodeR);
-            Orthogonal(AnodeR);
+            geom.Orthogonal(AnodeR);
             a3nR = a3n;
-            Orthogonal(a3nR);
+            geom.Orthogonal(a3nR);
 
             double alpha = compute_alpha(Vadj, AadjR, Vnode, AnodeR, Vface, a3nR, n_vec, tau_vec, dt, F);
 
@@ -5634,8 +5527,8 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(const Vector &S, const Pa
       if (bdr_ind == -1)
       {
          // Get updated iterated velocity and old velocity
-         GetNodeVelocity(S, node, Vi_next);
-         GetNodeVelocity(mv_gf_prev_it, node, Vi_prev);
+         geom.GetNodeVelocity(S, node, Vi_next);
+         geom.GetNodeVelocity(mv_gf_prev_it, node, Vi_prev);
          subtract(Vi_next, Vi_prev, temp_vec);
          numer += temp_vec.Norml2();
          denom += Vi_prev.Norml2();
@@ -5679,9 +5572,9 @@ double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double 
          int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
          // retrieve corner velocities
-         GetNodeVelocity(S, face_vdof1, Vdof1_n);
-         GetNodeVelocity(S, face_vdof2, Vdof2_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
+         geom.GetNodeVelocity(S, face_vdof1, Vdof1_n);
+         geom.GetNodeVelocity(S, face_vdof2, Vdof2_n);
+         geom.GetNodeVelocity(S, face_dof, Vface_n);
 
          add(0.5, Vdof1_n, 0.5, Vdof2_n, temp_vec);
          denom += temp_vec.Norml2();
@@ -5774,8 +5667,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
       bdr_ind = BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
-      GetNodeVelocity(S, node, Vnode_n);
-      GetNodePosition(S, node, anode_n);
+      geom.GetNodeVelocity(S, node, Vnode_n);
+      geom.GetNodePositionFromBV(S, node, anode_n);
 
       // Compute An for node
       add(anode_n, dt/2., Vnode_n, Anode);
@@ -5812,16 +5705,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          }
 
          /* Get face and adj node velocity and position */
-         GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodePosition(S, Vadj_index, aadj_n);
-         GetNodePosition(S, face_dof, a3n);
+         geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
+         geom.GetNodePositionFromBV(S, Vadj_index, aadj_n);
+         geom.GetNodePositionFromBV(S, face_dof, a3n);
 
          // Get n, tau, and F
          subtract(anode_n, aadj_n, tau_vec);
          F = tau_vec.Norml2();
          tau_vec /= F;
          n_vec = tau_vec;
-         Orthogonal(n_vec);
+         geom.Orthogonal(n_vec);
 
          // Compute future adjacent node locations
          add(aadj_n, dt/2., Vadj_n, Aadj);
@@ -5831,7 +5724,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          double Fhalf = tau_vec_half.Norml2();
          tau_vec_half /= Fhalf;
          n_vec_half = tau_vec_half;
-         Orthogonal(n_vec_half);
+         geom.Orthogonal(n_vec_half);
 
          // Get normal and tangential components of Vadj_n
          Vadj_n_comp = Vadj_n * n_vec;
@@ -5842,13 +5735,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          Bnode.Add(1./6., aadj_n);
          Bnode.Add(0.5, anode_n);
          Bnode.Add(-2./3., a3n);
-         Orthogonal(Bnode);
+         geom.Orthogonal(Bnode);
 
          Badj = 0.;
          Badj.Add(0.5, aadj_n);
          Badj.Add(1./6., anode_n);
          Badj.Add(-2./3., a3n);
-         Orthogonal(Badj);
+         geom.Orthogonal(Badj);
 
          // Compute dot products
          double badjn = Badj * n_vec;
@@ -5958,20 +5851,20 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
             double Fhalf = tau_vec_half.Norml2();
             tau_vec_half /= Fhalf;
             n_vec_half = tau_vec_half;
-            Orthogonal(n_vec_half);
+            geom.Orthogonal(n_vec_half);
 
             // Compute geometrical vectors
             Bnode = 0.;
             Bnode.Add(1./6., aadj_n);
             Bnode.Add(0.5, anode_n);
             Bnode.Add(-2./3., a3n);
-            Orthogonal(Bnode);
+            geom.Orthogonal(Bnode);
 
             Badj = 0.;
             Badj.Add(0.5, aadj_n);
             Badj.Add(1./6., anode_n);
             Badj.Add(-2./3., a3n);
-            Orthogonal(Badj);
+            geom.Orthogonal(Badj);
 
             // Compute dot products
             double badjn = Badj * n_vec;
@@ -6040,9 +5933,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
       // predicted_node_v.Print(cout);
       // Put velocity in S
       // Gauss-Seidel > Jacobi
-      // UpdateNodeVelocity(S, node, predicted_node_v);
+      // geom.UpdateNodeVelocity(S, node, predicted_node_v);
       // Try Jacobi
-      UpdateNodeVelocity(S_new, node, predicted_node_v);
+      geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
 }
@@ -6123,8 +6016,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
          faces_length = faces_row.Size();
 
          /* Get nodal position */
-         GetNodePosition(S, node, anode_n);
-         GetNodeVelocity(S, node, Vnode_n);
+         geom.GetNodePositionFromBV(S, node, anode_n);
+         geom.GetNodeVelocity(S, node, Vnode_n);
 
          /* Iterate over adjacent cells */ 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
@@ -6140,13 +6033,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
                l3_vi = verts[(node_index + 2) % verts_length],
                l1_vi = verts[(node_index + 3) % verts_length];
 
-            GetNodePosition(S, l1_vi, al1_n);
-            GetNodePosition(S, l2_vi, al2_n);
-            GetNodePosition(S, l3_vi, al3_n);
+            geom.GetNodePositionFromBV(S, l1_vi, al1_n);
+            geom.GetNodePositionFromBV(S, l2_vi, al2_n);
+            geom.GetNodePositionFromBV(S, l3_vi, al3_n);
 
-            GetNodeVelocity(S, l1_vi, Vl1);
-            GetNodeVelocity(S, l2_vi, Vl2);
-            GetNodeVelocity(S, l3_vi, Vl3);
+            geom.GetNodeVelocity(S, l1_vi, Vl1);
+            geom.GetNodeVelocity(S, l2_vi, Vl2);
+            geom.GetNodeVelocity(S, l3_vi, Vl3);
             
             // cout << "cell: " << el_index << ", node: " << node << ", index: " << node_index << endl;
             // cout << "\tl1_i: " << l1_vi << endl;
@@ -6168,7 +6061,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
 
             // c and bvec
             subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
-            Perpendicular(temp_vec);
+            geom.Perpendicular(temp_vec);
             subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
 
             // cout << "al1_n: ";
@@ -6225,8 +6118,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
                   // Get adj index
                   Vadj_index = face_vdof1;
                }
-               GetNodePosition(S, Vadj_index, aadj_n);
-               GetNodeVelocity(S, Vadj_index, Vadj_n);
+               geom.GetNodePositionFromBV(S, Vadj_index, aadj_n);
+               geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
 
                // Compute F
                subtract(anode_n, aadj_n, temp_vec);
@@ -6260,9 +6153,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
 
          // Put velocity in S
          // Gauss-Seidel > Jacobi
-         // UpdateNodeVelocity(S, node, predicted_node_v);
+         // geom.UpdateNodeVelocity(S, node, predicted_node_v);
          // Try Jacobi
-         UpdateNodeVelocity(S_new, node, predicted_node_v);
+         geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
       } // End interior node
 
    } // End node iterator
@@ -6341,8 +6234,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
          cells_length = cells_row.Size();
 
          /* Get nodal position */
-         GetNodePosition(S, node, anode_n);
-         GetNodeVelocity(S, node, Vnode_n);
+         geom.GetNodePositionFromBV(S, node, anode_n);
+         geom.GetNodeVelocity(S, node, Vnode_n);
 
          /* Iterate over adjacent cells */ 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
@@ -6358,13 +6251,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
                   l3_vi = verts[(node_index + 2) % verts_length],
                   l1_vi = verts[(node_index + 3) % verts_length];
 
-            GetNodePosition(S, l1_vi, al1_n);
-            GetNodePosition(S, l2_vi, al2_n);
-            GetNodePosition(S, l3_vi, al3_n);
+            geom.GetNodePositionFromBV(S, l1_vi, al1_n);
+            geom.GetNodePositionFromBV(S, l2_vi, al2_n);
+            geom.GetNodePositionFromBV(S, l3_vi, al3_n);
 
-            GetNodeVelocity(S, l1_vi, Vl1);
-            GetNodeVelocity(S, l2_vi, Vl2);
-            GetNodeVelocity(S, l3_vi, Vl3);
+            geom.GetNodeVelocity(S, l1_vi, Vl1);
+            geom.GetNodeVelocity(S, l2_vi, Vl2);
+            geom.GetNodeVelocity(S, l3_vi, Vl3);
 
             /* Compute nodal locations at next time step */
             add(1., al1_n, dt, Vl1, al1_np1);
@@ -6377,7 +6270,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
 
             // c and bvec
             subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
-            Perpendicular(temp_vec);
+            geom.Perpendicular(temp_vec);
             subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
          
             cj = temp_vec * temp_vec2;
@@ -6428,9 +6321,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
 
          // Put velocity in S
          // Gauss-Seidel > Jacobi
-         // UpdateNodeVelocity(S, node, predicted_node_v);
+         // geom.UpdateNodeVelocity(S, node, predicted_node_v);
          // Try Jacobi
-         UpdateNodeVelocity(S_new, node, predicted_node_v);
+         geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
       } // End interior node
 
    } // End node iterator
@@ -6510,8 +6403,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
          cells_length = cells_row.Size();
 
          /* Get nodal position */
-         GetNodePosition(S, node, anode_n);
-         GetNodeVelocity(S, node, Vnode_n);
+         geom.GetNodePositionFromBV(S, node, anode_n);
+         geom.GetNodeVelocity(S, node, Vnode_n);
 
          /* Iterate over adjacent cells */ 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
@@ -6527,13 +6420,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
                   l3_vi = verts[(node_index + 2) % verts_length],
                   l1_vi = verts[(node_index + 3) % verts_length];
 
-            GetNodePosition(S, l1_vi, al1_n);
-            GetNodePosition(S, l2_vi, al2_n);
-            GetNodePosition(S, l3_vi, al3_n);
+            geom.GetNodePositionFromBV(S, l1_vi, al1_n);
+            geom.GetNodePositionFromBV(S, l2_vi, al2_n);
+            geom.GetNodePositionFromBV(S, l3_vi, al3_n);
 
-            GetNodeVelocity(S, l1_vi, Vl1);
-            GetNodeVelocity(S, l2_vi, Vl2);
-            GetNodeVelocity(S, l3_vi, Vl3);
+            geom.GetNodeVelocity(S, l1_vi, Vl1);
+            geom.GetNodeVelocity(S, l2_vi, Vl2);
+            geom.GetNodeVelocity(S, l3_vi, Vl3);
 
             /* Compute nodal locations at next time step */
             add(1., al1_n, dt, Vl1, al1_np1);
@@ -6546,7 +6439,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
 
             // c and bvec
             subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
-            Perpendicular(temp_vec);
+            geom.Perpendicular(temp_vec);
             subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
          
             cj = temp_vec * temp_vec2;
@@ -6574,7 +6467,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
          if (mm_cell != 0.)
          {
             // Get mv2 velocity for node i 
-            GetNodeVelocity(mv2_gf, node, Vnode_mv2);
+            geom.GetNodeVelocity(mv2_gf, node, Vnode_mv2);
             for (int i = 0; i < dim; i++)
             {
                Mi.Elem(i,i) += mm_cell * pow(dt,2) * sum_k;
@@ -6595,9 +6488,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
 
          // Put velocity in S
          // Gauss-Seidel > Jacobi
-         // UpdateNodeVelocity(S, node, predicted_node_v);
+         // geom.UpdateNodeVelocity(S, node, predicted_node_v);
          // Try Jacobi
-         UpdateNodeVelocity(S_new, node, predicted_node_v);
+         geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
       } // End interior node
 
    } // End node iterator
@@ -6679,11 +6572,11 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
          cells_length = cells_row.Size();
 
          /* Get nodal position */
-         GetNodePosition(S, node, anode_n);
-         GetNodeVelocity(S, node, Vnode_n);
+         geom.GetNodePositionFromBV(S, node, anode_n);
+         geom.GetNodeVelocity(S, node, Vnode_n);
 
          /* Get mv2 velocity if needed in cell visc contribution */
-         GetNodeVelocity(mv2_gf, node, Vnode_mv2);
+         geom.GetNodeVelocity(mv2_gf, node, Vnode_mv2);
 
          /* Iterate over adjacent cells */ 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
@@ -6699,13 +6592,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
                   l3_vi = verts[(node_index + 2) % verts_length],
                   l1_vi = verts[(node_index + 3) % verts_length];
 
-            GetNodePosition(S, l1_vi, al1_n);
-            GetNodePosition(S, l2_vi, al2_n);
-            GetNodePosition(S, l3_vi, al3_n);
+            geom.GetNodePositionFromBV(S, l1_vi, al1_n);
+            geom.GetNodePositionFromBV(S, l2_vi, al2_n);
+            geom.GetNodePositionFromBV(S, l3_vi, al3_n);
 
-            GetNodeVelocity(S, l1_vi, Vl1);
-            GetNodeVelocity(S, l2_vi, Vl2);
-            GetNodeVelocity(S, l3_vi, Vl3);
+            geom.GetNodeVelocity(S, l1_vi, Vl1);
+            geom.GetNodeVelocity(S, l2_vi, Vl2);
+            geom.GetNodeVelocity(S, l3_vi, Vl3);
 
             /* Compute nodal locations at next time step */
             add(1., al1_n, dt, Vl1, al1_np1);
@@ -6718,7 +6611,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
 
             // c and bvec
             subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
-            Perpendicular(temp_vec);
+            geom.Perpendicular(temp_vec);
             subtract(anode_n, al3_np1, temp_vec2); // a_r^n - a_3^np1
          
             cj = temp_vec * temp_vec2;
@@ -6782,8 +6675,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
                   // Get adj index
                   Vadj_index = face_vdof1;
                }
-               GetNodePosition(S, Vadj_index, aadj_n);
-               GetNodeVelocity(S, Vadj_index, Vadj_n);
+               geom.GetNodePositionFromBV(S, Vadj_index, aadj_n);
+               geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
 
                // Compute F
                subtract(anode_n, aadj_n, temp_vec);
@@ -6816,9 +6709,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
 
          // Put velocity in S
          // Gauss-Seidel > Jacobi
-         // UpdateNodeVelocity(S, node, predicted_node_v);
+         // geom.UpdateNodeVelocity(S, node, predicted_node_v);
          // Try Jacobi
-         UpdateNodeVelocity(S_new, node, predicted_node_v);
+         geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
       } // End interior node
 
    } // End node iterator
@@ -6900,8 +6793,8 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
          vertex_element->GetRow(node, cells_row);
          cells_length = cells_row.Size();
 
-         GetNodeVelocity(S, node, Vnode);
-         GetNodeVelocity(mv2_gf, node, Vnode_mv2);
+         geom.GetNodeVelocity(S, node, Vnode);
+         geom.GetNodeVelocity(mv2_gf, node, Vnode_mv2);
 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
@@ -6922,10 +6815,10 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
       H1.GetFaceDofs(face,face_dofs_row);
       int face_dof1 = face_dofs_row[0], face_dof2 = face_dofs_row[1];
 
-      GetNodePosition(S, face_dof1, a1);
-      GetNodePosition(S, face_dof2, a2);
-      GetNodeVelocity(S, face_dof1, V1);
-      GetNodeVelocity(S, face_dof2, V2);
+      geom.GetNodePositionFromBV(S, face_dof1, a1);
+      geom.GetNodePositionFromBV(S, face_dof2, a2);
+      geom.GetNodeVelocity(S, face_dof1, V1);
+      geom.GetNodeVelocity(S, face_dof2, V2);
 
       subtract(a2, a1, temp_vec);
       F = temp_vec.Norml2();
@@ -6971,15 +6864,15 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
          pmesh->GetElementVertices(cell, verts);
          int verts_length = verts.Size();
          Vector a0(dim), a1(dim), a2(dim), a3(dim);
-         GetNodePosition(S, verts[0], a0);
-         GetNodePosition(S, verts[1], a1);
-         GetNodePosition(S, verts[2], a2);
-         GetNodePosition(S, verts[3], a3);
+         geom.GetNodePositionFromBV(S, verts[0], a0);
+         geom.GetNodePositionFromBV(S, verts[1], a1);
+         geom.GetNodePositionFromBV(S, verts[2], a2);
+         geom.GetNodePositionFromBV(S, verts[3], a3);
 
          // Compute area of square
          Vector temp_vec1(dim), temp_vec2(dim);
          subtract(a3, a1, temp_vec1);
-         Perpendicular(temp_vec1);
+         geom.Perpendicular(temp_vec1);
          subtract(a2, a0, temp_vec2);
          double area = temp_vec1 * temp_vec2;
          area *= 0.5;
@@ -7119,7 +7012,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
          vertex_element->GetRow(node, cells_row);
          cells_length = cells_row.Size();
 
-         GetNodeVelocity(S, node, Vnode);
+         geom.GetNodeVelocity(S, node, Vnode);
 
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
@@ -7170,7 +7063,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
    for (int node = 0; node < NDofs_H1L; node++)
    {
       Vpred = 0.;
-      GetNodeVelocity(S, node, Vnode);
+      geom.GetNodeVelocity(S, node, Vnode);
 
       // Only average for interior nodes
       int bdr_ind = BdrVertexIndexingArray[node];
@@ -7214,7 +7107,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
             }
 
             /* Get face and adj node velocity and position */
-            GetNodeVelocity(S, Vadj_index, Vadj);
+            geom.GetNodeVelocity(S, Vadj_index, Vadj);
 
             // Vpred += Vadj;
             Vpred.Add(F, Vadj);
@@ -7225,7 +7118,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
 
          // Add in viscosity
          add(1. - theta, Vnode, theta, Vpred, Vnode);
-         UpdateNodeVelocity(S_new, node, Vnode);
+         geom.UpdateNodeVelocity(S_new, node, Vnode);
       } // End interior node
    } // End node iteration
    S = S_new;
@@ -7269,7 +7162,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
    Vector Ri(dim);
 
    /* Iterate over corner nodes */
-   for (int node = 0; node < NDofs_H1L; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
+   for (int node = 0; node < NVDofs_H1; node++) // TODO: Is NDofs_H1L == NVDofs_H1?
    {
       // Reset new nodal velocity, and averaging objects
       Mi = 0., Ri = 0.;
@@ -7281,8 +7174,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
       bdr_ind = BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
-      GetNodeVelocity(S, node, Vnode_n);
-      GetNodePosition(S, node, Vnode_x);
+      geom.GetNodeVelocity(S, node, Vnode_n);
+      geom.GetNodePositionFromBV(S, node, Vnode_x);
 
       // Compute An and an+1 for node
       add(Vnode_x, dt/2., Vnode_n, Vnode_half);
@@ -7331,16 +7224,16 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
          }
 
          /* Get face and adj node velocity and position */
-         GetNodeVelocity(S, Vadj_index, Vadj_n);
-         GetNodeVelocity(S, face_dof, Vface_n);
-         GetNodePosition(S, Vadj_index, Vadj_x);
-         GetNodePosition(S, face_dof, face_x);
+         geom.GetNodeVelocity(S, Vadj_index, Vadj_n);
+         geom.GetNodeVelocity(S, face_dof, Vface_n);
+         geom.GetNodePositionFromBV(S, Vadj_index, Vadj_x);
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
 
          // Check to make sure orientation is correct
          // This part is mostly for assertion
          Vector ttvec(dim);
          subtract(Vnode_x, Vadj_x, ttvec);
-         Orthogonal(ttvec);
+         geom.Orthogonal(ttvec);
          double _val = ttvec * n_vec;
          // Vector should be pointing in same direction
          if (_val < 1E-6)
@@ -7363,7 +7256,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 
          // Perpendicular vector
          n_vec_R = n_vec;
-         Orthogonal(n_vec_R);
+         geom.Orthogonal(n_vec_R);
 
          // Calculate bmn
          double bmn = Vf * n_vec;
@@ -7381,13 +7274,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
          Bnode *= -2.;
          Bnode.Add(.5, Vadj_x);
          Bnode.Add(1.5, Vnode_x);
-         Orthogonal(Bnode);
+         geom.Orthogonal(Bnode);
 
          Badj = face_x;
          Badj *= -2.;
          Badj.Add(.5, Vnode_x);
          Badj.Add(1.5, Vadj_x);
-         Orthogonal(Badj);
+         geom.Orthogonal(Badj);
 
          // Compute dot products
          double badjn = Badj * n_vec;
@@ -7405,7 +7298,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
          subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
          subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
 
-         Orthogonal(temp_vec_2);
+         geom.Orthogonal(temp_vec_2);
          D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
          // Compute c1 (A.4a)
@@ -7490,7 +7383,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
             bmn *= F;
 
             n_vec_R = n_vec;
-            Orthogonal(n_vec_R);
+            geom.Orthogonal(n_vec_R);
             Vnode_prev_it_nR_comp = Vnode_n * n_vec_R;
 
             // Get normal and rotated components of Vadj_n
@@ -7505,7 +7398,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 
             Vector ttvec(dim);
             subtract(Vnode_x, Vadj_x, ttvec);
-            Orthogonal(ttvec);
+            geom.Orthogonal(ttvec);
             double _val = ttvec * n_vec;
             if (_val < 1E-6)
             {
@@ -7525,13 +7418,13 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
             Bnode *= -2.;
             Bnode.Add(.5, Vadj_x);
             Bnode.Add(1.5, Vnode_x);
-            Orthogonal(Bnode);
+            geom.Orthogonal(Bnode);
 
             Badj = face_x;
             Badj *= -2.;
             Badj.Add(.5, Vnode_x);
             Badj.Add(1.5, Vadj_x);
-            Orthogonal(Badj);
+            geom.Orthogonal(Badj);
 
             // Compute dot products
             double badjn = Badj * n_vec;
@@ -7549,7 +7442,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
             subtract(Vadj_n, Vnode_n, temp_vec); // V1 - V2 = temp_vec
             subtract(Vnode_half, Vadj_half, temp_vec_2); // A2-A1
 
-            Orthogonal(temp_vec_2);
+            geom.Orthogonal(temp_vec_2);
             D = dt * (temp_vec * n_vec_R) + 2. * (n_vec * temp_vec_2);
 
             // Compute c1 (A.4a)
@@ -7611,9 +7504,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 
       // Put velocity in S
       // Gauss-Seidel > Jacobi
-      // UpdateNodeVelocity(S, node, predicted_node_v);
+      // geom.UpdateNodeVelocity(S, node, predicted_node_v);
       // Try Jacobi
-      UpdateNodeVelocity(S_new, node, predicted_node_v);
+      geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
    } // End node iterator
    S = S_new;
 }
@@ -7714,16 +7607,16 @@ void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &
    node_im1 = (node_index - 1 + verts_length) % verts_length; // ensure index > 0
 
    // Get the corresponding position of those nodes at time np1
-   GetNodePosition(S, verts[node_ip1], anode_ip1_n);
-   GetNodePosition(S, verts[node_im1], anode_im1_n);
-   GetNodeVelocity(S, verts[node_ip1], Vnode_ip1_n);
-   GetNodeVelocity(S, verts[node_im1], Vnode_im1_n);
+   geom.GetNodePositionFromBV(S, verts[node_ip1], anode_ip1_n);
+   geom.GetNodePositionFromBV(S, verts[node_im1], anode_im1_n);
+   geom.GetNodeVelocity(S, verts[node_ip1], Vnode_ip1_n);
+   geom.GetNodeVelocity(S, verts[node_im1], Vnode_im1_n);
    add(anode_ip1_n, dt, Vnode_ip1_n, anode_ip1_np1);
    add(anode_im1_n, dt, Vnode_im1_n, anode_im1_np1);
 
    // Compute rotated diagonal
    subtract(anode_ip1_np1, anode_im1_np1, vec);
-   Orthogonal(vec);
+   geom.Orthogonal(vec);
 }
 
 
@@ -7731,14 +7624,16 @@ void LagrangianLOOperator<dim>::ComputeRotatedDiagonalForCellArea(const Vector &
 * Function: ComputeLagrangeMultiplierAndNodeVelocity
 * Parameters:
 *  S        - BlockVector representing FiniteElement information
+*  S_old    -
+*  cell     -
+*  node     -
 *  t        - Current time
 *  dt       - Current time step
-*  flag     - Flag used to indicate testing, can be "testing" or "NA"
-*  test_vel - Velocity used for testing
+*  l_mult   -
+*  node_v   -
 *
 * Purpose:
-*  This function iterates over all Serendipity nodes and computes the
-*  velocity with which to move the mesh from the geometric velocity.
+*  
 ****************************************************************************************************/
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v)
@@ -7821,10 +7716,10 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
    // Get index of verts for opposite node
    int node_op = (node_index + 2) % verts_length;
    Vector anode_op_n(dim), anode_op_np1(dim), Vnode_op(dim), anode_i_n(dim);
-   GetNodePosition(S, verts[node_op], anode_op_n);
-   GetNodeVelocity(S, verts[node_op], Vnode_op);
+   geom.GetNodePositionFromBV(S, verts[node_op], anode_op_n);
+   geom.GetNodeVelocity(S, verts[node_op], Vnode_op);
    add(anode_op_n, dt, Vnode_op, anode_op_np1);
-   GetNodePosition(S, node, anode_i_n);
+   geom.GetNodePositionFromBV(S, node, anode_i_n);
    temp_vec.Add(1., anode_i_n);
    temp_vec.Add(-1., anode_op_np1);
    // cout << "anode_i_n: ";
@@ -7904,7 +7799,7 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
          // Does verts[0] always correspond to the bottom left node? ---> YES
          node = verts[i];
          // Get current node velocity
-         GetNodeVelocity(S, node, Vnode_n);
+         geom.GetNodeVelocity(S, node, Vnode_n);
          // cout << "\t\t computing for node: " << node << ", cell: " << cell << endl;
          ComputeLagrangeMultiplierAndNodeVelocity(S, S_old, cell, node, t, dt, l_mult, predicted_node_v);
 
@@ -7915,11 +7810,11 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
          }
 
          /* Replace Lagrange Multiplier and nodal velocity */
-         UpdateNodeVelocity(S, node, predicted_node_v);
+         geom.UpdateNodeVelocity(S, node, predicted_node_v);
          LagrangeMultipliers[cell] = l_mult;
 
          // Try Jacobi
-         // UpdateNodeVelocity(S_new, node, predicted_node_v);
+         // geom.UpdateNodeVelocity(S_new, node, predicted_node_v);
       }
    }
 
@@ -7936,6 +7831,153 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
    // cout << "----------\n";
    // cout << "mv_gf: ";
    // mv_gf.Print(cout);
+}
+
+
+/****************************************************************************************************
+* Function:  CalcMassVolumeVector
+* Parameters:
+*  S        - BlockVector representing FiniteElement information at tn+1
+*  S_old    - BlockVector representing state at time tn
+*  dt       - Current time step
+*  massvec  - Vector of length num_cells representing mass of each cell 
+*             at time tn multiplied by the specific volume of the cell
+*             at time tn+1.
+*
+* Purpose:
+*  This function computes the massvec that is used as the constraint in the 
+*  HiOp implementation of the Lagrange Multiplier method to solve for the 
+*  mesh velocity that guarantees mass conservation cell-wise.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec)
+{
+   cout << "CalcMassVolumeVector\n";
+   Vector *sptr = const_cast<Vector*>(&S);
+   Vector *sptr_old = const_cast<Vector*>(&S_old);
+   ParGridFunction sv_gf, sv_gf_old;
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_gf_old.MakeRef(&L2, *sptr_old, block_offsets[2]);
+
+   /* Iterate over all cells in mesh and compute constraint */
+   for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
+   {
+      double Kn = ComputeCellVolume(S_old, cell_it);
+      double Tnp1 = sv_gf.Elem(cell_it);
+      double Tn = sv_gf_old.Elem(cell_it);
+
+      /* Compute constraint on cell */
+      double val = Tnp1 * Kn / Tn;
+      massvec[cell_it] = val;
+   }
+}
+
+
+/****************************************************************************************************
+* Function:  CalcCellAveragedVelocityVector
+* Parameters:
+*  S        - BlockVector representing FiniteElement information at tn+1
+*  mv_gf    -
+*
+* Purpose:
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, Vector &Vbar)
+{
+   cout << "CalcCellAveragedVelocityVector\n";
+   Vector node_v(dim);
+
+   for (int node = 0; node < NVDofs_H1; node++) // Corner Vertex iterator
+   {
+      ComputeWeightedCellAverageVelocityAtNode(S, node, node_v);
+      cout << "weighted cell average velocity for node " << node << ": ";
+      node_v.Print(cout);
+
+      /* Put node_v in place */
+      for (int i = 0; i < dim; i++)
+      {
+         int index = node + i * NVDofs_H1;
+         Vbar[index] = node_v[i];
+      }
+   }
+}
+
+
+/****************************************************************************************************
+* Function:  SolveHiOp
+* Parameters:
+*  S        - BlockVector representing FiniteElement information at tn+1
+*  S_old    - BlockVector representing state at time tn
+*  dt       - Current time step
+*  massvec  - Vector of length num_cells representing mass of each cell 
+*             at time tn multiplied by the specific volume of the cell
+*             at time tn+1.
+*
+* Purpose:
+*  This function solves for the velocity vector at the corner vertices by using
+*  an OptimizationSolver from MFEM.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const double &dt)
+{
+   cout << "SolveHiOp\n";
+   Vector massvec(NDofs_L2), Vbar(dim*NVDofs_H1);
+   ParGridFunction x_gf, mv_gf, x_gf_l(&H1_L), mv_gf_l(&H1_L);
+   Vector* sptr = const_cast<Vector*>(&S);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   x_gf_l.ProjectGridFunction(x_gf);
+   mv_gf_l.ProjectGridFunction(mv_gf);
+
+   CalcMassVolumeVector(S, S_old, dt, massvec);
+   cout << "mass vec: ";
+   massvec.Print(cout);
+   CalcCellAveragedCornerVelocityVector(S, Vbar);
+   // cout << "Vbar size: " << Vbar.Size() << endl;
+   // cout << "Vbar: ";
+   // Vbar.Print(cout);
+
+   OptimizationSolver *optsolver = NULL;
+   const int optimizer_type = 2; // TODO: change this to be a set param
+   if (optimizer_type == 2)
+   {
+#ifdef MFEM_USE_HIOP
+   HiopNlpOptimizer *tmp_opt_ptr = new HiopNlpOptimizer();
+   optsolver = tmp_opt_ptr;
+#else
+      MFEM_ABORT("MFEM is not built with HiOp support!");
+#endif
+   }
+   // else
+   // {
+   //    SLBQPOptimizer *slbqp = new SLBQPOptimizer();
+
+      
+   // }
+
+   Vector xmin(Vbar.Size()), xmax(Vbar.Size());
+   xmin = -1.E12;
+   xmax = 1.E12;
+
+   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf_l, *pmesh, NDofs_L2, dt, xmin, xmax);
+   optsolver->SetOptimizationProblem(omv_problem);
+   cout << " omv inputsize: " << omv_problem.get_input_size() << endl;
+   optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
+   optsolver->SetPrintLevel(0);
+   optsolver->SetRelTol(1E-7);
+   optsolver->SetAbsTol(1E-7);
+
+   // Vector y_out(NDofs_L2);
+   cout << "operator rows: " << optsolver->NumRows() << endl;
+   cout << "operator cols: " << optsolver->NumCols() << endl;
+   cout << "mv_gf_l size: " << mv_gf_l.Size() << endl;
+   // cout << "y_out size: " << y_out.Size() << endl;
+   optsolver->Mult(mv_gf_l, mv_gf_l); // Causing seg fault
+
+   mv_gf.ProjectGridFunction(mv_gf_l);
+
+   assert(false);
 }
 
 
@@ -7974,7 +8016,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
       //    MFEM_ABORT("Aborting due to NaNs.\n");
       // }
 
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
 
       // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
       // if (is_dt_changed)
@@ -8083,7 +8125,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
          //    }
          // } // End time restriction from velocity computation
 
-         GetNodeVelocity(S, node, Vgeo);
+         geom.GetNodeVelocity(S, node, Vgeo);
          
          // chrono_temp.Clear();
          // chrono_temp.Start();
@@ -8183,7 +8225,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
             pb->velocity(Uc, node_v);
 
             /* Put this velocity into mv_gf */
-            UpdateNodeVelocity(S,node,node_v);
+            geom.UpdateNodeVelocity(S,node,node_v);
             
             continue;
          }
@@ -8208,7 +8250,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
          // Get Transformation and IntegrationPoint
          ElementTransformation * trans = pmesh->GetElementTransformation(el_index);
          Vector node_x(dim);
-         GetNodePosition(S, node, node_x);
+         geom.GetNodePositionFromBV(S, node, node_x);
          IntegrationPoint ip;
          trans->TransformBack(node_x, ip);
          trans->SetIntPoint(&ip);
@@ -8247,7 +8289,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
          SetViGeo(node, node_v);
       }
 
-      UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocity(S, node, node_v);
       
    } // End vertex iterator
 }
@@ -8300,7 +8342,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
          ldof = vdofs[i];
 
          // Get integration point corresponding to dof
-         GetNodePosition(S, ldof, node_x);
+         geom.GetNodePositionFromBV(S, ldof, node_x);
          trans->TransformBack(node_x, ip);
          trans->SetIntPoint(&ip);
 
@@ -8467,7 +8509,7 @@ void LagrangianLOOperator<dim>::IntGrad(const int cell, DenseMatrix & res)
 }
 
 
-/* Explicit n_vectantiation */
+/* Explicit instantiation */
 template class LagrangianLOOperator<1>;
 template class LagrangianLOOperator<2>;
 template class LagrangianLOOperator<3>;

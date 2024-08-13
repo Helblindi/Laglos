@@ -750,7 +750,7 @@ int main(int argc, char *argv[]) {
    m->Assemble();
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);

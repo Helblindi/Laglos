@@ -14,9 +14,12 @@ template<int dim>
 Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1) :
    H1(h1),
    pmesh(H1.GetParMesh()),
-   block_offsets(offsets),
-   NDofs_H1(H1.GetNDofs()) 
-   {}
+   block_offsets(offsets)
+{
+   cout << "Geometric::Non-default constructor\n";
+
+   NDofs_H1 = H1.GetNDofs();
+}
 
 /****************************************************************************************************
 * Function: UpdateNodeVelocity
@@ -172,7 +175,6 @@ void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & no
    {
       int index = node + i * NDofs_H1;
       x[i] = x_gf[index];
-
    }
 }
 

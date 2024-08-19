@@ -25,6 +25,11 @@ public:
    Geometric(Array<int> offsets, ParFiniteElementSpace &h1);
    ~Geometric() {}
 
+   inline Array<int> GetBlockOffsets() const { return block_offsets; }
+   inline ParFiniteElementSpace GetPFES() const { return H1; }
+   inline ParMesh *GetParMesh() const { return pmesh; }
+   inline int GetNDofs_H1() const { return NDofs_H1; }
+
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel) const;
    void UpdateNodeVelocity(ParGridFunction &v_gf, const int &node, const Vector &vel) const;
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel) const;

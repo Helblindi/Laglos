@@ -20,6 +20,7 @@ private:
    ParFiniteElementSpace &H1;
    ParMesh *pmesh;
    int NDofs_H1;
+   int NVDofs_H1;
 
 public:
    Geometric(Array<int> offsets, ParFiniteElementSpace &h1);
@@ -31,9 +32,10 @@ public:
    inline int GetNDofs_H1() const { return NDofs_H1; }
 
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel) const;
-   void UpdateNodeVelocity(ParGridFunction &v_gf, const int &node, const Vector &vel) const;
+   void UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const;
    void GetNodeVelocity(const Vector &S, const int & node, Vector & vel) const;
    void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel) const;
+   void GetNodeVelocityVecL(const Vector &mv_gf, const int & node, Vector & vel) const;
    void UpdateNodePosition(Vector &S, const int & node, const Vector &x) const;
    void GetNodePositionFromBV(const Vector &S, const int & node, Vector & x) const;
    void GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector & x) const;

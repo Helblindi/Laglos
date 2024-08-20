@@ -13,12 +13,14 @@ namespace hydrodynamics
 template<int dim>
 Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1) :
    H1(h1),
-   pmesh(H1.GetParMesh()),
+   pmesh(h1.GetParMesh()),
    block_offsets(offsets)
 {
    cout << "Geometric::Non-default constructor\n";
 
-   NDofs_H1 = H1.GetNDofs();
+   NDofs_H1 = h1.GetNDofs();
+   NVDofs_H1 = h1.GetNVDofs();
+   cout << "NDofs_H1: " << NDofs_H1 << endl;
 }
 
 /****************************************************************************************************
@@ -36,6 +38,7 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vecto
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   assert(mv_gf.Size() == NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -55,12 +58,13 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vecto
 *   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &v_gf, const int &node, const Vector &vel) const
+void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const
 {
+   assert(mv_gf.Size() == NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      v_gf[index] = vel[i];
+      mv_gf[index] = vel[i];
    }
 }
 
@@ -81,6 +85,7 @@ void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector &
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   assert(mv_gf.Size() == NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -103,9 +108,32 @@ void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector &
 template<int dim>
 void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel) const
 {
+   assert(mv_gf.Size() == NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
+      vel[i] = mv_gf[index];
+   }
+}
+
+/****************************************************************************************************
+* Function: GetNodeVelocityVecL
+* Parameters:
+*   S    - BlockVector representing FiniteElement information
+*   node - Global index of node in question.
+*   vel  - Velocity at given node
+*
+* Purpose:
+*  This function returns the velocity at the given global node.
+* Note: L indicates grid function is the low order form.
+****************************************************************************************************/
+template<int dim>
+void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf, const int & node, Vector & vel) const
+{
+   assert(mv_gf.Size() == NVDofs_H1);
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NVDofs_H1;
       vel[i] = mv_gf[index];
    }
 }
@@ -127,6 +155,7 @@ void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vecto
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   assert(x_gf.Size() == NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -152,6 +181,7 @@ void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Ve
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   assert(x_gf.Size() == NDofs_H1);
 
    GetNodePosition(x_gf, node, x);
 }
@@ -170,7 +200,7 @@ void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Ve
 template<int dim>
 void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector &x) const
 {
-   // cout << "GetNodePosition\n";
+   assert(x_gf.Size() == NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
@@ -194,6 +224,7 @@ void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & no
 template<int dim>
 void Geometric<dim>::Orthogonal(Vector &v) const
 {
+   assert(v.Size() == dim);
    if (dim == 2)
    {
       double x = v(0), y = v(1);
@@ -221,6 +252,7 @@ void Geometric<dim>::Orthogonal(Vector &v) const
 template<int dim>
 void Geometric<dim>::Perpendicular(Vector &v) const
 {
+   assert(v.Size() == dim);
    if (dim == 2)
    {
       double x = v(0), y = v(1);

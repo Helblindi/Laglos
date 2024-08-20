@@ -7526,33 +7526,36 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v)
 {
-   // cout << "ComputeWeightedCellAverageVelocityAtNode\n";
+   // cout << "========================================\n"
+   //      << "ComputeWeightedCellAverageVelocityAtNode\n"
+   //      << "========================================\n";
+
    Array<int> cells_row;
    Vector Uc(dim+2), Vcell(dim);
-
    double sum_k = 0.;
    node_v = 0.;
 
-   // Get adjacent cells
+   /* Get adjacent cells */
    vertex_element->GetRow(node, cells_row);
    int cells_length = cells_row.Size();
 
-   // Iterate over adjacent cells
+   /* Iterate over adjacent cells */
    for (int cell_it = 0; cell_it < cells_length; cell_it++)
    {
-      // Get cell index and volume
+      /* Get cell index and volume */
       int el_index = cells_row[cell_it];
       double Kcn = pmesh->GetElementVolume(el_index);
 
-      // Retrieve cell velocity
+      /* Retrieve cell velocity */
       GetCellStateVector(S, el_index, Uc);
       pb->velocity(Uc, Vcell);
       sum_k += Kcn;
-      // Add the weighted contribution
+
+      /* Add the weighted contribution */
       node_v.Add(Kcn, Vcell);
    }
 
-   // Finally, take the average
+   /* Finally, take the average */
    node_v /= sum_k;
 }
 
@@ -7852,7 +7855,10 @@ void LagrangianLOOperator<dim>::IterativeLagrangeMultiplier(Vector &S, const Vec
 template<int dim>
 void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec)
 {
-   cout << "CalcMassVolumeVector\n";
+   // cout << "=======================================\n"
+   //      << "          CalcMassVolumeVector         \n"
+   //      << "=======================================\n";
+
    Vector *sptr = const_cast<Vector*>(&S);
    Vector *sptr_old = const_cast<Vector*>(&S_old);
    ParGridFunction sv_gf, sv_gf_old;
@@ -7869,6 +7875,10 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vect
       /* Compute constraint on cell */
       double val = Tnp1 * Kn / Tn;
       massvec[cell_it] = val;
+      if (val <= 0.)
+      {
+         MFEM_ABORT("massvec should be positive.\n");
+      }
    }
 }
 
@@ -7885,14 +7895,15 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vect
 template<int dim>
 void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, Vector &Vbar)
 {
-   cout << "CalcCellAveragedVelocityVector\n";
+   // cout << "=======================================\n"
+   //      << "    CalcCellAveragedVelocityVector     \n"
+   //      << "=======================================\n";
    Vector node_v(dim);
 
-   for (int node = 0; node < NVDofs_H1; node++) // Corner Vertex iterator
+   /* Iterate over corner node */
+   for (int node = 0; node < NVDofs_H1; node++)
    {
       ComputeWeightedCellAverageVelocityAtNode(S, node, node_v);
-      cout << "weighted cell average velocity for node " << node << ": ";
-      node_v.Print(cout);
 
       /* Put node_v in place */
       for (int i = 0; i < dim; i++)
@@ -7921,22 +7932,21 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
 template<int dim>
 void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const double &dt)
 {
-   cout << "SolveHiOp\n";
+   // cout << "=======================================\n"
+   //      << "               SolveHiOp               \n"
+   //      << "=======================================\n";
    Vector massvec(NDofs_L2), Vbar(dim*NVDofs_H1);
-   ParGridFunction x_gf, mv_gf, x_gf_l(&H1_L), mv_gf_l(&H1_L);
+   ParGridFunction x_gf, mv_gf, mv_gf_l(&H1_L);
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   x_gf_l.ProjectGridFunction(x_gf);
    mv_gf_l.ProjectGridFunction(mv_gf);
 
+   /* Compute equality restrictions */
    CalcMassVolumeVector(S, S_old, dt, massvec);
-   cout << "mass vec: ";
-   massvec.Print(cout);
+
+   /* Compute average velocity vector from adjacent cells */
    CalcCellAveragedCornerVelocityVector(S, Vbar);
-   // cout << "Vbar size: " << Vbar.Size() << endl;
-   // cout << "Vbar: ";
-   // Vbar.Print(cout);
 
    OptimizationSolver *optsolver = NULL;
    const int optimizer_type = 2; // TODO: change this to be a set param
@@ -7949,35 +7959,28 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
       MFEM_ABORT("MFEM is not built with HiOp support!");
 #endif
    }
+   /* TODO: Finish non hiop way to solve.  See mfem/examples/hiop/ex9.cpp */
    // else
    // {
    //    SLBQPOptimizer *slbqp = new SLBQPOptimizer();
-
-      
    // }
 
+   /* Set min/max velocities */
    Vector xmin(Vbar.Size()), xmax(Vbar.Size());
    xmin = -1.E12;
    xmax = 1.E12;
 
-   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf_l, *pmesh, NDofs_L2, dt, xmin, xmax);
+   /* Solve for corner node velocities */
+   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
    optsolver->SetOptimizationProblem(omv_problem);
-   cout << " omv inputsize: " << omv_problem.get_input_size() << endl;
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
    optsolver->SetRelTol(1E-7);
    optsolver->SetAbsTol(1E-7);
+   optsolver->Mult(mv_gf_l, mv_gf_l); 
 
-   // Vector y_out(NDofs_L2);
-   cout << "operator rows: " << optsolver->NumRows() << endl;
-   cout << "operator cols: " << optsolver->NumCols() << endl;
-   cout << "mv_gf_l size: " << mv_gf_l.Size() << endl;
-   // cout << "y_out size: " << y_out.Size() << endl;
-   optsolver->Mult(mv_gf_l, mv_gf_l); // Causing seg fault
-
+   /* Project corner node velocities onto current ParGridFunction */
    mv_gf.ProjectGridFunction(mv_gf_l);
-
-   assert(false);
 }
 
 

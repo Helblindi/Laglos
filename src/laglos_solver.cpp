@@ -835,10 +835,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             MFEM_ABORT("Invalid mesh velocity option.\n");
          }
 
-         if (pb->has_boundary_conditions())
-         {
-            EnforceMVBoundaryConditions(S,t,dt);
-         }
+         // if (pb->has_boundary_conditions())
+         // {
+         //    EnforceMVBoundaryConditions(S,t,dt);
+         // }
 
          switch (fv_option)
          {

@@ -7981,6 +7981,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
 
    /* Project corner node velocities onto current ParGridFunction */
    mv_gf.ProjectGridFunction(mv_gf_l);
+
+   delete optsolver;
+   optsolver = nullptr;
 }
 
 

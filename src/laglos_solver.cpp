@@ -835,10 +835,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             MFEM_ABORT("Invalid mesh velocity option.\n");
          }
 
-         // if (pb->has_boundary_conditions())
-         // {
-         //    EnforceMVBoundaryConditions(S,t,dt);
-         // }
+         if (pb->has_boundary_conditions())
+         {
+            EnforceMVBoundaryConditions(S,t,dt);
+         }
 
          switch (fv_option)
          {
@@ -7953,7 +7953,8 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
    if (optimizer_type == 2)
    {
 #ifdef MFEM_USE_HIOP
-   HiopNlpOptimizer *tmp_opt_ptr = new HiopNlpOptimizer();
+   HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
+   tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
    optsolver = tmp_opt_ptr;
 #else
       MFEM_ABORT("MFEM is not built with HiOp support!");

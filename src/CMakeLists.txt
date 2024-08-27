@@ -7,7 +7,7 @@ list(APPEND HEADERS
    "${PROJECT_SOURCE_DIR}/include/sedov_exact.hpp"
    "${PROJECT_SOURCE_DIR}/include/geometry.hpp"
    "${PROJECT_SOURCE_DIR}/include/lagrange_multiplier.hpp"
-   "${PROJECT_SOURCE_DIR}/../mfem-git/build/mfem.hpp")
+   "${PROJECT_SOURCE_DIR}/../mfem/build/mfem.hpp")
 
 list(APPEND SOURCES 
    laglos.cpp

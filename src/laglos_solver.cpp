@@ -193,6 +193,13 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Initialize Dij sparse
    InitializeDijMatrix();   
 
+   SetHiopHessianSparsityPattern(HiopHessIArr, HiopHessJArr);
+   std::cout << "HiopHessIArr: ";
+   HiopHessIArr.Print(cout);
+   std::cout << "HiopHessJArr: ";
+   HiopHessJArr.Print(cout);
+   SetHiopConstraintGradSparsityPattern(HiopCGradIArr, HiopCGradJArr);
+
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
    RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), RT_ir_order);
@@ -224,6 +231,145 @@ template<int dim>
 LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
    delete dij_sparse;
+}
+
+
+/****************************************************************************************************
+* Function: SetHiopHessianSparsityPattern
+*
+* Purpose:
+*  Set the sparsity pattern for the Hessian matrix to be used in the 
+*  Hiop mesh velocity solve.  Recall the the Hessian matrix is a SparseMatrix
+*  of size 2*eta_geo x 2*eta_geo
+*
+*        1x  2x  3x ... 1y 2y 3y ...
+*    1x  .   0
+*    2x  0   .
+*    .. 
+*    1y
+*    2y
+*    ..
+*
+*  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetHiopHessianSparsityPattern(Array<int> &I, Array<int> &J)
+{
+   std::cout << "LagrangianLOOperator::SetHiopHessianSparsityPattern\n";
+   Array<int> faces_row, face_dofs_row;
+   Array<int> Ix(NVDofs_H1+1), Jx, Jy;
+   Ix[0] = 0;
+   int faces_length;
+   mfem::Mesh::FaceInformation FI;
+
+   // cout << "NVDofs_H1: " << NVDofs_H1 << endl;
+
+   for (int node = 0; node < NVDofs_H1; node++)
+   {
+      // cout << "node: " << node << endl;
+      vertex_edge.GetRow(node, faces_row);
+      faces_length = faces_row.Size();
+      Array<int> adj_nodes_x(faces_length + 1), adj_nodes_y(faces_length + 1);
+
+      /* Fill Ix and Iy (Iy is duplicate of Ix) */
+      if (node <= NVDofs_H1) {
+         // cout << "Ix at " << node+1 << " is: " << Ix[node] + faces_length + 1 << endl;
+         Ix[node+1] = Ix[node] + faces_length + 1; 
+      }       
+
+      for (int face_it = 0; face_it < faces_length; face_it++)
+      {
+         /* Get adj node index */
+         int face = faces_row[face_it];
+         FI = pmesh->GetFaceInformation(face);
+         H1.GetFaceDofs(face, face_dofs_row);
+         int adj_node = (node == face_dofs_row[0]) ? face_dofs_row[1] : face_dofs_row[0];
+
+         /* Fill adjacency array */
+         adj_nodes_x[face_it] = adj_node + NVDofs_H1;
+         adj_nodes_y[face_it] = adj_node;
+      }
+      /* Append diagonal element */
+      adj_nodes_x[faces_length] = node;
+      adj_nodes_y[faces_length] = node + NVDofs_H1;
+
+      /* Sort nodes for insertion into J array*/
+      adj_nodes_x.Sort();
+      adj_nodes_y.Sort();
+
+      /* Append to Jx and Jy */
+      Jx.Append(adj_nodes_x);
+      Jy.Append(adj_nodes_y);
+
+      // cout << "adj_nodes_x: ";
+      // adj_nodes_x.Print(cout);
+      // cout << "adj_nodes_y: ";
+      // adj_nodes_y.Print(cout);
+   }
+
+   /* Append Ix + Ix[size] on Ix to form full I array */
+   I = Ix;
+   const int base = I[NVDofs_H1];
+   for (int i = 1; i < Ix.Size(); i++)
+   {
+      I.Append(base + Ix[i]);
+   }
+
+   /* Concatenate Jx and Jy */
+   J = Jx;
+   J.Append(Jy);
+   // std::cout << "I: ";
+   // I.Print(std::cout);
+   // cout << "J: ";
+   // J.Print(cout);
+   // cout << "Ix: ";
+   // Ix.Print(cout);
+
+   // MFEM_ABORT("END Hiop Hess Sparsity Pattern\n");
+}
+
+
+/****************************************************************************************************
+* Function: SetHiopConstraintGradSparsityPattern
+*
+* Purpose:
+*  Set the sparsity pattern for the Jacobian matrix of the constraints vector to be used in the 
+*  Hiop mesh velocity solve.  Recall the the Gradient matrix is a SparseMatrix
+*  of size |eta_cel| x 2*eta_geo
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetHiopConstraintGradSparsityPattern(Array<int> &I, Array<int> &J)
+{
+   std::cout << "LagrangianLOOperator::SetHiopConstraintGradSparsityPattern\n";
+
+   Array<int> verts;
+
+   I.SetSize(L2.GetNE() + 1);
+   J.SetSize(8*L2.GetNE()); /// TODO: Remove hardcoded parameter representing the number of nonzeros per row
+   I[0] = 0;
+
+   for (int cell_it = 0; cell_it < L2.GetNE(); cell_it++)
+   {
+      /* Set the (i+1)th entry of I */
+      I[cell_it+1] = 8*(cell_it+1); /// TODO: Remove hardcoded parameter representing the number of nonzeros per row
+
+      /* Fill J */
+      pmesh->GetElementVertices(cell_it, verts);
+      verts.Sort();
+      int verts_length = verts.Size();
+      assert(verts_length == 4);
+      for (int j = 0; j < verts_length; j++)
+      {
+         J[8*cell_it+j] = verts[j];
+         J[8*cell_it +j+4] = verts[j] + NVDofs_H1;
+      }
+   }
+   cout << "final I: ";
+   I.Print(cout);
+   cout << "final J: ";
+   J.Print(cout);
+   cout << "LagrangianLOOperator::SetHiopConstraintGradSparsityPattern - DONE\n";
+
 }
 
 
@@ -798,7 +944,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             {
                mv_gf_prev_it = mv_gf;
                double loss = ComputeCellVolumeNorm(S, S_old, dt);
-               cout << "starting loss: " << loss << endl;
+               // cout << "starting loss: " << loss << endl;
 
                for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
                {
@@ -809,8 +955,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
                   
                   // ComputeAverageVelocities(S);
                   // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
-                  loss = ComputeCellVolumeNorm(S, S_old, dt);
-                  cout << "val at iteration " << i << ": " << loss << endl;
+                  // loss = ComputeCellVolumeNorm(S, S_old, dt);
+                  // cout << "val at iteration " << i << ": " << loss << endl;
                   // cout << i << "," << val << endl;
                   // compare_gamma2(S, S_old, dt, i);
                   // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
@@ -7972,19 +8118,19 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
    xmax = 1.E12;
 
    /* Solve for corner node velocities */
-   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
+   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
    optsolver->SetOptimizationProblem(omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
-   optsolver->SetRelTol(1E-7);
-   optsolver->SetAbsTol(1E-7);
+   optsolver->SetRelTol(1E-8);
+   optsolver->SetAbsTol(1E-8);
    optsolver->Mult(mv_gf_l, mv_gf_l); 
 
    /* Project corner node velocities onto current ParGridFunction */
    mv_gf.ProjectGridFunction(mv_gf_l);
 
-   delete optsolver;
-   optsolver = nullptr;
+   // delete optsolver;
+   // optsolver = nullptr;
 }
 
 

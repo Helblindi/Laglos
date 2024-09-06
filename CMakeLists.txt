@@ -4,6 +4,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(LAGLOS_USE_HIOP_SPARSE "Utilize sparse linear algebra" ON)
+
 # Prohibit in-source builds
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
   message(FATAL_ERROR "In-source builds are prohibited.")
@@ -63,8 +65,8 @@ message(STATUS "Laglos defines: ${_glvis_compile_defs}")
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
 # Boost required for filesystem modification
-# find_package(Boost REQUIRED COMPONENTS filesystem)
-find_package(Boost COMPONENTS filesystem REQUIRED)
+cmake_policy(SET CMP0167 NEW)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 # Include libraries needed by lboost_filesystem
 # https://stackoverflow.com/questions/9235679/create-a-directory-if-it-doesnt-exist
 list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})

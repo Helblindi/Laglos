@@ -193,13 +193,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Initialize Dij sparse
    InitializeDijMatrix();   
 
-   SetHiopHessianSparsityPattern(HiopHessIArr, HiopHessJArr);
-   std::cout << "HiopHessIArr: ";
-   HiopHessIArr.Print(cout);
-   std::cout << "HiopHessJArr: ";
-   HiopHessJArr.Print(cout);
-   SetHiopConstraintGradSparsityPattern(HiopCGradIArr, HiopCGradJArr);
-
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
    RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), RT_ir_order);
@@ -970,13 +963,36 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             }
             break;
          }
-         case 8: // HiOp Solver for optimization problem
+         case 8: // HiOp Dense Solver for optimization problem
+         {
+            MFEM_ABORT("Hiop Dense not implemented.\n");
+            // ComputeGeoVNormal(S);
+            // SolveHiOp(S, S_old, dt);
+            // break;
+         }
+         case 9: // HiOp Sparse Solver for optimization problem
          {
             ComputeGeoVNormal(S);
             SolveHiOp(S, S_old, dt);
             break;
          }
-         
+         case 10: // mv2 but with viscosity distribution
+         {
+            ComputeGeoVNormalDistributedViscosity(S);
+            // MFEM_ABORT("Viscosity distribution mesh movement not yet implemented.\n");
+            break;
+         }
+         case 11: // arithmetic average of adjacent  cells with distributed viscosity
+         {
+            bool is_weighted = false;
+            ParGridFunction mv_gf_l(&H1_L);
+            mv_gf_l.ProjectGridFunction(mv_gf);
+            CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
+            DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
+            mv_gf.ProjectGridFunction(mv_gf_l);
+            break;
+         }
+
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
          }
@@ -2161,12 +2177,12 @@ void LagrangianLOOperator<dim>::
             Vf *= 0.5;
             if (use_viscosity)
             {
-               double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-               double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+               // double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+               // double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
                // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
                Vf.Add(coeff, n_vec);
-               Vf.Add(coeff, tau_vec);
+               // Vf.Add(coeff, tau_vec);
 
                // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
                // {
@@ -2571,7 +2587,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
       }
 
       val = temp_num / temp_denom;
-      if (val > pow(10, -8))
+      if (val > pow(10, -12))
       {
          counter++;
          // cout << "cell: " << ci << endl;
@@ -2582,9 +2598,10 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
          // cout << "m: " << m << endl;
          // cout << "K/T: " << k / U_i[0] << endl;
          // cout << endl;
+         mc_gf[ci] = val;
       }
       // Fill corresponding cell to indicate graphically the local change in mass, if any
-      mc_gf[ci] = val;
+      // mc_gf[ci] = val;
    }
 
    double cell_ratio = (double)counter / (double)NDofs_L2;
@@ -3508,6 +3525,153 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
 
             Mi.Invert();
             Mi.Mult(Ri, node_v);
+
+            // Only update the v_geo_gf in the case of the corners
+            // Using Q1 for this velocity field
+            SetViGeo(node, node_v);
+
+            break;
+         }
+         case 1: // face
+         {
+            // face nodes just set to ivf
+            assert(face >= 0);
+            GetIntermediateFaceVelocity(EDof, node_v);
+
+            break;
+         }
+         case 2: // Cell Center
+         {
+            Vector Uc(dim+2);
+            GetCellStateVector(S, EDof, Uc);
+            pb->velocity(Uc, node_v);
+
+            break;
+         }
+         default:
+         {
+            MFEM_ABORT("Invalid entity\n");
+         }
+      }
+      // cout << "node velocity from mv2 for node (" << node << "): ";
+      // node_v.Print(cout);
+      // In every case, update the corresponding nodal velocity in S
+      geom.UpdateNodeVelocity(S, node, node_v);
+
+   } // End node iterator
+}
+
+
+/****************************************************************************************************
+* Function: ComputeGeoVNormalDistributedViscosity
+* Parameters:
+*  S    - BlockVector corresponding to nth timestep that stores mesh information, 
+*         mesh velocity, and state variables.
+*
+* Purpose:
+*  This function computes the geometric velocity from the adjacent face normals
+*  and face velocities as follows:
+*
+*  Define Mi    = Sum (nf x nf)
+*         Ri    = Sum [(nf x nf) Vf]
+*         Vigeo = Mi^-1 Ri
+*
+*  Note: Vigeo is only the geometric velocity, and is not the velocity used 
+*        to move the mesh.  For the mesh velocity, one must solve for the 
+*        alpha_i, which process is found in ComputeNodeVelocitiesFromVgeo().
+*
+*  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
+*        in the BlockVector S.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
+{
+   mfem::Mesh::FaceInformation FI;
+   Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
+   DenseMatrix Mi(dim), dm_tmp(dim);
+
+   Array<int> faces_row, oris;
+   int faces_length;
+   double c_norm, d, pcp, pc, coeff;
+
+   DofEntity entity;
+   int EDof, c, cp;
+
+   Vector Uc(dim+2), Ucp(dim+2), vcp(dim), visc_contr(dim);
+
+   // Iterate over all mesh velocity dofs
+   for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
+   {
+      node_v = 0.; // Reset node velocity
+      GetEntityDof(node, entity, EDof);
+
+      switch (entity)
+      {
+         case 0: // corner
+         {
+            // Reset Mi, Ri, Vi
+            Mi = 0., Ri = 0., node_v = 0., visc_contr = 0.;
+
+            // Get cell faces
+            vertex_edge.GetRow(node, faces_row);
+            faces_length = faces_row.Size();
+
+            // iterate over adjacent faces
+            for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
+            {
+               /* Just the velocity */
+               Vf = 0.; 
+               int face = faces_row[face_it];
+               FI = pmesh->GetFaceInformation(face);
+
+               c = FI.element[0].index;
+               cp = FI.element[1].index;
+               GetCellStateVector(S,c,Uc);
+               // Retrieve corresponding normal (orientation doesn't matter)
+               CalcOutwardNormalInt(S, c, face, n_vec);
+               c_norm = n_vec.Norml2();
+               n_vec /= c_norm;
+
+               if (FI.IsInterior())
+               {
+                  GetCellStateVector(S,cp,Ucp);
+                  d = dij_sparse->Elem(c,cp);
+
+                  /* Compute average velocity across face */
+                  pb->velocity(Uc, Vf);
+                  pb->velocity(Ucp, vcp);
+                  Vf.Add(1., vcp);
+                  Vf *= 0.5;
+               }
+               else
+               {
+                  assert(FI.IsBoundary());
+                  pb->velocity(Uc, Vf);
+               }
+               
+               tensor(n_vec, n_vec, dm_tmp);
+               Mi += dm_tmp;
+               dm_tmp.Mult(Vf, y);
+               Ri += y;
+
+               /* Get viscosity contribution */
+               // pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+               // pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+               // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
+               coeff = 0.5 * d * (Ucp[0] - Uc[0]) / c_norm; // This is how 5.7b is defined.
+               if (BdrVertexIndexingArray[node] == -1)
+               {
+                  visc_contr.Add(0.5 * coeff, n_vec);
+               }
+               else 
+               {
+                  visc_contr.Add(coeff, n_vec);
+               }
+            }
+
+            Mi.Invert();
+            Mi.Mult(Ri, node_v);
+            node_v.Add(1., visc_contr);
 
             // Only update the v_geo_gf in the case of the corners
             // Using Q1 for this velocity field
@@ -7659,23 +7823,23 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 
 
 /****************************************************************************************************
-* Function: ComputeWeightedCellAverageVelocityAtNode
+* Function: ComputeCellAverageVelocityAtNode
 * Parameters:
-*  S        - BlockVector representing FiniteElement information
-*  node     - Node on which to compute the weighted average cell velocities
-*  node_v   - Averaged velocity on node
+*  S           - BlockVector representing FiniteElement information
+*  node        - Node on which to compute the weighted average cell velocities
+*  is_weighted - boolean representing if the average should be a weighted 
+*                average or not.
+*  node_v      - Averaged velocity on node
 *
 * Purpose:
 *  To compute the weighted average of the adjacent cell velocities.
-*  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v)
+void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v)
 {
    // cout << "========================================\n"
-   //      << "ComputeWeightedCellAverageVelocityAtNode\n"
+   //      << "ComputeCellAverageVelocityAtNode\n"
    //      << "========================================\n";
-
    Array<int> cells_row;
    Vector Uc(dim+2), Vcell(dim);
    double sum_k = 0.;
@@ -7690,15 +7854,23 @@ void LagrangianLOOperator<dim>::ComputeWeightedCellAverageVelocityAtNode(const V
    {
       /* Get cell index and volume */
       int el_index = cells_row[cell_it];
-      double Kcn = pmesh->GetElementVolume(el_index);
 
       /* Retrieve cell velocity */
       GetCellStateVector(S, el_index, Uc);
       pb->velocity(Uc, Vcell);
-      sum_k += Kcn;
 
-      /* Add the weighted contribution */
-      node_v.Add(Kcn, Vcell);
+      /* Add in contribution of cell */
+      if (is_weighted) // weighted
+      {
+         double Kcn = pmesh->GetElementVolume(el_index);
+         sum_k += Kcn;
+         node_v.Add(Kcn, Vcell);
+      }
+      else // arithmetic
+      {
+         sum_k += 1.;
+         node_v.Add(1., Vcell);
+      }
    }
 
    /* Finally, take the average */
@@ -7798,7 +7970,8 @@ void LagrangianLOOperator<dim>::ComputeLagrangeMultiplierAndNodeVelocity(const V
    sv_gf_old.MakeRef(&L2, *sptr_old, block_offsets[2]);
 
    /* Compute averaged V */
-   ComputeWeightedCellAverageVelocityAtNode(S, node, vbar);
+   bool is_weighted = true;
+   ComputeCellAverageVelocityAtNode(S, node, is_weighted, vbar);
 
    /* Compute vector R corresponding to current cell */
    ComputeRotatedDiagonalForCellArea(S, cell, node, dt, R);
@@ -8039,7 +8212,7 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vect
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, Vector &Vbar)
+void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, Vector &Vbar)
 {
    // cout << "=======================================\n"
    //      << "    CalcCellAveragedVelocityVector     \n"
@@ -8049,7 +8222,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
    /* Iterate over corner node */
    for (int node = 0; node < NVDofs_H1; node++)
    {
-      ComputeWeightedCellAverageVelocityAtNode(S, node, node_v);
+      ComputeCellAverageVelocityAtNode(S, node, is_weighted, node_v);
 
       /* Put node_v in place */
       for (int i = 0; i < dim; i++)
@@ -8058,6 +8231,71 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
          Vbar[index] = node_v[i];
       }
    }
+}
+
+
+/****************************************************************************************************
+* Function:  DistributeFaceViscosityToVelocity
+* Parameters:
+*  S        - BlockVector representing FiniteElement information at tn+1
+*  mv_gf    - Gridfunction representing velocity of all geometric corner nodes
+*
+* Purpose:
+* Note: This function assumes that mv_gf is defined on all geometric corner nodes of the mesh.  
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv)
+{
+   // cout << "DistributeFaceViscosityToVelocity\n";
+   assert(mv_gf.Size() == dim * NVDofs_H1);
+
+   mfem::Mesh::FaceInformation FI;
+   int c, cp, node_i, node_j;
+   double F, d, coeff;
+   Vector n_int(dim), Vi(dim), Vj(dim), Uc(dim+2), Ucp(dim+2);
+   Array<int> face_dofs_row;
+
+   for (int face = 0; face < num_faces; face++) // face iterator
+   {
+      FI = pmesh->GetFaceInformation(face);
+      if (FI.IsInterior())
+      {
+         c = FI.element[0].index; cp = FI.element[1].index;
+         CalcOutwardNormalInt(S, c, face, n_int);
+         F = n_int.Norml2();
+         n_int /= F;
+         d = dij_sparse->Elem(c,cp);
+         GetCellStateVector(S, c, Uc);
+         GetCellStateVector(S, cp, Ucp);
+
+         /* Get corner indices */
+         H1.GetFaceDofs(face, face_dofs_row);
+         node_i = face_dofs_row[0];
+         node_j = face_dofs_row[1];
+         geom.GetNodeVelocityVecL(mv, node_i, Vi);
+         geom.GetNodeVelocityVecL(mv, node_j, Vj);
+         coeff = 0.5 * d * (Ucp[0] - Uc[0]) / F;
+
+         /* Handle ghost face on boundary */
+         if (BdrVertexIndexingArray[node_i] == -1) // interior
+         {
+            Vi.Add(coeff, n_int);
+         } else {
+            Vi.Add(2*coeff, n_int);
+         }
+         if (BdrVertexIndexingArray[node_j] == -1) // interior
+         {
+            Vj.Add(coeff, n_int);
+         } else {
+            Vj.Add(2*coeff, n_int);
+         }
+         
+         /* Updated nodal velocity */
+         geom.UpdateNodeVelocityVecL(mv, node_i, Vi);
+         geom.UpdateNodeVelocityVecL(mv, node_j, Vj);
+      }
+   }
+   // cout << "DistributeFaceViscosityToVelocity - DONE\n";
 }
 
 
@@ -8088,16 +8326,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
    mv_gf_l.ProjectGridFunction(mv_gf);
 
-   /* Compute equality restrictions */
-   CalcMassVolumeVector(S, S_old, dt, massvec);
-
-   /* Compute average velocity vector from adjacent cells */
-   CalcCellAveragedCornerVelocityVector(S, Vbar);
-
    OptimizationSolver *optsolver = NULL;
-   const int optimizer_type = 2; // TODO: change this to be a set param
-   if (optimizer_type == 2)
-   {
 #ifdef MFEM_USE_HIOP
    HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
    tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
@@ -8105,21 +8334,50 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
 #else
       MFEM_ABORT("MFEM is not built with HiOp support!");
 #endif
-   }
-   /* TODO: Finish non hiop way to solve.  See mfem/examples/hiop/ex9.cpp */
-   // else
-   // {
-   //    SLBQPOptimizer *slbqp = new SLBQPOptimizer();
-   // }
 
    /* Set min/max velocities */
    Vector xmin(Vbar.Size()), xmax(Vbar.Size());
    xmin = -1.E12;
    xmax = 1.E12;
 
+   /* Compute equality restrictions */
+   CalcMassVolumeVector(S, S_old, dt, massvec);
+
+   int lm_option = 1; // TODO: make this a command line parameter, possibly mv_option
+   OptimizationProblem * omv_problem = NULL;
+   switch (lm_option)
+   {
+      case 1: // Have a target velocity
+      {
+         /* 
+         Calculate sparsity patterns for both the Hessian of the objective 
+         and the Gradient of the constrain vector 
+         */
+         SetHiopHessianSparsityPattern(HiopHessIArr, HiopHessJArr);
+         SetHiopConstraintGradSparsityPattern(HiopCGradIArr, HiopCGradJArr);
+
+         /* Calculate target velocity to minimize to */
+         bool is_weighted = false;
+         CalcCellAveragedCornerVelocityVector(S, is_weighted, Vbar);
+
+         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
+         break;
+      }
+      case 2: // Viscous objective function
+      {
+         MFEM_ABORT("ViscouseOptimizedMeshVelocityProblem not yet implemented.\n");
+         // omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>();
+         break;
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid Lagrange Multiplier option.\n");
+         break;
+      }
+   }
+
    /* Solve for corner node velocities */
-   OptimizedMeshVelocityProblem<dim> omv_problem(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
-   optsolver->SetOptimizationProblem(omv_problem);
+   optsolver->SetOptimizationProblem(*omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
    optsolver->SetRelTol(1E-8);

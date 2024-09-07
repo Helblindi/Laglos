@@ -228,6 +228,9 @@ public:
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
    void ComputeGeoVNormal(Vector &S);
+
+   // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)
+   void ComputeGeoVNormalDistributedViscosity(Vector &S);
    
    // Raviart-Thomas mesh motion 
    void ComputeGeoVRaviart(Vector &S);
@@ -281,14 +284,15 @@ public:
    void IterativeCornerVelocityFLUXLS(Vector &S, const double & dt);
 
    // Lagrange Multipliers implementation
-   void ComputeWeightedCellAverageVelocityAtNode(const Vector &S, const int node, Vector &node_v);
+   void ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v);
    void ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, const double &dt, Vector &vec);
    void ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v);
    void IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt);
 
    // HiOp Lagrange Multipliers implementation
    void CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec);
-   void CalcCellAveragedCornerVelocityVector(const Vector &S, Vector &Vbar);
+   void CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, Vector &Vbar);
+   void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
    void SolveHiOp(Vector &S, const Vector &S_old, const double &dt);
    
    // Convert from geometric velocity to mesh velocity

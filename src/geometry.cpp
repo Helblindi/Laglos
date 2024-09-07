@@ -70,6 +70,29 @@ void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node,
 
 
 /****************************************************************************************************
+* Function: UpdateNodeVelocityVecL
+* Parameters:
+*   mv_gf_l - Vector on the first order FESpace representing velocity on geometric
+*             corner nodes of the mesh
+*   node    - Global index of node in question.
+*   vel     - Velocity at given node
+* Purpose:
+*   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
+****************************************************************************************************/
+template<int dim>
+void Geometric<dim>::UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, const Vector &vel) const
+{
+   assert(mv_gf_l.Size() == NVDofs_H1);
+   for (int i = 0; i < dim; i++)
+   {
+      int index = node + i * NVDofs_H1;
+      mv_gf_l[index] = vel[i];
+   }
+
+}
+
+
+/****************************************************************************************************
 * Function: GetNodeVelocity
 * Parameters:
 *   S    - BlockVector representing FiniteElement information
@@ -119,22 +142,23 @@ void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & n
 /****************************************************************************************************
 * Function: GetNodeVelocityVecL
 * Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   vel  - Velocity at given node
+*   mv_gf_l - Vector on the first order FESpace representing velocity on geometric
+*             corner nodes of the mesh
+*   node    - Global index of node in question.
+*   vel     - Velocity at given node
 *
 * Purpose:
 *  This function returns the velocity at the given global node.
 * Note: L indicates grid function is the low order form.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf, const int & node, Vector & vel) const
+void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf_l, const int & node, Vector & vel) const
 {
-   assert(mv_gf.Size() == NVDofs_H1);
+   assert(mv_gf_l.Size() == NVDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
-      vel[i] = mv_gf[index];
+      vel[i] = mv_gf_l[index];
    }
 }
 

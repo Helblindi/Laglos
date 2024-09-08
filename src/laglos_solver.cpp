@@ -886,8 +886,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    /* Set mesh velocity for the previous iteration before we make 
    any modifications to the mesh velocity object contained in S */
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf, mv_gf_prev_it;
+   ParGridFunction mv_gf, mv_gf_l(&H1_L), mv_gf_prev_it;
+   
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   mv_gf_l.ProjectGridFunction(mv_gf);
 
    if (mm)
    {
@@ -912,7 +914,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             break;
 
          case 2:
-            ComputeGeoVNormal(S);
+            ComputeGeoVNormal(S, mv_gf_l);
             break;
          
          case 3:
@@ -972,7 +974,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          }
          case 9: // HiOp Sparse Solver for optimization problem
          {
-            ComputeGeoVNormal(S);
+            ComputeGeoVNormal(S, mv_gf_l);
             SolveHiOp(S, S_old, dt);
             break;
          }
@@ -985,16 +987,31 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 11: // arithmetic average of adjacent  cells with distributed viscosity
          {
             bool is_weighted = false;
-            ParGridFunction mv_gf_l(&H1_L);
-            mv_gf_l.ProjectGridFunction(mv_gf);
             CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
             DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
-            mv_gf.ProjectGridFunction(mv_gf_l);
+
             break;
          }
 
          default:
             MFEM_ABORT("Invalid mesh velocity option.\n");
+         }
+
+         /* Optionally, Linearize velocity */
+         bool do_linearize_velocity = true;
+         if (do_linearize_velocity)
+         {
+            ParGridFunction mv_gf_l_linearized(&H1_L);
+            ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
+            mv_gf.ProjectGridFunction(mv_gf_l_linearized);
+
+            /* Get difference between linearized and non-linearized velocity */
+            // subtract(mv_gf_l_linearized, mv_gf_l, mv_gf_l_linearized);
+            // cout << "Difference: " << mv_gf_l_linearized.Norml2() << endl;
+         }
+         else 
+         {
+            mv_gf.ProjectGridFunction(mv_gf_l);
          }
 
          if (pb->has_boundary_conditions())
@@ -2954,7 +2971,7 @@ void LagrangianLOOperator<dim>::
          DenseMatrix Ci;
          // mfem::Array<int> elements;
          // face_element->GetRow(face_dof, elements);
-         ComputeCiGeo(face_dof, Ci);
+         ComputeCiGeo(v_geo_gf, face_dof, Ci);
 
          // Compute alpha_i
          double alpha_i;
@@ -3237,6 +3254,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(Vector &S, const strin
 template<int dim>
 void LagrangianLOOperator<dim>::SetViGeo(const int &node, const Vector &vel)
 {
+   MFEM_ABORT("Function deprecated.\n");
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
@@ -3475,7 +3493,7 @@ void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, Den
 *        in the BlockVector S.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
+void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l)
 {
    mfem::Mesh::FaceInformation FI;
    Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
@@ -3526,10 +3544,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
             Mi.Invert();
             Mi.Mult(Ri, node_v);
 
-            // Only update the v_geo_gf in the case of the corners
-            // Using Q1 for this velocity field
-            SetViGeo(node, node_v);
-
             break;
          }
          case 1: // face
@@ -3556,7 +3570,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(Vector &S)
       // cout << "node velocity from mv2 for node (" << node << "): ";
       // node_v.Print(cout);
       // In every case, update the corresponding nodal velocity in S
-      geom.UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocityVecL(mv_gf_l, node, node_v);
 
    } // End node iterator
 }
@@ -8392,6 +8406,138 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
 }
 
 
+/**********************************************************
+ * Linearization functions where v_geo_gf is not used but
+ * is passed in as an argument.
+ * Also, the BlockVector S is not updated in these functions,
+ * but the linearized velocity is returned by way of a reference
+ * argument.  This is necessary to utilize a target velocity 
+ * function in the Lagrange Multiplier application
+ **********************************************************/
+/****************************************************************************************************
+* Function: ComputeCiGeo
+* Parameters:
+*  node  - Global DOF corresponding to the node the CiGeo should be evaluated at.
+*          DOF should correspond to a corner or face node, as there is no reason 
+*          evaluate CiGeo at a cell center.
+*  res   - DenseMatrix representing CiGeo evaluated at the provided node.
+*
+* Purpose:
+*  This function serves to evaluate CiGeo at a given global dof.  Recall that
+*  CiGeo is defined as
+*     CiGeo =  [1 / Sum |K|] Sum int grad v_geo_gf
+*
+*  This function is essential to go from ViGeo to Vi.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeCiGeo(const ParGridFunction &mv_gf_l, const int & node, DenseMatrix & res)
+{
+   // cout << "=======================================\n"
+   //      << "             ComputeCiGeo              \n"
+   //      << "=======================================\n";
+   assert(node < NDofs_H1); // "Invalid nodal index"
+   res.SetSize(dim);
+   res = 0.;
+
+   // Check if node corresponds to a face or to a 
+   // vertex and get adjacent cell indices
+   double denom = 0.;
+   DenseMatrix dm_temp(dim);
+   mfem::Array<int> row;
+
+   DofEntity entity;
+   int EDof;
+   GetEntityDof(node, entity, EDof);
+
+   switch (entity)
+   {
+      case 0: // corner
+      {
+         vertex_element->GetRow(node, row);
+         break;
+      }
+      case 1: // face
+      {
+         face_element->GetRow(EDof, row);
+         break;
+      }
+      case 2: // cell
+      {
+         MFEM_ABORT("No need to compute C_i at cell centers.\n");
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid entity\n");
+      }
+   }
+
+   int row_length = row.Size();
+   for (int row_it = 0; row_it < row_length; row_it++)
+   {
+      int row_el = row[row_it];
+      double cell_vol = pmesh->GetElementVolume(row_el);
+      denom += cell_vol;
+
+      dm_temp = 0.;
+      IntGrad(mv_gf_l, row_el, dm_temp);
+      res.Add(cell_vol, dm_temp);
+   }
+   res *= 1./denom;
+}
+
+
+/****************************************************************************************************
+* Function: IntGrad
+* Parameters:
+*    cell - index corrseponding to the cell (K_c)
+*    res  - (dim x dim) DenseMatrix representing the outer product of Vfm with 
+*           the gradient of its corresponding scalar RT shape function.
+* Purpose:
+*    This function calculates the integral of the gradient of the v_geo velocity function
+*    on a given cell.
+
+* NOTE: This function assumes that dim > 1.
+* NOTE: This function assumes that the functions:
+*          - LagrangianLOOperator::ComputeIntermediateFaceVelocities()
+*          - LagrangianLOOperator::ComputeGeoVRaviart() 
+*       have already been called.  If the functions have not been called, then the 
+*       returned velocity will be 0.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::IntGrad(const ParGridFunction &mv_gf_l, const int cell, DenseMatrix & res)
+{
+   // cout << "=======================================\n"
+   //      << "             IntGrad            \n"
+   //      << "=======================================\n";
+
+   ParGridFunction H1Lc_gf(&H1Lc), mv_gf_copy(mv_gf_l);
+   const int _size = H1Lc.GetVSize();
+
+   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+   Vector grad(dim), row(dim);
+   res.SetSize(dim);
+   res = 0., row = 0.;
+
+   // Iterate over quadrature
+   for (int i = 0; i < RT_ir.GetNPoints(); i++)
+   {
+      const IntegrationPoint &ip = RT_ir.IntPoint(i);
+      trans->SetIntPoint(&ip);
+
+      for (int j = 0; j < dim; j++)
+      {
+         H1Lc_gf.MakeRef(&H1Lc, mv_gf_copy, j*_size);
+         H1Lc_gf.GetGradient(*trans, grad);
+
+         // Put information into Dense Matrix
+         res.GetRow(j, row);
+         row.Add(ip.weight, grad);
+         res.SetRow(j, row);
+      }
+   }
+}
+
+
 /****************************************************************************************************
 * Function: ComputeNodeVelocitiesFromVgeo
 * Parameters:
@@ -8407,17 +8553,19 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
-   Vector &S, const double & t, double & dt, const string, 
+void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
+   const ParGridFunction &mv_gf_l, ParGridFunction &mv_gf_linearized,
+   const double &t, const double &dt, const string, 
    void (*test_vel)(const Vector&, const double&, Vector&))
 {
+   // cout << "ComputeLinearizedNodeVelocities\n";
    Vector node_v(dim);
    bool is_dt_changed = false;
 
    // Iterate over vertices and faces
    for (int node = 0; node < NVDofs_H1; node++) // Vertex and face iterator
    {
-      ComputeNodeVelocityFromVgeo(S, node, dt, node_v, is_dt_changed);
+      ComputeLinearizedNodeVelocity(mv_gf_l, node, dt, node_v, is_dt_changed);
 
       // if (node_v[0] != node_v[0] || node_v[1] != node_v[1])
       // {
@@ -8427,7 +8575,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
       //    MFEM_ABORT("Aborting due to NaNs.\n");
       // }
 
-      geom.UpdateNodeVelocity(S, node, node_v);
+      geom.UpdateNodeVelocityVecL(mv_gf_linearized, node, node_v);
 
       // If we restricted the timestep, we must recompute the vertex velocities that were computed previously
       // if (is_dt_changed)
@@ -8441,7 +8589,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
 
 
 /****************************************************************************************************
-* Function: ComputeNodeVelocityFromVgeo
+* Function: ComputeLinearizedNodeVelocity
 * Parameters:
 *  S             - BlockVector representing FiniteElement information
 *  node          - Global DOF to compute velocity at
@@ -8459,8 +8607,8 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocitiesFromVgeo(
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
-   Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed)
+void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
+   const ParGridFunction &mv_gf_l, const int & node, const double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "=======================================\n"
    //      << "      ComputeNodeVelocityFromVgeo      \n"
@@ -8486,7 +8634,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
 
          // chrono_temp.Clear();
          // chrono_temp.Start();
-         ComputeCiGeo(node, Ci);
+         ComputeCiGeo(mv_gf_l, node, Ci);
          // chrono_temp.Stop();
          // cout << "ci computation for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
 
@@ -8536,7 +8684,7 @@ void LagrangianLOOperator<dim>::ComputeNodeVelocityFromVgeo(
          //    }
          // } // End time restriction from velocity computation
 
-         geom.GetNodeVelocity(S, node, Vgeo);
+         geom.GetNodeVelocityVecL(mv_gf_l, node, Vgeo);
          
          // chrono_temp.Clear();
          // chrono_temp.Start();
@@ -8792,130 +8940,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
    {
       const int nz = zones_per_dof[i];
       if (nz) { v_geo_gf(i) /= nz; }
-   }
-}
-
-
-/****************************************************************************************************
-* Function: ComputeCiGeo
-* Parameters:
-*  node  - Global DOF corresponding to the node the CiGeo should be evaluated at.
-*          DOF should correspond to a corner or face node, as there is no reason 
-*          evaluate CiGeo at a cell center.
-*  res   - DenseMatrix representing CiGeo evaluated at the provided node.
-*
-* Purpose:
-*  This function serves to evaluate CiGeo at a given global dof.  Recall that
-*  CiGeo is defined as
-*     CiGeo =  [1 / Sum |K|] Sum int grad v_geo_gf
-*
-*  This function is essential to go from ViGeo to Vi.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeCiGeo(const int & node, DenseMatrix & res)
-{
-   // cout << "=======================================\n"
-   //      << "             ComputeCiGeo              \n"
-   //      << "=======================================\n";
-   assert(node < NDofs_H1); // "Invalid nodal index"
-   res.SetSize(dim);
-   res = 0.;
-
-   // Check if node corresponds to a face or to a 
-   // vertex and get adjacent cell indices
-   double denom = 0.;
-   DenseMatrix dm_temp(dim);
-   mfem::Array<int> row;
-
-   DofEntity entity;
-   int EDof;
-   GetEntityDof(node, entity, EDof);
-
-   switch (entity)
-   {
-      case 0: // corner
-      {
-         vertex_element->GetRow(node, row);
-         break;
-      }
-      case 1: // face
-      {
-         face_element->GetRow(EDof, row);
-         break;
-      }
-      case 2: // cell
-      {
-         MFEM_ABORT("No need to compute C_i at cell centers.\n");
-      }
-      default:
-      {
-         MFEM_ABORT("Invalid entity\n");
-      }
-   }
-
-   int row_length = row.Size();
-   for (int row_it = 0; row_it < row_length; row_it++)
-   {
-      int row_el = row[row_it];
-      double cell_vol = pmesh->GetElementVolume(row_el);
-      denom += cell_vol;
-
-      dm_temp = 0.;
-      IntGrad(row_el, dm_temp);
-      res.Add(cell_vol, dm_temp);
-   }
-   res *= 1./denom;
-}
-
-
-/****************************************************************************************************
-* Function: IntGrad
-* Parameters:
-*    cell - index corrseponding to the cell (K_c)
-*    res  - (dim x dim) DenseMatrix representing the outer product of Vfm with 
-*           the gradient of its corresponding scalar RT shape function.
-* Purpose:
-*    This function calculates the integral of the gradient of the v_geo velocity function
-*    on a given cell.
-
-* NOTE: This function assumes that dim > 1.
-* NOTE: This function assumes that the functions:
-*          - LagrangianLOOperator::ComputeIntermediateFaceVelocities()
-*          - LagrangianLOOperator::ComputeGeoVRaviart() 
-*       have already been called.  If the functions have not been called, then the 
-*       returned velocity will be 0.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IntGrad(const int cell, DenseMatrix & res)
-{
-   // cout << "=======================================\n"
-   //      << "             IntGrad            \n"
-   //      << "=======================================\n";
-
-   ParGridFunction H1Lc_gf(&H1Lc);
-   const int _size = H1Lc.GetVSize();
-
-   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
-   Vector grad(dim), row(dim);
-   res.SetSize(dim);
-   res = 0., row = 0.;
-
-   // Iterate over quadrature
-   for (int i = 0; i < RT_ir.GetNPoints(); i++)
-   {
-      const IntegrationPoint &ip = RT_ir.IntPoint(i);
-      trans->SetIntPoint(&ip);
-
-      for (int j = 0; j < dim; j++)
-      {
-         H1Lc_gf.MakeRef(&H1Lc, v_geo_gf, j*_size);
-         H1Lc_gf.GetGradient(*trans, grad);
-
-         // Put information into Dense Matrix
-         res.GetRow(j, row);
-         row.Add(ip.weight, grad);
-         res.SetRow(j, row);
-      }
    }
 }
 

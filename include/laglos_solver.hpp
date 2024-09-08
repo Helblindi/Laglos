@@ -197,12 +197,6 @@ public:
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
 
-   // void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel);
-   // void GetNodeVelocity(const Vector &S, const int & node, Vector & vel);
-   // void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel);
-   // void UpdateNodePosition(Vector &S, const int & node, const Vector &x);
-   // void GetNodePosition(const Vector &S, const int & node, Vector & x);
-
    void UpdateMesh(const Vector &S) const;
    
    // Face velocity functions
@@ -227,7 +221,7 @@ public:
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
-   void ComputeGeoVNormal(Vector &S);
+   void ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l);
 
    // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)
    void ComputeGeoVNormalDistributedViscosity(Vector &S);
@@ -295,12 +289,12 @@ public:
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
    void SolveHiOp(Vector &S, const Vector &S_old, const double &dt);
    
-   // Convert from geometric velocity to mesh velocity
+   /* Functions to linearize the mesh velocity */
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);
-   void ComputeCiGeo(const int & node, DenseMatrix & res);
-   void IntGrad(const int cell, DenseMatrix & res);
-   void ComputeNodeVelocitiesFromVgeo(Vector &S, const double & t, double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void ComputeNodeVelocityFromVgeo(Vector &S, const int & node, double & dt, Vector &node_v, bool &is_dt_changed);
+   void ComputeCiGeo(const ParGridFunction &mv_gf_l, const int & node, DenseMatrix & res);
+   void IntGrad(const ParGridFunction &mv_gf_l, const int cell, DenseMatrix & res);
+   void ComputeLinearizedNodeVelocities(const ParGridFunction &mv_gf_l, ParGridFunction &mv_gf_linearized, const double &t, const  double &dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeLinearizedNodeVelocity(const ParGridFunction &mv_gf_l, const int & node, const double & dt, Vector &node_v, bool &is_dt_changed);
 
    // Enforce Boundary Conditions
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 

@@ -6,6 +6,7 @@
 #include "problem_base.h"
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
+#include "lagrange_multiplier_dense.hpp" // TODO: Remove
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -285,9 +286,10 @@ public:
 
    // HiOp Lagrange Multipliers implementation
    void CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec);
-   void CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, Vector &Vbar);
+   void CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, ParGridFunction &mv_gf_l);
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
-   void SolveHiOp(Vector &S, const Vector &S_old, const double &dt);
+   void SolveHiOp(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l);
+   void SolveHiOpDense(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    
    /* Functions to linearize the mesh velocity */
    void ComputeDeterminant(const DenseMatrix &C, const double &dt, double & d, int obj_index);

@@ -118,10 +118,6 @@ public:
          /* Get adjacent vertices */
          geom.GetParMesh()->GetElementVertices(cell_it, verts);
 
-         // cout << "cell: " << cell_it << ", verts: ";
-         // verts.Print(cout);
-         // cout << "----------\n";
-
          /* Get current node positions */
          geom.GetNodePosition(X, verts[0], x1);
          geom.GetNodePosition(X, verts[1], x2);
@@ -189,20 +185,6 @@ public:
          // dm.Print(cout);
          grad->SetSubMatrix(rows_arr, cols_arr, dm);
          // cout << endl;
-         
-         /* Dense Matrix implementation */
-         // V1
-         // grad->Elem(cell_it, verts[0]) = coeff * diag2[0]; 
-         // grad->Elem(cell_it, verts[0] + input_size / 2) = coeff * diag2[1];
-         // // V2
-         // grad->Elem(cell_it, verts[1]) = coeff * diag1[0];
-         // grad->Elem(cell_it, verts[1] + input_size / 2) = coeff * diag1[1];
-         // // V3
-         // grad->Elem(cell_it, verts[2]) = - coeff * diag2[0];
-         // grad->Elem(cell_it, verts[2] + input_size / 2) = - coeff * diag2[1];
-         // // V4
-         // grad->Elem(cell_it, verts[3]) = -coeff * diag1[0];
-         // grad->Elem(cell_it, verts[3] + input_size / 2) = -coeff * diag1[1];
       }
       grad->Finalize();
 
@@ -331,20 +313,26 @@ private:
    DenseMatrix block;
 
 public:
-   TargetOptimizedMeshVelocityProblem(const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
-                                const ParGridFunction &_X, const int _num_cells,
-                                const double &dt, const Vector &xmin, const Vector &xmax,
-                                const Array<int> &I, const Array<int> &J,
-                                const Array<int> &GradCI, const Array<int> &GradCJ) 
+   TargetOptimizedMeshVelocityProblem(
+      const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
+      const ParGridFunction &_X, const int _num_cells,
+      const double &dt, const Vector &xmin, const Vector &xmax,
+      const Array<int> &I, const Array<int> &J,
+      const Array<int> &GradCI, const Array<int> &GradCJ) 
       : geom(_geom),
         num_cells(_num_cells),
-        OptimizationProblem(_V_target.Size(), NULL, NULL),
+        OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
         V_target(_V_target), massvec(_massvec), d_lo(1), d_hi(1),
         LMCoper(_geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
         HessIArr(I), HessJArr(J),
         block(4)
    {
       // cout << "OMVProblem constructor\n";
+
+      // Problem assumes that vectors are of the correct size
+      assert(_massvec.Size() == _num_cells);
+      assert(_V_target.Size() == input_size);
+
       // cout << "inputsize: " << input_size << endl;
       C = &LMCoper;
       SetEqualityConstraint(massvec);

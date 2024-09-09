@@ -357,11 +357,11 @@ void LagrangianLOOperator<dim>::SetHiopConstraintGradSparsityPattern(Array<int> 
          J[8*cell_it +j+4] = verts[j] + NVDofs_H1;
       }
    }
-   cout << "final I: ";
-   I.Print(cout);
-   cout << "final J: ";
-   J.Print(cout);
-   cout << "LagrangianLOOperator::SetHiopConstraintGradSparsityPattern - DONE\n";
+   // cout << "final I: ";
+   // I.Print(cout);
+   // cout << "final J: ";
+   // J.Print(cout);
+   // cout << "LagrangianLOOperator::SetHiopConstraintGradSparsityPattern - DONE\n";
 
 }
 
@@ -967,15 +967,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          }
          case 8: // HiOp Dense Solver for optimization problem
          {
-            MFEM_ABORT("Hiop Dense not implemented.\n");
-            // ComputeGeoVNormal(S);
-            // SolveHiOp(S, S_old, dt);
-            // break;
+            // MFEM_ABORT("Hiop Dense not implemented.\n");
+            SolveHiOpDense(S, S_old, t, dt, mv_gf_l);
+            break;
          }
          case 9: // HiOp Sparse Solver for optimization problem
          {
-            ComputeGeoVNormal(S, mv_gf_l);
-            SolveHiOp(S, S_old, dt);
+            SolveHiOp(S, S_old, t, dt, mv_gf_l);
             break;
          }
          case 10: // mv2 but with viscosity distribution
@@ -8226,7 +8224,7 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vect
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, Vector &Vbar)
+void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "    CalcCellAveragedVelocityVector     \n"
@@ -8239,11 +8237,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
       ComputeCellAverageVelocityAtNode(S, node, is_weighted, node_v);
 
       /* Put node_v in place */
-      for (int i = 0; i < dim; i++)
-      {
-         int index = node + i * NVDofs_H1;
-         Vbar[index] = node_v[i];
-      }
+      geom.UpdateNodeVelocityVecL(mv_gf_l, node, node_v);
    }
 }
 
@@ -8313,6 +8307,62 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
 }
 
 
+/************
+ * Function: SolveHiopDense
+ * TODO: combine with SolveHiop function with a dense/sparse flag
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+{
+   cout << "SolveHiOpDense\n";
+   Vector massvec(NDofs_L2);
+   ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
+   Vector* sptr = const_cast<Vector*>(&S);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+
+   CalcMassVolumeVector(S, S_old, dt, massvec);
+
+   OptimizationSolver *optsolver = NULL;
+   const int optimizer_type = 2; // TODO: change this to be a set param
+   if (optimizer_type == 2)
+   {
+#ifdef MFEM_USE_HIOP
+   HiopNlpOptimizer *tmp_opt_ptr = new HiopNlpOptimizer();
+   optsolver = tmp_opt_ptr;
+#else
+      MFEM_ABORT("MFEM is not built with HiOp support!");
+#endif
+   }
+   // else
+   // {
+   //    SLBQPOptimizer *slbqp = new SLBQPOptimizer();
+
+
+   // }
+
+   Vector xmin(V_target.Size()), xmax(V_target.Size());
+   xmin = -1.E12;
+   xmax = 1.E12;
+
+   bool is_weighted = false;
+   CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+   DistributeFaceViscosityToVelocity(S_old, V_target);
+
+   ParGridFunction mv_gf_l_lin(mv_gf_l);
+   ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_lin, t, dt);
+   mv_gf_l = mv_gf_l_lin;
+
+   OptimizedMeshVelocityProblemDense<dim> omv_problem(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
+   optsolver->SetOptimizationProblem(omv_problem);
+   optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
+   optsolver->SetPrintLevel(0);
+   optsolver->SetRelTol(1E-8);
+   optsolver->SetAbsTol(1E-8);
+   optsolver->Mult(mv_gf_l, mv_gf_l_out);
+
+   mv_gf_l = mv_gf_l_out;
+}
+
 /****************************************************************************************************
 * Function:  SolveHiOp
 * Parameters:
@@ -8328,17 +8378,16 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
 *  an OptimizationSolver from MFEM.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const double &dt)
+void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "               SolveHiOp               \n"
    //      << "=======================================\n";
-   Vector massvec(NDofs_L2), Vbar(dim*NVDofs_H1);
-   ParGridFunction x_gf, mv_gf, mv_gf_l(&H1_L);
+   assert(mv_gf_l.Size() == dim*NVDofs_H1);
+   Vector massvec(NDofs_L2);
+   ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   mv_gf_l.ProjectGridFunction(mv_gf);
 
    OptimizationSolver *optsolver = NULL;
 #ifdef MFEM_USE_HIOP
@@ -8350,7 +8399,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
 #endif
 
    /* Set min/max velocities */
-   Vector xmin(Vbar.Size()), xmax(Vbar.Size());
+   Vector xmin(V_target.Size()), xmax(V_target.Size());
    xmin = -1.E12;
    xmax = 1.E12;
 
@@ -8370,11 +8419,16 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
          SetHiopHessianSparsityPattern(HiopHessIArr, HiopHessJArr);
          SetHiopConstraintGradSparsityPattern(HiopCGradIArr, HiopCGradJArr);
 
-         /* Calculate target velocity to minimize to */
+         /* Calculate target velocity */
          bool is_weighted = false;
-         CalcCellAveragedCornerVelocityVector(S, is_weighted, Vbar);
+         CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+         DistributeFaceViscosityToVelocity(S_old, V_target);
 
-         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, Vbar, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
+         ParGridFunction mv_gf_l_lin(mv_gf_l);
+         ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_lin, t, dt);
+         mv_gf_l = mv_gf_l_lin;
+
+         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
          break;
       }
       case 2: // Viscous objective function
@@ -8396,10 +8450,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(Vector &S, const Vector &S_old, const 
    optsolver->SetPrintLevel(0);
    optsolver->SetRelTol(1E-8);
    optsolver->SetAbsTol(1E-8);
-   optsolver->Mult(mv_gf_l, mv_gf_l); 
+   optsolver->Mult(mv_gf_l, mv_gf_l_out); 
 
-   /* Project corner node velocities onto current ParGridFunction */
-   mv_gf.ProjectGridFunction(mv_gf_l);
+   mv_gf_l = mv_gf_l_out;
 
    // delete optsolver;
    // optsolver = nullptr;

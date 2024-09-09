@@ -66,7 +66,10 @@ message(STATUS "Laglos defines: ${_glvis_compile_defs}")
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
 # Boost required for filesystem modification
-cmake_policy(SET CMP0167 NEW)
+# Avoid setting CMP0167 if using a CMake version that predates 3.26
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost REQUIRED COMPONENTS filesystem)
 # Include libraries needed by lboost_filesystem
 # https://stackoverflow.com/questions/9235679/create-a-directory-if-it-doesnt-exist

@@ -30,6 +30,7 @@ public:
    inline ParFiniteElementSpace GetPFES() const { return H1; }
    inline ParMesh *GetParMesh() const { return pmesh; }
    inline int GetNDofs_H1() const { return NDofs_H1; }
+   inline int GetNVDofs_H1() const { return NVDofs_H1; }
 
    void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel) const;
    void UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const;

@@ -128,50 +128,17 @@ public:
          geom.GetNodePosition(X, verts[2], x3);
          geom.GetNodePosition(X, verts[3], x4);
 
-         // cout << "\tNode Positions:\n";
-         // cout << "x1n: ";
-         // x1.Print(cout);
-         // cout << "x2n: ";
-         // x2.Print(cout);
-         // cout << "x3n: ";
-         // x3.Print(cout);
-         // cout << "x4n: ";
-         // x4.Print(cout);
-         // cout << "----------\n";
-
          /* Get node velocities */
          geom.GetNodeVelocityVecL(v, verts[0], v1n);
          geom.GetNodeVelocityVecL(v, verts[1], v2n);
          geom.GetNodeVelocityVecL(v, verts[2], v3n);
          geom.GetNodeVelocityVecL(v, verts[3], v4n);
 
-         // cout << "\tNode Velocities:\n";
-         // cout << "v1np1: ";
-         // v1n.Print(cout);
-         // cout << "v2np1: ";
-         // v2n.Print(cout);
-         // cout << "v3np1: ";
-         // v3n.Print(cout);
-         // cout << "v4np1: ";
-         // v4n.Print(cout);
-         // cout << "----------\n";
-
          /* Compute updated node locations */
          add(x1, dt, v1n, x1);
          add(x2, dt, v2n, x2);
          add(x3, dt, v3n, x3);
          add(x4, dt, v4n, x4);
-
-         // cout << "\tMoved Node Positions:\n";
-         // cout << "x1np1: ";
-         // x1.Print(cout);
-         // cout << "x2np1: ";
-         // x2.Print(cout);
-         // cout << "x3np1: ";
-         // x3.Print(cout);
-         // cout << "x4np1: ";
-         // x4.Print(cout);
-         // cout << "----------\n";
 
          /* Compute volume at time tn+1 */
          subtract(x3, x1, diag1);
@@ -332,7 +299,7 @@ public:
 
 /**
  * Conservative a posteriori correction to mesh velocity to guarantee local mass conservation:
- * Find V that minimizes || Vi - \bar{V}i ||^2, subject to
+ * Find V that minimizes || Vi - {V_target}_i ||^2, subject to
  *   Kc(n+1)   Kcn
  *   ------- - --- = 0  for all cells c in the mesh,
  *   Tc(n+1)   Tcn
@@ -342,20 +309,21 @@ public:
  *   Kc(n+1) = Tc(n+1) ---
  *                     Tcn 
  *
- * Here, \bar{V}_i is a weighted average of the adjacent cell velocities.
+ * Here, {V_target}_i is some target velocity that approximates the mesh velocity well.
+ * That is to say that moving the mesh with V_target results in minimal necessary correction 
+ * at the faces to guarantee local mass conservation.
  * 
  * Note that both velocity vectors are of size dim * NVDofsH1
  */
 template <int dim>
-class OptimizedMeshVelocityProblem : public OptimizationProblem
+class TargetOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
    const Geometric<dim> &geom;
    const int num_cells;
-   const Vector &V_bar;
+   const Vector &V_target;
    Vector massvec, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
-   // const zeroDenseMatrix<dim> zDMoper;
    Array<int> HessIArr;
    Array<int> HessJArr;
    Array<double> HessData;
@@ -363,17 +331,16 @@ private:
    DenseMatrix block;
 
 public:
-   OptimizedMeshVelocityProblem(const Geometric<dim> &_geom, const Vector &_Vbar, const Vector &_massvec, 
+   TargetOptimizedMeshVelocityProblem(const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
                                 const ParGridFunction &_X, const int _num_cells,
                                 const double &dt, const Vector &xmin, const Vector &xmax,
                                 const Array<int> &I, const Array<int> &J,
                                 const Array<int> &GradCI, const Array<int> &GradCJ) 
       : geom(_geom),
         num_cells(_num_cells),
-        OptimizationProblem(_Vbar.Size(), NULL, NULL),
-        V_bar(_Vbar), massvec(_massvec), d_lo(1), d_hi(1),
+        OptimizationProblem(_V_target.Size(), NULL, NULL),
+        V_target(_V_target), massvec(_massvec), d_lo(1), d_hi(1),
         LMCoper(_geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
-      //   zDMoper(1, input_size),
         HessIArr(I), HessJArr(J),
         block(4)
    {
@@ -381,12 +348,6 @@ public:
       // cout << "inputsize: " << input_size << endl;
       C = &LMCoper;
       SetEqualityConstraint(massvec);
-
-      // Hiop must have C and D DenseMatrices
-      // D = &zDMoper;
-      // d_lo(0) = -1.E4;
-      // d_hi(0) = 1.E4;
-      // SetInequalityConstraint(d_lo, d_hi);
 
       SetSolutionBounds(xmin, xmax);
 
@@ -402,7 +363,7 @@ public:
       block *= pow(dt, 2);
    }
 
-   ~OptimizedMeshVelocityProblem()
+   ~TargetOptimizedMeshVelocityProblem()
    {
       // delete hess;
       // hess = nullptr;
@@ -414,7 +375,7 @@ public:
       double res = 0.0;
       for (int i = 0; i < input_size; i++)
       {
-         const double d = V(i) - V_bar(i);
+         const double d = V(i) - V_target(i);
          res += d * d;
       }
       return res;
@@ -434,7 +395,7 @@ public:
 
       for (int i = 0; i < input_size; i++)
       {
-         grad(i) = (V(i) - V_bar(i));
+         grad(i) = (V(i) - V_target(i));
       }
       grad *= 2.;
    }
@@ -519,6 +480,90 @@ public:
       ComputeObjectiveHessData(x);
 
       // std::cout << "OptimizedMeshVelocityProblem::CalcObjectiveHessian - DONE\n";
+      return *hess;
+   }
+};
+
+
+/**
+ * Conservative a posteriori correction to mesh velocity to guarantee local mass conservation:
+ * Find V that minimizes SUM_i SUM_{j\in nbr{(i)} || Vi - Vj ||^2, subject to
+ *   Kc(n+1)   Kcn
+ *   ------- - --- = 0  for all cells c in the mesh,
+ *   Tc(n+1)   Tcn
+ *
+ * OR (as implemented here)
+ *                     Kcn
+ *   Kc(n+1) = Tc(n+1) ---
+ *                     Tcn
+ * 
+ * Note that both velocity vectors are of size dim * NVDofsH1
+ */
+template <int dim>
+class ViscousOptimizedMeshVelocityProblem : public OptimizationProblem
+{
+private:
+   const Geometric<dim> &geom;
+   const int num_cells;
+   Vector massvec, d_lo, d_hi;
+   const LocalMassConservationOperator<dim> LMCoper;
+   // const zeroDenseMatrix<dim> zDMoper;
+   Array<int> HessIArr;
+   Array<int> HessJArr;
+   Array<double> HessData;
+   SparseMatrix *hess;
+   DenseMatrix block;
+
+public:
+   ViscousOptimizedMeshVelocityProblem(const Geometric<dim> &_geom, const Vector &_massvec,
+                                       const ParGridFunction &_X, const int _num_cells,
+                                       const double &dt, const Vector &xmin, const Vector &xmax,
+                                       const Array<int> &I, const Array<int> &J,
+                                       const Array<int> &GradCI, const Array<int> &GradCJ)
+      : geom(_geom),
+        num_cells(_num_cells),
+        OptimizationProblem(_geom.GetNVDofs_H1(), NULL, NULL),
+        massvec(_massvec), d_lo(1), d_hi(1),
+        LMCoper(_geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
+      //   zDMoper(1, input_size),
+        HessIArr(I), HessJArr(J),
+        block(4)
+   {
+      MFEM_ABORT("OptimizationProblem is not yet implemented.\n");
+   }
+
+   ~ViscousOptimizedMeshVelocityProblem()
+   {
+      // delete hess;
+      // hess = nullptr;
+   }
+
+   virtual double CalcObjective(const Vector &V) const
+   {
+      MFEM_ABORT("CalcObjective must be implemented.\n");
+   }
+   int get_input_size()
+   {
+      return input_size;
+   }
+
+   virtual void CalcObjectiveGrad(const Vector &V, Vector &grad) const
+   {
+      if (V.Size() != input_size)
+      {
+         MFEM_ABORT("Vectors must be of same size\n");
+      }
+      MFEM_ABORT("CalcObjectiveGrad must be implemented.\n");
+   }
+
+   void ComputeObjectiveHessData(const Vector &x) const
+   {
+   }
+
+   virtual Operator & CalcObjectiveHess(const Vector &x) const
+   {
+      ComputeObjectiveHessData(x);
+
       return *hess;
    }
 };

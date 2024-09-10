@@ -997,15 +997,11 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
 
          /* Optionally, Linearize velocity */
          bool do_linearize_velocity = true;
-         if (do_linearize_velocity)
+         if (do_linearize_velocity && mv_option != 8 && mv_option != 9)
          {
             ParGridFunction mv_gf_l_linearized(&H1_L);
             ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
             mv_gf.ProjectGridFunction(mv_gf_l_linearized);
-
-            /* Get difference between linearized and non-linearized velocity */
-            // subtract(mv_gf_l_linearized, mv_gf_l, mv_gf_l_linearized);
-            // cout << "Difference: " << mv_gf_l_linearized.Norml2() << endl;
          }
          else 
          {
@@ -2613,10 +2609,10 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
          // cout << "m: " << m << endl;
          // cout << "K/T: " << k / U_i[0] << endl;
          // cout << endl;
-         mc_gf[ci] = val;
+         // mc_gf[ci] = val;
       }
       // Fill corresponding cell to indicate graphically the local change in mass, if any
-      // mc_gf[ci] = val;
+      mc_gf[ci] = val;
    }
 
    double cell_ratio = (double)counter / (double)NDofs_L2;
@@ -8344,21 +8340,52 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    xmin = -1.E12;
    xmax = 1.E12;
 
+   /* Options */
+   bool do_lin = true;
    bool is_weighted = false;
-   CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
-   DistributeFaceViscosityToVelocity(S_old, V_target);
+   int mvop = 11; // options currently include mv2, mv11
 
-   ParGridFunction mv_gf_l_lin(mv_gf_l);
-   ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_lin, t, dt);
-   mv_gf_l = mv_gf_l_lin;
+   /* Compute targeted velocity */
+   switch (mvop)
+   {
+   case 2:
+      ComputeGeoVNormal(S, V_target);
+      break;
+   case 11:
+      CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+      DistributeFaceViscosityToVelocity(S_old, V_target);
+      break;
+   default:
+      MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
+   }
+
+   /* Linearize target velocity */
+   if (do_lin)
+   {
+      ParGridFunction mv_gf_l_lin(mv_gf_l);
+      ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_lin, t, dt);
+      mv_gf_l = mv_gf_l_lin;
+   }
 
    OptimizedMeshVelocityProblemDense<dim> omv_problem(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
    optsolver->SetOptimizationProblem(omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
-   optsolver->SetRelTol(1E-8);
+   optsolver->SetRelTol(1E-6);
    optsolver->SetAbsTol(1E-8);
    optsolver->Mult(mv_gf_l, mv_gf_l_out);
+
+   bool converged = optsolver->GetConverged();
+   int num_iter = optsolver->GetNumIterations();
+
+   if (converged)
+   {
+      cout << "Solver converged in " << num_iter << " iterations.\n";
+   }
+   else 
+   {
+      cout << "Failed to converge.\n";
+   }
 
    mv_gf_l = mv_gf_l_out;
 }

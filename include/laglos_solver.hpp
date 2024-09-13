@@ -130,9 +130,7 @@ protected:
    StopWatch chrono_mm, chrono_state, chrono_temp;
 
    Array<int> HiopHessIArr, HiopHessJArr;
-   void SetHiopHessianSparsityPattern(Array<int> &I, Array<int> &J);
    Array<int> HiopCGradIArr, HiopCGradJArr;
-   void SetHiopConstraintGradSparsityPattern(Array<int> &I, Array<int> &J);
 
 public:
    enum DofEntity {corner, face, cell};

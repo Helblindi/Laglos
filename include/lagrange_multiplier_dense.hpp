@@ -36,8 +36,8 @@ public:
         geom(_geom),
         dt(_dt)
    {
-      cout << "LocalMassConservationOperatorDense::Non-default constructor\n";
-      cout << "input_size: " << input_size << endl;
+      // cout << "LocalMassConservationOperatorDense::Non-default constructor\n";
+      // cout << "input_size: " << input_size << endl;
       /* Initialize gradient */
       grad = 0.;
    }

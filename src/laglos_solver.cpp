@@ -126,7 +126,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    TVSize_L2V(L2V.TrueVSize()),
    GTVSize_L2V(L2V.GlobalTrueVSize()),
    NDofs_L2V(L2V.GetNDofs()),
-   // block_offsets(offset),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
    num_elements(L2.GetNE()),
@@ -148,7 +147,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    cout << "Instantiating hydro op\n";
    cout << "block offsets: ";
    block_offsets.Print(cout);
-   assert(false);
    // block_offsets[0] = 0;
    // block_offsets[1] = block_offsets[0] + Vsize_H1;
    // block_offsets[2] = block_offsets[1] + Vsize_H1;
@@ -8109,7 +8107,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
 * Note: This function assumes that mv_gf is defined on all geometric corner nodes of the mesh.  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv)
+void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf)
 {
    // cout << "DistributeFaceViscosityToVelocity\n";
    assert(mv_gf.Size() == dim * NVDofs_H1);
@@ -8137,8 +8135,8 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
          H1.GetFaceDofs(face, face_dofs_row);
          node_i = face_dofs_row[0];
          node_j = face_dofs_row[1];
-         geom.GetNodeVelocityVecL(mv, node_i, Vi);
-         geom.GetNodeVelocityVecL(mv, node_j, Vj);
+         geom.GetNodeVelocityVecL(mv_gf, node_i, Vi);
+         geom.GetNodeVelocityVecL(mv_gf, node_j, Vj);
          coeff = 0.5 * d * (Ucp[0] - Uc[0]) / F;
 
          /* Handle ghost face on boundary */
@@ -8156,8 +8154,8 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
          }
          
          /* Updated nodal velocity */
-         geom.UpdateNodeVelocityVecL(mv, node_i, Vi);
-         geom.UpdateNodeVelocityVecL(mv, node_j, Vj);
+         geom.UpdateNodeVelocityVecL(mv_gf, node_i, Vi);
+         geom.UpdateNodeVelocityVecL(mv_gf, node_j, Vj);
       }
    }
    // cout << "DistributeFaceViscosityToVelocity - DONE\n";

@@ -38,7 +38,7 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vecto
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   assert(mv_gf.Size() == NDofs_H1);
+   assert(mv_gf.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -60,7 +60,7 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vecto
 template<int dim>
 void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const
 {
-   assert(mv_gf.Size() == NDofs_H1);
+   assert(mv_gf.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
@@ -82,7 +82,7 @@ void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node,
 template<int dim>
 void Geometric<dim>::UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, const Vector &vel) const
 {
-   assert(mv_gf_l.Size() == NVDofs_H1);
+   assert(mv_gf_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
@@ -108,7 +108,7 @@ void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector &
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction mv_gf;
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   assert(mv_gf.Size() == NDofs_H1);
+   assert(mv_gf.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -131,7 +131,7 @@ void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector &
 template<int dim>
 void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel) const
 {
-   assert(mv_gf.Size() == NDofs_H1);
+   assert(mv_gf.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
@@ -154,7 +154,7 @@ void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & n
 template<int dim>
 void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf_l, const int & node, Vector & vel) const
 {
-   assert(mv_gf_l.Size() == NVDofs_H1);
+   assert(mv_gf_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
@@ -179,7 +179,7 @@ void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vecto
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   assert(x_gf.Size() == NDofs_H1);
+   assert(x_gf.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
@@ -205,7 +205,7 @@ void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Ve
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   assert(x_gf.Size() == NDofs_H1);
+   assert(x_gf.Size() == dim*NDofs_H1);
 
    GetNodePosition(x_gf, node, x);
 }
@@ -224,7 +224,7 @@ void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Ve
 template<int dim>
 void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector &x) const
 {
-   assert(x_gf.Size() == NDofs_H1);
+   assert(x_gf.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;

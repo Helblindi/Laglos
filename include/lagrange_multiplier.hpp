@@ -129,7 +129,7 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
    }
 
    /* Validate propert of csr matrices */
-   assert(I[2*num_vertices + 1] == J.Size());
+   assert(I[2*num_vertices] == J.Size());
 }
 
 

@@ -50,6 +50,10 @@ add_test(NAME LagrangeMWSCompare
                "${PROJECT_SOURCE_DIR}/build/tests/lagrangian-mws-output.txt"
                "${PROJECT_SOURCE_DIR}/Fortran/lagrangian-mws/output_ref_c")
 
+# Test Lagrange Multipliers implementation
+add_executable(TestLM EXCLUDE_FROM_ALL test_lagrange_multipliers.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/geometry.cpp")
+target_link_libraries(TestLM PRIVATE "${MFEM_LIBRARIES}")
+add_test(NAME TestLM COMMAND TestLM)
 
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
@@ -57,4 +61,4 @@ add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
 # add_dependencies(build_tests TestRTvel TestRaviart Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
-add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran TestMM)
+add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran TestMM TestLM)

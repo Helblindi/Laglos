@@ -222,6 +222,7 @@ template<int dim>
 LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
    delete dij_sparse;
+   dij_sparse = nullptr;
 }
 
 
@@ -297,6 +298,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    HypreParMatrix * k_hpm = k.ParallelAssemble();
    k_hpm->MergeDiagAndOffd(*dij_sparse);
 
+   delete k_hpm;
    // From here, we can modify the sparse matrix according to the sparsity pattern
 }
 
@@ -607,7 +609,6 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
             // a value non negative
             if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
             {
-               cout << "vertex " << index << " is a corner.\n";
                BdrVertexIndexingArray[index] = 5;
             }
             else 
@@ -657,7 +658,6 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
            pb->get_indicator() == "SodRadial"))
       {
          // Corner cell
-         cout << "we have a corner cell: " << row[0] << endl;
          cell_bdr_flag_gf[row[0]] = 5;
       }
       else
@@ -8233,6 +8233,9 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    optsolver->Mult(mv_gf_l, mv_gf_l_out);
 
    mv_gf_l = mv_gf_l_out;
+
+   // delete optsolver;
+   // optsolver = nullptr;
 }
 
 /****************************************************************************************************
@@ -8261,15 +8264,6 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
 
-   OptimizationSolver *optsolver = NULL;
-#ifdef MFEM_USE_HIOP
-   HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
-   tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
-   optsolver = tmp_opt_ptr;
-#else
-      MFEM_ABORT("MFEM is not built with HiOp support!");
-#endif
-
    /* Set min/max velocities */
    Vector xmin(V_target.Size()), xmax(V_target.Size());
    xmin = -1.E12;
@@ -8284,57 +8278,77 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    int mvop = 11; // options currently include mv2, mv11
    int lm_option = 1; // TODO: make this a command line parameter, possibly mv_option
 
-   OptimizationProblem * omv_problem = NULL;
-   switch (lm_option)
+   // OptimizationProblem * omv_problem = NULL;
+   // switch (lm_option)
+   // {
+   //    case 1: // Have a target velocity
+   //    {
+   /* 
+   Calculate sparsity patterns for both the Hessian of the objective 
+   and the Gradient of the constrain vector 
+   */
+   SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+   SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
+   
+   /* Calculate target velocity */
+   switch (mvop)
    {
-      case 1: // Have a target velocity
-      {
-         /* 
-         Calculate sparsity patterns for both the Hessian of the objective 
-         and the Gradient of the constrain vector 
-         */
-         SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
-         SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
-         
-         /* Calculate target velocity */
-         switch (mvop)
-         {
-         case 2:
-            ComputeGeoVNormal(S, V_target);
-            break;
-         case 11:
-            CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
-            DistributeFaceViscosityToVelocity(S_old, V_target);
-            break;
-         default:
-            MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
-         }
-
-         if (do_lin)
-         {
-            ParGridFunction V_target_lin(V_target);
-            ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
-            V_target = V_target_lin;
-         }
-
-         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
-         break;
-      }
-      case 2: // Viscous objective function
-      {
-         MFEM_ABORT("ViscouseOptimizedMeshVelocityProblem not yet implemented.\n");
-         // omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>();
-         break;
-      }
-      default:
-      {
-         MFEM_ABORT("Invalid Lagrange Multiplier option.\n");
-         break;
-      }
+   case 2:
+      ComputeGeoVNormal(S, V_target);
+      break;
+   case 11:
+      CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+      DistributeFaceViscosityToVelocity(S_old, V_target);
+      break;
+   default:
+      MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
    }
 
+   if (do_lin)
+   {
+      ParGridFunction V_target_lin(V_target);
+      ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
+      V_target = V_target_lin;
+   }
+
+   TargetOptimizedMeshVelocityProblem<dim> omv_problem(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
+   // TestProblem<dim> omv_problem(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax,HiopCGradIArr, HiopCGradJArr);
+
+
+
+   // TargetOptimizedMeshVelocityProblem<dim> *tomv_temp = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
+   // omv_problem = tomv_temp;
+   //       break;
+   //    }
+   //    case 2: // Viscous objective function
+   //    {
+   //       MFEM_ABORT("ViscouseOptimizedMeshVelocityProblem not yet implemented.\n");
+   //       // ViscousOptimizedMeshVelocityProblem *vomv_temp= new ViscousOptimizedMeshVelocityProblem<dim>();
+   //       // omv_problem = vomv_temp;
+   //       break;
+   //    }
+   //    default:
+   //    {
+   //       MFEM_ABORT("Invalid Lagrange Multiplier option.\n");
+   //       break;
+   //    }
+   // }
+
+   // OptimizationSolver *optsolver = NULL;
+   std::shared_ptr<OptimizationSolver> optsolver;
+
+#ifdef MFEM_USE_HIOP
+   std::shared_ptr<HiopNlpSparseOptimizer> tmp_opt_ptr = std::make_shared<HiopNlpSparseOptimizer>();
+   tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
+   // tmp_opt_ptr->SetOptimizationProblem(omv_problem);
+   optsolver = tmp_opt_ptr;
+#else
+      MFEM_ABORT("MFEM is not built with HiOp support!");
+#endif
+
    /* Solve for corner node velocities */
-   optsolver->SetOptimizationProblem(*omv_problem);
+   // optsolver->SetOptimizationProblem(*omv_problem);
+   optsolver->SetOptimizationProblem(omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
    optsolver->SetRelTol(1E-6);
@@ -8343,6 +8357,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    optsolver->Mult(mv_gf_l, mv_gf_l_out); 
 
    mv_gf_l = mv_gf_l_out;
+
+   // delete optsolver;
+   // fscanf(stdin, "c");
 }
 
 

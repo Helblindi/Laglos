@@ -78,6 +78,7 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
    // std::cout << "SetHiopHessianSparsityPattern\n";
    Array<int> faces_row, face_dofs_row;
    I.SetSize(num_vertices+1);
+   I[0] = 0;
    J.SetSize(0);
    int faces_length;
    mfem::Mesh::FaceInformation FI;
@@ -148,12 +149,12 @@ private:
    double dt; 
    Array<int> GradCIArr, GradCJArr;
    Array<double> GradDataArr;
-   SparseMatrix * grad;
+   mutable SparseMatrix grad;
 
 public:
    LocalMassConservationOperator(const Geometric<dim> &_geom, const ParGridFunction &_X, 
                                  const int &_num_cells, const int &_input_size, const double &_dt,
-                                 const Array<int> &GradCI, const Array<int> &GradCJ)
+                                 const Array<int> GradCI, const Array<int> GradCJ)
       : Operator(_num_cells, _input_size),
         num_cells(_num_cells),
         input_size(_input_size),
@@ -161,23 +162,20 @@ public:
         geom(_geom),
         dt(_dt),
         GradCIArr(GradCI),
-        GradCJArr(GradCJ)
+        GradCJArr(GradCJ),
+        GradDataArr(GradCJArr.Size()),
+        grad(GradCIArr.GetData(), GradCJArr.GetData(), GradDataArr.GetData(), num_cells, input_size,
+             false/*ownij*/, false/*owna*/, true/*is_sorted*/)
    {
       // cout << "LocalMassConservationOperator::Non-default constructor\n";
-
-      /* Initialize gradient */
-      GradDataArr.SetSize(GradCJArr.Size());
-      GradDataArr = 0.;
-      grad = new SparseMatrix(GradCIArr.GetData(), GradCJArr.GetData(), GradDataArr.GetData(), num_cells, input_size);  
-      // cout << "grad height: " << grad->Height() << ", grad width: " << grad->Width() << endl;
    }
+
    ~LocalMassConservationOperator()
    {
-      // delete grad; 
-      // grad = nullptr;
+      // std::cout << "LocalMassConservationOperator - destructor\n";
    }
 
-   virtual void Mult(const Vector &v, Vector &y) const
+   void Mult(const Vector &v, Vector &y) const
    {
       // cout << "LMC::Mult()\n";
       Vector x1(dim), x2(dim), x3(dim), x4(dim);
@@ -216,10 +214,6 @@ public:
          double val = diag1 * diag2;
 
          y[cell_it] = val;
-         // if (val <= 0.)
-         // {
-         //    MFEM_ABORT("Cell volume should be positive.\n");
-         // }
       }
       y *= 0.5;
    }
@@ -290,18 +284,18 @@ public:
          double coeff = dt / 2;
          dm *= coeff;
 
-         grad->SetSubMatrix(rows_arr, cols_arr, dm);
+         grad.SetSubMatrix(rows_arr, cols_arr, dm);
       }
-      grad->Finalize();
+      grad.Finalize();
    }
 
    /* Evaluate the gradient operator at the point v. */
-   virtual Operator &GetGradient(const Vector &v) const
+   Operator &GetGradient(const Vector &v) const
    {
       // cout << "LMC::GetGradient\n";
       ComputeGradient(v);
 
-      const int *In = grad->GetI(), *Jn = grad->GetJ();
+      const int *In = grad.GetI(), *Jn = grad.GetJ();
       
       for (int i = 0, k=0; i < num_cells; i++)
       {
@@ -311,7 +305,7 @@ public:
          }
       }
 
-      return *grad;
+      return grad;
    }
 };
 
@@ -348,12 +342,12 @@ public:
    //    grad = nullptr;
    // }
 
-   virtual void Mult(const Vector &v, Vector &y) const
+   void Mult(const Vector &v, Vector &y) const
    {
       y = 0.;
    }
 
-   virtual Operator &GetGradient(const Vector &v) const 
+   Operator &GetGradient(const Vector &v) const 
    {
       return *grad;
    } 
@@ -384,31 +378,38 @@ private:
    const Geometric<dim> &geom;
    const int num_cells, nnz_sparse_jaceq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
+   const Vector xmin, xmax;
    Vector massvec, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
    // zeroSparseMatrix<dim> zSMoper;
-   Array<int> HessIArr;
-   Array<int> HessJArr;
-   Array<double> HessData;
-   SparseMatrix *hess;
+   Array<int> HessIArr, HessJArr;
+   Array<double> GradCData, HessData;
+   mutable SparseMatrix hess;
    DenseMatrix block;
+   const ParGridFunction &X;
+   const double dt;
 
 public:
    TargetOptimizedMeshVelocityProblem(
       const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
       const ParGridFunction &_X, const int _num_cells,
-      const double &dt, const Vector &xmin, const Vector &xmax,
-      const Array<int> &I, const Array<int> &J,
-      const Array<int> &GradCI, const Array<int> &GradCJ) 
+      const double &dt, const Vector &_xmin, const Vector &_xmax,
+      Array<int> _HessI, Array<int> _HessJ,
+      Array<int> _GradCI, Array<int> _GradCJ) 
       : geom(_geom),
+        X(_X),
+        dt(dt),
         num_cells(_num_cells),
+        xmin(_xmin), xmax(_xmax),
         OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
         V_target(_V_target), massvec(_massvec), d_lo(1), d_hi(1),
-        LMCoper(_geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
-        nnz_sparse_jaceq(GradCJ.Size()),
-        nnz_sparse_Hess_Lagr(J.Size()),
       //   zSMoper(1, input_size),
-        HessIArr(I), HessJArr(J),
+        LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
+        HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
+        nnz_sparse_jaceq(_GradCJ.Size()),
+        nnz_sparse_Hess_Lagr(_HessJ.Size()),
+        hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
+             input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4)
    {
       // cout << "TOMVProblem constructor\n";
@@ -427,11 +428,6 @@ public:
 
       SetSolutionBounds(xmin, xmax);
 
-      HessData.SetSize(J.Size());
-      HessData = 0.;
-      hess = new SparseMatrix(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, input_size); // input_size x input_size sparse matrix.
-      hess->Finalize();
-
       block(0,1) = -0.5, block(0,3) = 0.5;
       block(1,0) = 0.5, block(1,2) = -0.5;
       block(2,1) = 0.5, block(2,3) = -0.5;
@@ -442,11 +438,10 @@ public:
 
    ~TargetOptimizedMeshVelocityProblem()
    {
-      // delete hess;
-      // hess = nullptr;
+      // std::cout << "TargetOptimizedMeshVelocityProblem - destructor\n";
    }
 
-   virtual double CalcObjective(const Vector &V) const
+   double CalcObjective(const Vector &V) const
    {
       // cout << "OMV calc objective\n";
       double res = 0.0;
@@ -457,12 +452,13 @@ public:
       }
       return res;
    }
+
    int get_input_size() 
    {
       return input_size;
    }
 
-   virtual void CalcObjectiveGrad(const Vector &V, Vector &grad) const 
+   void CalcObjectiveGrad(const Vector &V, Vector &grad) const 
    {
       // cout << "OMV CalcObjectiveGrad\n";
       assert(grad.Size() == input_size);
@@ -485,16 +481,16 @@ public:
       DenseMatrix dm;
 
       /* Reset data in sparse Hessian since we build it through addition */
-      double * _data = hess->GetData();
+      double * _data = hess.GetData();
       for (int d = 0; d < HessJArr.Size(); d++)
       {
          _data[d] = 0.;
       }
 
       /* Verify our Hessian is starting out zeroed out */
-      if (hess->MaxNorm() > 0.)
+      if (hess.MaxNorm() > 0.)
       {
-         std::cout << "max norm: " << hess->MaxNorm() << std::endl;
+         std::cout << "max norm: " << hess.MaxNorm() << std::endl;
          MFEM_ABORT("Hessian has not been reset properly.\n")
       }
 
@@ -518,29 +514,29 @@ public:
             dm = block;
             dm *= this->lambda[cell_it];
 
-            hess->AddSubMatrix(verts, Vy_arr, dm, 2/*skip_zeros*/);
+            hess.AddSubMatrix(verts, Vy_arr, dm, 2/*skip_zeros*/);
          }
       } // End cell it
 
       /* Set the diagonal entries */
       for (int i = 0; i < input_size; i++)
       {
-         hess->Elem(i,i) = 2.;
+         hess.Elem(i,i) = 2.;
       }
    }
 
-   virtual Operator & CalcObjectiveHess(const Vector &x) const 
+   Operator & CalcObjectiveHess(const Vector &x) const
    {
       // std::cout << "OptimizedMeshVelocityProblem::CalcObjectiveHessian\n";
       ComputeObjectiveHessData(x);
 
       // std::cout << "OptimizedMeshVelocityProblem::CalcObjectiveHessian - DONE\n";
-      return *hess;
+      return hess;
    }
 
-   virtual int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
-   virtual int get_nnz_sparse_Jacineq() const { return 0; }
-   virtual int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
+   int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
+   int get_nnz_sparse_Jacineq() const { return 0; }
+   int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
 };
 
 
@@ -596,11 +592,12 @@ public:
 
    ~ViscousOptimizedMeshVelocityProblem()
    {
+      // std::cout << "ViscousOptimizedMeshVelocityProblem - destructor\n";
       // delete hess;
       // hess = nullptr;
    }
 
-   virtual double CalcObjective(const Vector &V) const
+   double CalcObjective(const Vector &V) const
    {
       MFEM_ABORT("CalcObjective must be implemented.\n");
    }
@@ -609,7 +606,7 @@ public:
       return input_size;
    }
 
-   virtual void CalcObjectiveGrad(const Vector &V, Vector &grad) const
+   void CalcObjectiveGrad(const Vector &V, Vector &grad) const
    {
       if (V.Size() != input_size)
       {
@@ -622,15 +619,15 @@ public:
    {
    }
 
-   virtual Operator & CalcObjectiveHess(const Vector &x) const
+   Operator & CalcObjectiveHess(const Vector &x) const
    {
       ComputeObjectiveHessData(x);
 
       return *hess;
    }
-   virtual int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
-   virtual int get_nnz_sparse_Jacineq() const { return 0; }
-   virtual int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
+   int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
+   int get_nnz_sparse_Jacineq() const { return 0; }
+   int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
 };
 
 } // End ns hydrodynamics

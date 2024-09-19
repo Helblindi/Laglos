@@ -297,6 +297,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    HypreParMatrix * k_hpm = k.ParallelAssemble();
    k_hpm->MergeDiagAndOffd(*dij_sparse);
 
+   if (k_hpm) { delete k_hpm; } // Clear memory to avoid leak
    // From here, we can modify the sparse matrix according to the sparsity pattern
 }
 
@@ -891,6 +892,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
       FillCenterVelocitiesWithAvg(S);
    }
    // chrono_mm.Stop();
+   /** 
+   * Uncomment the following command to check memory leaks.
+   * This will freeze Laglos at this point.
+   * In another terminal window type 'leaks <PID>'
+   * where the pid can be found in the activity monitor.
+   */
+   // fscanf(stdin, "c"); // wait for user to enter input from keyboard
 }
 
 
@@ -8261,15 +8269,6 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
 
-   OptimizationSolver *optsolver = NULL;
-#ifdef MFEM_USE_HIOP
-   HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
-   tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
-   optsolver = tmp_opt_ptr;
-#else
-      MFEM_ABORT("MFEM is not built with HiOp support!");
-#endif
-
    /* Set min/max velocities */
    Vector xmin(V_target.Size()), xmax(V_target.Size());
    xmin = -1.E12;
@@ -8333,6 +8332,15 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       }
    }
 
+   OptimizationSolver *optsolver = NULL;
+#ifdef MFEM_USE_HIOP
+   HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
+   tmp_opt_ptr->SetNNZSparse(8); // FIXME: adjust hardcoded parameter
+   optsolver = tmp_opt_ptr;
+#else
+      MFEM_ABORT("MFEM is not built with HiOp support!");
+#endif
+
    /* Solve for corner node velocities */
    optsolver->SetOptimizationProblem(*omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
@@ -8343,6 +8351,13 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    optsolver->Mult(mv_gf_l, mv_gf_l_out); 
 
    mv_gf_l = mv_gf_l_out;
+
+   /* Avoid any memory leak */
+   delete tmp_opt_ptr;
+   delete omv_problem;
+   optsolver = nullptr;
+   omv_problem = nullptr;
+   tmp_opt_ptr = nullptr;
 }
 
 
@@ -8499,6 +8514,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
    void (*test_vel)(const Vector&, const double&, Vector&))
 {
    // cout << "ComputeLinearizedNodeVelocities\n";
+   assert(mv_gf_l.Size() == dim * NVDofs_H1);
    Vector node_v(dim);
    bool is_dt_changed = false;
 

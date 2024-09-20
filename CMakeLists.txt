@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(LAGLOS_USE_HIOP_SPARSE "Utilize sparse linear algebra" ON)
+option(LAGLOS_USE_HIOP "Utilize sparse linear algebra" ON)
+option(LAGLOS_USE_COINHSL "Use COINHSL for sparse linear algebra" ON)
 
 # Prohibit in-source builds
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -41,11 +42,11 @@ endif()
 #
 # Start finding everything
 #
-
 set(_laglos_compile_defs)
 set(_laglos_compile_opts)
 set(_laglos_include_dirs)
 set(_laglos_libraries)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMake)
 
 
 # if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
@@ -57,9 +58,15 @@ set(_laglos_libraries)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MFEM_CXX_FLAGS}")
 list(APPEND _laglos_include_dirs "${MFEM_INCLUDE_DIRS}")
 list(APPEND _laglos_libraries "${MFEM_LIBRARIES}")
+if (LAGLOS_USE_HIOP)
+  if (LAGLOS_USE_COINHSL)
+    set(LAGLOS_COINHSL_DIR "${PROJECT_SOURCE_DIR}/../coinhsl" CACHE PATH "Path to COINHSL directory")
+    include(FindLaglosCOINHSL)
+    list(APPEND _laglos_libraries ${COINHSL_LIBRARY})
+  endif()
+endif()
 
 message(STATUS "Laglos build type: CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
-message(STATUS "Laglos defines: ${_glvis_compile_defs}")
 # message(STATUS "GLVis opts: ${_glvis_compile_opts}")
 # message(STATUS "GLVis include dirs: ${_glvis_include_dirs}")
 # message(STATUS "GLVis libraries: ${_glvis_libraries}")
@@ -79,7 +86,7 @@ list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})
 list(APPEND _laglos_libraries comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
 
 # Add in quick fix to sparse stuff
-list(APPEND _laglos_libraries "${PROJECT_SOURCE_DIR}/../coinhsl/lib/libcoinhsl.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libgfortran.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libquadmath.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/gcc/aarch64-apple-darwin23/14/libgcc.a")
+# list(APPEND _laglos_libraries "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libgfortran.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libquadmath.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/gcc/aarch64-apple-darwin23/14/libgcc.a")
 
 #
 # Setup the GLVis library target

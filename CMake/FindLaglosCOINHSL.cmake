@@ -17,7 +17,7 @@ find_library(COINHSL_LIBRARY
   PATHS
   ${COINHSL_DIR} $ENV{COINHSL_DIR} ${LAGLOS_COINHSL_DIR}
   PATH_SUFFIXES
-  lib64 lib a so lib/x86_64-linux-gnu)
+  lib64 lib a so install/lib/x86_64-linux-gnu)
 
 if(COINHSL_LIBRARY)
   get_filename_component(COINHSL_LIBRARY_DIR ${COINHSL_LIBRARY} DIRECTORY)

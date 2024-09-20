@@ -3363,73 +3363,39 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S, ParGridFuncti
    int faces_length;
    double c_norm;
 
-   DofEntity entity;
-   int EDof;
-
-   // Iterate over all mesh velocity dofs
-   for (int node = 0; node < NDofs_H1; node++) // Vertex iterator
+   // Iterate over all corner mesh velocity dofs
+   for (int node = 0; node < NVDofs_H1; node++) // Vertex iterator
    {
-      node_v = 0.; // Reset node velocity
-      GetEntityDof(node, entity, EDof);
+      /* Reset Mi, Ri, Vi */
+      Mi = 0., Ri = 0., node_v = 0.;
 
-      switch (entity)
+      /* Get cell faces */
+      vertex_edge.GetRow(node, faces_row);
+      faces_length = faces_row.Size();
+
+      /* iterate over adjacent faces */
+      for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
       {
-         case 0: // corner
-         {
-            // Reset Mi, Ri, Vi
-            Mi = 0., Ri = 0., node_v = 0.;
+         int face = faces_row[face_it];
+         GetIntermediateFaceVelocity(face, Vf);
+         FI = pmesh->GetFaceInformation(face);
 
-            // Get cell faces
-            vertex_edge.GetRow(node, faces_row);
-            faces_length = faces_row.Size();
+         // Retrieve corresponding normal (orientation doesn't matter)
+         CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
+         c_norm = n_vec.Norml2();
+         n_vec /= c_norm;
 
-            // iterate over adjacent faces
-            for (int face_it = 0; face_it < faces_length; face_it++) // Adjacent face iterator
-            {
-               int face = faces_row[face_it];
-               GetIntermediateFaceVelocity(face, Vf);
-               FI = pmesh->GetFaceInformation(face);
-
-               // Retrieve corresponding normal (orientation doesn't matter)
-               CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
-               c_norm = n_vec.Norml2();
-               n_vec /= c_norm;
-
-               tensor(n_vec, n_vec, dm_tmp);
-               Mi += dm_tmp;
-               dm_tmp.Mult(Vf, y);
-               Ri += y;
-            }
-
-            Mi.Invert();
-            Mi.Mult(Ri, node_v);
-
-            break;
-         }
-         case 1: // face
-         {
-            // face nodes just set to ivf
-            assert(face >= 0);
-            GetIntermediateFaceVelocity(EDof, node_v);
-
-            break;
-         }
-         case 2: // Cell Center
-         {
-            Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
-            pb->velocity(Uc, node_v);
-
-            break;
-         }
-         default:
-         {
-            MFEM_ABORT("Invalid entity\n");
-         }
+         tensor(n_vec, n_vec, dm_tmp);
+         Mi += dm_tmp;
+         dm_tmp.Mult(Vf, y);
+         Ri += y;
       }
-      // cout << "node velocity from mv2 for node (" << node << "): ";
-      // node_v.Print(cout);
-      // In every case, update the corresponding nodal velocity in S
+
+      /* Solve for node_v */
+      Mi.Invert();
+      Mi.Mult(Ri, node_v);
+
+      /* In every case, update the corresponding nodal velocity in S */
       geom.UpdateNodeVelocityVecL(mv_gf_l, node, node_v);
 
    } // End node iterator

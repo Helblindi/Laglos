@@ -1,12 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
+set(USER_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/config/user.cmake" CACHE PATH
+  "Path to optional user configuration file.")
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(LAGLOS_USE_HIOP "Utilize sparse linear algebra" ON)
-option(LAGLOS_USE_COINHSL "Use COINHSL for sparse linear algebra" ON)
+# Load user settings before the defaults - this way the defaults will not
+# overwrite the user set options. If the user has not set all options, we still
+# have the defaults.
+include("${USER_CONFIG}" OPTIONAL RESULT_VARIABLE USER_CONFIG_LOADED)
+if (USER_CONFIG_LOADED)
+  set(USER_CONFIG_LOADED "LOADED")
+endif()
+message(STATUS "Loading USER_CONFIG = ${USER_CONFIG} (${USER_CONFIG_LOADED})")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 
 # Prohibit in-source builds
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -19,10 +28,9 @@ project(Laglos LANGUAGES C CXX Fortran)
 #  * MFEM_DIR - absolute path to the MFEM build or install prefix.
 #  * mfem_DIR - absolute path to where MFEMConfig.cmake is.
 message(STATUS "Looking for mfem ...")
-set(MFEM_DIR "" CACHE PATH "Path to the MFEM build or install prefix.")
 if (MFEM_DIR)
    find_package(mfem REQUIRED NAMES MFEM HINTS "${MFEM_DIR}"
-                "${MFEM_DIR}/lib/cmake/mfem" NO_DEFAULT_PATH)
+                "${MFEM_DIR}/build" NO_DEFAULT_PATH)
 else()
    find_package(mfem REQUIRED NAMES MFEM)
 endif()
@@ -60,7 +68,6 @@ list(APPEND _laglos_include_dirs "${MFEM_INCLUDE_DIRS}")
 list(APPEND _laglos_libraries "${MFEM_LIBRARIES}")
 if (LAGLOS_USE_HIOP)
   if (LAGLOS_USE_COINHSL)
-    set(LAGLOS_COINHSL_DIR "${PROJECT_SOURCE_DIR}/../coinhsl" CACHE PATH "Path to COINHSL directory")
     include(FindLaglosCOINHSL)
     list(APPEND _laglos_libraries ${COINHSL_LIBRARY})
   endif()

@@ -197,7 +197,9 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
    // Reset chronos
    chrono_mm.Clear();
+   chrono_mm_lin.Clear();
    chrono_state.Clear();
+   chrono_dij.Clear();
 
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -688,7 +690,6 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    // cout << "========================================\n"
    //      << "             MakeTimeStep               \n"
    //      << "========================================\n";
-   // chrono_mm.Start();
    ParGridFunction x_gf, mv_gf;
 
    // Get sv from current timestep before update
@@ -696,12 +697,9 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    Vector S_old = S;
 
    // Update state variables contained in S_new
-   // chrono_state.Start();
    ComputeStateUpdate(S, t, dt);
-   // chrono_state.Stop();
 
    ComputeMeshVelocities(S, S_old, t, dt);
-   // chrono_mm.Stop();
 
    // Move the mesh
    Vector* sptr = const_cast<Vector*>(&S);
@@ -710,9 +708,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    add(x_gf, dt, mv_gf, x_gf);
    UpdateMesh(S);
    pmesh->NewNodes(x_gf, false);
-   // cout << "mm computation took " << chrono_mm.RealTime() << "s.\n";
-   // cout << "state update computation took " << chrono_state.RealTime() << "s.\n";
-   
+
    /*
    Check if mesh has tangled. If so, modify isCollapsed parameter
    to stop computation and print final data
@@ -741,7 +737,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    // cout << "========================================\n"
    //      << "         ComputeMeshVelocities          \n"
    //      << "========================================\n";
-   // chrono_mm.Start();
+   chrono_mm.Start();
    /* Set mesh velocity for the previous iteration before we make 
    any modifications to the mesh velocity object contained in S */
    Vector* sptr = const_cast<Vector*>(&S);
@@ -890,7 +886,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
       
       FillCenterVelocitiesWithAvg(S);
    }
-   // chrono_mm.Stop();
+   chrono_mm.Stop();
    /** 
    * Uncomment the following command to check memory leaks.
    * This will freeze Laglos at this point.
@@ -962,7 +958,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
    // cout << "========================================\n"
    //      << "          ComputeStateUpdate            \n"
    //      << "========================================\n";
-
+   chrono_state.Start();
    // We need a place to store the new state variables
    Vector S_new = S;
 
@@ -1346,6 +1342,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
    // Finally, update S
    S = S_new;
+   chrono_state.Stop();
 }
 
 
@@ -8483,6 +8480,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
    void (*test_vel)(const Vector&, const double&, Vector&))
 {
    // cout << "ComputeLinearizedNodeVelocities\n";
+   chrono_mm_lin.Start();
    assert(mv_gf_l.Size() == dim * NVDofs_H1);
    Vector node_v(dim);
    bool is_dt_changed = false;
@@ -8510,6 +8508,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
       //    cout << "Restarting vertex iterator\n";
       // }
    } // End Vertex iterator
+   chrono_mm_lin.Stop();
 }
 
 
@@ -8538,7 +8537,6 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
    // cout << "=======================================\n"
    //      << "      ComputeNodeVelocityFromVgeo      \n"
    //      << "=======================================\n";
-   chrono_temp.Clear();
    switch (dim)
    {
       case 1:
@@ -8557,12 +8555,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
          
          Ci = 0., Vgeo = 0., node_v = 0.;
 
-         // chrono_temp.Clear();
-         // chrono_temp.Start();
          ComputeCiGeo(mv_gf_l, node, Ci);
-         // chrono_temp.Stop();
-         // cout << "ci computation for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
-
 
          // Enforce time restriction imposed by calculation of alpha_i
          // if (dim == 2)
@@ -8611,14 +8604,9 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
 
          geom.GetNodeVelocityVecL(mv_gf_l, node, Vgeo);
          
-         // chrono_temp.Clear();
-         // chrono_temp.Start();
          ComputeDeterminant(Ci, dt, d, node);
-         // chrono_temp.Stop();
 
          // Compute V_i^n
-         // chrono_temp.Clear();
-         // chrono_temp.Start();
          DenseMatrix _mat(Ci);
          _mat *= - dt / 2.;
          for (int i = 0; i < dim; i++)
@@ -8628,8 +8616,6 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
 
          _mat.Invert();
          _mat.Mult(Vgeo, node_v);
-         // chrono_temp.Stop();
-         // cout << "mult for node " << node << " took: " << chrono_temp.RealTime() << "s\n";
 
          break;
       }

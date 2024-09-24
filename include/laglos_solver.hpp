@@ -127,8 +127,6 @@ protected:
    double mm_visc_face = 0., mm_cell = 0.;
    int problem = -1;
 
-   StopWatch chrono_mm, chrono_state, chrono_temp;
-
    Array<int> HiopHessIArr, HiopHessJArr;
    Array<int> HiopCGradIArr, HiopCGradJArr;
 
@@ -176,6 +174,9 @@ public:
 
    /* cij comp */
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
+
+   /* System timing */
+   StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin;
 
    /* Mesh movement */
    void SetMVOption(const int & option);

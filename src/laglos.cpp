@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
    int mv_option = 2;
    int fv_option = 2;
    int mv_it_option = 2;
-   int mv_n_iterations = 0;
+   int mv_n_iterations = 10;
    double mm_visc_face = 0., mm_cell = 0.;
    bool optimize_timestep = true;
    bool convergence_testing = false;
@@ -1041,6 +1041,7 @@ int main(int argc, char *argv[]) {
    bool isCollapsed = false;
    for (; !last_step; ti++)
    {
+      hydro.chrono_dij.Start();
       hydro.BuildDijMatrix(S);
       /* Check if we need to change CFL */
       if (problem_class->get_cfl_change() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
@@ -1055,6 +1056,7 @@ int main(int argc, char *argv[]) {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
       }
+      hydro.chrono_dij.Stop();
 
       if (t + dt >= t_final)
       {
@@ -1577,6 +1579,14 @@ int main(int argc, char *argv[]) {
    cout << "Program took " << chrono.RealTime() << "s.\n";
    double time_per_gp_ts = chrono.RealTime() / ti / L2FESpace.GetNE();
    cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
+
+   cout << "================ Runtime breakdown ================\n"
+        << setprecision(3)
+        << "   Dij calculation took: " << setw(20) << hydro.chrono_dij.RealTime() << " s.\n"
+        << "   Mesh Motion calculation took: " << setw(12) << hydro.chrono_mm.RealTime() << " s.\n"
+        << "   Mesh Motion Linearization: " << setw(15) << hydro.chrono_mm_lin.RealTime() << " s.\n"
+        << "   State Update calculation took: " << setw(11) << hydro.chrono_state.RealTime() << " s.\n"
+        << "===================================================\n";
    
    delete pmesh;
    delete CRFEC;

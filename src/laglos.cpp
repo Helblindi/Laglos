@@ -126,6 +126,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    int mv_option = 2;
+   bool do_mv_linearization = true;
    int fv_option = 2;
    int mv_it_option = 2;
    int mv_n_iterations = 10;
@@ -172,9 +173,23 @@ int main(int argc, char *argv[]) {
    args.AddOption(&check_mesh, "-cm", "-check-mesh", "-no-cm", "-no-check-mesh",
                   "Enable or disable checking if the mesh has twisted.");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
-                  "Choose how to compute mesh velocities, 1 - Raviart, 2 - Normal, 3 - Cell Face Normal, 4 - CAVEAT Weighted LS, 5 - CAVEAT/Cell Face combo, 6 - 5 with weights");
+                  "Choose how to compute mesh velocities:"
+                  "\n\t 00 - Arithmetic avg of adj cells,"
+                  "\n\t 01 - Arithmetic avg of adj cells with distributed viscosity,"
+                  "\n\t 02 - Cell Face Normal with viscosity,"
+                  "\n\t 1* - Sparse HiOp LM with * mv as target"
+                  );
+                  // "\n\t 4 - CAVEAT Weighted LS,"
+                  // "\n\t 5 - CAVEAT/Cell Face combo,"
+                  // "\n\t 6 - 5 with weights");
+   args.AddOption(&do_mv_linearization, "-mv-lin", "--mesh-velocity-linearization",
+                  "-no-mv-lin", "--no-mesh-velocity-linearization",
+                  "Enable mesh velocity linearization using alpha parameter.");
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
-                  "Choose how to compute face velocities, 0 - Do nothing, 1 - Mass conservative bubble, 2 - Average, Q1 type");
+                  "Choose how to compute face velocities:"
+                  "\n\t 0 - Do nothing,"
+                  "\n\t 1 - Mass conservative bubble,"
+                  "\n\t 2 - Average, Q1 type");
    args.AddOption(&mv_it_option, "-mv-it-op", "--mv-it-op",
                   "Set the desired type of mesh velocity iteration to use");
    args.AddOption(&mv_n_iterations, "-mv-iter-n", "--mv-num-iterations",
@@ -754,6 +769,7 @@ int main(int argc, char *argv[]) {
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
+   hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);

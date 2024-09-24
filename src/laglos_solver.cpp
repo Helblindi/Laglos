@@ -764,85 +764,144 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
       {
          switch (mv_option)
          {
-         case 1:
-            ComputeGeoVRaviart(S);
-            break;
-
-         case 2:
-            ComputeGeoVNormal(S, mv_gf_l);
-            break;
-         
-         case 3:
-            ComputeGeoVCellFaceNormal(S);
-            break;
-
-         case 4:
-            ComputeGeoVCAVEAT(S);
-            break;
-         
-         case 5:
-            ComputeGeoVCAVEATCellFace(S);
-            break;
-         
-         case 6:
-            ComputeGeoVCAVEATCellFaceWeighted(S);
-            break;
-
-         case 7: // Lagrange Multiplier
+         /* 
+         0-9   - no lagrange multipliers 
+         10-19 - Dense LM
+         20-29 - Sparse LM
+         */
+   
+         case 0: // arithmetic average of adjacent cells with distributed viscosity
          {
-            if (this->use_corner_velocity_MC_iteration)
-            {
-               mv_gf_prev_it = mv_gf;
-               double loss = ComputeCellVolumeNorm(S, S_old, dt);
-               // cout << "starting loss: " << loss << endl;
-
-               for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
-               {
-                  // cout << "iterating on the corner node velocities\n";
-                  // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
-                  // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
-                  IterativeLagrangeMultiplier(S, S_old, t, dt);
-                  
-                  // ComputeAverageVelocities(S);
-                  // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
-                  // loss = ComputeCellVolumeNorm(S, S_old, dt);
-                  // cout << "val at iteration " << i << ": " << loss << endl;
-                  // cout << i << "," << val << endl;
-                  // compare_gamma2(S, S_old, dt, i);
-                  // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
-                  // VerifyContributions(S, S_old, mv2_gf, dt, i);
-                  mv_gf_prev_it = mv_gf;
-               }
-            }
-            else
-            {
-               MFEM_ABORT("Must use iteration if computing the mesh velocity with Lagrange Multiplier method.\n");
-            }
+            bool is_weighted = false;
+            CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
             break;
          }
-         case 8: // HiOp Dense Solver for optimization problem
-         {
-            // MFEM_ABORT("Hiop Dense not implemented.\n");
-            SolveHiOpDense(S, S_old, t, dt, mv_gf_l);
-            break;
-         }
-         case 9: // HiOp Sparse Solver for optimization problem
-         {
-            SolveHiOp(S, S_old, t, dt, mv_gf_l);
-            break;
-         }
-         case 10: // mv2 but with viscosity distribution
-         {
-            ComputeGeoVNormalDistributedViscosity(S);
-            // MFEM_ABORT("Viscosity distribution mesh movement not yet implemented.\n");
-            break;
-         }
-         case 11: // arithmetic average of adjacent  cells with distributed viscosity
+         case 1: // arithmetic average of adjacent cells, no viscosity
          {
             bool is_weighted = false;
             CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
             DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
+            break;
+         }
 
+         case 2:
+         {
+            ComputeGeoVNormal(S, mv_gf_l);
+            break;
+         }
+         
+         // case 3:
+         //    ComputeGeoVCellFaceNormal(S);
+         //    break;
+
+         // case 1:
+         //    ComputeGeoVRaviart(S);
+         //    break;
+
+         // case 4:
+         //    ComputeGeoVCAVEAT(S);
+         //    break;
+         
+         // case 5:
+         //    ComputeGeoVCAVEATCellFace(S);
+         //    break;
+         
+         // case 6:
+         //    ComputeGeoVCAVEATCellFaceWeighted(S);
+         //    break;
+
+         // case 7: // Lagrange Multiplier
+         // {
+         //    if (this->use_corner_velocity_MC_iteration)
+         //    {
+         //       mv_gf_prev_it = mv_gf;
+         //       double loss = ComputeCellVolumeNorm(S, S_old, dt);
+         //       // cout << "starting loss: " << loss << endl;
+
+         //       for (int i = 1; i < corner_velocity_MC_num_iterations+1; i++)
+         //       {
+         //          // cout << "iterating on the corner node velocities\n";
+         //          // IterativeCornerVelocityLSCellVolumeFaceVisc(S, S_old, dt);
+         //          // IterativeCornerVelocityLSCellVolumeMv2FaceVisc(S, S_old, mv2_gf, dt);
+         //          IterativeLagrangeMultiplier(S, S_old, t, dt);
+                  
+         //          // ComputeAverageVelocities(S);
+         //          // double val = ComputeIterationNorm(S,mv_gf_prev_it,dt);
+         //          // loss = ComputeCellVolumeNorm(S, S_old, dt);
+         //          // cout << "val at iteration " << i << ": " << loss << endl;
+         //          // cout << i << "," << val << endl;
+         //          // compare_gamma2(S, S_old, dt, i);
+         //          // compare_gamma_mv2(S, S_old, mv2_gf, dt, i);
+         //          // VerifyContributions(S, S_old, mv2_gf, dt, i);
+         //          mv_gf_prev_it = mv_gf;
+         //       }
+         //    }
+         //    else
+         //    {
+         //       MFEM_ABORT("Must use iteration if computing the mesh velocity with Lagrange Multiplier method.\n");
+         //    }
+         //    break;
+         // }
+         // case 8: // HiOp Dense Solver for optimization problem
+         // {
+         //    // MFEM_ABORT("Hiop Dense not implemented.\n");
+         //    SolveHiOpDense(S, S_old, t, dt, mv_gf_l);
+         //    break;
+         // }
+         // case 9: // HiOp Sparse Solver for optimization problem
+         // {
+         //    SolveHiOp(S, S_old, t, dt, mv_gf_l);
+         //    break;
+         // }
+         // case 10: // mv2 but with viscosity distribution
+         // {
+         //    ComputeGeoVNormalDistributedViscosity(S);
+         //    // MFEM_ABORT("Viscosity distribution mesh movement not yet implemented.\n");
+         //    break;
+         // }
+         // case 11: // arithmetic average of adjacent cells with distributed viscosity
+         // {
+         //    bool is_weighted = false;
+         //    CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
+         //    DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
+
+         //    break;
+         // }
+         // case 12: // arithmetic average of adjacent cells, no viscosity
+         // {
+         //    bool is_weighted = false;
+         //    CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
+         //    break;
+         // }
+
+         case 10:
+         case 11: 
+         case 12:
+         case 13:
+         case 14:
+         case 15:
+         case 16:
+         case 17:
+         case 18:
+         case 19:
+         {
+            int target_option = mv_option % 10;
+            SolveHiOp(S, S_old, target_option, t, dt, mv_gf_l);
+            break;
+         }
+         case 20:
+         case 21: 
+         case 22:
+         case 23:
+         case 24:
+         case 25:
+         case 26:
+         case 27:
+         case 28:
+         case 29:
+         {
+            int target_option = mv_option % 10;
+            SolveHiOpDense(S, S_old, target_option, t, dt, mv_gf_l);
             break;
          }
 
@@ -851,8 +910,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          }
 
          /* Optionally, Linearize velocity */
-         bool do_linearize_velocity = true;
-         if (do_linearize_velocity && mv_option != 8 && mv_option != 9)
+         if (this->do_mv_linearization && mv_option < 10)
          {
             ParGridFunction mv_gf_l_linearized(&H1_L);
             ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
@@ -8079,7 +8137,6 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
 template<int dim>
 void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf)
 {
-   // cout << "DistributeFaceViscosityToVelocity\n";
    assert(mv_gf.Size() == dim * NVDofs_H1);
 
    mfem::Mesh::FaceInformation FI;
@@ -8137,9 +8194,16 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
  * TODO: combine with SolveHiop function with a dense/sparse flag
  */
 template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
-   cout << "SolveHiOpDense\n";
+   // cout << "=======================================\n"
+   //      << "            SolveHiOpDense             \n"
+   //      << "=======================================\n";
+   assert(target_option < 10);
+   assert(mv_gf_l.Size() == dim*NVDofs_H1);
+
+   MFEM_ABORT("Why are you using the dense implementation when Sparse is available?\n");
+
    Vector massvec(NDofs_L2);
    ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
@@ -8166,26 +8230,33 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    CalcMassVolumeVector(S, S_old, dt, massvec);
 
    /* Options */
-   bool do_lin = true;
    bool is_weighted = false;
-   int mvop = 11; // options currently include mv2, mv11
 
    /* Compute targeted velocity */
-   switch (mvop)
+   switch (target_option)
    {
-   case 2:
-      ComputeGeoVNormal(S, V_target);
+   case 0: // arithmetic average of adjacent cells with distributed viscosity
+   {
+      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
       break;
-   case 11:
-      CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+   }
+   case 1: // arithmetic average of adjacent cells with viscosity
+   {
+      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
       DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
+   }
+   case 2:
+   {
+      ComputeGeoVNormal(S, V_target);
+      break;
+   }
    default:
       MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
    }
 
    /* Linearize target velocity */
-   if (do_lin)
+   if (this->do_mv_linearization)
    {
       ParGridFunction V_target_lin(V_target);
       ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
@@ -8223,12 +8294,14 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
 *  an OptimizationSolver from MFEM.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "               SolveHiOp               \n"
    //      << "=======================================\n";
+   assert(target_option < 10);
    assert(mv_gf_l.Size() == dim*NVDofs_H1);
+
    Vector massvec(NDofs_L2);
    ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
@@ -8243,10 +8316,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    CalcMassVolumeVector(S, S_old, dt, massvec);
 
    /* Options */
-   bool do_lin = true;
    bool is_weighted = false;
-   int mvop = 11; // options currently include mv2, mv11
-   int lm_option = 1; // TODO: make this a command line parameter, possibly mv_option
 
    /* 
    Calculate sparsity patterns for both the Hessian of the objective 
@@ -8256,20 +8326,30 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
    
    /* Calculate target velocity */
-   switch (mvop)
+   switch (target_option)
    {
-   case 2:
-      ComputeGeoVNormal(S, V_target);
+   case 0: // arithmetic average of adjacent cells with distributed viscosity
+   {
+      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
       break;
-   case 11:
-      CalcCellAveragedCornerVelocityVector(S, is_weighted, V_target);
+   }
+   case 1: // arithmetic average of adjacent cells with viscosity
+   {
+      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
       DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
+   }
+   case 2:
+   {
+      ComputeGeoVNormal(S, V_target);
+      break;
+   }
+
    default:
       MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
    }
 
-   if (do_lin)
+   if (this->do_mv_linearization)
    {
       ParGridFunction V_target_lin(V_target);
       ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
@@ -8277,6 +8357,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    }
 
    OptimizationProblem * omv_problem = NULL;
+   int lm_option = 1;
    switch (lm_option)
    {
       case 1: // Have a target velocity

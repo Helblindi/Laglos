@@ -47,9 +47,9 @@ def main():
    f.write("boundary\n")
    d_bdry = 4 # Dirichlet BCs for left side.  v = e_x
    bdry_left = d_bdry
-   bdry_bottom = 1
-   bdry_right = 2
-   bdry_top = 3
+   bdry_bottom = 2
+   bdry_right = 1
+   bdry_top = 2
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")

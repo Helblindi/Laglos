@@ -773,13 +773,15 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 0: // arithmetic average of adjacent cells with distributed viscosity
          {
             bool is_weighted = false;
-            CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
+            int td_flag = 0;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
             break;
          }
          case 1: // arithmetic average of adjacent cells, no viscosity
          {
             bool is_weighted = false;
-            CalcCellAveragedCornerVelocityVector(S_old, is_weighted, mv_gf_l);
+            int td_flag = 0;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
             DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
             break;
          }
@@ -787,6 +789,15 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 2:
          {
             ComputeGeoVNormal(S, mv_gf_l);
+            break;
+         }
+         case 3: // weighted average of adjacent cell midpoint in time
+         {
+            /* Petrov-Galerkin Justified weighted average */
+            bool is_weighted = true;
+            int td_flag = 2;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
+            // DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
             break;
          }
          
@@ -7688,23 +7699,29 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 /****************************************************************************************************
 * Function: ComputeCellAverageVelocityAtNode
 * Parameters:
-*  S           - BlockVector representing FiniteElement information
+*  S           - BlockVector representing FiniteElement information tnp1
+*  S_old       - BlockVector representing FiniteElement information tn
 *  node        - Node on which to compute the weighted average cell velocities
 *  is_weighted - boolean representing if the average should be a weighted 
 *                average or not.
+*  td_flag     - Which time discretized value should be used for Vcell:
+*                    0 - tn
+*                    1 - tnp1
+*                    2 - tnp1/2
+*  mv_gf       - Corresponding mesh velocities
 *  node_v      - Averaged velocity on node
 *
 * Purpose:
 *  To compute the weighted average of the adjacent cell velocities.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v)
+void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v)
 {
    // cout << "========================================\n"
    //      << "ComputeCellAverageVelocityAtNode\n"
    //      << "========================================\n";
    Array<int> cells_row;
-   Vector Uc(dim+2), Vcell(dim);
+   Vector Uc(dim+2), Ucnp1(dim+2), Vcell(dim), Vcellnp1(dim);
    double sum_k = 0.;
    node_v = 0.;
 
@@ -7719,6 +7736,36 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
       int el_index = cells_row[cell_it];
 
       /* Retrieve cell velocity */
+      switch (td_flag)
+      {
+      case 0: // S_OLD
+      {
+         GetCellStateVector(S_old, el_index, Uc);
+         pb->velocity(Uc, Vcell);
+         break;
+      }
+      case 1: // S_NEW 
+      {
+         GetCellStateVector(S, el_index, Uc);
+         pb->velocity(Uc, Vcell);
+         break;
+      }
+      case 2: // MIDPOINT
+      {
+         GetCellStateVector(S_old, el_index, Uc);
+         GetCellStateVector(S, el_index, Ucnp1);
+
+         pb->velocity(Uc, Vcell);
+         pb->velocity(Ucnp1, Vcellnp1);
+
+         Vcell.Add(1., Vcellnp1);
+         Vcell *= .5;
+         break;
+      }
+      default:
+         MFEM_ABORT("Should not have reached this point.\n");
+         break;
+      }
       GetCellStateVector(S, el_index, Uc);
       pb->velocity(Uc, Vcell);
 
@@ -7790,14 +7837,22 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vect
 /****************************************************************************************************
 * Function:  CalcCellAveragedVelocityVector
 * Parameters:
-*  S        - BlockVector representing FiniteElement information at tn+1
-*  mv_gf    -
+*  S           - BlockVector representing FiniteElement information tnp1
+*  S_old       - BlockVector representing FiniteElement information tn
+*  is_weighted - boolean representing if the average should be a weighted 
+*                average or not.
+*  td_flag     - Which time discretized value should be used for Vcell:
+*                    0 - tn
+*                    1 - tnp1
+*                    2 - tnp1/2
+*  mv_gf       - Corresponding mesh velocities
+*  mv_gf       - Corresponding mesh velocities
 *
 * Purpose:
 *  
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "    CalcCellAveragedVelocityVector     \n"
@@ -7807,7 +7862,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
    /* Iterate over corner node */
    for (int node = 0; node < NVDofs_H1; node++)
    {
-      ComputeCellAverageVelocityAtNode(S, node, is_weighted, node_v);
+      ComputeCellAverageVelocityAtNode(S, S_old, node, is_weighted, td_flag, node_v);
 
       /* Put node_v in place */
       geom.UpdateNodeVelocityVecL(mv_gf_l, node, node_v);
@@ -7927,18 +7982,29 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    {
    case 0: // arithmetic average of adjacent cells with distributed viscosity
    {
-      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
+      int td_flag = 0;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
       break;
    }
    case 1: // arithmetic average of adjacent cells with viscosity
    {
-      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
+      int td_flag = 0;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
       DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
    case 2:
    {
       ComputeGeoVNormal(S, V_target);
+      break;
+   }
+   case 3: // weighted average of adjacent cell midpoint in time
+   {
+      /* Petrov-Galerkin Justified weighted average */
+      bool is_weighted = true;
+      int td_flag = 2;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+      // DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
    default:
@@ -8020,18 +8086,29 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    {
    case 0: // arithmetic average of adjacent cells with distributed viscosity
    {
-      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
+      int td_flag = 0;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
       break;
    }
    case 1: // arithmetic average of adjacent cells with viscosity
    {
-      CalcCellAveragedCornerVelocityVector(S_old, is_weighted, V_target);
+      int td_flag = 0;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
       DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
    case 2:
    {
       ComputeGeoVNormal(S, V_target);
+      break;
+   }
+   case 3: // weighted average of adjacent cell midpoint in time
+   {
+      /* Petrov-Galerkin Justified weighted average */
+      bool is_weighted = true;
+      int td_flag = 2;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+      // DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
 

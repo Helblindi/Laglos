@@ -281,8 +281,8 @@ public:
 
    // HiOp Lagrange Multipliers implementation
    void CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec);
-   void CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, ParGridFunction &mv_gf_l);
-   void ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v);
+   void CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l);
+   void ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v);
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
    void SolveHiOp(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    void SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);

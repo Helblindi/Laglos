@@ -877,22 +877,49 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             MFEM_ABORT("Invalid mesh velocity option.\n");
          }
 
-         /* Optionally, Linearize velocity */
-         if (this->do_mv_linearization && mv_option < 10)
+         /* mesh velocity only needs to be linearized and boundary condition enforced 
+         only when not solving for them via a constrained optimization problem*/
+         if (mv_option < 10)
          {
-            ParGridFunction mv_gf_l_linearized(&H1_L);
-            ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
-            mv_gf.ProjectGridFunction(mv_gf_l_linearized);
+            /* Optionally, Linearize velocity */
+            if (this->do_mv_linearization)
+            {
+               ParGridFunction mv_gf_l_linearized(&H1_L);
+               ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
+               mv_gf.ProjectGridFunction(mv_gf_l_linearized);
+            }
+            else 
+            {
+               mv_gf.ProjectGridFunction(mv_gf_l);
+            }
+
+            /* Optionally, enforce boundary conditions */
+            if (pb->has_boundary_conditions())
+            {
+               EnforceMVBoundaryConditions(S,t,dt);
+            }
          }
+         /* Otherwise, just project the linearized velocity */
          else 
          {
             mv_gf.ProjectGridFunction(mv_gf_l);
          }
 
-         if (pb->has_boundary_conditions())
-         {
-            EnforceMVBoundaryConditions(S,t,dt);
-         }
+         // if (this->do_mv_linearization && mv_option < 10)
+         // {
+         //    ParGridFunction mv_gf_l_linearized(&H1_L);
+         //    ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
+         //    mv_gf.ProjectGridFunction(mv_gf_l_linearized);
+         // }
+         // else 
+         // {
+         //    mv_gf.ProjectGridFunction(mv_gf_l);
+         // }
+
+         // if (pb->has_boundary_conditions())
+         // {
+         //    EnforceMVBoundaryConditions(S,t,dt);
+         // }
 
          switch (fv_option)
          {

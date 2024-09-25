@@ -279,15 +279,10 @@ public:
    // Trying Flux on LHS
    void IterativeCornerVelocityFLUXLS(Vector &S, const double & dt);
 
-   // Lagrange Multipliers implementation
-   void ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v);
-   void ComputeRotatedDiagonalForCellArea(const Vector &S, const int &cell, const int &node, const double &dt, Vector &vec);
-   void ComputeLagrangeMultiplierAndNodeVelocity(const Vector &S, const Vector &S_old, const int &cell, const int &node, const double &t, const double &dt, double &l_mult, Vector &node_v);
-   void IterativeLagrangeMultiplier(Vector &S, const Vector &S_old, const double &t, const double &dt);
-
    // HiOp Lagrange Multipliers implementation
    void CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec);
    void CalcCellAveragedCornerVelocityVector(const Vector &S, const bool &is_weighted, ParGridFunction &mv_gf_l);
+   void ComputeCellAverageVelocityAtNode(const Vector &S, const int node, const bool &is_weighted, Vector &node_v);
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
    void SolveHiOp(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    void SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);

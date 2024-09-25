@@ -131,6 +131,8 @@ protected:
    Array<int> HiopHessIArr, HiopHessJArr;
    Array<int> HiopCGradIArr, HiopCGradJArr;
 
+   Array<int> ess_bdr, dofs_list, ess_tdofs;
+
 public:
    enum DofEntity {corner, face, cell};
 
@@ -298,8 +300,7 @@ public:
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                              const double &dt, Vector & state_val);
    void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
-   void ComputeCorrectedNodalVelocityOnBoundary(const Vector &S, const int &node, const double &t, const double &dt, Vector &vel);
-   
+
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);

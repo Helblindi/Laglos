@@ -49,10 +49,10 @@ def main():
    # BOUNDARY
    f.write("boundary\n")
 
-   bdry_left = 1
-   bdry_bottom = 1
-   bdry_right = 1
-   bdry_top = 1
+   bdry_left = 4
+   bdry_bottom = 4
+   bdry_right = 4
+   bdry_top = 4
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints - 1) + 2 * (ny_gridpoints - 1)) + "\n")

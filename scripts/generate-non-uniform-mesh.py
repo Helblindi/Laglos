@@ -25,8 +25,8 @@ def main():
    f.write("2\n")
    f.write("\n")
 
-   n_gridpoints_neg = 33
-   n_gridpoints_pos = 65
+   n_gridpoints_neg = 17
+   n_gridpoints_pos = 33
    nx_gridpoints = n_gridpoints_neg - 1 + n_gridpoints_pos
    ny_gridpoints = n_gridpoints_neg - 1 + n_gridpoints_pos
 
@@ -46,10 +46,10 @@ def main():
 
    # BOUNDARY
    f.write("boundary\n")
-   bdry_left = 1
-   bdry_bottom = 1
-   bdry_right = 1
-   bdry_top = 1
+   bdry_left = 4
+   bdry_bottom = 4
+   bdry_right = 4
+   bdry_top = 4
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")
@@ -58,22 +58,22 @@ def main():
    #LEFT
    bdr_el = 1
    for i in range(0, (ny_gridpoints - 1)):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_left, i, i+1))
+      f.write("%d %d %d %d\n" % (bdry_left, 1, i, i+1))
       bdr_el += 1
 
    #BOTTOM
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_bottom, i, i+ny_gridpoints))
+      f.write("%d %d %d %d\n" % (bdry_bottom, 1, i, i+ny_gridpoints))
       bdr_el += 1
 
    #RIGHT
    for i in range((nx_gridpoints - 1) * ny_gridpoints, nx_gridpoints * ny_gridpoints - 1):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_right, i, i+1))
+      f.write("%d %d %d %d\n" % (bdry_right, 1, i, i+1))
       bdr_el += 1
 
    #TOP
    for i in range(nx_gridpoints * ny_gridpoints - 1, ny_gridpoints, -ny_gridpoints):
-      f.write("%d %d %d %d\n" % (bdr_el, bdry_top, i, i-ny_gridpoints))
+      f.write("%d %d %d %d\n" % (bdry_top, 1, i, i-ny_gridpoints))
       bdr_el += 1
 
    f.write("\n")

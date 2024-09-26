@@ -51,6 +51,33 @@ inline void SetHiopConstraintGradSparsityPattern(const ParMesh *pmesh, const int
    }
 }
 
+/****************************************************************************************************
+* Function: SetHiopConstraintGradSparsityPattern
+*
+* Purpose:
+*  Set the sparsity pattern for the Jacobian matrix of the boundary constraints vector to be 
+*  used in the Hiop mesh velocity solve.  Recall the the Gradient matrix is a SparseMatrix
+*  of size |n_bdr_dofs| x 2*eta_geo
+****************************************************************************************************/
+inline void SetHiopBoundaryConstraintGradSparsityPattern(const Array<int> ess_tdofs, Array<int> &I, Array<int> &J, Array<double> &Data)
+{
+   // std::cout << "SetHiopBoundaryConstraintGradSparsityPattern\n";
+   const int n_bdr_dofs = ess_tdofs.Size();
+
+   I.SetSize(n_bdr_dofs + 1);
+   J.SetSize(n_bdr_dofs);
+   Data.SetSize(n_bdr_dofs);
+   Data = 1;
+   I[0] = 0;
+
+   for (int bdr_it = 0; bdr_it < n_bdr_dofs; bdr_it++)
+   {
+      /* Set the (i+1)th entry of I and ith entry of J */
+      I[bdr_it+1] = bdr_it+1;
+      J[bdr_it] = ess_tdofs[bdr_it];
+   }
+}
+
 
 /****************************************************************************************************
 * Function: SetHiopHessianSparsityPattern
@@ -167,7 +194,7 @@ public:
         grad(GradCIArr.GetData(), GradCJArr.GetData(), GradDataArr.GetData(), num_cells, input_size,
              false/*ownij*/, false/*owna*/, true/*is_sorted*/)
    {
-      cout << "LocalMassConservationOperator::Non-default constructor\n";
+      // cout << "LocalMassConservationOperator::Non-default constructor\n";
    }
 
    ~LocalMassConservationOperator()
@@ -322,7 +349,7 @@ public:
       Operator(height, width),
       arrI(2), arrJ(8), arrData(8)
    {
-      cout << "zeroSparseMatrix constructor\n";
+      // cout << "zeroSparseMatrix constructor\n";
 
       arrI[0] = 0, arrI[1] = 8;
 
@@ -353,6 +380,49 @@ public:
    } 
 };
 
+
+template<int dim>
+class BoundaryConditionsOperator : public Operator
+{
+private:
+   const int n_bdr_dofs, input_size;
+   const int nnzSparse = 1;
+   Array<int> ess_tdofs;
+   Array<int> GradDIArr, GradDJArr;
+   Array<double> GradDataArr;
+   mutable SparseMatrix grad;
+
+public:
+   BoundaryConditionsOperator(const int &_n_bdr_dofs, const int &_input_size, const Array<int> _ess_tdofs,
+                              const Array<int> GradDI, const Array<int> GradDJ, const Array<double> GradDData) :
+      n_bdr_dofs(_n_bdr_dofs),
+      input_size(_input_size),
+      Operator(_n_bdr_dofs, _input_size),
+      ess_tdofs(_ess_tdofs),
+      GradDIArr(GradDI),
+      GradDJArr(GradDJ),
+      GradDataArr(GradDData),
+      grad(GradDIArr.GetData(), GradDJArr.GetData(), GradDataArr.GetData(), n_bdr_dofs, input_size, false, false, true)
+   {
+      // std::cout << "BCoper constructor\n";
+      assert(ess_tdofs.Size() == n_bdr_dofs);
+   }
+
+   void Mult(const Vector &v, Vector &y) const
+   {
+      y.SetSize(n_bdr_dofs);
+      for (int i = 0; i < n_bdr_dofs; i++)
+      {
+         y[i] = v[ess_tdofs[i]];
+      }
+   }
+
+   Operator &GetGradient(const Vector &v) const
+   {
+      return grad;
+   }
+};
+
 /**
  * Conservative a posteriori correction to mesh velocity to guarantee local mass conservation:
  * Find V that minimizes || Vi - {V_target}_i ||^2, subject to
@@ -376,12 +446,13 @@ class TargetOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
    const Geometric<dim> &geom;
-   const int num_cells, nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
+   const int n_bdr_dofs, num_cells;
+   const int nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
    const Vector xmin, xmax;
-   Vector massvec, d_lo, d_hi;
+   Vector massvec, bdr_vals, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
-   zeroSparseMatrix<dim> zSMoper;
+   const BoundaryConditionsOperator<dim> BCoper;
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
    mutable SparseMatrix hess;
@@ -395,7 +466,10 @@ public:
       const ParGridFunction &_X, const int _num_cells,
       const double &dt, const Vector &_xmin, const Vector &_xmax,
       Array<int> _HessI, Array<int> _HessJ,
-      Array<int> _GradCI, Array<int> _GradCJ) 
+      Array<int> _GradCI, Array<int> _GradCJ,
+      Array<int> _GradDI, Array<int> _GradDJ,
+      Array<double> _GradDData, Array<int> _ess_tdofs,
+      Array<double> &_bdr_vals) 
       : geom(_geom),
         X(_X),
         dt(dt),
@@ -404,23 +478,26 @@ public:
         OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
         V_target(_V_target), 
         massvec(_massvec), 
+        bdr_vals(_bdr_vals, _bdr_vals.Size()),
       //   d_lo(_massvec), d_hi(_massvec),
-        d_lo(1), d_hi(1),
-        zSMoper(1, input_size),
+        n_bdr_dofs(_ess_tdofs.Size()),
+        d_lo(bdr_vals), d_hi(bdr_vals),
+        BCoper(n_bdr_dofs, input_size, _ess_tdofs, _GradDI, _GradDJ, _GradDData),
         LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         nnz_sparse_jaceq(_GradCJ.Size()),
-        nnz_sparse_jacineq(8),
+        nnz_sparse_jacineq(n_bdr_dofs),
         nnz_sparse_Hess_Lagr(_HessJ.Size()),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4)
    {
-      cout << "TOMVProblem constructor\n";
+      // cout << "TOMVProblem constructor\n";
 
       // Problem assumes that vectors are of the correct size
       assert(_massvec.Size() == _num_cells);
       assert(_V_target.Size() == input_size);
+      assert(_bdr_vals.Size() == n_bdr_dofs);
 
       C = &LMCoper;
       SetEqualityConstraint(massvec);
@@ -430,8 +507,8 @@ public:
       // d_lo -= tol;
       // d_hi += tol;
       // SetInequalityConstraint(d_lo, d_hi);
-      D = &zSMoper;
-      d_lo[0] = -1.E4, d_hi[0] = 1.E4;
+      D = &BCoper;
+      d_lo = -1.E-6, d_hi = 1.E-6;
       SetInequalityConstraint(d_lo, d_hi);
 
       SetSolutionBounds(xmin, xmax);

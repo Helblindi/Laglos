@@ -195,16 +195,25 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    // Initialize arrays of tdofs
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
    // that the boundaries are straight.
-   for (int d = 0; d < dim; d++)
+   if (ess_bdr.Size() > 0)
    {
-      // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
-      // i.e., we must enforce v_x/y/z = 0 for the velocity components.
-      ess_bdr = 0; ess_bdr[d] = 1;
-      H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-      ess_tdofs.Append(dofs_list);
+      for (int d = 0; d < dim; d++)
+      {
+         // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
+         // i.e., we must enforce v_x/y/z = 0 for the velocity components.
+         ess_bdr = 0; ess_bdr[d] = 1;
+         H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+         ess_tdofs.Append(dofs_list);
+      }
+      /* Set bdr_vals for dofs that should be 0 */
+      bdr_vals.SetSize(ess_tdofs.Size());
+      bdr_vals = 0.;
+
+      if (ess_bdr.Size() > dim)
+      {
+         MFEM_WARNING("May need to enforce additional BCs.\n");
+      }
    }
-   cout << "ess_tdof list: \n";
-   ess_tdofs.Print(cout);
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
@@ -7795,6 +7804,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    */
    SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
    SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
+   SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
    
    /* Calculate target velocity */
    switch (target_option)
@@ -7844,7 +7854,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    {
       case 1: // Have a target velocity
       {
-         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr);
+         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, HiopDGradIArr, HiopDGradJArr, HiopDGradData, ess_tdofs, bdr_vals);
          break;
       }
       case 2: // Viscous objective function

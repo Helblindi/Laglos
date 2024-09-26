@@ -209,9 +209,15 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
       bdr_vals.SetSize(ess_tdofs.Size());
       bdr_vals = 0.;
 
-      if (ess_bdr.Size() > dim)
+      if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
+         Array<int> add_ess_tdofs;
+         Array<double> add_bdr_vals;
+         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals);
+
+         ess_tdofs.Append(add_ess_tdofs);
+         bdr_vals.Append(add_bdr_vals);
       }
    }
 

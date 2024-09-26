@@ -79,6 +79,7 @@ public:
    virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
+   virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
 
    /* ProblemDescription */
    static double internal_energy(const Vector &U)

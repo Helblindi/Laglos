@@ -61,6 +61,26 @@ public:
       this->set_b(b_covolume);
    }
 
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals) override
+   {
+      Array<int> dofs_list;
+      ess_bdr = 0;
+      ess_bdr[4] = 1;
+
+      /* Boundary conditions: This test freezes all nodes on the boundaries - marker 5 */
+      for (int d = 0; d < dim; d++)
+      {
+         fes.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+         add_ess_tdofs.Append(dofs_list);
+      }
+
+      /* Fill bdr vals with 0 in this case */
+      add_bdr_vals.SetSize(add_ess_tdofs.Size());
+      add_bdr_vals = 0.;
+
+      assert(add_bdr_vals.Size() == add_ess_tdofs.Size());
+   }
+
    /*********************************************************
     * Problem Description functions
     *********************************************************/

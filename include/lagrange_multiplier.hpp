@@ -167,7 +167,7 @@ public:
         grad(GradCIArr.GetData(), GradCJArr.GetData(), GradDataArr.GetData(), num_cells, input_size,
              false/*ownij*/, false/*owna*/, true/*is_sorted*/)
    {
-      // cout << "LocalMassConservationOperator::Non-default constructor\n";
+      cout << "LocalMassConservationOperator::Non-default constructor\n";
    }
 
    ~LocalMassConservationOperator()
@@ -322,25 +322,25 @@ public:
       Operator(height, width),
       arrI(2), arrJ(8), arrData(8)
    {
-      // cout << "zeroSparseMatrix constructor\n";
+      cout << "zeroSparseMatrix constructor\n";
 
       arrI[0] = 0, arrI[1] = 8;
 
       for (int i = 0; i < 8; i++)
       {
          arrJ[i] = i;
-         arrData[i] = 0.;
+         arrData[i] = 1.;
       }
 
-      grad = new SparseMatrix(arrI.GetData(), arrJ.GetData(), arrData.GetData(), height, width);  
+      grad = new SparseMatrix(arrI.GetData(), arrJ.GetData(), arrData.GetData(), height, width, false, false, true);  
 
       // grad->Finalize();
    }
-   // ~zeroSparseMatrix()
-   // {
-   //    delete grad;
-   //    grad = nullptr;
-   // }
+   ~zeroSparseMatrix()
+   {
+      delete grad;
+      grad = nullptr;
+   }
 
    void Mult(const Vector &v, Vector &y) const
    {
@@ -376,14 +376,14 @@ class TargetOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
    const Geometric<dim> &geom;
-   const int num_cells, nnz_sparse_jaceq, nnz_sparse_Hess_Lagr;
+   const int num_cells, nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
    const Vector xmin, xmax;
    Vector massvec, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
-   // zeroSparseMatrix<dim> zSMoper;
+   zeroSparseMatrix<dim> zSMoper;
    Array<int> HessIArr, HessJArr;
-   Array<double> GradCData, HessData;
+   Array<double> HessData;
    mutable SparseMatrix hess;
    DenseMatrix block;
    const ParGridFunction &X;
@@ -402,17 +402,21 @@ public:
         num_cells(_num_cells),
         xmin(_xmin), xmax(_xmax),
         OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
-        V_target(_V_target), massvec(_massvec), d_lo(1), d_hi(1),
-      //   zSMoper(1, input_size),
+        V_target(_V_target), 
+        massvec(_massvec), 
+      //   d_lo(_massvec), d_hi(_massvec),
+        d_lo(1), d_hi(1),
+        zSMoper(1, input_size),
         LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         nnz_sparse_jaceq(_GradCJ.Size()),
+        nnz_sparse_jacineq(8),
         nnz_sparse_Hess_Lagr(_HessJ.Size()),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4)
    {
-      // cout << "TOMVProblem constructor\n";
+      cout << "TOMVProblem constructor\n";
 
       // Problem assumes that vectors are of the correct size
       assert(_massvec.Size() == _num_cells);
@@ -421,10 +425,14 @@ public:
       C = &LMCoper;
       SetEqualityConstraint(massvec);
 
-      // D = &zSMoper;
-      // d_lo(0) = -1.E4;
-      // d_hi(0) = 1.E4;
+      // D = &LMCoper;
+      // double tol = 1.;
+      // d_lo -= tol;
+      // d_hi += tol;
       // SetInequalityConstraint(d_lo, d_hi);
+      D = &zSMoper;
+      d_lo[0] = -1.E4, d_hi[0] = 1.E4;
+      SetInequalityConstraint(d_lo, d_hi);
 
       SetSolutionBounds(xmin, xmax);
 
@@ -535,7 +543,8 @@ public:
    }
 
    virtual int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
-   virtual int get_nnz_sparse_Jacineq() const { return 0; }
+   virtual int get_nnz_sparse_Jacineq() const { return nnz_sparse_jacineq; }
+   // virtual int get_nnz_sparse_Jacineq() const { return 0; }
    virtual int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
 };
 

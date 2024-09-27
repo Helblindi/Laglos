@@ -7846,7 +7846,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    case 3: // weighted average of adjacent cell midpoint in time
    {
       /* Petrov-Galerkin Justified weighted average */
-      bool is_weighted = true;
+      is_weighted = true;
       int td_flag = 2;
       CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
       // DistributeFaceViscosityToVelocity(S_old, V_target);
@@ -7862,6 +7862,12 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       ParGridFunction V_target_lin(V_target);
       ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
       V_target = V_target_lin;
+   }
+
+   /* Enforce BCs on target velocity */
+   if (pb->has_boundary_conditions())
+   {
+      for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
    }
 
    OptimizationProblem * omv_problem = NULL;

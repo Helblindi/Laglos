@@ -452,13 +452,15 @@ private:
    const Vector xmin, xmax;
    Vector massvec, bdr_vals, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
-   const BoundaryConditionsOperator<dim> BCoper;
+   // const BoundaryConditionsOperator<dim> BCoper;
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
+   Array<int> ess_tdofs;
    mutable SparseMatrix hess;
    DenseMatrix block;
    const ParGridFunction &X;
    const double dt;
+   const double interior_multiplier = 1.E-2;
 
 public:
    TargetOptimizedMeshVelocityProblem(
@@ -482,11 +484,13 @@ public:
       //   d_lo(_massvec), d_hi(_massvec),
         n_bdr_dofs(_ess_tdofs.Size()),
         d_lo(bdr_vals), d_hi(bdr_vals),
-        BCoper(n_bdr_dofs, input_size, _ess_tdofs, _GradDI, _GradDJ, _GradDData),
+      //   BCoper(n_bdr_dofs, input_size, _ess_tdofs, _GradDI, _GradDJ, _GradDData),
         LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
+        ess_tdofs(_ess_tdofs),
         nnz_sparse_jaceq(_GradCJ.Size()),
-        nnz_sparse_jacineq(n_bdr_dofs),
+      //   nnz_sparse_jacineq(n_bdr_dofs),
+        nnz_sparse_jacineq(0),
         nnz_sparse_Hess_Lagr(_HessJ.Size()),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
@@ -507,9 +511,9 @@ public:
       // d_lo -= tol;
       // d_hi += tol;
       // SetInequalityConstraint(d_lo, d_hi);
-      D = &BCoper;
-      d_lo -= 1.E-6, d_hi += 1.E-6;
-      SetInequalityConstraint(d_lo, d_hi);
+      // D = &BCoper;
+      // d_lo -= 1.E-6, d_hi += 1.E-6;
+      // SetInequalityConstraint(d_lo, d_hi);
 
       SetSolutionBounds(xmin, xmax);
 
@@ -528,12 +532,18 @@ public:
 
    double CalcObjective(const Vector &V) const
    {
-      // cout << "OMV calc objective\n";
+      // cout << "TOMV calc objective\n";
       double res = 0.0;
       for (int i = 0; i < input_size; i++)
       {
          const double d = V(i) - V_target(i);
-         res += d * d;
+         if (ess_tdofs.Find(i) != -1)
+         {
+            res += d * d;
+         }
+         else {
+            res += interior_multiplier * d * d;
+         }
       }
       return res;
    }
@@ -554,7 +564,15 @@ public:
 
       for (int i = 0; i < input_size; i++)
       {
-         grad(i) = (V(i) - V_target(i));
+         if (ess_tdofs.Find(i) != -1)
+         {
+            grad(i) = (V(i) - V_target(i));
+         }
+         else
+         {
+            grad(i) = interior_multiplier * (V(i) - V_target(i));
+         }
+
       }
       grad *= 2.;
    }
@@ -606,7 +624,14 @@ public:
       /* Set the diagonal entries */
       for (int i = 0; i < input_size; i++)
       {
-         hess.Elem(i,i) = 2.;
+         if (ess_tdofs.Find(i) != -1)
+         {
+            hess.Elem(i,i) = 2;
+         }
+         else
+         {
+            hess.Elem(i,i) = 2 * interior_multiplier ;
+         }
       }
    }
 

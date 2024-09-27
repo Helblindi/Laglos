@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    int mv_option = 2;
-   bool do_mv_linearization = true;
+   bool do_mv_linearization = false;
    int fv_option = 2;
    int mv_it_option = 2;
    int mv_n_iterations = 10;

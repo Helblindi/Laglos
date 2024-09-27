@@ -39,6 +39,9 @@ private:
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
+   // Indicator if mesh velocity boundary conditions need to be updated at each iteration
+   // So far the only problem that needs this is Saltzman
+   bool mv_bcs_need_updating = false; 
    string indicator = ""; // Possible: saltzmann
 
    // CFL change
@@ -54,6 +57,7 @@ public:
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
    void set_bcs_indicator(const bool &tvalue) { this->bcs = tvalue; }
+   void set_mv_bcs_need_updating_indicator(const bool &tvalue) { this->mv_bcs_need_updating = tvalue; }
    void set_distort_mesh(const bool &_distort_mesh) { distort_mesh = _distort_mesh; }
    void set_exact_solution(const bool &_known_exact_solution) { known_exact_solution = _known_exact_solution; }
    // CFL change
@@ -67,6 +71,7 @@ public:
    double get_b() { return b; }
    string get_indicator() { return indicator; }
    bool has_boundary_conditions() { return bcs; }
+   bool get_mv_bcs_need_updating() { return mv_bcs_need_updating; }
    bool get_distort_mesh() { return distort_mesh; }
    bool has_exact_solution() { return known_exact_solution; }
    // CFL change
@@ -80,6 +85,7 @@ public:
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
    virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
+   virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
 
    /* ProblemDescription */
    static double internal_energy(const Vector &U)

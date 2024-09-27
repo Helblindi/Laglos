@@ -45,7 +45,7 @@ def main():
 
    # BOUNDARY
    f.write("boundary\n")
-   d_bdry = 4 # Dirichlet BCs for left side.  v = e_x
+   d_bdry = 5 # Dirichlet BCs for left side.  v = e_x
    bdry_left = d_bdry
    bdry_bottom = 2
    bdry_right = 1

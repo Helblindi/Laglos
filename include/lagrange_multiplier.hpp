@@ -508,7 +508,7 @@ public:
       // d_hi += tol;
       // SetInequalityConstraint(d_lo, d_hi);
       D = &BCoper;
-      d_lo = -1.E-6, d_hi = 1.E-6;
+      d_lo -= 1.E-6, d_hi += 1.E-6;
       SetInequalityConstraint(d_lo, d_hi);
 
       SetSolutionBounds(xmin, xmax);

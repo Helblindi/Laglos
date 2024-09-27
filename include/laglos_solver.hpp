@@ -133,8 +133,11 @@ protected:
    Array<int> HiopDGradIArr, HiopDGradJArr;
    Array<double> HiopDGradData;
 
+   int ess_tdofs_cart_size;
    Array<int> ess_bdr, dofs_list, ess_tdofs;
    Array<double> bdr_vals;
+   Array<int> add_ess_tdofs;
+   Array<double> add_bdr_vals;
 
 public:
    enum DofEntity {corner, face, cell};

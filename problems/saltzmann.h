@@ -32,10 +32,13 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
+   mutable double timestep_first = 0.;
    double _a = 0., _b = 0., _gamma = 5./3.;
    bool _distort_mesh = true;
    bool _known_exact_solution = true;
    bool _bcs = true;
+   bool _mv_bcs_need_updating = true;
+   int size_add_bdr_dofs;
    string _indicator = "saltzmann";
 
    // CFL change
@@ -67,6 +70,7 @@ public:
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
+      this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
       // CFL change
@@ -80,6 +84,41 @@ public:
    void lm_update(const double b_covolume) override 
    {
       this->set_b(b_covolume);
+   }
+
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals) override 
+   {
+      std::cout << "saltzman::get_additional_BCs\n";
+
+      Array<int> dofs_list;
+      ess_bdr = 0;
+      ess_bdr[4] = 1;
+
+      /* Boundary conditions: This test enforces nonzero dirichlet conditions on left wall - marker 5 */
+      fes.GetEssentialTrueDofs(ess_bdr, dofs_list, 0); // only x coordinate is nonzero
+      add_ess_tdofs.Append(dofs_list);
+
+      /* Fill bdr vals with 0 in this case */
+      size_add_bdr_dofs = add_ess_tdofs.Size();
+      add_bdr_vals.SetSize(size_add_bdr_dofs);
+
+      /* since current time is t=0, this val is 0. */
+      add_bdr_vals = 0.;
+
+      assert(add_bdr_vals.Size() == size_add_bdr_dofs);
+   }
+
+   /* The dirichlet condition that is enforced on the left hand side changes in time */
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals) override 
+   {
+      /* Validate we do not divide by 0 and than the array of dofs is the right size */
+      assert(timestep_first > 0.);
+      assert(add_bdr_vals.Size() == size_add_bdr_dofs);
+
+      /* Solve for Dirichlet velocity at left wall */
+      double _xi = t / (2*timestep_first);
+      double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+      add_bdr_vals = _psi;
    }
 
    /*********************************************************

@@ -73,6 +73,8 @@ public:
          fes.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
          add_ess_tdofs.Append(dofs_list);
       }
+      /* remove possible duplicates */
+      add_ess_tdofs.Unique();
 
       /* Fill bdr vals with 0 in this case */
       add_bdr_vals.SetSize(add_ess_tdofs.Size());

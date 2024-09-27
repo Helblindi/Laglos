@@ -206,14 +206,13 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
          ess_tdofs.Append(dofs_list);
       }
       /* Set bdr_vals for dofs that should be 0 */
-      bdr_vals.SetSize(ess_tdofs.Size());
+      ess_tdofs_cart_size = ess_tdofs.Size();
+      bdr_vals.SetSize(ess_tdofs_cart_size);
       bdr_vals = 0.;
 
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         Array<int> add_ess_tdofs;
-         Array<double> add_bdr_vals;
          pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals);
 
          ess_tdofs.Append(add_ess_tdofs);
@@ -625,7 +624,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
             // Replace the bdr attribute in the array as long as it is not
             // the dirichlet condition (For Saltzmann Problem)
             // This ensures the left wall vertices have the proper indicator
-            if (BdrVertexIndexingArray[index] != 4)
+            if (BdrVertexIndexingArray[index] != 5)
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
@@ -778,6 +777,19 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
 
    if (mm)
    {
+      if (pb->get_mv_bcs_need_updating())
+      {
+         if (timestep_first == 0.)
+         {
+            timestep_first = dt;
+         }
+         // bdr_vals.GetSubArray(ess_tdofs_cart_size, add_bdr_vals.Size(), mutable_bdr_vals);
+         /// TODO: Too bad there isn't a method to get a reference to a sub array or to set a sub array.
+         bdr_vals.SetSize(ess_tdofs_cart_size);
+         pb->update_additional_BCs(t, timestep_first, add_bdr_vals);
+         bdr_vals.Append(add_bdr_vals);
+      }
+
       ComputeIntermediateFaceVelocities(S_old, t);
       
       if (dim == 1)
@@ -933,7 +945,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             /* Optionally, enforce boundary conditions */
             if (pb->has_boundary_conditions())
             {
-               for (int i = 0; i < ess_tdofs.Size(); i++) { mv_gf_l(ess_tdofs[i]) = 0.0; }
+               for (int i = 0; i < ess_tdofs.Size(); i++) { mv_gf_l(ess_tdofs[i]) = bdr_vals[i]; }
                // EnforceMVBoundaryConditions(S,t,dt);
             }
          }
@@ -1171,7 +1183,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
                switch (bdr_attribute)
                {
-               case 4:
+               case 5:
                // Left wall
                {
                   double _rho = 3.9992502342988532;
@@ -1276,7 +1288,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                      tmp_vel[1] = 0.;
                   }
 
-                  if (cell_bdr == 4)
+                  if (cell_bdr == 5)
                   {
                      // left
                      tmp_vel = 0.;
@@ -7496,8 +7508,6 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
          MFEM_ABORT("Should not have reached this point.\n");
          break;
       }
-      GetCellStateVector(S, el_index, Uc);
-      pb->velocity(Uc, Vcell);
 
       /* Add in contribution of cell */
       if (is_weighted) // weighted
@@ -7811,7 +7821,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
    SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
    SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
-   
+
    /* Calculate target velocity */
    switch (target_option)
    {
@@ -7860,6 +7870,10 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    {
       case 1: // Have a target velocity
       {
+         // cout << "ess_tdofs: ";
+         // ess_tdofs.Print(cout);
+         // cout << "bdr_vals: ";
+         // bdr_vals.Print(cout);
          omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, HiopDGradIArr, HiopDGradJArr, HiopDGradData, ess_tdofs, bdr_vals);
          break;
       }

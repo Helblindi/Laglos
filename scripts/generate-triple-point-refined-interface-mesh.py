@@ -2,7 +2,7 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 15
+   nx_gridpoints = 29
    ny_gridpoints1 = 5
    ny_gridpoints2 = 4
    ny_gridpoints3 = 6
@@ -23,7 +23,7 @@ def main():
    print("y_arr: ", y_arr)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
    # filename = home_dir + "data/vortex-square-131044.mesh"
-   filename = home_dir + "data/triple-point-refined-interface.mesh"
+   filename = home_dir + "data/triple-point-refined-interface-2.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file

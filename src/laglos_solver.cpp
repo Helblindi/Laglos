@@ -839,7 +839,15 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             bool is_weighted = true;
             int td_flag = 2;
             CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
-            // DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
+            break;
+         }
+         case 4: // weighted average of adjacent cell midpoint in time with distributed viscosity
+         {
+            /* Petrov-Galerkin Justified weighted average */
+            bool is_weighted = true;
+            int td_flag = 2;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
+            DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
             break;
          }
          
@@ -7744,7 +7752,15 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
       bool is_weighted = true;
       int td_flag = 2;
       CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      // DistributeFaceViscosityToVelocity(S_old, V_target);
+      break;
+   }
+    case 4: // weighted average of adjacent cell midpoint in time with distributed viscosity
+   {
+      /* Petrov-Galerkin Justified weighted average */
+      bool is_weighted = true;
+      int td_flag = 2;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+      DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
    default:
@@ -7849,7 +7865,15 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       is_weighted = true;
       int td_flag = 2;
       CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      // DistributeFaceViscosityToVelocity(S_old, V_target);
+      break;
+   }
+   case 4: // weighted average of adjacent cell midpoint in time with distributed viscosity
+   {
+      /* Petrov-Galerkin Justified weighted average */
+      is_weighted = true;
+      int td_flag = 2;
+      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+      DistributeFaceViscosityToVelocity(S_old, V_target);
       break;
    }
 

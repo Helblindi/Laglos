@@ -54,7 +54,7 @@ public:
 
    /* Override getters */
    double get_gamma(const int &cell_attr) override {
-      assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
+      assert((cell_attr == 1 || cell_attr == 2) && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
       return (cell_attr == 1) ? _gamma_1 : _gamma_2;
    }
 

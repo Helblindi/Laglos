@@ -32,27 +32,46 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _a = 0., _b = 0., _gamma = 1.4;
+   double _a = 0., _b = 0;
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
-   bool _bcs = false; // Indicator for boundary conditions
-   string _indicator = ""; // Possible: saltzmann
+   bool _bcs = true; // Indicator for boundary conditions
+   string _indicator = "riemann"; // Possible: saltzmann
 
-   double rhoL = 1., rhoR = .125;
+   /* Top states of TP */
+   // double _gamma_1 = 1.5, _gamma_2 = 1.5;
+   // double rhoL = 1., rhoR = .125;
+   // double vL = 0., vR = 0.;
+   // double eL = 2., eR = 1.6;
+
+   /* Bottom states of TP */
+   // double _gamma_1 = 1.5, _gamma_2 = 1.4;
+   // double rhoL = 1., rhoR = 1.;
+   // double vL = 0., vR = 0.;
+   // double eL = 2., eR = 0.25;
+
+   /* bottom = Left, top = Right*/
+   double _gamma_1 = 1.4, _gamma_2 = 1.5;
+   double rhoL = 1., rhoR = 0.125;
    double vL = 0., vR = 0.;
-   double pL = .1, pR = .1;
-   double x0 = 0.;
+   double eL = 0.25, eR = 1.6;
+
+   double x0 = 1.;
 
 public:
    RiemannProblem()
    {
       this->set_a(_a);
       this->set_b(_b);
-      this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+   }
+
+   double get_gamma(const int &cell_attr) override {
+      assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
+      return (cell_attr == 1) ? _gamma_1 : _gamma_2;
    }
 
    /*********************************************************
@@ -61,12 +80,21 @@ public:
    virtual double pressure(const Vector &U, const int &cell_attr=0) override
    {
       // Use van der Waals
-      double rho = 1. / U[0];
-      double sie = this->specific_internal_energy(U);
+      // double rho = 1. / U[0];
+      // double sie = this->specific_internal_energy(U);
 
-      double val = (this->get_gamma(cell_attr) - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
-
-      return val;
+      // double val = (this->get_gamma(cell_attr) - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
+      // return val;
+      
+      /* How the TriplePoint problem handles pressure */
+      double _g;
+      if (cell_attr == 1) { 
+         _g = _gamma_1;
+      } else {
+         assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::pressure funcalls.\n");
+         _g = _gamma_2;
+      }
+      return (_g - 1.) * this->internal_energy(U);
    }
 
    /*********************************************************
@@ -81,7 +109,7 @@ public:
          }
          else
          {
-            assert(x[0] <= 1.);
+            // assert(x[0] <= 1.);
             return rhoR;
          }
       }
@@ -111,29 +139,17 @@ public:
    virtual double sie0(const Vector &x, const double & t) override 
    {
       if (t < 1.e-16) {
-         double rho = rho0(x,t);
-         double pressure = p0(x);
 
-         return ((pressure + this->get_a() * pow(rho,2)) * (1. - this->get_b()*rho)  / (rho * (this->get_gamma() - 1.))) - this->get_a() * rho;
+         if (x[0] <= 1)
+         {
+            return eL;
+         }
+         else
+         {
+            return eR;
+         }
       }
-      else {
-         MFEM_ABORT("Exact solution for vdw3 not programmed.\n");
-         return -1.;
-      }
-   }
-
-   // Initial values are in terms of pressure
-   double p0(const Vector &x)
-   {
-      if (x[0] <= x0)
-      {
-         return pL;
-      }
-      else 
-      {
-         assert(x[0] <= 1.);
-         return pR;
-      }
+      MFEM_ABORT("Should not be calling sie0 unless initializing.\n");
    }
 
 }; // End class

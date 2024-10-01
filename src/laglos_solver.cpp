@@ -390,8 +390,6 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
          d = lambda_max * c_norm; 
 
-         double ss = pb->sound_speed(Uc, pmesh->GetAttribute(c));
-
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
 
@@ -631,6 +629,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
          }
          else if (pb->get_indicator() == "Sod" ||
                   pb->get_indicator() == "TriplePoint" || 
+                  pb->get_indicator() == "riemann" ||
                   pb->get_indicator() == "Sedov" || 
                   pb->get_indicator() == "SodRadial")
          {
@@ -685,6 +684,7 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
       if (cell_bdr_flag_gf[row[0]] != -1 && 
           (pb->get_indicator() == "Sod" || 
            pb->get_indicator() == "TriplePoint" || 
+           pb->get_indicator() == "riemann" ||
            pb->get_indicator() == "Sedov" || 
            pb->get_indicator() == "SodRadial"))
       {
@@ -1127,11 +1127,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
 
             // flux contribution
             DenseMatrix dm = pb->flux(U_j, pmesh->GetAttribute(cj));
-            // cout << "flux at cj = " << cj << ":\n";
-            // dm.Print(cout);
             dm += F_i; 
-            // cout << "flux at ci = " << ci << ":\n";
-            // F_i.Print(cout);
             Vector y(dim+2);
             dm.Mult(c, y);
 
@@ -1314,6 +1310,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                }
                else if (pb->get_indicator() == "Sod" ||
                         pb->get_indicator() == "TriplePoint" || 
+                        pb->get_indicator() == "riemann" ||
                         pb->get_indicator() == "SodRadial" ||
                         pb->get_indicator() == "Sedov" || 
                         pb->get_indicator() == "TestBCs" ||
@@ -1440,6 +1437,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 
    if (pb->get_indicator() == "Sod" ||
       pb->get_indicator() == "TriplePoint" ||
+      pb->get_indicator() == "riemann" ||
       pb->get_indicator() == "Sedov" ||
       pb->get_indicator() == "SodRadial" || 
       pb->get_indicator() == "TestBCs" ||

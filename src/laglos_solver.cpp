@@ -7831,7 +7831,21 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    /* Set min/max velocities */
    Vector xmin(Vsize_H1L), xmax(Vsize_H1L);
    xmin = -1.E12;
-   xmax = 1.E22;
+   xmax = 1.E12;
+
+   /* Adjust the above for boundary conditions */
+   if (pb->has_boundary_conditions())
+   {
+      double bdr_tol = 1.E-12;
+      for (int i = 0; i < ess_tdofs.Size(); i++) { 
+         xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol; 
+         xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
+      }
+   }
+   // cout << "xmin: ";
+   // xmin.Print(cout);
+   // cout << "xmax: ";
+   // xmax.Print(cout);
 
    /* Compute equality restrictions */
    CalcMassVolumeVector(S, S_old, dt, massvec);

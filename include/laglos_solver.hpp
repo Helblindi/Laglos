@@ -84,6 +84,7 @@ protected:
    const int NDofs_H1;
    const int NVDofs_H1;
    const int NDofs_H1L;
+   const int Vsize_H1L;
 
    const int Vsize_L2;
    const int TVSize_L2;
@@ -292,7 +293,7 @@ public:
    void CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l);
    void ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v);
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
-   void SolveHiOp(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
+   void SolveHiOp(const Vector &S, const Vector &S_old, const int &lm_option, const int &target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    void SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    
    /* Functions to linearize the mesh velocity */

@@ -111,12 +111,13 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    m_lf(m),
    pb(_pb),
    block_offsets(offset),
-   geom(offset, H1),
+   geom(offset, H1, L2),
    Vsize_H1(H1.GetVSize()),
    TVSize_H1(H1.TrueVSize()),
    GTVSize_H1(H1.GlobalTrueVSize()),
    NDofs_H1(H1.GetNDofs()),
    NDofs_H1L(H1_L.GetNDofs()),
+   Vsize_H1L(H1_L.GetVSize()),
    NVDofs_H1(H1.GetNVDofs()), // Scalar vertex dofs
    Vsize_L2(L2.GetVSize()),
    TVSize_L2(L2.TrueVSize()),
@@ -232,6 +233,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
+   cout << "Vsize_H1L: " << Vsize_H1L << endl;
    cout << "TVSize_H1: " << TVSize_H1 << endl;
    cout << "GTVSize_H1: " << GTVSize_H1 << endl;
    cout << "NDofs_H1: " << NDofs_H1 << endl;
@@ -810,6 +812,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          0-9   - no lagrange multipliers 
          10-19 - Dense LM
          20-29 - Sparse LM
+         30    - Sparse Viscous LM
          */
    
          case 0: // arithmetic average of adjacent cells with distributed viscosity
@@ -915,7 +918,8 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 19:
          {
             int target_option = mv_option % 10;
-            SolveHiOp(S, S_old, target_option, t, dt, mv_gf_l);
+            int lm_option = 1; // Indicates Target
+            SolveHiOp(S, S_old, lm_option, target_option, t, dt, mv_gf_l);
             break;
          }
          case 20:
@@ -931,6 +935,13 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          {
             int target_option = mv_option % 10;
             SolveHiOpDense(S, S_old, target_option, t, dt, mv_gf_l);
+            break;
+         }
+         case 30:
+         {
+            int target_option = -1;
+            int lm_option = 2; // Indicates Viscous
+            SolveHiOp(S, S_old, lm_option, target_option, t, dt, mv_gf_l);
             break;
          }
 
@@ -7804,13 +7815,13 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
 *  an OptimizationSolver from MFEM.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const int &lm_option, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "               SolveHiOp               \n"
    //      << "=======================================\n";
    assert(target_option < 10);
-   assert(mv_gf_l.Size() == dim*NVDofs_H1);
+   assert(mv_gf_l.Size() == Vsize_H1L);
 
    Vector massvec(NDofs_L2);
    ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
@@ -7818,7 +7829,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
 
    /* Set min/max velocities */
-   Vector xmin(V_target.Size()), xmax(V_target.Size());
+   Vector xmin(Vsize_H1L), xmax(Vsize_H1L);
    xmin = -1.E12;
    xmax = 1.E22;
 
@@ -7829,86 +7840,92 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    bool is_weighted = false;
 
    /* 
-   Calculate sparsity patterns for both the Hessian of the objective 
-   and the Gradient of the constrain vector 
+   Calculate sparsity patterns for Gradient of the constraint vector as it is the same
+   whether or not the target or viscous option is used
    */
-   SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
    SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
-   SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
-
-   /* Calculate target velocity */
-   switch (target_option)
-   {
-   case 0: // arithmetic average of adjacent cells with distributed viscosity
-   {
-      int td_flag = 0;
-      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      break;
-   }
-   case 1: // arithmetic average of adjacent cells with viscosity
-   {
-      int td_flag = 0;
-      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      DistributeFaceViscosityToVelocity(S_old, V_target);
-      break;
-   }
-   case 2:
-   {
-      ComputeGeoVNormal(S, V_target);
-      break;
-   }
-   case 3: // weighted average of adjacent cell midpoint in time
-   {
-      /* Petrov-Galerkin Justified weighted average */
-      is_weighted = true;
-      int td_flag = 2;
-      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      break;
-   }
-   case 4: // weighted average of adjacent cell midpoint in time with distributed viscosity
-   {
-      /* Petrov-Galerkin Justified weighted average */
-      is_weighted = true;
-      int td_flag = 2;
-      CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
-      DistributeFaceViscosityToVelocity(S_old, V_target);
-      break;
-   }
-
-   default:
-      MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
-   }
-
-   if (this->do_mv_linearization)
-   {
-      ParGridFunction V_target_lin(V_target);
-      ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
-      V_target = V_target_lin;
-   }
-
-   /* Enforce BCs on target velocity */
-   if (pb->has_boundary_conditions())
-   {
-      for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
-   }
 
    OptimizationProblem * omv_problem = NULL;
-   int lm_option = 1;
    switch (lm_option)
    {
       case 1: // Have a target velocity
       {
-         // cout << "ess_tdofs: ";
-         // ess_tdofs.Print(cout);
-         // cout << "bdr_vals: ";
-         // bdr_vals.Print(cout);
+         /* Calculate sparsity pattern for D and Hessian */
+         SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+         SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
+
+         /* Calculate target velocity */
+         switch (target_option)
+         {
+         case 0: // arithmetic average of adjacent cells with distributed viscosity
+         {
+            int td_flag = 0;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+            break;
+         }
+         case 1: // arithmetic average of adjacent cells with viscosity
+         {
+            int td_flag = 0;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+            DistributeFaceViscosityToVelocity(S_old, V_target);
+            break;
+         }
+         case 2:
+         {
+            ComputeGeoVNormal(S, V_target);
+            break;
+         }
+         case 3: // weighted average of adjacent cell midpoint in time
+         {
+            /* Petrov-Galerkin Justified weighted average */
+            is_weighted = true;
+            int td_flag = 2;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+            break;
+         }
+         case 4: // weighted average of adjacent cell midpoint in time with distributed viscosity
+         {
+            /* Petrov-Galerkin Justified weighted average */
+            is_weighted = true;
+            int td_flag = 2;
+            CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, V_target);
+            DistributeFaceViscosityToVelocity(S_old, V_target);
+            break;
+         }
+
+         default:
+            MFEM_ABORT("Invalid mesh velocity target in Hiop solver.\n");
+         }
+
+         if (this->do_mv_linearization)
+         {
+            ParGridFunction V_target_lin(V_target);
+            ComputeLinearizedNodeVelocities(V_target, V_target_lin, t, dt);
+            V_target = V_target_lin;
+         }
+
+         /* Enforce BCs on target velocity */
+         if (pb->has_boundary_conditions())
+         {
+            for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
+         }
+
+         /* Instantiate problem */
          omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, HiopDGradIArr, HiopDGradJArr, HiopDGradData, ess_tdofs, bdr_vals);
          break;
       }
       case 2: // Viscous objective function
       {
-         MFEM_ABORT("ViscouseOptimizedMeshVelocityProblem not yet implemented.\n");
-         // omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>();
+         /* Hessian sparsity pattern is slightly different due to the different objective function */
+         SetHiopHessianSparsityPatternViscous(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+
+         // cout << "viscous hess I: ";
+         // HiopHessIArr.Print(cout);
+         // cout << "viscous hess J: ";
+         // HiopHessJArr.Print(cout);
+
+         /* Instantiate problem */
+         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs);
          break;
       }
       default:

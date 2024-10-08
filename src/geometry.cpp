@@ -11,15 +11,19 @@ namespace hydrodynamics
 * Constructor 
 */
 template<int dim>
-Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1) :
+Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFiniteElementSpace &l2) :
    H1(h1),
+   L2(l2),
    pmesh(h1.GetParMesh()),
-   block_offsets(offsets)
+   block_offsets(offsets),
+   num_faces(L2.GetNF()),
+   edge_vertex(pmesh->GetEdgeVertexTable())
 {
    cout << "Geometric::Non-default constructor\n";
 
    NDofs_H1 = h1.GetNDofs();
    NVDofs_H1 = h1.GetNVDofs();
+   Transpose(*edge_vertex, vertex_edge);
    cout << "NDofs_H1: " << NDofs_H1 << endl;
 }
 
@@ -229,6 +233,86 @@ void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & no
    {
       int index = node + i * NDofs_H1;
       x[i] = x_gf[index];
+   }
+}
+
+
+/****************************************************************************************************
+* Function: GetFaceDofs
+* Parameters:
+*   face      - integer representing the face that dofs are requested from
+*   face_dofs - Integer array of face dofs 
+*
+* Purpose:
+*    This function returns the H1 DOFS on a given face.
+****************************************************************************************************/
+template<int dim>
+void Geometric<dim>::GetFaceDofs(const int &face, Array<int> &face_dofs) const
+{
+   H1.GetFaceDofs(face, face_dofs);
+}
+
+
+/****************************************************************************************************
+* Function: VertexGetAdjacentFaces
+* Parameters:
+*   vertex       - integer representing the vertex
+*   adj_vertices - array of adjacent face indices
+*
+* Purpose:
+*    This function returns the H1 adjacent faces
+****************************************************************************************************/
+template<int dim>
+void Geometric<dim>::VertexGetAdjacentFaces(const int &vertex, Array<int> &adj_faces) const
+{
+   vertex_edge.GetRow(vertex, adj_faces);
+}
+
+
+/****************************************************************************************************
+* Function: GetNumAdjFaces
+* Parameters:
+*   vertex       - integer representing the vertex
+*
+* Purpose:
+*    This function returns the number of adjacent faces
+****************************************************************************************************/
+template<int dim>
+int Geometric<dim>::GetNumAdjFaces(const int &vertex) const
+{
+   Array<int> adj_faces;
+   vertex_edge.GetRow(vertex, adj_faces);
+   return adj_faces.Size();
+}
+
+
+/****************************************************************************************************
+* Function: VertexGetAdjacentVertices
+* Parameters:
+*   vertex       - integer representing the vertex
+*   adj_vertices - array of adjacent vertex indices
+*
+* Purpose:
+*    This function returns the H1L adjacent vertices
+****************************************************************************************************/
+template<int dim>
+void Geometric<dim>::VertexGetAdjacentVertices(const int &vertex, Array<int> &adj_vertices) const
+{
+   Array<int> faces_row, face_dofs;
+   vertex_edge.GetRow(vertex, faces_row);
+   int num_faces = faces_row.Size();
+   adj_vertices.SetSize(num_faces);
+
+   for (int face_it = 0; face_it < num_faces; face_it++)
+   {
+      int face = faces_row[face_it];
+      H1.GetFaceDofs(face, face_dofs);
+      int face_dof1 = face_dofs[0], face_dof2 = face_dofs[1];
+      if (vertex == face_dof1) {
+         adj_vertices[face_it] = face_dof2;
+      } else {
+         adj_vertices[face_it] = face_dof1;
+      }
    }
 }
 

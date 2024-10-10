@@ -890,7 +890,7 @@ public:
             }
 
             /* Compute norm and add to val */
-            Vi *= 4.;
+            Vi_hat *= .25;
             subtract(Vi, Vi_hat, temp_vec);
             val += std::pow(temp_vec.Norml2(),2);
          } // End interior vertices if statement
@@ -933,7 +933,7 @@ public:
 
             /* Add interior portion to d/dvix, d/dviy */
             iy = ix + num_vertices;
-            add(32., Vi, -8., Vi_hat, temp_vec); // 32Vi - 8Vi_hat
+            add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
             grad[ix] += temp_vec[0];
             grad[iy] += temp_vec[1];
 
@@ -943,7 +943,7 @@ public:
                /* add adjacency portion to d/dvjx, d/dvjy */
                jx = adj_verts[j_it];
                jy = jx + num_vertices;
-               add(-8., Vi, 2., Vi_hat, temp_vec);
+               add(-.5, Vi, .125, Vi_hat, temp_vec);
                grad[jx] += temp_vec[0];
                grad[jy] += temp_vec[1];
             }
@@ -1009,8 +1009,8 @@ public:
          {
             /* Add to diagonal elements for both x and y coords */
             int iy = ix + num_vertices;
-            hess.Elem(ix,ix) += 32.;
-            hess.Elem(iy,iy) += 32.;
+            hess.Elem(ix,ix) += 2.;
+            hess.Elem(iy,iy) += 2.;
 
             /* Get adjacent vertices */
             geom.VertexGetAdjacentVertices(ix, adj_verts);
@@ -1028,13 +1028,13 @@ public:
                /* Contribution to off diagonal for row i */
                if (jx > ix)
                {
-                  hess.Elem(ix,jx) -= 8.;
-                  hess.Elem(iy,jy) -= 8.;
+                  hess.Elem(ix,jx) -= .5;
+                  hess.Elem(iy,jy) -= .5;
                } 
                else
                {
-                  hess.Elem(jx,ix) -= 8.;
-                  hess.Elem(jy,iy) -= 8.;
+                  hess.Elem(jx,ix) -= .5;
+                  hess.Elem(jy,iy) -= .5;
                }
 
                /* Contribution to entries not in row i */
@@ -1047,13 +1047,13 @@ public:
 
                   if (hx >= jx)
                   {
-                     hess.Elem(jx,hx) += 2.;
-                     hess.Elem(jy,hy) += 2.;
+                     hess.Elem(jx,hx) += .125;
+                     hess.Elem(jy,hy) += .125;
                   }
                   else
                   {
-                     hess.Elem(hx,jx) += 2.;
-                     hess.Elem(hy,jy) += 2.;
+                     hess.Elem(hx,jx) += .125;
+                     hess.Elem(hy,jy) += .125;
                   }
                } // end nested adj verts loop
             } // end adj verts loop

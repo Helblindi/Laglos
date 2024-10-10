@@ -7931,7 +7931,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       case 2: // Viscous objective function
       {
          /* Hessian sparsity pattern is slightly different due to the different objective function */
-         SetHiopHessianSparsityPatternViscous(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+         SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
          // cout << "viscous hess I: ";
          // HiopHessIArr.Print(cout);
@@ -7939,7 +7939,16 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          // HiopHessJArr.Print(cout);
 
          /* Instantiate problem */
-         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs);
+         // cout << "ess_bdr: ";
+         // ess_bdr.Print(cout);
+         // cout << "dofs_list: ";
+         // dofs_list.Print(cout);
+         // cout << "ess_tdofs: ";
+         // ess_tdofs.Print(cout);
+         // cout << "BdrVertexIndexingArray: ";
+         // BdrVertexIndexingArray.Print(cout);
+
+         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
          break;
       }
       default:

@@ -155,7 +155,7 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
       J.Append(num_vertices + i);
    }
 
-   /* Validate propert of csr matrices */
+   /* Validate property of csr matrices */
    assert(I[2*num_vertices] == J.Size());
 }
 
@@ -169,6 +169,9 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
 *  Recall the the Hessian matrix is a SparseMatrix of size 
 *  2*eta_geo x 2*eta_geo
 *
+*  For the viscous case, the sparsity pattern includes all neighbors
+*  and neighbors of neighbors.
+*
 *  Note: According to hiop/src/Linalg/README.md, this matrix is upper triangular.
 *
 *        1x  2x  3x ... 1y 2y ...
@@ -181,53 +184,56 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
 *
 *  Upper triangular, CSR.
 ****************************************************************************************************/
-inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const ParFiniteElementSpace &H1, const int &num_vertices, Array<int> &I, Array<int> &J)
+template<int dim>
+inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Geometric<dim> &geom, const ParFiniteElementSpace &H1, const int &num_vertices, Array<int> &I, Array<int> &J)
 {
    // std::cout << "SetHiopHessianSparsityPatternViscous\n";
-   Array<int> faces_row, face_dofs_row;
+   Array<int> adj_verts, adj_adj_verts, cols_for_node, cols_upper_diag;
+   int size_adj_verts, size_adj_adj_verts;
    I.SetSize(num_vertices+1);
    I[0] = 0;
    J.SetSize(0);
-   int faces_length;
-   mfem::Mesh::FaceInformation FI;
-
-   Table *edge_vertex(pmesh->GetEdgeVertexTable());
-   Table vertex_edge;
-   Transpose(*edge_vertex, vertex_edge);
    
-   /* Iterate over nodes and build x portion of spart matrix objects */
-   for (int node = 0; node < num_vertices; node++)
+   /* Iterate over nodes and build x portion of sparse matrix objects */
+   for (int ix = 0; ix < num_vertices; ix++)
    {
-      vertex_edge.GetRow(node, faces_row);
-      faces_length = faces_row.Size();
-      Array<int> cols_for_node;
+      cols_for_node.SetSize(0);
+      geom.VertexGetAdjacentVertices(ix, adj_verts);
+      cols_for_node.Append(adj_verts);
+      size_adj_verts = adj_verts.Size();
 
       /* Iterate over adjacent faces and append adjacent vertices with higher x index, always append y index as it is bigger by design */
-      for (int face_it = 0; face_it < faces_length; face_it++)
+      for (int j_it = 0; j_it < size_adj_verts; j_it++)
       {
          /* Get adj node index*/
-         int face = faces_row[face_it];
-         FI = pmesh->GetFaceInformation(face);
-         H1.GetFaceDofs(face, face_dofs_row);
-         int adj_node = (node == face_dofs_row[0]) ? face_dofs_row[1] : face_dofs_row[0];
+         int jx = adj_verts[j_it];
+         geom.VertexGetAdjacentVertices(jx, adj_adj_verts);
+         cols_for_node.Append(adj_adj_verts);
 
-         /* Fill adjacency array, optionally x and always y */
-         if (adj_node > node) { cols_for_node.Append(adj_node); } // only append greater x
-         cols_for_node.Append(adj_node + num_vertices); // always append y
+         /* Fill adjacency array append y of adj_verts from constraints */
+         cols_for_node.Append(jx + num_vertices); // always append y
       }
 
       /* Append diagonal element and sort */
-      cols_for_node.Append(node);
+      cols_for_node.Append(ix);
       cols_for_node.Sort();
+      cols_for_node.Unique();
+      int col_node_index = cols_for_node.Find(ix);
+      cols_for_node.GetSubArray(col_node_index, cols_for_node.Size() - col_node_index, cols_upper_diag);
+
+      // cout << "node " << ix;// << " has nonzero col: ";
+      // cols_for_node.Print(cout);
+      // cout << " has upper diag: ";
+      // cols_upper_diag.Print(cout);
 
       /* Fill I */
-      if (node <= num_vertices) {
-         I[node+1] = I[node] + cols_for_node.Size(); 
-      }
+      I[ix+1] = I[ix] + cols_upper_diag.Size(); 
 
       /* Append onto J */
-      J.Append(cols_for_node);
+      J.Append(cols_upper_diag);
    }
+
+   // MFEM_ABORT("NOT FULLY IMPLEMENTED");
 
    /* 
    * Fill rest of I and J for y components. Upper Triangular 
@@ -236,34 +242,44 @@ inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Par
    * */
    const int base = I[num_vertices];
 
-   for (int i = 0; i < num_vertices; i++)
+   for (int ix = 0; ix < num_vertices; ix++)
    {      
       /// TODO: Remove duplicated code.  Is there a way to put this code into the stuff above?
-      vertex_edge.GetRow(i, faces_row);
-      faces_length = faces_row.Size();
-      Array<int> cols_for_node;
+      geom.VertexGetAdjacentVertices(ix, adj_verts);
+      size_adj_verts = adj_verts.Size();
+
       cols_for_node.SetSize(0);
-      cols_for_node.Append(num_vertices + i);
+      cols_for_node.Append(num_vertices + ix);
 
       /* iterate over faces and append onto cols_for_node those indices who are greated than i */
-      for (int face_it = 0; face_it < faces_length; face_it++)
+      for (int j_it = 0; j_it < size_adj_verts; j_it++)
       {
-         int face = faces_row[face_it];
-         H1.GetFaceDofs(face, face_dofs_row);
-         int adj_node = (i == face_dofs_row[0]) ? face_dofs_row[1] : face_dofs_row[0];
+         int jx = adj_verts[j_it];
+         geom.VertexGetAdjacentVertices(jx, adj_adj_verts);
+         size_adj_adj_verts = adj_adj_verts.Size();
+         for (int h_it = 0; h_it < size_adj_adj_verts; h_it++)
+         {
+            int hx = adj_adj_verts[h_it];
+            if (hx > ix) { cols_for_node.Append(hx + num_vertices); }
+         }
+
          /* Append if adj index is greater than one we are iterating on, upper triangular */
-         if (adj_node > i) { cols_for_node.Append(adj_node + num_vertices); }
+         if (jx > ix) { cols_for_node.Append(jx + num_vertices); }
       }
 
       /* Sort cols and append to J */
       cols_for_node.Sort();
+      cols_for_node.Unique();
+      assert(cols_for_node.Size() <= 13);
       J.Append(cols_for_node);
+      // cout << "node " << ix << " has nonzero col: ";
+      // cols_for_node.Print(cout);
 
       /* Fill i */
-      I.Append(I[num_vertices + i] + cols_for_node.Size());
+      I.Append(I[num_vertices + ix] + cols_for_node.Size());
    }
 
-   /* Validate propert of csr matrices */
+   /* Validate property of csr matrices */
    assert(I[2*num_vertices] == J.Size());
 }
 
@@ -778,15 +794,15 @@ class ViscousOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
    const Geometric<dim> &geom;
-   const int num_cells, num_faces;
+   const int num_cells, num_faces, num_vertices;
    const int nnz_sparse_jaceq, nnz_sparse_Hess_Lagr;
    Vector massvec, d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
    // const zeroSparseMatrix<dim> zSMoper;
-   const int num_vertices;
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
    Array<int> ess_tdofs;
+   Array<int> BdrVertexIndexingArray;
    mutable SparseMatrix hess;
    DenseMatrix block;
 
@@ -796,7 +812,7 @@ public:
                                        const double &dt, const Vector &xmin, const Vector &xmax,
                                        const Array<int> &_HessI, const Array<int> &_HessJ,
                                        const Array<int> &GradCI, const Array<int> &GradCJ,
-                                       const Array<int> _ess_tdofs)
+                                       const Array<int> _ess_tdofs, const Array<int> _BdrVertexIndexingArray)
       : geom(_geom),
         num_cells(_num_cells),
         num_faces(geom.GetNumFaces()),
@@ -808,6 +824,7 @@ public:
         num_vertices(_geom.GetNVDofs_H1()),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         ess_tdofs(_ess_tdofs),
+        BdrVertexIndexingArray(_BdrVertexIndexingArray),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4)
@@ -833,103 +850,117 @@ public:
 
    ~ViscousOptimizedMeshVelocityProblem()
    {
-      // std::cout << "ViscousOptimizedMeshVelocityProblem - destructor\n";
-      // delete hess;
-      // hess = nullptr;
    }
 
    double CalcObjective(const Vector &V) const
    {
       double val = 0.;
-      int bdr_ind, faces_row_length;
-      Array<int> faces_row, face_dofs_row;
-      Vector vel_1(dim), vel_2(dim), temp_vec(dim);
+      Vector Vi(dim), Vi_hat(dim), Vj(dim), temp_vec(dim);
+      Array<int> adj_verts;
 
-      // MFEM_ABORT("CalcObjective must be implemented.\n");
-      /* Iterate over faces */
-      for (int face = 0; face < num_faces; face++)
+      /* Iterate over geometric vertices */
+      for (int ix = 0; ix < num_vertices; ix++)
       {
-         geom.GetFaceDofs(face, face_dofs_row);
-         int face_vdof1 = face_dofs_row[1],
-               face_vdof2 = face_dofs_row[0],
-               face_dof = face_dofs_row[2];
+         /* We only care about interior vertices */
+         if (BdrVertexIndexingArray[ix] == -1)
+         {
+            /* Grab Vi */
+            geom.GetNodeVelocityVecL(V, ix, Vi);
 
-         /* Get adjacent nodal velocities */
-         geom.GetNodeVelocityVecL(V, face_vdof1, vel_1);
-         geom.GetNodeVelocityVecL(V, face_vdof2, vel_2);
+            /* Compute Vi_hat */
+            Vi_hat = 0.;
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
 
-         /* Add in contribution to objective val */
-         subtract(vel_1, vel_2, temp_vec);
-         double F = temp_vec.Norml2(), F2 = std::pow(F,2);
-         val += F2;
+            // std::cout << "interior vertex at: " << ix << std::endl;
+            // cout << "adj verts: ";
+            // adj_verts.Print(cout);
 
-      }
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               int jx = adj_verts[j_it];
+               geom.GetNodeVelocityVecL(V, jx, Vj);
+               Vi_hat += Vj;
+
+               // cout << "Vi hat: ";
+               // Vi_hat.Print(cout);
+               // cout << "Vj: ";
+               // Vj.Print(cout);
+            }
+
+            /* Compute norm and add to val */
+            Vi_hat *= .25;
+            subtract(Vi, Vi_hat, temp_vec);
+            val += std::pow(temp_vec.Norml2(),2);
+         } // End interior vertices if statement
+      } // End geometric vertices loops
+
+      // MFEM_ABORT("NOT FULLY IMPLEMENTED\n");
 
       return val;
-   }
-
-   int get_input_size()
-   {
-      return input_size;
    }
 
    void CalcObjectiveGrad(const Vector &V, Vector &grad) const
    {
       assert(grad.Size() == input_size);
       assert(V.Size() == input_size);
-      Array<int> adj_vertices;
-      double vx_sum, vy_sum, vx_val, vy_val; 
-      int num_vertices, iy;
 
-      /* Iterate over all vertices, handling x and y componends at same time */
-      /// 3DTODO: Adjust this to work in 3d.
+      Vector Vi(dim), Vi_hat(dim), Vj(dim), temp_vec(dim);
+      Array<int> adj_verts;
+      int jx, iy, jy;
+
+      /* Reset gradient */
+      grad = 0.;
+
+      /* Iterate over geometric vertices */
       for (int ix = 0; ix < num_vertices; ix++)
       {
-         /* boundary dof */
-         if (ess_tdofs.Find(ix) != -1)
+         /* We only care about interior vertices */
+         if (BdrVertexIndexingArray[ix] == -1)
          {
-            grad(ix) = 0.;
-         }
-         else /* Interior dof */ 
-         {
-            /* Reset sums */
-            vx_sum = 0., vy_sum = 0.;
+            /* Compute Vi_hat */
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
 
-            /* Get adjacent vertices */
-            geom.VertexGetAdjacentVertices(ix, adj_vertices);
-            num_vertices = adj_vertices.Size();
-            assert(num_vertices == 4);
-
-            /* Set y index */
-            iy = ix + num_vertices;
-
-            /* Initialize vx and vy */
-            vx_val = num_vertices * V[ix];
-            vy_val = num_vertices * V[iy];
-
-            /* Sum over adjacent vertices */
-            for (int adj_vert_it = 0; adj_vert_it < num_vertices; adj_vert_it++)
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
             {
-               int adj_vert_ind = adj_vertices[adj_vert_it];
-               vx_sum += V[adj_vert_ind];
-               vy_sum += V[adj_vert_ind + num_vertices];
+               jx = adj_verts[j_it];
+               geom.GetNodeVelocityVecL(V, jx, Vj);
+               Vi_hat += Vj;
             }
 
-            /* Subtract out sums */
-            vx_val -= vx_sum; vy_val -= vy_sum;
+            /* Add interior portion to d/dvix, d/dviy */
+            iy = ix + num_vertices;
+            add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
+            grad[ix] += temp_vec[0];
+            grad[iy] += temp_vec[1];
 
-            /* Put 2x this value into gradient */
-            grad(ix) = 2*vx_val; grad(iy) = 2*vy_val;
-         }
-      }
+            /* iterate over adjacent vertices */
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {  
+               /* add adjacency portion to d/dvjx, d/dvjy */
+               jx = adj_verts[j_it];
+               jy = jx + num_vertices;
+               add(-.5, Vi, .125, Vi_hat, temp_vec);
+               grad[jx] += temp_vec[0];
+               grad[jy] += temp_vec[1];
+            }
+         } // End interior vertices if statement
+      } // End geometric vertices loops
+
+      // cout << "grad: ";
+      // grad.Print(cout);
+      // MFEM_ABORT("NOT FULLY IMPLEMENTED\n");
    }
 
    void ComputeObjectiveHessData(const Vector &x) const
    {
       // std::cout << "ViscousOptimizedMeshVelocityProblem::ComputeObjectiveHessData\n";
-      Array<int> verts, Vy_arr, face_dofs_row;
+      Array<int> adj_verts, adj_verts_y;
       DenseMatrix dm;
-      mfem::Mesh::FaceInformation FI;
+      int size_adj_verts;
 
       /* Reset data in sparse Hessian since we build it through addition */
       double * _data = hess.GetData();
@@ -939,13 +970,13 @@ public:
       }
 
       /* Verify our Hessian is starting out zeroed out */
-      if (hess.MaxNorm() > 0.)
+      if (hess.MaxNorm() > 1.E-12)
       {
          std::cout << "max norm: " << hess.MaxNorm() << std::endl;
          MFEM_ABORT("Hessian has not been reset properly.\n")
       }
 
-      /* Fill data array cell by cell */
+      /* Fill data array cell by cell from local mass constraints */
       for (int cell_it = 0; cell_it < num_cells; cell_it++)
       {
          /* Only add the contribution to the hessian if the LM is nonzero */
@@ -953,60 +984,94 @@ public:
          if (coeff != 0.)
          {
             /* Get adjacent vertices */
-            geom.GetParMesh()->GetElementVertices(cell_it, verts);
+            geom.GetParMesh()->GetElementVertices(cell_it, adj_verts);
+            size_adj_verts = adj_verts.Size();
 
-            Vy_arr.SetSize(verts.Size());
-            for (int i = 0; i < verts.Size(); i++)
+            adj_verts_y.SetSize(size_adj_verts);
+            for (int i = 0; i < size_adj_verts; i++)
             {
-               Vy_arr[i] = verts[i] + 0.5 * input_size;
+               adj_verts_y[i] = adj_verts[i] + num_vertices;
             }
 
             /* top right block */
             dm = block;
             dm *= this->lambda[cell_it];
 
-            hess.AddSubMatrix(verts, Vy_arr, dm, 2/*skip_zeros*/);
+            hess.AddSubMatrix(adj_verts, adj_verts_y, dm, 2/*skip_zeros*/);
          }
       } // End cell it
 
-      /* This target function also imposes nonzero quantities dependent on each face */
-      for (int face = 0; face < num_faces; face++)
+      /* This target function also imposes nonzero quantities dependent on the adjacency */
+      for (int ix = 0; ix < num_vertices; ix++)
       {
-         FI = geom.GetParMesh()->GetFaceInformation(face);
-         geom.GetFaceDofs(face, face_dofs_row);
-         int face_i = face_dofs_row[0];
-         int face_j = face_dofs_row[1];
-         if (FI.IsInterior())
+         /* We only care about interior vertices */
+         if (BdrVertexIndexingArray[ix] == -1)
          {
-            /* Hess is upper diagonal so only one entry is needed */
-            if (face_i > face_j) {
-               hess.Elem(face_j, face_i) -= 2.;
-            } else {
-               hess.Elem(face_i, face_j) -= 2.;
-            }
-         }
-      }
+            /* Add to diagonal elements for both x and y coords */
+            int iy = ix + num_vertices;
+            hess.Elem(ix,ix) += 2.;
+            hess.Elem(iy,iy) += 2.;
 
-      /* Set the diagonal entries */
-      for (int i = 0; i < num_vertices; i++)
-      {
-         /* Compute diagonal component */
-         int num_adj_faces = geom.GetNumAdjFaces(i);
-         double val = 2. * num_adj_faces;
-         int y_index = i + num_vertices;
+            /* Get adjacent vertices */
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
 
-         /* Fill hess */
-         hess.Elem(i,i) = val;
-         hess.Elem(y_index, y_index) = val;
-      }
+            /* Iterate over adjacent vertices */
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               int jx = adj_verts[j_it];
+               assert(jx < num_vertices);
+               int jy = jx + num_vertices;
+               assert(jy < input_size);
+
+               /* Contribution to off diagonal for row i */
+               if (jx > ix)
+               {
+                  hess.Elem(ix,jx) -= .5;
+                  hess.Elem(iy,jy) -= .5;
+               } 
+               else
+               {
+                  hess.Elem(jx,ix) -= .5;
+                  hess.Elem(jy,iy) -= .5;
+               }
+
+               /* Contribution to entries not in row i */
+               for (int h_it = 0; h_it < adj_verts_size; h_it++)
+               {
+                  int hx = adj_verts[h_it];
+                  assert(hx < num_vertices);
+                  int hy = hx + num_vertices;
+                  assert(hy < input_size);
+
+                  if (hx >= jx)
+                  {
+                     hess.Elem(jx,hx) += .125;
+                     hess.Elem(jy,hy) += .125;
+                  }
+                  else
+                  {
+                     hess.Elem(hx,jx) += .125;
+                     hess.Elem(hy,jy) += .125;
+                  }
+               } // end nested adj verts loop
+            } // end adj verts loop
+         } // End interior vertices if statement
+      } // End geometric vertices loops
    }
 
    Operator & CalcObjectiveHess(const Vector &x) const
    {
+      // cout << "Hess I: ";
+      // HessIArr.Print(cout);
+      // cout << "Hess J: ";
+      // HessJArr.Print(cout);
       ComputeObjectiveHessData(x);
 
       return hess;
    }
+   int get_input_size() { return input_size; }
    int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
    int get_nnz_sparse_Jacineq() const { return 0; }
    int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }

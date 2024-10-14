@@ -803,7 +803,7 @@ private:
    Array<double> HessData;
    Array<int> ess_tdofs;
    Array<int> BdrVertexIndexingArray;
-   mutable SparseMatrix hess;
+   mutable SparseMatrix hessf, hess;
    DenseMatrix block;
 
 public:
@@ -825,6 +825,8 @@ public:
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         ess_tdofs(_ess_tdofs),
         BdrVertexIndexingArray(_BdrVertexIndexingArray),
+        hessf(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
+             input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4)
@@ -846,6 +848,9 @@ public:
       block(3,0) = -0.5, block(3,2) = 0.5;
 
       block *= pow(dt, 2);
+
+      /* Compute hessf since this does not change in time */
+      ComputeObjectiveHessFData();
    }
 
    ~ViscousOptimizedMeshVelocityProblem()
@@ -946,6 +951,74 @@ public:
       // MFEM_ABORT("NOT FULLY IMPLEMENTED\n");
    }
 
+   void ComputeObjectiveHessFData() const
+   {
+      Array<int> adj_verts;
+      int size_adj_verts;
+
+      /* Reset data in sparse Hessian since we build it through addition */
+      double * _dataf = hessf.GetData();
+      for (int d = 0; d < HessJArr.Size(); d++)
+      {
+         _dataf[d] = 0.;
+      }
+
+      /* This target function imposes nonzero quantities dependent on the adjacency */
+      for (int ix = 0; ix < num_vertices; ix++)
+      {
+         /* We only care about interior vertices */
+         if (BdrVertexIndexingArray[ix] == -1)
+         {
+            /* Add to diagonal elements for both x and y coords */
+            int iy = ix + num_vertices;
+            hessf.Elem(ix,ix) += 2.;
+            hessf.Elem(iy,iy) += 2.;
+
+            /* Get adjacent vertices */
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
+
+            /* Iterate over adjacent vertices */
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               int jx = adj_verts[j_it];
+               assert(jx < num_vertices);
+               int jy = jx + num_vertices;
+               assert(jy < input_size);
+
+               /* Contribution to off diagonal that depends on i */
+               if (jx > ix)
+               {
+                  hessf.Elem(ix,jx) -= .5;
+                  hessf.Elem(iy,jy) -= .5;
+               } 
+               else
+               {
+                  hessf.Elem(jx,ix) -= .5;
+                  hessf.Elem(jy,iy) -= .5;
+               }
+
+               /* Contribution to entries not dependent on i (from adjacency) */
+               for (int h_it = 0; h_it < adj_verts_size; h_it++)
+               {
+                  int hx = adj_verts[h_it];
+                  assert(hx < num_vertices);
+                  int hy = hx + num_vertices;
+                  assert(hy < input_size);
+
+                  /* Only add in this contribution once per pair */
+                  if (hx >= jx)
+                  {
+                     hessf.Elem(jx,hx) += .125;
+                     hessf.Elem(jy,hy) += .125;
+                  }
+               } // end nested adj verts loop
+            } // end adj verts loop
+         } // End interior vertices if statement
+      } // End geometric vertices loops
+   }
+
    void ComputeObjectiveHessData(const Vector &x) const
    {
       // std::cout << "ViscousOptimizedMeshVelocityProblem::ComputeObjectiveHessData\n";
@@ -955,13 +1028,14 @@ public:
 
       /* Reset data in sparse Hessian since we build it through addition */
       double * _data = hess.GetData();
+      double * _dataf = hessf.GetData();
       for (int d = 0; d < HessJArr.Size(); d++)
       {
-         _data[d] = 0.;
+         _data[d] = _dataf[d];
       }
 
       /* Verify our Hessian is starting out zeroed out */
-      if (hess.MaxNorm() > 1.E-12)
+      if (hess.MaxNorm() > hessf.MaxNorm())
       {
          std::cout << "max norm: " << hess.MaxNorm() << std::endl;
          MFEM_ABORT("Hessian has not been reset properly.\n")
@@ -991,61 +1065,6 @@ public:
             hess.AddSubMatrix(adj_verts, adj_verts_y, dm, 2/*skip_zeros*/);
          }
       } // End cell it
-
-      /* This target function also imposes nonzero quantities dependent on the adjacency */
-      for (int ix = 0; ix < num_vertices; ix++)
-      {
-         /* We only care about interior vertices */
-         if (BdrVertexIndexingArray[ix] == -1)
-         {
-            /* Add to diagonal elements for both x and y coords */
-            int iy = ix + num_vertices;
-            hess.Elem(ix,ix) += 2.;
-            hess.Elem(iy,iy) += 2.;
-
-            /* Get adjacent vertices */
-            geom.VertexGetAdjacentVertices(ix, adj_verts);
-            int adj_verts_size = adj_verts.Size();
-            assert(adj_verts_size == 4);
-
-            /* Iterate over adjacent vertices */
-            for (int j_it = 0; j_it < adj_verts_size; j_it++)
-            {
-               int jx = adj_verts[j_it];
-               assert(jx < num_vertices);
-               int jy = jx + num_vertices;
-               assert(jy < input_size);
-
-               /* Contribution to off diagonal that depends on i */
-               if (jx > ix)
-               {
-                  hess.Elem(ix,jx) -= .5;
-                  hess.Elem(iy,jy) -= .5;
-               } 
-               else
-               {
-                  hess.Elem(jx,ix) -= .5;
-                  hess.Elem(jy,iy) -= .5;
-               }
-
-               /* Contribution to entries not dependent on i (from adjacency) */
-               for (int h_it = 0; h_it < adj_verts_size; h_it++)
-               {
-                  int hx = adj_verts[h_it];
-                  assert(hx < num_vertices);
-                  int hy = hx + num_vertices;
-                  assert(hy < input_size);
-
-                  /* Only add in this contribution once per pair */
-                  if (hx >= jx)
-                  {
-                     hess.Elem(jx,hx) += .125;
-                     hess.Elem(jy,hy) += .125;
-                  }
-               } // end nested adj verts loop
-            } // end adj verts loop
-         } // End interior vertices if statement
-      } // End geometric vertices loops
    }
 
    Operator & CalcObjectiveHess(const Vector &x) const

@@ -7958,6 +7958,12 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       }
    }
 
+   /* Testing */
+   ParGridFunction _v(mv_gf_l), _grad(mv_gf_l);
+   _v = 1.;
+   omv_problem->CalcObjectiveGrad(_v, _grad);
+   cout << "grad of 1s: ";
+   _grad.Print(cout);
    OptimizationSolver *optsolver = NULL;
 #ifdef MFEM_USE_HIOP
    HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
@@ -7975,6 +7981,11 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    optsolver->SetRelTol(1E-6);
    optsolver->SetAbsTol(1E-8);
    mv_gf_l = 0.;
+   // ComputeGeoVNormal(S, mv_gf_l);
+   // is_weighted = true;
+   // int td_flag = 2;
+   // CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
+   // DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
    optsolver->Mult(mv_gf_l, mv_gf_l_out); 
 
    mv_gf_l = mv_gf_l_out;

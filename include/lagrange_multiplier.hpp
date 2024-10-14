@@ -873,20 +873,11 @@ public:
             int adj_verts_size = adj_verts.Size();
             assert(adj_verts_size == 4);
 
-            // std::cout << "interior vertex at: " << ix << std::endl;
-            // cout << "adj verts: ";
-            // adj_verts.Print(cout);
-
             for (int j_it = 0; j_it < adj_verts_size; j_it++)
             {
                int jx = adj_verts[j_it];
                geom.GetNodeVelocityVecL(V, jx, Vj);
                Vi_hat += Vj;
-
-               // cout << "Vi hat: ";
-               // Vi_hat.Print(cout);
-               // cout << "Vj: ";
-               // Vj.Print(cout);
             }
 
             /* Compute norm and add to val */
@@ -895,8 +886,6 @@ public:
             val += std::pow(temp_vec.Norml2(),2);
          } // End interior vertices if statement
       } // End geometric vertices loops
-
-      // MFEM_ABORT("NOT FULLY IMPLEMENTED\n");
 
       return val;
    }
@@ -919,7 +908,9 @@ public:
          /* We only care about interior vertices */
          if (BdrVertexIndexingArray[ix] == -1)
          {
+            geom.GetNodeVelocityVecL(V, ix, Vi);
             /* Compute Vi_hat */
+            Vi_hat = 0.;
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
             assert(adj_verts_size == 4);
@@ -1025,7 +1016,7 @@ public:
                int jy = jx + num_vertices;
                assert(jy < input_size);
 
-               /* Contribution to off diagonal for row i */
+               /* Contribution to off diagonal that depends on i */
                if (jx > ix)
                {
                   hess.Elem(ix,jx) -= .5;
@@ -1037,7 +1028,7 @@ public:
                   hess.Elem(jy,iy) -= .5;
                }
 
-               /* Contribution to entries not in row i */
+               /* Contribution to entries not dependent on i (from adjacency) */
                for (int h_it = 0; h_it < adj_verts_size; h_it++)
                {
                   int hx = adj_verts[h_it];
@@ -1045,15 +1036,11 @@ public:
                   int hy = hx + num_vertices;
                   assert(hy < input_size);
 
+                  /* Only add in this contribution once per pair */
                   if (hx >= jx)
                   {
                      hess.Elem(jx,hx) += .125;
                      hess.Elem(jy,hy) += .125;
-                  }
-                  else
-                  {
-                     hess.Elem(hx,jx) += .125;
-                     hess.Elem(hy,jy) += .125;
                   }
                } // end nested adj verts loop
             } // end adj verts loop
@@ -1063,15 +1050,11 @@ public:
 
    Operator & CalcObjectiveHess(const Vector &x) const
    {
-      // cout << "Hess I: ";
-      // HessIArr.Print(cout);
-      // cout << "Hess J: ";
-      // HessJArr.Print(cout);
       ComputeObjectiveHessData(x);
 
       return hess;
    }
-   int get_input_size() { return input_size; }
+   int get_input_size() const { return input_size; }
    int get_nnz_sparse_Jaceq() const { return nnz_sparse_jaceq; }
    int get_nnz_sparse_Jacineq() const { return 0; }
    int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }

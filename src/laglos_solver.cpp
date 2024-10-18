@@ -7946,6 +7946,16 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       }
       case 2: // Viscous objective function
       {
+         /* Need to modify the solution bound restrictions to accomodate boundary conditions */
+         if (pb->has_boundary_conditions())
+         {
+            double bdr_tol = 1.E-12;
+            for (int i = 0; i < ess_tdofs.Size(); i++) {
+               xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol;
+               xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
+            }
+         }
+
          /* Hessian sparsity pattern is slightly different due to the different objective function */
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 

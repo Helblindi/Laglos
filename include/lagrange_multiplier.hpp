@@ -285,6 +285,68 @@ inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Geo
 }
 
 
+/****************************************************************************************************
+* Function: CalcViscousVelocity
+* Parameters:
+*  BdrVertexIndexingArray - Vertex of size NumVertices that indicates if a node is
+*                           is a boundary node or interior node
+*  node                   - node to compute averaged velocity
+*  adj_verts              - adjacent nodes
+*  vel                    - Vi_hat
+*
+* Purpose:
+*  Compute the average velocity of the adjacent geometric nodes.
+*
+* Example: (V1 + V2 + V3 + V4) / 4 = Vx_hat
+*           1
+*           |
+*       4---X---2
+*           |
+*           3
+*
+* Note: On boundary vertices (not corners), the interior neighbor is doubled.
+* Example: (V1 + 2V2 + V3) / 4 = Vx_hat
+*     1---X---3
+*         |
+*         2
+****************************************************************************************************/
+template<int dim>
+inline void CalcViscousVelocity(const Geometric<dim> &geom, const Array<int> &BdrVertexIndexingArray, const Vector &V, const int &ix, const Array<int> &adj_verts, Vector &vel)
+{
+   Vector Vj(dim);
+   int adj_verts_size = adj_verts.Size();
+   vel.SetSize(dim);
+   vel = 0.;
+
+   /* Iterate over adjacent vertices */
+   for (int j_it = 0; j_it < adj_verts_size; j_it++)
+   {
+      int jx = adj_verts[j_it];
+      geom.GetNodeVelocityVecL(V, jx, Vj);
+
+      /* if ix is bdr and jx is interior, double the contribution */
+      if (BdrVertexIndexingArray[ix] != -1 && BdrVertexIndexingArray[jx] == -1)
+      {
+         vel.Add(2., Vj);
+      }
+      else
+      {
+         vel += Vj;
+      }
+   }
+
+   /* Compute average */
+   if (adj_verts_size == 2)
+   {
+      vel *= 0.5;
+   }
+   else
+   {
+      vel *= .25;
+   }
+}
+
+
 /**
  * Class to represent the local mass conservation
  * constraints on our Lagrange Multiplier problem
@@ -585,7 +647,8 @@ private:
    DenseMatrix block;
    const ParGridFunction &X;
    const double dt;
-   const double exterior_multiplier = 1.E+2;
+   // const double exterior_multiplier = 1.E+2;
+   const double exterior_multiplier = 1.E+1;
    const double interior_multiplier = 1.E-2;
    // const double interior_multiplier = 1.;
    const double visc_multiplier = 2.;
@@ -700,27 +763,14 @@ public:
             val += interior_multiplier * iy_val;
          }
 
-         /* Optionally add in viscosity at interior geometric nodes */
-         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
+         /* Optionally add in viscosity */
+         if (add_obj_visc)
          {
-            /* Grab Vi */
-            geom.GetNodeVelocityVecL(V, ix, Vi);
-
             /* Compute Vi_hat */
-            Vi_hat = 0.;
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
-            assert(adj_verts_size == 4);
+            CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
 
-            for (int j_it = 0; j_it < adj_verts_size; j_it++)
-            {
-               int jx = adj_verts[j_it];
-               geom.GetNodeVelocityVecL(V, jx, Vj);
-               Vi_hat += Vj;
-            }
-
-            /* Compute norm and add to val */
-            Vi_hat *= .25;
             subtract(Vi, Vi_hat, temp_vec);
             visc += visc_multiplier * std::pow(temp_vec.Norml2(),2);
          } // End interior node viscosity
@@ -771,25 +821,18 @@ public:
             grad(iy) += interior_multiplier * iy_val;
          }
 
-         /* For viscosity, we only care about interior vertices */
-         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
+         /* Optionally, add in viscosity*/
+         if (add_obj_visc)
          {
             geom.GetNodeVelocityVecL(V, ix, Vi);
             /* Compute Vi_hat */
-            Vi_hat = 0.;
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
-            assert(adj_verts_size == 4);
 
-            for (int j_it = 0; j_it < adj_verts_size; j_it++)
-            {
-               jx = adj_verts[j_it];
-               geom.GetNodeVelocityVecL(V, jx, Vj);
-               Vi_hat += Vj;
-            }
+            CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
 
             /* Add interior portion to d/dvix, d/dviy */
-            add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
+            add(2, Vi, -2., Vi_hat, temp_vec); // 32Vi - 8Vi_hat
             grad[ix] += visc_multiplier * temp_vec[0];
             grad[iy] += visc_multiplier * temp_vec[1];
 
@@ -799,7 +842,7 @@ public:
                /* add adjacency portion to d/dvjx, d/dvjy */
                jx = adj_verts[j_it];
                jy = jx + num_vertices;
-               add(-.5, Vi, .125, Vi_hat, temp_vec);
+               add(-.5, Vi, .5, Vi_hat, temp_vec);
                grad[jx] += visc_multiplier * temp_vec[0];
                grad[jy] += visc_multiplier * temp_vec[1];
             } // End interior vertices if statement
@@ -838,7 +881,7 @@ public:
          }
 
          /* For the viscosity component, we only care about the interior vertices */
-         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
+         if (add_obj_visc)
          {
             /* Add to diagonal elements for both x and y coords */
             hessf.Elem(ix,ix) += visc_multiplier * 2.;
@@ -847,7 +890,6 @@ public:
             /* Get adjacent vertices */
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
-            assert(adj_verts_size == 4);
 
             /* Iterate over adjacent vertices */
             for (int j_it = 0; j_it < adj_verts_size; j_it++)
@@ -1047,34 +1089,9 @@ public:
          geom.GetNodeVelocityVecL(V, ix, Vi);
 
          /* Compute Vi_hat */
-         Vi_hat = 0.;
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-
-         for (int j_it = 0; j_it < adj_verts_size; j_it++)
-         {
-            int jx = adj_verts[j_it];
-            geom.GetNodeVelocityVecL(V, jx, Vj);
-            /* if ix is bdr and jx is interior, double the contribution */
-            if (BdrVertexIndexingArray[ix] != -1 && BdrVertexIndexingArray[jx] == -1)
-            {
-               Vi_hat.Add(2., Vj);
-            }
-            else 
-            {
-               Vi_hat += Vj;
-            }
-         }
-
-         /* Compute norm and add to val */
-         if (adj_verts_size == 2)
-         {
-            Vi_hat *= 0.5;
-         }
-         else 
-         {
-            Vi_hat *= .25;
-         }
+         CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
          
          subtract(Vi, Vi_hat, temp_vec);
          val += std::pow(temp_vec.Norml2(),2);
@@ -1101,29 +1118,13 @@ public:
       {
          geom.GetNodeVelocityVecL(V, ix, Vi);
          /* Compute Vi_hat */
-         Vi_hat = 0.;
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-
-         for (int j_it = 0; j_it < adj_verts_size; j_it++)
-         {
-            jx = adj_verts[j_it];
-            geom.GetNodeVelocityVecL(V, jx, Vj);
-
-            /* if ix is bdr and jx is interior, double the contribution */
-            if (BdrVertexIndexingArray[ix] != -1 && BdrVertexIndexingArray[jx] == -1)
-            {
-               Vi_hat.Add(2., Vj);
-            }
-            else 
-            {
-               Vi_hat += Vj;
-            }
-         }
+         CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, temp_vec);
 
          /* Add interior portion to d/dvix, d/dviy */
          iy = ix + num_vertices;
-         add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
+         add(2., Vi, -2., Vi_hat, temp_vec); // 32Vi - 8Vi_hat
          grad[ix] += temp_vec[0];
          grad[iy] += temp_vec[1];
 
@@ -1133,7 +1134,7 @@ public:
             /* add adjacency portion to d/dvjx, d/dvjy */
             jx = adj_verts[j_it];
             jy = jx + num_vertices;
-            add(-.5, Vi, .125, Vi_hat, temp_vec);
+            add(-.5, Vi, .5, Vi_hat, temp_vec);
             grad[jx] += temp_vec[0];
             grad[jy] += temp_vec[1];
          }

@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "geometry.hpp"
+#include <cassert>
 
 using namespace std;
 
@@ -1049,17 +1050,32 @@ public:
          Vi_hat = 0.;
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-         assert(adj_verts_size == 4);
 
          for (int j_it = 0; j_it < adj_verts_size; j_it++)
          {
             int jx = adj_verts[j_it];
             geom.GetNodeVelocityVecL(V, jx, Vj);
-            Vi_hat += Vj;
+            /* if ix is bdr and jx is interior, double the contribution */
+            if (BdrVertexIndexingArray[ix] != -1 && BdrVertexIndexingArray[jx] == -1)
+            {
+               Vi_hat.Add(2., Vj);
+            }
+            else 
+            {
+               Vi_hat += Vj;
+            }
          }
 
          /* Compute norm and add to val */
-         Vi_hat *= .25;
+         if (adj_verts_size == 2)
+         {
+            Vi_hat *= 0.5;
+         }
+         else 
+         {
+            Vi_hat *= .25;
+         }
+         
          subtract(Vi, Vi_hat, temp_vec);
          val += std::pow(temp_vec.Norml2(),2);
       } // End geometric vertices loops
@@ -1088,13 +1104,21 @@ public:
          Vi_hat = 0.;
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-         assert(adj_verts_size == 4);
 
          for (int j_it = 0; j_it < adj_verts_size; j_it++)
          {
             jx = adj_verts[j_it];
             geom.GetNodeVelocityVecL(V, jx, Vj);
-            Vi_hat += Vj;
+
+            /* if ix is bdr and jx is interior, double the contribution */
+            if (BdrVertexIndexingArray[ix] != -1 && BdrVertexIndexingArray[jx] == -1)
+            {
+               Vi_hat.Add(2., Vj);
+            }
+            else 
+            {
+               Vi_hat += Vj;
+            }
          }
 
          /* Add interior portion to d/dvix, d/dviy */
@@ -1144,7 +1168,6 @@ public:
          /* Get adjacent vertices */
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-         assert(adj_verts_size == 4);
 
          /* Iterate over adjacent vertices */
          for (int j_it = 0; j_it < adj_verts_size; j_it++)

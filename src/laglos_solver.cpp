@@ -594,9 +594,9 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 * Function: CreateBdrVertexIndexingArray
 *
 * Purpose: 
-*  To fill the Vector CreateBdrVertexIndexingArray of size Numvertices. If a vertex is a boundary vertex, 
-*  then CreateBdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
-*  have CreateBdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
+*  To fill the Vector BdrVertexIndexingArray of size Numvertices. If a vertex is a boundary vertex, 
+*  then BdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
+*  have BdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
 *  grab edges, and fill in the corresponding boundary attribute for the adjacent vertices
 *
 *  Note that this function will label a vertex with 5 if that vertex lies on the corner, indicating 

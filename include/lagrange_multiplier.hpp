@@ -584,6 +584,7 @@ private:
    DenseMatrix block;
    const ParGridFunction &X;
    const double dt;
+   const double exterior_multiplier = 1.E+2;
    const double interior_multiplier = 1.E-2;
    // const double interior_multiplier = 1.;
    const double visc_multiplier = 2.;
@@ -685,7 +686,7 @@ public:
          /* contribution from x coord */
          double ix_val = temp_vec[ix] * temp_vec[ix];
          if (ess_tdofs.Find(ix) != -1) {
-            val += ix_val; 
+            val += exterior_multiplier * ix_val; 
          } else { // interior node
             val += interior_multiplier * ix_val;
          }
@@ -693,7 +694,7 @@ public:
          int iy = ix + num_vertices;
          double iy_val = temp_vec[iy] * temp_vec[iy];
          if (ess_tdofs.Find(iy) != -1) {
-            val += iy_val; 
+            val += exterior_multiplier * iy_val; 
          } else { // interior node
             val += interior_multiplier * iy_val;
          }
@@ -756,7 +757,7 @@ public:
          /* contribution from x coord */
          double ix_val = 2.*(V(ix) - V_target(ix));
          if (ess_tdofs.Find(ix) != -1) {
-            grad(ix) += ix_val;
+            grad(ix) += exterior_multiplier * ix_val;
          } else {
             grad(ix) += interior_multiplier * ix_val;
          }
@@ -764,7 +765,7 @@ public:
          iy = ix + num_vertices;
          double iy_val = 2.*(V(iy) - V_target(iy));
          if (ess_tdofs.Find(iy) != -1) {
-            grad(iy) += iy_val;
+            grad(iy) += exterior_multiplier * iy_val;
          } else {
             grad(iy) += interior_multiplier * iy_val;
          }
@@ -823,14 +824,14 @@ public:
          /* Target velocity portion */
          /* contribution from x coord */
          if (ess_tdofs.Find(ix) != -1) {
-            hessf.Elem(ix,ix) += 2.; 
+            hessf.Elem(ix,ix) += 2. * exterior_multiplier; 
          } else { // interior node
             hessf.Elem(ix,ix) += 2. * interior_multiplier;
          }
          /* contribution from y coord */
          int iy = ix + num_vertices;
          if (ess_tdofs.Find(iy) != -1) {
-            hessf.Elem(iy,iy) += 2.;
+            hessf.Elem(iy,iy) += 2. * exterior_multiplier;
          } else { // interior node
             hessf.Elem(iy,iy) += 2. * interior_multiplier;
          }

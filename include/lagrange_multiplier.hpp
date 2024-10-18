@@ -584,8 +584,9 @@ private:
    DenseMatrix block;
    const ParGridFunction &X;
    const double dt;
-   // const double interior_multiplier = 1.E-2;
-   const double interior_multiplier = 1.;
+   const double interior_multiplier = 1.E-2;
+   // const double interior_multiplier = 1.;
+   const double visc_multiplier = 2.;
    const bool add_obj_visc;
 
 public:
@@ -719,7 +720,7 @@ public:
             /* Compute norm and add to val */
             Vi_hat *= .25;
             subtract(Vi, Vi_hat, temp_vec);
-            visc += std::pow(temp_vec.Norml2(),2);
+            visc += visc_multiplier * std::pow(temp_vec.Norml2(),2);
          } // End interior node viscosity
       } // End geometric vertices loops
 
@@ -787,8 +788,8 @@ public:
 
             /* Add interior portion to d/dvix, d/dviy */
             add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
-            grad[ix] += temp_vec[0];
-            grad[iy] += temp_vec[1];
+            grad[ix] += visc_multiplier * temp_vec[0];
+            grad[iy] += visc_multiplier * temp_vec[1];
 
             /* iterate over adjacent vertices */
             for (int j_it = 0; j_it < adj_verts_size; j_it++)
@@ -797,8 +798,8 @@ public:
                jx = adj_verts[j_it];
                jy = jx + num_vertices;
                add(-.5, Vi, .125, Vi_hat, temp_vec);
-               grad[jx] += temp_vec[0];
-               grad[jy] += temp_vec[1];
+               grad[jx] += visc_multiplier * temp_vec[0];
+               grad[jy] += visc_multiplier * temp_vec[1];
             } // End interior vertices if statement
          } // End add_obj_visc
       } // End geometric vertices loops
@@ -838,8 +839,8 @@ public:
          if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
          {
             /* Add to diagonal elements for both x and y coords */
-            hessf.Elem(ix,ix) += 2.;
-            hessf.Elem(iy,iy) += 2.;
+            hessf.Elem(ix,ix) += visc_multiplier * 2.;
+            hessf.Elem(iy,iy) += visc_multiplier * 2.;
 
             /* Get adjacent vertices */
             geom.VertexGetAdjacentVertices(ix, adj_verts);
@@ -857,13 +858,13 @@ public:
                /* Contribution to off diagonal that depends on i */
                if (jx > ix)
                {
-                  hessf.Elem(ix,jx) -= .5;
-                  hessf.Elem(iy,jy) -= .5;
+                  hessf.Elem(ix,jx) -= visc_multiplier * .5;
+                  hessf.Elem(iy,jy) -= visc_multiplier * .5;
                } 
                else
                {
-                  hessf.Elem(jx,ix) -= .5;
-                  hessf.Elem(jy,iy) -= .5;
+                  hessf.Elem(jx,ix) -= visc_multiplier * .5;
+                  hessf.Elem(jy,iy) -= visc_multiplier * .5;
                }
 
                /* Contribution to entries not dependent on i (from adjacency) */
@@ -877,8 +878,8 @@ public:
                   /* Only add in this contribution once per pair */
                   if (hx >= jx)
                   {
-                     hessf.Elem(jx,hx) += .125;
-                     hessf.Elem(jy,hy) += .125;
+                     hessf.Elem(jx,hx) += visc_multiplier * .125;
+                     hessf.Elem(jy,hy) += visc_multiplier * .125;
                   }
                } // end nested adj verts loop
             } // End interior vertices/adj_verts loop if statement

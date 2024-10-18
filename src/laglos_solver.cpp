@@ -7834,14 +7834,14 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    xmax = 1.E12;
 
    /* Adjust the above for boundary conditions */
-   if (pb->has_boundary_conditions())
-   {
-      double bdr_tol = 1.E-12;
-      for (int i = 0; i < ess_tdofs.Size(); i++) { 
-         xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol; 
-         xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
-      }
-   }
+   // if (pb->has_boundary_conditions())
+   // {
+   //    double bdr_tol = 1.E-12;
+   //    for (int i = 0; i < ess_tdofs.Size(); i++) { 
+   //       xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol; 
+   //       xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
+   //    }
+   // }
    // cout << "xmin: ";
    // xmin.Print(cout);
    // cout << "xmax: ";
@@ -7864,9 +7864,21 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    {
       case 1: // Have a target velocity
       {
-         /* Calculate sparsity pattern for D and Hessian */
-         SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
-         SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
+         /* Choose whether to add viscosity to the objective function */
+         bool use_obj_visc = true;
+
+         /* Calculate sparsity pattern Hessian which depends on if we choose to use viscosity */
+         if (use_obj_visc)
+         {
+            SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+         }
+         else 
+         {
+            SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+         }
+
+         // Sparsity pattern for Boundary Constraint implementation which did not yield good results
+         // SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
 
          /* Calculate target velocity */
          switch (target_option)
@@ -7925,7 +7937,11 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          }
 
          /* Instantiate problem */
-         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, HiopDGradIArr, HiopDGradJArr, HiopDGradData, ess_tdofs, bdr_vals);
+         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(
+            geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
+            HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
+            HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
+            ess_tdofs, BdrVertexIndexingArray, use_obj_visc);
          break;
       }
       case 2: // Viscous objective function
@@ -7933,21 +7949,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          /* Hessian sparsity pattern is slightly different due to the different objective function */
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
-         // cout << "viscous hess I: ";
-         // HiopHessIArr.Print(cout);
-         // cout << "viscous hess J: ";
-         // HiopHessJArr.Print(cout);
-
          /* Instantiate problem */
-         // cout << "ess_bdr: ";
-         // ess_bdr.Print(cout);
-         // cout << "dofs_list: ";
-         // dofs_list.Print(cout);
-         // cout << "ess_tdofs: ";
-         // ess_tdofs.Print(cout);
-         // cout << "BdrVertexIndexingArray: ";
-         // BdrVertexIndexingArray.Print(cout);
-
          omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
          break;
       }
@@ -7974,17 +7976,17 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    optsolver->SetPrintLevel(0);
    optsolver->SetRelTol(1E-6);
    optsolver->SetAbsTol(1E-8);
-   // mv_gf_l = 0.;
+   mv_gf_l = 0.;
    // ComputeGeoVNormal(S, mv_gf_l);
-   is_weighted = true;
-   int td_flag = 2;
-   CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
-   DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
+   // is_weighted = true;
+   // int td_flag = 2;
+   // CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
+   // DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
    optsolver->Mult(mv_gf_l, mv_gf_l_out); 
 
    mv_gf_l = mv_gf_l_out;
 
-   /* Avoid any memory leak */
+   /* Properly dispose of allocated memory */
    delete tmp_opt_ptr;
    delete omv_problem;
    optsolver = nullptr;

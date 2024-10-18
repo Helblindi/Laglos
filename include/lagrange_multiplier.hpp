@@ -569,7 +569,7 @@ class TargetOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
    const Geometric<dim> &geom;
-   const int n_bdr_dofs, num_cells;
+   const int n_bdr_dofs, num_cells, num_vertices;
    const int nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
    const Vector xmin, xmax;
@@ -579,11 +579,14 @@ private:
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
    Array<int> ess_tdofs;
-   mutable SparseMatrix hess;
+   Array<int> BdrVertexIndexingArray;
+   mutable SparseMatrix hess, hessf;
    DenseMatrix block;
    const ParGridFunction &X;
    const double dt;
-   const double interior_multiplier = 1.E-2;
+   // const double interior_multiplier = 1.E-2;
+   const double interior_multiplier = 1.;
+   const bool add_obj_visc;
 
 public:
    TargetOptimizedMeshVelocityProblem(
@@ -593,12 +596,14 @@ public:
       Array<int> _HessI, Array<int> _HessJ,
       Array<int> _GradCI, Array<int> _GradCJ,
       Array<int> _GradDI, Array<int> _GradDJ,
-      Array<double> _GradDData, Array<int> _ess_tdofs,
-      Array<double> &_bdr_vals) 
+      Array<double> _GradDData, Array<double> &_bdr_vals, 
+      Array<int> _ess_tdofs, Array<int> _BdrVertexIndexingArray,
+      const bool &_add_obj_visc) 
       : geom(_geom),
         X(_X),
         dt(dt),
         num_cells(_num_cells),
+        num_vertices(_geom.GetNVDofs_H1()),
         xmin(_xmin), xmax(_xmax),
         OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
         V_target(_V_target), 
@@ -606,18 +611,22 @@ public:
         bdr_vals(_bdr_vals, _bdr_vals.Size()),
       //   d_lo(_massvec), d_hi(_massvec),
         n_bdr_dofs(_ess_tdofs.Size()),
-        d_lo(bdr_vals), d_hi(bdr_vals),
+      //   d_lo(bdr_vals), d_hi(bdr_vals),
       //   BCoper(n_bdr_dofs, input_size, _ess_tdofs, _GradDI, _GradDJ, _GradDData),
         LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         ess_tdofs(_ess_tdofs),
+        BdrVertexIndexingArray(_BdrVertexIndexingArray),
         nnz_sparse_jaceq(_GradCJ.Size()),
       //   nnz_sparse_jacineq(n_bdr_dofs),
         nnz_sparse_jacineq(0),
         nnz_sparse_Hess_Lagr(_HessJ.Size()),
         hess(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
-        block(4)
+        hessf(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
+             input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
+        block(4),
+        add_obj_visc(_add_obj_visc)
    {
       // cout << "TOMVProblem constructor\n";
 
@@ -647,6 +656,9 @@ public:
       block(3,0) = -0.5, block(3,2) = 0.5;
 
       block *= pow(dt, 2);
+
+      /* Compute hess of objective function since this does not change in time */
+      ComputeObjectiveHessFData();
    }
 
    ~TargetOptimizedMeshVelocityProblem()
@@ -656,20 +668,67 @@ public:
 
    double CalcObjective(const Vector &V) const
    {
-      // cout << "TOMV calc objective\n";
-      double res = 0.0;
-      for (int i = 0; i < input_size; i++)
+      // cout << "TargetOptimizedMeshVelocityProblem::CalcObjective\n";
+      double val = 0., visc = 0.;
+      Vector Vi(dim), Vi_hat(dim), Vi_target(dim), Vj(dim), temp_vec(dim);
+      Array<int> adj_verts;
+
+      /* Iterate over geometric vertices */
+      for (int ix = 0; ix < num_vertices; ix++)
       {
-         const double d = V(i) - V_target(i);
-         if (ess_tdofs.Find(i) != -1)
+         /* Grab Vi */
+         geom.GetNodeVelocityVecL(V, ix, Vi);
+         geom.GetNodeVelocityVecL(V_target, ix, Vi_target);
+         subtract(Vi, Vi_target, temp_vec);
+   
+         /* contribution from x coord */
+         double ix_val = temp_vec[ix] * temp_vec[ix];
+         if (ess_tdofs.Find(ix) != -1) {
+            val += ix_val; 
+         } else { // interior node
+            val += interior_multiplier * ix_val;
+         }
+         /* contribution from y coord */
+         int iy = ix + num_vertices;
+         double iy_val = temp_vec[iy] * temp_vec[iy];
+         if (ess_tdofs.Find(iy) != -1) {
+            val += iy_val; 
+         } else { // interior node
+            val += interior_multiplier * iy_val;
+         }
+
+         /* Optionally add in viscosity at interior geometric nodes */
+         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
          {
-            res += d * d;
-         }
-         else {
-            res += interior_multiplier * d * d;
-         }
-      }
-      return res;
+            /* Grab Vi */
+            geom.GetNodeVelocityVecL(V, ix, Vi);
+
+            /* Compute Vi_hat */
+            Vi_hat = 0.;
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
+
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               int jx = adj_verts[j_it];
+               geom.GetNodeVelocityVecL(V, jx, Vj);
+               Vi_hat += Vj;
+            }
+
+            /* Compute norm and add to val */
+            Vi_hat *= .25;
+            subtract(Vi, Vi_hat, temp_vec);
+            visc += std::pow(temp_vec.Norml2(),2);
+         } // End interior node viscosity
+      } // End geometric vertices loops
+
+      // std::cout //<< "TargetOptimizedMeshVelocityProblem::CalcObjective\n"
+      //           << "Target val: " << std::setw(8) << val << std::endl
+      //           << "Interior visc: " << std::setw(8) << visc << std::endl;
+
+      val += visc;
+      return val;
    }
 
    int get_input_size() 
@@ -679,26 +738,152 @@ public:
 
    void CalcObjectiveGrad(const Vector &V, Vector &grad) const 
    {
-      // cout << "OMV CalcObjectiveGrad\n";
+      // cout << "TargetOptimizedMeshVelocityProblem::CalcObjectiveGrad\n";
       assert(grad.Size() == input_size);
-      if (V.Size() != input_size)
+      assert(V.Size() == input_size);
+
+      Vector Vi(dim), Vi_hat(dim), Vj(dim), temp_vec(dim);
+      Array<int> adj_verts;
+      int jx, iy, jy;
+
+      /* Reset gradient */
+      grad = 0.;
+
+      /* Iterate over geometric vertices */
+      for (int ix = 0; ix < num_vertices; ix++)
       {
-         MFEM_ABORT("Vectors must be of same size\n");
+         /* contribution from x coord */
+         double ix_val = 2.*(V(ix) - V_target(ix));
+         if (ess_tdofs.Find(ix) != -1) {
+            grad(ix) += ix_val;
+         } else {
+            grad(ix) += interior_multiplier * ix_val;
+         }
+         /* contribution from x coord */
+         iy = ix + num_vertices;
+         double iy_val = 2.*(V(iy) - V_target(iy));
+         if (ess_tdofs.Find(iy) != -1) {
+            grad(iy) += iy_val;
+         } else {
+            grad(iy) += interior_multiplier * iy_val;
+         }
+
+         /* For viscosity, we only care about interior vertices */
+         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
+         {
+            geom.GetNodeVelocityVecL(V, ix, Vi);
+            /* Compute Vi_hat */
+            Vi_hat = 0.;
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
+
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               jx = adj_verts[j_it];
+               geom.GetNodeVelocityVecL(V, jx, Vj);
+               Vi_hat += Vj;
+            }
+
+            /* Add interior portion to d/dvix, d/dviy */
+            add(2, Vi, -.5, Vi_hat, temp_vec); // 32Vi - 8Vi_hat
+            grad[ix] += temp_vec[0];
+            grad[iy] += temp_vec[1];
+
+            /* iterate over adjacent vertices */
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {  
+               /* add adjacency portion to d/dvjx, d/dvjy */
+               jx = adj_verts[j_it];
+               jy = jx + num_vertices;
+               add(-.5, Vi, .125, Vi_hat, temp_vec);
+               grad[jx] += temp_vec[0];
+               grad[jy] += temp_vec[1];
+            } // End interior vertices if statement
+         } // End add_obj_visc
+      } // End geometric vertices loops
+   }
+
+   void ComputeObjectiveHessFData() const
+   {
+      Array<int> adj_verts;
+      int size_adj_verts;
+
+      /* Reset data in sparse Hessian since we build it through addition */
+      double * _dataf = hessf.GetData();
+      for (int d = 0; d < HessJArr.Size(); d++)
+      {
+         _dataf[d] = 0.;
       }
 
-      for (int i = 0; i < input_size; i++)
+      /* This target function imposes nonzero quantities dependent on the adjacency */
+      for (int ix = 0; ix < num_vertices; ix++)
       {
-         if (ess_tdofs.Find(i) != -1)
-         {
-            grad(i) = (V(i) - V_target(i));
+         /* Target velocity portion */
+         /* contribution from x coord */
+         if (ess_tdofs.Find(ix) != -1) {
+            hessf.Elem(ix,ix) += 2.; 
+         } else { // interior node
+            hessf.Elem(ix,ix) += 2. * interior_multiplier;
          }
-         else
-         {
-            grad(i) = interior_multiplier * (V(i) - V_target(i));
+         /* contribution from y coord */
+         int iy = ix + num_vertices;
+         if (ess_tdofs.Find(iy) != -1) {
+            hessf.Elem(iy,iy) += 2.;
+         } else { // interior node
+            hessf.Elem(iy,iy) += 2. * interior_multiplier;
          }
 
-      }
-      grad *= 2.;
+         /* For the viscosity component, we only care about the interior vertices */
+         if (add_obj_visc && BdrVertexIndexingArray[ix] == -1)
+         {
+            /* Add to diagonal elements for both x and y coords */
+            hessf.Elem(ix,ix) += 2.;
+            hessf.Elem(iy,iy) += 2.;
+
+            /* Get adjacent vertices */
+            geom.VertexGetAdjacentVertices(ix, adj_verts);
+            int adj_verts_size = adj_verts.Size();
+            assert(adj_verts_size == 4);
+
+            /* Iterate over adjacent vertices */
+            for (int j_it = 0; j_it < adj_verts_size; j_it++)
+            {
+               int jx = adj_verts[j_it];
+               assert(jx < num_vertices);
+               int jy = jx + num_vertices;
+               assert(jy < input_size);
+
+               /* Contribution to off diagonal that depends on i */
+               if (jx > ix)
+               {
+                  hessf.Elem(ix,jx) -= .5;
+                  hessf.Elem(iy,jy) -= .5;
+               } 
+               else
+               {
+                  hessf.Elem(jx,ix) -= .5;
+                  hessf.Elem(jy,iy) -= .5;
+               }
+
+               /* Contribution to entries not dependent on i (from adjacency) */
+               for (int h_it = 0; h_it < adj_verts_size; h_it++)
+               {
+                  int hx = adj_verts[h_it];
+                  assert(hx < num_vertices);
+                  int hy = hx + num_vertices;
+                  assert(hy < input_size);
+
+                  /* Only add in this contribution once per pair */
+                  if (hx >= jx)
+                  {
+                     hessf.Elem(jx,hx) += .125;
+                     hessf.Elem(jy,hy) += .125;
+                  }
+               } // end nested adj verts loop
+            } // End interior vertices/adj_verts loop if statement
+         } // End add_obj_visc
+      } // End geometric vertices loops
    }
 
    void ComputeObjectiveHessData(const Vector &x) const
@@ -709,13 +894,14 @@ public:
 
       /* Reset data in sparse Hessian since we build it through addition */
       double * _data = hess.GetData();
+      double * _dataf = hessf.GetData();
       for (int d = 0; d < HessJArr.Size(); d++)
       {
-         _data[d] = 0.;
+         _data[d] = _dataf[d];
       }
 
       /* Verify our Hessian is starting out zeroed out */
-      if (hess.MaxNorm() > 0.)
+      if (hess.MaxNorm() > hessf.MaxNorm())
       {
          std::cout << "max norm: " << hess.MaxNorm() << std::endl;
          MFEM_ABORT("Hessian has not been reset properly.\n")
@@ -744,19 +930,6 @@ public:
             hess.AddSubMatrix(verts, Vy_arr, dm, 2/*skip_zeros*/);
          }
       } // End cell it
-
-      /* Set the diagonal entries */
-      for (int i = 0; i < input_size; i++)
-      {
-         if (ess_tdofs.Find(i) != -1)
-         {
-            hess.Elem(i,i) = 2;
-         }
-         else
-         {
-            hess.Elem(i,i) = 2 * interior_multiplier ;
-         }
-      }
    }
 
    virtual Operator & CalcObjectiveHess(const Vector &x) const 

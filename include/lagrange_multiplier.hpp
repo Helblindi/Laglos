@@ -636,7 +636,9 @@ private:
    const int nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
    const Vector xmin, xmax;
-   Vector massvec, bdr_vals, d_lo, d_hi;
+   const Vector &massvec;
+   const Vector bdr_vals;
+   // const Vector &d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
    // const BoundaryConditionsOperator<dim> BCoper;
    Array<int> HessIArr, HessJArr;

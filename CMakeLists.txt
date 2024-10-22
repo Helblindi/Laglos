@@ -105,6 +105,7 @@ file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/state_vectors")
 set(LAGLOS_DIR "${PROJECT_SOURCE_DIR}/")
 configure_file("${PROJECT_SOURCE_DIR}/config/var-config.h.in" "${PROJECT_BINARY_DIR}/var-config.h")
 configure_file("${PROJECT_SOURCE_DIR}/include/compile_time_vals_template.h" "${PROJECT_SOURCE_DIR}/include/compile_time_vals.h" COPYONLY)
+configure_file("${PROJECT_SOURCE_DIR}/include/hiop_fr_template.options" "${PROJECT_BINARY_DIR}/hiop_fr.options" COPYONLY)
 
 # Finally, add the executable
 add_executable(laglos-exe src/laglos.cpp)

@@ -7559,29 +7559,30 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
 *  This function computes the massvec that is used as the constraint in the 
 *  HiOp implementation of the Lagrange Multiplier method to solve for the 
 *  mesh velocity that guarantees mass conservation cell-wise.
+*
+*  Note: This function assumes that m_hpv has been populated and contains
+*  the initial mass of all cells in the mesh.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const Vector &S_old, const double &dt, Vector &massvec)
+void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const double &dt, Vector &massvec)
 {
    // cout << "=======================================\n"
    //      << "          CalcMassVolumeVector         \n"
    //      << "=======================================\n";
 
    Vector *sptr = const_cast<Vector*>(&S);
-   Vector *sptr_old = const_cast<Vector*>(&S_old);
-   ParGridFunction sv_gf, sv_gf_old;
+   ParGridFunction sv_gf;
    sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
-   sv_gf_old.MakeRef(&L2, *sptr_old, block_offsets[2]);
 
    /* Iterate over all cells in mesh and compute constraint */
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
    {
-      double Kn = ComputeCellVolume(S_old, cell_it);
       double Tnp1 = sv_gf.Elem(cell_it);
-      double Tn = sv_gf_old.Elem(cell_it);
+      double m = m_hpv->Elem(cell_it);
 
       /* Compute constraint on cell */
-      double val = Tnp1 * Kn / Tn;
+      double val = Tnp1 * m;
+
       massvec[cell_it] = val;
       if (val <= 0.)
       {
@@ -7729,7 +7730,7 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    xmax = 1.E12;
 
    /* Compute equality restrictions */
-   CalcMassVolumeVector(S, S_old, dt, massvec);
+   CalcMassVolumeVector(S, dt, massvec);
 
    /* Options */
    bool is_weighted = false;
@@ -7848,7 +7849,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    // xmax.Print(cout);
 
    /* Compute equality restrictions */
-   CalcMassVolumeVector(S, S_old, dt, massvec);
+   CalcMassVolumeVector(S, dt, massvec);
 
    /* Options */
    bool is_weighted = false;
@@ -7984,8 +7985,8 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    optsolver->SetOptimizationProblem(*omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
-   optsolver->SetRelTol(1E-6);
-   optsolver->SetAbsTol(1E-8);
+   optsolver->SetRelTol(1E-1);
+   optsolver->SetAbsTol(1E-1);
    mv_gf_l = 0.;
    // ComputeGeoVNormal(S, mv_gf_l);
    // is_weighted = true;

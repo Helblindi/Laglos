@@ -583,7 +583,7 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);
-      int index = pmesh->GetBdrElementEdgeIndex(i);
+      int index = pmesh->GetBdrElementFaceIndex(i);
       BdrElementIndexingArray[index] = bdr_attr;
    }
 }
@@ -611,7 +611,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrFace(i);
+      int face = pmesh->GetBdrElementFaceIndex(i);
 
       pmesh->GetEdgeVertices(face, verts);
       for (int k = 0; k < verts.Size(); k++)
@@ -673,7 +673,7 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrFace(i);
+      int face = pmesh->GetBdrElementFaceIndex(i);
 
       Array<int> row;
       // Get cell

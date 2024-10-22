@@ -1,0 +1,16 @@
+# Default options to be used with HiOp
+# Information straight from the hiop_usermanual:
+
+# The options file(s) that should be placed in the same directory where the application
+# driver using HiOp is executed. The format of an option file is very basic, each of its
+# lines should contain a single pair option name option value. Lines that begin with ’#’
+# or consist of only white characters are discarded. The option value is checked to have
+# the correct type (numeric, integer, or string) and to be in the expected range. If the
+# checks fail, then the option is set to the default value and a warning message is
+# displayed.
+
+rel_tolerance .1
+tolerance .1
+max_iter 10
+
+verbosity_level 0

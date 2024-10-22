@@ -736,7 +736,7 @@ public:
    {
       // cout << "TargetOptimizedMeshVelocityProblem::CalcObjective\n";
       double val = 0., visc = 0.;
-      Vector Vi(dim), Vi_hat(dim), Vi_target(dim), Vj(dim), temp_vec(dim);
+      Vector Vi(dim), Vi_hat(dim), Vi_target(dim), Vj(dim), Vi_diff(V.Size());
       Array<int> adj_verts;
 
       /* Iterate over geometric vertices */
@@ -745,10 +745,11 @@ public:
          /* Grab Vi */
          geom.GetNodeVelocityVecL(V, ix, Vi);
          geom.GetNodeVelocityVecL(V_target, ix, Vi_target);
-         subtract(Vi, Vi_target, temp_vec);
+         subtract(Vi, Vi_target, Vi_diff);
    
          /* contribution from x coord */
-         double ix_val = temp_vec[ix] * temp_vec[ix];
+         assert(ix < input_size);
+         double ix_val = Vi_diff[ix] * Vi_diff[ix];
          if (ess_tdofs.Find(ix) != -1) {
             val += exterior_multiplier * ix_val; 
          } else { // interior node
@@ -756,7 +757,8 @@ public:
          }
          /* contribution from y coord */
          int iy = ix + num_vertices;
-         double iy_val = temp_vec[iy] * temp_vec[iy];
+         assert(iy < input_size);
+         double iy_val = Vi_diff[iy] * Vi_diff[iy];
          if (ess_tdofs.Find(iy) != -1) {
             val += exterior_multiplier * iy_val; 
          } else { // interior node
@@ -771,8 +773,8 @@ public:
             int adj_verts_size = adj_verts.Size();
             CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
 
-            subtract(Vi, Vi_hat, temp_vec);
-            visc += visc_multiplier * std::pow(temp_vec.Norml2(),2);
+            subtract(Vi, Vi_hat, Vi_diff);
+            visc += visc_multiplier * std::pow(Vi_diff.Norml2(),2);
          } // End interior node viscosity
       } // End geometric vertices loops
 

@@ -242,9 +242,8 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    cout << "NDofs_L2: " << NDofs_L2 << endl;
    cout << "NDofs_L2V: " << NDofs_L2V << endl;
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
-   cout << "CR.GetNDofs(): " << CR.GetNDofs() << endl;
-   cout << "pmesh->GetNFaces(): " << pmesh->GetNFaces() << endl;
-   cout << "each element in the mesh has " << el_num_faces << " faces." << endl;
+
+   // More readable format
    cout << "num_elements: " << num_elements << endl;
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;

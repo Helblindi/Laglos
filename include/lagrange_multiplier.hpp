@@ -653,8 +653,7 @@ private:
    const double exterior_multiplier = 1.E+1;
    const double interior_multiplier = 1.E-2;
    // const double interior_multiplier = 1.;
-   const double visc_multiplier = 2.;
-   const bool add_obj_visc;
+   const double visc_multiplier = 0.;
 
 public:
    TargetOptimizedMeshVelocityProblem(
@@ -666,7 +665,7 @@ public:
       Array<int> _GradDI, Array<int> _GradDJ,
       Array<double> _GradDData, Array<double> &_bdr_vals, 
       Array<int> _ess_tdofs, Array<int> _BdrVertexIndexingArray,
-      const bool &_add_obj_visc) 
+      const double &mv_target_visc_coeff)
       : geom(_geom),
         X(_X),
         dt(dt),
@@ -694,7 +693,7 @@ public:
         hessf(HessIArr.GetData(), HessJArr.GetData(), HessData.GetData(), input_size, 
              input_size, false/*ownij*/, false/*owna*/, true/*is_sorted*/),
         block(4),
-        add_obj_visc(_add_obj_visc)
+        visc_multiplier(mv_target_visc_coeff)
    {
       // cout << "TOMVProblem constructor\n";
 
@@ -767,7 +766,7 @@ public:
          }
 
          /* Optionally add in viscosity */
-         if (add_obj_visc)
+         if (visc_multiplier > 0.)
          {
             /* Compute Vi_hat */
             geom.VertexGetAdjacentVertices(ix, adj_verts);
@@ -826,7 +825,7 @@ public:
          }
 
          /* Optionally, add in viscosity*/
-         if (add_obj_visc)
+         if (visc_multiplier > 0.)
          {
             geom.GetNodeVelocityVecL(V, ix, Vi);
             /* Compute Vi_hat */
@@ -850,7 +849,7 @@ public:
                grad[jx] += visc_multiplier * temp_vec[0];
                grad[jy] += visc_multiplier * temp_vec[1];
             } // End interior vertices if statement
-         } // End add_obj_visc
+         } // End viscosity
       } // End geometric vertices loops
    }
 
@@ -885,7 +884,7 @@ public:
          }
 
          /* For the viscosity component, we only care about the interior vertices */
-         if (add_obj_visc)
+         if (visc_multiplier > 0.)
          {
             /* Add to diagonal elements for both x and y coords */
             hessf.Elem(ix,ix) += visc_multiplier * 2.;
@@ -931,7 +930,7 @@ public:
                   }
                } // end nested adj verts loop
             } // End interior vertices/adj_verts loop if statement
-         } // End add_obj_visc
+         } // End viscosity
       } // End geometric vertices loops
    }
 

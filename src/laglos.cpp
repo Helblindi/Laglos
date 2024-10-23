@@ -126,6 +126,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    int mv_option = 2;
+   double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
    int fv_option = 2;
    int mv_it_option = 2;
@@ -182,6 +183,8 @@ int main(int argc, char *argv[]) {
                   // "\n\t 4 - CAVEAT Weighted LS,"
                   // "\n\t 5 - CAVEAT/Cell Face combo,"
                   // "\n\t 6 - 5 with weights");
+   args.AddOption(&mv_target_visc_coeff, "-tvc", "--mv-target-viscosity-coeff",
+                  "Set the coefficient for the viscosity term in the target mesh velocity approach.");
    args.AddOption(&do_mv_linearization, "-mv-lin", "--mesh-velocity-linearization",
                   "-no-mv-lin", "--no-mesh-velocity-linearization",
                   "Enable mesh velocity linearization using alpha parameter.");
@@ -773,6 +776,7 @@ int main(int argc, char *argv[]) {
    hydro.SetFVOption(fv_option);
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);
+   hydro.SetMVTargetViscCoeff(mv_target_visc_coeff);
    if (mv_n_iterations != 0)
    {
       // If an iterative method is desired for computation of the mesh velocity

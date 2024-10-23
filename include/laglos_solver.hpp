@@ -127,6 +127,7 @@ protected:
    bool use_corner_velocity_MC_iteration = false;
    int corner_velocity_MC_num_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
+   double mv_target_visc_coeff = 0.;
    int problem = -1;
 
    Array<int> HiopHessIArr, HiopHessJArr;
@@ -189,6 +190,7 @@ public:
    StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin;
 
    /* Mesh movement */
+   void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);
    void SetMVLinOption(const bool & option) { this->do_mv_linearization = option; }
    void SetFVOption(const int & option);

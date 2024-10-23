@@ -1939,6 +1939,26 @@ void LagrangianLOOperator<dim>::
 
 
 /****************************************************************************************************
+* Function: SetMVTargetViscCoeff
+* Parameters:
+*  coeff - double parameter indicating the coefficient for the viscous term to be used in
+*          the target mesh velocity optimization with HiOp.  See the function SolveHiOp().
+*
+* Purpose:
+*  To set the viscosity coefficient to be used with the TargetOptimizedMeshVelocityProblem
+*  in the SolveHiOp function.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMVTargetViscCoeff(const double & coeff)
+{
+   if (coeff < 0.)
+   {
+      MFEM_ABORT("Viscosity coefficient for TargetOptimizedMeshVelocityProblem cannot be negative.\n")
+   }
+   this->mv_target_visc_coeff = coeff;
+}
+
+/****************************************************************************************************
 * Function: SetMVOption
 * Parameters:
 *  option - integer parameter indicating which mesh velocity to use.
@@ -7865,7 +7885,11 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       case 1: // Have a target velocity
       {
          /* Choose whether to add viscosity to the objective function */
-         bool use_obj_visc = true;
+         bool use_obj_visc = false;
+         if (this->mv_target_visc_coeff > 0.)
+         {
+            use_obj_visc = true;
+         }
 
          /* Calculate sparsity pattern Hessian which depends on if we choose to use viscosity */
          if (use_obj_visc)
@@ -7941,7 +7965,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
             geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
-            ess_tdofs, BdrVertexIndexingArray, use_obj_visc);
+            ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff);
          break;
       }
       case 2: // Viscous objective function

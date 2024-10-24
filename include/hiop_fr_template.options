@@ -14,3 +14,8 @@ tolerance .1
 max_iter 10
 
 verbosity_level 0
+
+force_resto no
+accept_every_trial_step yes
+moving_lim_rel 0.5
+Hessian analytical_exact

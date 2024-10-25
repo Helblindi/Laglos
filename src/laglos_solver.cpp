@@ -218,13 +218,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
          ess_tdofs.Append(add_ess_tdofs);
          bdr_vals.Append(add_bdr_vals);
-         cout << "get_additional_BCs.\n";
-         cout << "ess_tdofs size: " << ess_tdofs.Size() 
-              << ", bdrvals size: " << bdr_vals.Size() << endl;
-         cout << "ess_tdofs: ";
-         ess_tdofs.Print(cout);
-         cout << "bdr_Vals: ";
-         bdr_vals.Print(cout);
       }
    }
 
@@ -796,9 +789,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          bdr_vals.SetSize(ess_tdofs_cart_size);
          pb->update_additional_BCs(t, timestep_first, add_bdr_vals);
          bdr_vals.Append(add_bdr_vals);
-         cout << "update_additional_BCS\n";
-         cout << "bdr_vals.Size(): " << bdr_vals.Size() << ", vals: ";
-         bdr_vals.Print(cout);
       }
 
       ComputeIntermediateFaceVelocities(S_old, t);

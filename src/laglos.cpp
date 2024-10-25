@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
    double dt = 0.001;
    bool visualization = false;
    int vis_steps = 5;
+   bool visit = false;
    bool gfprint = false;
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
@@ -162,6 +163,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable GLVis visualization.");
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
+   args.AddOption(&visit, "-visit", "--visit", "-no-visit", "--no-visit",
+                  "Enable or disable VisIt visualization.");
    args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
                   "Enable or disable result output (files in mfem format).");
    args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
@@ -245,6 +248,7 @@ int main(int argc, char *argv[]) {
    string _convergence = output_path + "convergence";
    string _temp_output = _convergence + "/temp_output";
    string _state_vectors = output_path + "state_vectors";
+   // string _visit = output_path + "visit"
 
    const char* path = output_path.c_str();
    boost::filesystem::path output_path_dir(path);
@@ -272,6 +276,14 @@ int main(int argc, char *argv[]) {
                    << "/";
 
    gfprint_path = gfprint_path_ss.str();
+
+   string _visit = gfprint_path + "visit/";
+   const char* _visit_basename = _visit.c_str();
+   if (visit)
+   {
+      boost::filesystem::path visit_output_dir(_visit_basename);
+      boost::filesystem::create_directory(visit_output_dir);
+   }
 
    path = gfprint_path.c_str();
    boost::filesystem::path gfprint_output_dir(path);
@@ -818,7 +830,7 @@ int main(int argc, char *argv[]) {
    }
 
    // Compute the density if we need to visualize it
-   if (visualization || gfprint)
+   if (visualization || gfprint || visit)
    {
       // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
@@ -1028,6 +1040,17 @@ int main(int argc, char *argv[]) {
       }
    }
 
+   VisItDataCollection visit_dc(_visit_basename, pmesh);
+   if (visit)
+   {
+      visit_dc.RegisterField("Density", &rho_gf);
+      visit_dc.RegisterField("Velocity", &v_gf);
+      visit_dc.RegisterField("Specific Total Energy", &ste_gf);
+      visit_dc.SetCycle(0);
+      visit_dc.SetTime(0.0);
+      visit_dc.Save();
+   }
+
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
@@ -1139,7 +1162,7 @@ int main(int argc, char *argv[]) {
          }
 
          // Compute the density if we need to visualize it
-         if (visualization || gfprint)
+         if (visualization || gfprint || visit)
          {
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
@@ -1260,6 +1283,13 @@ int main(int argc, char *argv[]) {
             }
          }
          
+         if (visit)
+         {
+            visit_dc.SetCycle(ti);
+            visit_dc.SetTime(t);
+            visit_dc.Save();
+         }
+
          if (gfprint)
          {
             // Save mesh and gfs to files

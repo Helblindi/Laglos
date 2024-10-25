@@ -1228,6 +1228,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   F_i_bdry.SetRow(dim+1, _vp);
 
                   F_i_bdry.Mult(c, y_temp_bdry);
+                  y_temp += y_temp_bdry;
                   break;
                }
                // case 1:
@@ -1254,7 +1255,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   break;
                }
                } // switch (bdr_attr)
-               y_temp += y_temp_bdry;
             } // if saltzmann
             else
             {

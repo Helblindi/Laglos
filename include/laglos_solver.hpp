@@ -187,7 +187,7 @@ public:
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
 
    /* System timing */
-   StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin;
+   StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin, chrono_hiop;
 
    /* Mesh movement */
    void SetMVTargetViscCoeff(const double & coeff);

@@ -1627,16 +1627,20 @@ int main(int argc, char *argv[]) {
    }
 
    cout << "Program took " << chrono.RealTime() << "s.\n";
-   double time_per_gp_ts = chrono.RealTime() / ti / L2FESpace.GetNE();
+   double temp_denom = ti * L2FESpace.GetNE();
+   double time_per_gp_ts = chrono.RealTime() / temp_denom;
    cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
 
-   cout << "================ Runtime breakdown ================\n"
+   cout << "==================== Runtime breakdown ====================\n"
+        << setw(59) <<  " total time | t / (dof*ts) \n"
         << setprecision(3)
-        << "   Dij calculation took: " << setw(20) << hydro.chrono_dij.RealTime() << " s.\n"
-        << "   Mesh Motion calculation took: " << setw(12) << hydro.chrono_mm.RealTime() << " s.\n"
-        << "   Mesh Motion Linearization: " << setw(15) << hydro.chrono_mm_lin.RealTime() << " s.\n"
-        << "   State Update calculation took: " << setw(11) << hydro.chrono_state.RealTime() << " s.\n"
-        << "===================================================\n";
+        << "  Total time: " << setw(28) << chrono.RealTime() << " | " << chrono.RealTime() / temp_denom << endl
+        << "  Dij calculation: " << setw(23) << hydro.chrono_dij.RealTime() << " | " << hydro.chrono_dij.RealTime() / temp_denom << endl
+        << "  Mesh Motion calculation: " << setw(15) << hydro.chrono_mm.RealTime() << " | " << hydro.chrono_mm.RealTime() / temp_denom << endl
+        << "    Hiop calculation (if used): " << setw(10) << hydro.chrono_hiop.RealTime() << " | " << hydro.chrono_hiop.RealTime() / temp_denom << endl
+        << "  Mesh Motion Linearization: " << setw(13) << hydro.chrono_mm_lin.RealTime() << " | " << hydro.chrono_mm_lin.RealTime() / temp_denom << endl
+        << "  State Update calculation: " << setw(14) << hydro.chrono_state.RealTime() << " | " << hydro.chrono_state.RealTime() / temp_denom << endl
+        << "===========================================================\n";
    
    delete pmesh;
    delete CRFEC;

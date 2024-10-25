@@ -230,6 +230,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
    chrono_mm_lin.Clear();
    chrono_state.Clear();
    chrono_dij.Clear();
+   chrono_hiop.Clear();
 
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -7994,6 +7995,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       }
    }
 
+   chrono_hiop.Start();
    OptimizationSolver *optsolver = NULL;
 #ifdef MFEM_USE_HIOP
    HiopNlpSparseOptimizer *tmp_opt_ptr = new HiopNlpSparseOptimizer();
@@ -8017,6 +8019,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    // CalcCellAveragedCornerVelocityVector(S, S_old, is_weighted, td_flag, mv_gf_l);
    // DistributeFaceViscosityToVelocity(S_old, mv_gf_l);
    optsolver->Mult(mv_gf_l, mv_gf_l_out); 
+   chrono_hiop.Stop();
 
    mv_gf_l = mv_gf_l_out;
 

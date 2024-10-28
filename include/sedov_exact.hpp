@@ -1,3 +1,6 @@
+#ifndef SEDOV_EXACT
+#define SEDOV_EXACT
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -284,3 +287,5 @@ double sedov_vy(const double *xyt)
 
 //   return 0;
 //}
+
+#endif // Sedov exact

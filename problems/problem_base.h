@@ -265,19 +265,18 @@ public:
     ********************************************/
    virtual double pressure(const Vector &U, const int &cell_attr=0) {
       MFEM_ABORT("Must override pressure in ProblemBase class.\n");
-      return 1.;
    } // virtual function, must be overridden
    virtual double rho0(const Vector &x, const double & t) {
       MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
-      return 1.;
    } // virtual function, must be overridden
    virtual void v0(const Vector &x, const double & t, Vector &v) {
       MFEM_ABORT("Must override v0 in ProblemBase class.\n");
-      return;
    } // virtual function, must be overridden
    virtual double sie0(const Vector &x, const double & t) {
       MFEM_ABORT("Must override sie0 in ProblemBase class.\n");
-      return 1.;
+   } // virtual function, must be overridden
+   virtual double p0(const Vector &x, const double & t) {
+      MFEM_ABORT("Must override p0 in the ProblemBase class.\n");
    } // virtual function, must be overridden
    
 }; // End ProblemBase

@@ -14,6 +14,7 @@
 
 #include "mfem.hpp"
 #include "problem_base.h"
+#include "sedov_exact.hpp"
 #include <cmath>
 #include <string>
 
@@ -26,7 +27,7 @@ namespace hydrodynamics
 {
 
 template<int dim>
-class SedovProblem: public ProblemBase<dim>
+class SedovLLNLProblem: public ProblemBase<dim>
 {
 private:
    /*********************************************************
@@ -38,15 +39,13 @@ private:
    bool _bcs = true; // Indicator for boundary conditions
    string _indicator = "Sedov"; // Possible: saltzmann
 
-   // Constants specific to Sedov problem
-   double h = 1., cell_vol = 1.;
-   // double sedov_energy_initial = 1.;
-   // double sedov_energy_initial = 0.979264;
-   double sedov_energy_initial = 0.25;
-
 public:
-   SedovProblem()
+   SedovLLNLProblem()
    {
+      if (dim != 2)
+      {
+         MFEM_ABORT("Dimension != 2 is not supported.\n");
+      }
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
@@ -61,14 +60,6 @@ public:
    {
       this->set_b(b_covolume);
    }
-   virtual void update(Vector params, double t) override {
-      // params is a vector [hmax, cell_vol]
-      if (t <= 1.e-16)
-      {
-         this->h = params[0];
-         this->cell_vol = params[1];
-      }
-   }
 
    /*********************************************************
     * Problem Description functions
@@ -76,7 +67,6 @@ public:
    double pressure(const Vector &U, const int &cell_attr=0) override
    {
       double val = (this->get_gamma() - 1.) * this->internal_energy(U);
-      // cout << "pressure: " << val << endl;
       return val;
    }
 
@@ -85,59 +75,47 @@ public:
     *********************************************************/
    double rho0(const Vector &x, const double & t) override
    {
-      if (t < 1.e-16)
-      {
-         // Initial condition 
-         return 1.;
-      }
-      else 
-      {
-         MFEM_ABORT("Exact solution not programmed.\n");
-      }
+      double xyt[3];
+      xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+      return sedov_rho(xyt);
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
       v = 0.;
 
-      if (t < 1.e-16)
-      {
-         // Initial condition
-         return;
-      }
-      else
-      {
-         MFEM_ABORT("Exact solution not programmed.\n");
-      }
+      double xyt[3];
+      xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+
+      v[0] = sedov_vx(xyt);
+      v[1] = sedov_vy(xyt);
 
       return;
    }
    double sie0(const Vector &x, const double & t) override
    {
-      assert(h != 0.);
-      assert(cell_vol != 0.);
-      double norm = x.Norml2();
-      if (t < 1.e-16)
-      {
-         // Initial condition
-         // if (norm <= 2.5*h) {
-         //    cout << "bomb cell\n";
-         //    cout << "h: " << h << endl;
-         //    cout << "cell vol: " << cell_vol << endl;
-         //    cout << "x: ";
-         //    x.Print(cout);
-         //    assert(cell_vol > 0.);
-         //    return sedov_energy_initial;
-         // }
-         // else
-         // {
-         //    return 0.;
-         // }
-         return 0.;
-      }
-      else
-      {
-         MFEM_ABORT("Exact solution not programmed.\n");
-      }
+      double xyt[3];
+      xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+
+      Vector v(dim);
+      v0(x, t, v);
+      double p = p0(x,t);
+      double rho = rho0(x,t);
+      double e = p / ((_gamma - 1.) * rho);
+      double se = sedov_e(xyt);
+      // e and se and the same, no bug in sedov_exact
+      // if (x.Norml2() < .1)
+      // {
+      //    cout << "pressure: " << p << ", density: " << rho << ", sie: " << e << ", se: " << se << endl;
+      // }
+      
+      // return sedov_e(xyt);
+      return e;
+   }
+   double p0(const Vector &x, const double &t) override
+   {
+      double xyt[3];
+      xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+      return sedov_p(xyt);
    }
 
    /*********************************************************

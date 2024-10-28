@@ -1561,11 +1561,19 @@ int main(int argc, char *argv[]) {
       }
 
       GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf);
+      ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
+      for (int i = 0; i < ste_ex_gf.Size(); i++)
+      {
+         te_gf[i] = rho_gf[i] * ste_gf[i];
+         te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
+      }
+      GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
 
       /* Compute relative errors */
       rho_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
       vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
-      ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
+      // ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
+      ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
 
       rho_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
       vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);

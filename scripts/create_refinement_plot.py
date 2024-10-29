@@ -46,20 +46,22 @@ def main():
       # plt.set_ylabel("$\rho$")
       if (refinements == "ex"):
          flag -= 1
-         plt.plot(df[df.columns[0]], df[df.columns[col]], 'k-', label="Exact solution")
+         plt.plot(df[df.columns[0]], df[df.columns[col]], 'k-', label="Analytical solution")
       else:
          # num_ref = int(refinements)
          # _label = str(1 * pow(2,num_ref))
-         _label = refinements
+         # _label = refinements
+         _label = "# dof = " + str(df.shape[0])
          plt.scatter(df[df.columns[0]], df[df.columns[col]], label=_label, s=0.3)
       
       # flag += 1
       
       
    
-   screen_aspect = 1.12 # y_length / x_length
+   screen_aspect = 0.75 # y_length / x_length
    plt.gca().set_aspect(screen_aspect / plt.gca().get_data_ratio())
-   plt.legend()
+   plt.legend(markerscale=4)
+   plt.xlim(0., 1.1)
    plt.show()
 
 # then we put main at the bottom to run everything

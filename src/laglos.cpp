@@ -1560,28 +1560,37 @@ int main(int argc, char *argv[]) {
          }
       }
 
-      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf);
-      ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
-      for (int i = 0; i < ste_ex_gf.Size(); i++)
-      {
-         te_gf[i] = rho_gf[i] * ste_gf[i];
-         te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
-      }
-      GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
-
       /* Compute relative errors */
+      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf);
       rho_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
       vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
-      // ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
-      ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
 
       rho_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
       vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);
-      ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
 
       rho_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
       vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
-      ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
+
+      /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
+      if (problem == 6)
+      {
+         ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
+         for (int i = 0; i < ste_ex_gf.Size(); i++)
+         {
+            te_gf[i] = rho_gf[i] * ste_gf[i];
+            te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
+         }
+         GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
+         ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
+         ste_L2_error_n = te_gf.ComputeL2Error(te_ex_coeff) / te_ex_gf.ComputeL2Error(zero);
+         ste_Max_error_n = te_gf.ComputeMaxError(te_ex_coeff) / te_ex_gf.ComputeMaxError(zero);
+      }
+      else 
+      {
+         ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
+         ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
+         ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
+      }
    }
 
    /* Get composite errors values, will return 0 if exact solution is not known */

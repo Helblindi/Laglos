@@ -132,7 +132,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   double pressure(const Vector &x, const double &t) 
+   double p0(const Vector &x, const double &t) override
    {
       if (t == 0) { return pow((this->get_gamma() - 1), 2) * 10e-4; } // TODO: Change pressure
       else {
@@ -232,7 +232,7 @@ public:
    {
       if (t == 0) { return pow(10, -4); }
       else {
-         double _p = pressure(x,t);
+         double _p = p0(x,t);
          double _rho = rho0(x,t);
          return _p / (_rho * (this->get_gamma() - 1.));
       }

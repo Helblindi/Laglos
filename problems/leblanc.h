@@ -67,7 +67,7 @@ public:
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
 
-   double pressure(const Vector &x, const double & t)
+   double p0(const Vector &x, const double & t) override
    {
       if (t < 1e-12)
       {
@@ -154,8 +154,8 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      return (x(0) < x_center) ? pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
-                        : pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      return (x(0) < x_center) ? p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
+                        : p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
 }; // End class

@@ -89,6 +89,13 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double & t) override
+   {
+      /*
+      Must Override
+      */
+      return 0.;
+   }
    double rho0(const Vector &x, const double & t) override
    {
       /*

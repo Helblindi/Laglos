@@ -67,6 +67,11 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double &t) override
+   {
+      return (_gamma - 1.) * rho0(x,t) * sie0(x,t);
+   }
+
    double rho0(const Vector &x, const double & t) override
    {
       /* Initial condition */

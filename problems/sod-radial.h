@@ -70,7 +70,7 @@ public:
       return (this->get_gamma() - 1.) * this->internal_energy(U);
    }
 
-   double pressure(const Vector &x, const double & t)
+   double p0(const Vector &x, const double & t) override
    {
       double norm_x = x.Norml2();
       if (t < 1e-12)
@@ -160,7 +160,7 @@ public:
    {
       double norm_x = x.Norml2();
 
-      return pressure(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      return p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
 }; // End class

@@ -95,6 +95,25 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double &t) override
+   {
+      if (t < 1.e-16) {
+         if (x[0] <= initial_shock)
+         {
+            return pL;
+         }
+         else
+         {
+            return pR;
+         }
+      }
+      else {
+         double rho = rho0(x,t);
+         double val = (this->get_gamma() - 1.) * (rho * sie0(x,t) + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
+         return val;
+      }
+   }
+
    virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {

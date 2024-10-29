@@ -84,6 +84,12 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double &t) override
+   {
+      // TODO: Pressure function requires a cell_attr value, but the base function does not share this requirement
+      return 0.;
+   }
+
    double rho0(const Vector &x, const double & t) override
    {
       return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0

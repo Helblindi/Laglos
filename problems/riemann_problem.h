@@ -100,6 +100,20 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double &t) override
+   {
+      double _gamma = 0.;
+      if (x[0] <= 1)
+      {
+         _gamma = _gamma_1;
+      }
+      else
+      {
+         _gamma = _gamma_2;
+      }
+      return (_gamma - 1.) * rho0(x,t) * sie0(x,t);
+   }
+
    virtual double rho0(const Vector &x, const double & t) override
    {
       if (t < 1.e-16) {

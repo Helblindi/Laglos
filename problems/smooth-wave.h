@@ -64,6 +64,12 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
+   double p0(const Vector &x, const double &t) override
+   {
+      // pL = pR = 1
+      return 1.;
+   }
+
    double rho0(const Vector &x, const double & t) override
    {
       double x0 = 0.1, x1 = 0.3;
@@ -84,7 +90,7 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      return 1.0 / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      return p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
 }; // End class

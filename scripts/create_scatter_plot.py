@@ -44,10 +44,10 @@ def main():
    
    # Plot
    ax.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[1]], 'k-', label="Exact solution")
-   _label = "# dof = " + str(dofs)
+   _label = "# dofs = " + str(dofs)
    ax.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[1]], label=_label, s=.1)
    
-   # ax.legend()
+   ax.legend()
    # plt.show()
    dpi = fig.get_dpi()
    fig.savefig("Fig1py.png", dpi=dpi)

@@ -51,7 +51,7 @@ def main():
          # num_ref = int(refinements)
          # _label = str(1 * pow(2,num_ref))
          # _label = refinements
-         _label = "# dof = " + str(df.shape[0])
+         _label = "# dofs = " + str(df.shape[0])
          plt.scatter(df[df.columns[0]], df[df.columns[col]], label=_label, s=0.3)
       
       # flag += 1
@@ -61,7 +61,7 @@ def main():
    screen_aspect = 0.75 # y_length / x_length
    plt.gca().set_aspect(screen_aspect / plt.gca().get_data_ratio())
    plt.legend(markerscale=4)
-   plt.xlim(0., 1.1)
+   plt.xlim(0., 0.9)
    plt.show()
 
 # then we put main at the bottom to run everything

@@ -2,10 +2,10 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 101
-   ny_gridpoints = 6
+   nx_gridpoints = 28
+   ny_gridpoints = 2
 
-   x_arr = np.linspace(0.,1.,nx_gridpoints)
+   x_arr = np.linspace(-1.7,1.,nx_gridpoints)
    y_arr = np.linspace(0.,.1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
    filename = home_dir + "data/shocktube-test.mesh"

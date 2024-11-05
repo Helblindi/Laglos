@@ -3041,8 +3041,8 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
-   Vector center(dim), U(dim+2);
-   double pressure=0., ss=0., x_val=0.;
+   Vector center(dim), U(dim+2), vel(dim);
+   double pressure=0., ss=0., x_val=0., vel_val = 0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
@@ -3053,6 +3053,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    {
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
+      pb->velocity(U, vel);
       pressure = pb->pressure(U, pmesh->GetAttribute(i));
       ss = pb->sound_speed(U, pmesh->GetAttribute(i));
       
@@ -3067,6 +3068,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       case 6:  // Sedov
       case 13: // Sod Radial
          x_val = center.Norml2();
+         vel_val = vel.Norml2(); // magnitude in radial case
          break;
       
       // For stacked Sod problem, we only need the x-coord
@@ -3081,26 +3083,17 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       case 20:
       default:
          x_val = center[0];
+         vel_val = vel[0]; // v_x
          break;
       }
 
-      // if (abs(x_val - 0.6) < 0.02)
-      // {
-      //    cout << "=============\n"
-      //         << "cell: " << i << endl 
-      //         << "attr: " << BdrElementIndexingArray[i] << endl
-      //         << "x_val: " << x_val << endl
-      //         << "coords: ";
-      //    center.Print(cout);
-      //    cout << "rho: " << 1./U[0] << endl << endl;
-      // }
-      
+      // Output to file
       fstream_sv << x_val << ","    // x
-               << 1./U[0] << ","  // rho
-               << U[1] << ","     // v_x
-               << U[dim+1] << "," // ste
-               << pressure << "," // pressure
-               << ss << ",";     // sound speed
+                 << 1./U[0] << ","  // rho
+                 << vel_val << ","  // vel, either v_x or ||v||
+                 << U[dim+1] << "," // ste
+                 << pressure << "," // pressure
+                 << ss << ",";      // sound speed
 
       // Print flag if interior or bdr
       if (cell_bdr_flag_gf[i] == -1.)

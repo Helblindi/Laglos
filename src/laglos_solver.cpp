@@ -1308,13 +1308,14 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                      // left
                      tmp_vel = 0.;
                      /* Ramping up to ex */
-                     if (timestep_first == 0.)
-                     {
-                        timestep_first = timestep;
-                     }
-                     double _xi = t / (2*timestep_first);
-                     double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-                     tmp_vel[0] = 1. * _psi;
+                     // if (timestep_first == 0.)
+                     // {
+                     //    timestep_first = timestep;
+                     // }
+                     // double _xi = t / (2*timestep_first);
+                     // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+                     // tmp_vel[0] = 1. * _psi;
+                     tmp_vel[0] = 1.;
                   }
 
                   val.SetSubVector(tmp_dofs, tmp_vel);
@@ -1509,14 +1510,14 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       Vector ex(dim);
       ex = 0.;
       /* Ramping up to ex */
-      if (timestep_first == 0.)
-      {
-         timestep_first = timestep;
-      }
-      double _xi = t / (2*timestep_first);
-      double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-      ex[0] = 1. * _psi;
-      // ex[0] = 1.;
+      // if (timestep_first == 0.)
+      // {
+      //    timestep_first = timestep;
+      // }
+      // double _xi = t / (2*timestep_first);
+      // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+      // ex[0] = 1. * _psi;
+      ex[0] = 1.;
 
       // VectorConstantCoefficient left_wall_coeff(ex);
       // Array<int> left_wall_attr(1);

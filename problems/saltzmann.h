@@ -116,9 +116,10 @@ public:
       assert(add_bdr_vals.Size() == size_add_bdr_dofs);
 
       /* Solve for Dirichlet velocity at left wall */
-      double _xi = t / (2*timestep_first);
-      double _psi = (4. - (_xi + 1.) * (_xi - 2.) * ((_xi - 2.) - (abs(_xi-2.) + (_xi-2.)) / 2.)) / 4.;
-      add_bdr_vals = _psi;
+      // double _xi = t / (2*timestep_first);
+      // double _psi = (4. - (_xi + 1.) * (_xi - 2.) * ((_xi - 2.) - (abs(_xi-2.) + (_xi-2.)) / 2.)) / 4.;
+      // add_bdr_vals = _psi;
+      add_bdr_vals = 1.;
    }
 
    /*********************************************************

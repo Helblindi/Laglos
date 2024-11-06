@@ -3071,11 +3071,17 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          vel_val = vel.Norml2(); // magnitude in radial case
          break;
       
+      case 7: // Saltzman
+         x_val = center[0];
+         vel_val = vel[1]; // v_y
+         break;
+
       // For stacked Sod problem, we only need the x-coord
       case 0:  // Smooth
       case 1:  // Sod
       case 2:  // Lax
       case 3:  // Leblanc
+      case 5:
       case 8:  // Vdw1
       case 9:  // Vdw2
       case 10: // Vdw3
@@ -3090,7 +3096,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // Output to file
       fstream_sv << x_val << ","    // x
                  << 1./U[0] << ","  // rho
-                 << vel_val << ","  // vel, either v_x or ||v||
+                 << vel_val << ","  // vel, either v_x, v_y, or ||v||
                  << U[dim+1] << "," // ste
                  << pressure << "," // pressure
                  << ss << ",";      // sound speed

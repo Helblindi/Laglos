@@ -44,7 +44,7 @@ private:
    // CFL change
    bool _change_cfl = true;
    double _cfl_first = 0.01;
-   double _cfl_second = 0.25;
+   double _cfl_second = 0.5;
    double _cfl_time_change = 0.01; // From Boscheri's paper
 
    double rotation_angle = 0.; // 0 - 1D horizontal velocity

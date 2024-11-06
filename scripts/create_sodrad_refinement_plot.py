@@ -21,7 +21,16 @@ import pandas as pd
 import os
 import sys
 import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
 
+# Globally set parameters for figures
+params = {'legend.markerscale': 10,
+          'legend.fontsize': 24,
+          'axes.labelsize': 24,
+          'axes.titlesize': 24,
+          'xtick.labelsize': 24,
+          'ytick.labelsize': 24}
+pylab.rcParams.update(params)
 
 # check command line inputs
 assert len(sys.argv) == 2, "This file needs 1 input arguments: directory, but " + str(len(sys.argv)) + " were given."
@@ -57,7 +66,8 @@ def main():
    ax.set_xlim(0., 1.)
    ax.set_xlabel("$x$")
    ax.set_ylabel("Density")
-   plt.savefig("sodrad-density.png")
+   _dpi = fig.get_dpi()
+   fig.savefig("sodrad-density.png", dpi=_dpi)
 
    #########################
    ##### Velocity norm #####
@@ -87,7 +97,8 @@ def main():
    ax.set_xlim(0., 1.)
    ax.set_xlabel("$x$")
    ax.set_ylabel("$||v||$")
-   plt.savefig("sodrad-velocity.png")
+   _dpi = fig.get_dpi()
+   fig.savefig("sodrad-velocity.png", dpi=_dpi)
 
    ####################
    ##### Pressure #####
@@ -117,7 +128,8 @@ def main():
    ax.set_xlim(0., 1.)
    ax.set_xlabel("$x$")
    ax.set_ylabel("Pressure")
-   plt.savefig("sodrad-pressure.png")
+   _dpi = fig.get_dpi()
+   fig.savefig("sodrad-pressure.png", dpi=_dpi)
 
 # then we put main at the bottom to run everything
 main()

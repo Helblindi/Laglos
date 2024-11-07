@@ -2,13 +2,14 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 101
-   ny_gridpoints = 6
+   nx_gridpoints = 109
+   ny_gridpoints = 5
 
-   x_arr = np.linspace(0,1,nx_gridpoints)
-   y_arr = np.linspace(0,.1,ny_gridpoints)
+   x_arr = np.linspace(-1.7,1.,nx_gridpoints)
+   l = 2.7
+   y_arr = np.linspace(0.,.1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/distorted-tube-11.mesh"
+   filename = home_dir + "data/distorted-tube-test.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -88,7 +89,8 @@ def main():
          y = y_arr[j]
          # print("i: %.2f, j: %.2f" % (x_arr[i], y_arr[j]))
          if (y != 0 and y != .1):
-            y = y + x*(1.-x) * np.sin(4.*np.pi * x) / 20.
+            # y = y + (x - x_arr[0])*(x_arr[-1]-x) * np.sin(4.*np.pi * x) / (20. * (l**2))
+            y = y + np.sin(4.*np.pi * x) / 100.
          f.write("%.6f %.6f\n" % (x, y))
 
 main()

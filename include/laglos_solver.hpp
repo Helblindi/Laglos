@@ -120,6 +120,7 @@ protected:
    bool use_viscosity;
    bool mm;
    bool check_mesh;
+   bool post_process_density;
    int mv_option = 0;
    bool do_mv_linearization;
    int fv_option = 0;
@@ -163,6 +164,7 @@ public:
 
    void SetProblem(const int _problem) { this->problem = _problem; }
    void SetMeshCheck(const bool _check_mesh) { this->check_mesh = _check_mesh; }
+   void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
 
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -309,6 +311,9 @@ public:
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                              const double &dt, Vector & state_val);
    void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
+
+   // Enforce Mass Conservation
+   void SetMassConservativeDensity(const Vector &S_old, Vector &S);
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

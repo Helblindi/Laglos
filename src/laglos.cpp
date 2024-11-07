@@ -45,6 +45,7 @@
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
 * ./Laglos -m data/tube-np5-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 2 -vis        ## Vdw3 
+* ./Laglos -m data/tube-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis     ## Vdw4
 * 
 * --- General Riemann Problem, change riemann_problem.h ---
 * ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis     ## General Riemann Problem
@@ -126,6 +127,7 @@ int main(int argc, char *argv[]) {
    bool use_viscosity = true;
    bool mm = true;
    bool check_mesh = true;
+   bool post_process_density = false;
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
@@ -174,8 +176,10 @@ int main(int argc, char *argv[]) {
                   "Enable or disable the use of artificial viscosity.");
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
-   args.AddOption(&check_mesh, "-cm", "-check-mesh", "-no-cm", "-no-check-mesh",
+   args.AddOption(&check_mesh, "-cm", "--check-mesh", "-no-cm", "--no-check-mesh",
                   "Enable or disable checking if the mesh has twisted.");
+   args.AddOption(&post_process_density, "-ppd", "--post-process-density", "-no-ppd", "--no-post-process-density",
+                  "Enable or disable density post processing to guarantee conservation of mass.");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities:"
                   "\n\t 00 - Arithmetic avg of adj cells,"
@@ -797,6 +801,7 @@ int main(int argc, char *argv[]) {
    hydro.SetFVOption(fv_option);
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);
+   hydro.SetDensityPP(post_process_density);
    hydro.SetMVTargetViscCoeff(mv_target_visc_coeff);
    if (mv_n_iterations != 0)
    {

@@ -313,7 +313,7 @@ public:
    void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
 
    // Enforce Mass Conservation
-   void SetMassConservativeDensity(const Vector &S_old, Vector &S);
+   void SetMassConservativeDensity(Vector &S);
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

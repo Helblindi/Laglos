@@ -743,7 +743,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    /* Optionally post process the density to be mass conservative */
    if (post_process_density)
    {
-      SetMassConservativeDensity(S_old, S);
+      SetMassConservativeDensity(S);
    }
 
    /*
@@ -1600,7 +1600,6 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 /****************************************************************************************************
 * Function: SetMassConservativeDensity
 * Parameters:
-*  S_old - BlockVector that stores mesh information, mesh velocity, and state variables.
 *  S     - BlockVector that stores mesh information, mesh velocity, and state variables.
 *
 * Purpose:
@@ -1608,7 +1607,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 *  after the mesh motion has been calculated.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SetMassConservativeDensity(const Vector &S_old, Vector &S)
+void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S)
 {
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
@@ -1618,39 +1617,26 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(const Vector &S_old, 
    ParGridFunction sv_gf;
    sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
 
-   Vector* sptr_old = const_cast<Vector*>(&S_old);
-   ParGridFunction x_gf_old, sv_gf_old;
-   x_gf_old.MakeRef(&H1, *sptr_old, block_offsets[0]);
-   sv_gf_old.MakeRef(&L2, *sptr_old, block_offsets[2]);
-   ParMesh pmesh_old(*pmesh);
-   pmesh_old.NewNodes(x_gf_old, false);
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
    {
-      // Get old cell volume
-      const double k_old = pmesh_old.GetElementVolume(cell_it);
-      const double sv_old = sv_gf_old.Elem(cell_it);
+      // Get cell mass
+      const double m = m_hpv->Elem(cell_it);
 
       // Get new cell volume
       const double k_new = pmesh->GetElementVolume(cell_it);
-      double sv_new= sv_gf.Elem(cell_it);
+      const double sv_new= sv_gf.Elem(cell_it);
 
-      // if (k_old != k_new)
-      // {
-      //    cout << "\tcell: " << cell_it << endl
-      //         << "old vol: " << k_old << endl
-      //         << "new vol: " << k_new << endl;
-      // }
-      const double sv_new_mc = sv_old * k_new / k_old;
+      // Compute sv that gives exact mass conservation
+      const double sv_new_mc = k_new / m;
 
-      if (sv_new != sv_new_mc)
+      // If needed, replace sv with mass conservative sv
+      if (abs(sv_new - sv_new_mc) > 1.E-12)
       {
-         // cout << "\tcorrecting specific volume on cell: " << cell_it << endl
-         //      << "sv_new: " << sv_new
-         //      << ", sv_new_mc: " << sv_new_mc << endl;
          num_corrected_cells += 1;
+         sv_gf.Elem(cell_it) = sv_new_mc;
       }
-      sv_gf.Elem(cell_it) = sv_new_mc;
    }
+   // Output percentage of cells that needed correction
    cout << "pct corrected cells: " << double(num_corrected_cells)/NDofs_L2 << endl;
 }
 

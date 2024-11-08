@@ -1517,9 +1517,9 @@ int main(int argc, char *argv[]) {
    convergence_filename << output_path << "convergence/temp_output/np" << num_procs;
 
    /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
-   double rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
-          rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,
-          rho_Max_error_n = 0., vel_Max_error_n = 0., ste_Max_error_n = 0.;
+   double sv_L1_error_n = 0., rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
+          sv_L2_error_n = 0., rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,
+          sv_Max_error_n = 0., rho_Max_error_n = 0., vel_Max_error_n = 0., ste_Max_error_n = 0.;
 
    if (problem_class->has_exact_solution())
    {
@@ -1529,15 +1529,17 @@ int main(int argc, char *argv[]) {
       }
       
       // Compute errors
-      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace);
+      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
 
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
       ste_coeff.SetTime(t);
+      sv_coeff.SetTime(t);
 
       rho_ex_gf.ProjectCoefficient(rho_coeff);
       vel_ex_gf.ProjectCoefficient(v_coeff);
       ste_ex_gf.ProjectCoefficient(ste_coeff);
+      sv_ex_gf.ProjectCoefficient(sv_coeff);
 
       // In the case of the Noh Problem, project 0 on the boundary of approx and exact
       if (problem_class->get_indicator() == "Noh")
@@ -1555,6 +1557,7 @@ int main(int argc, char *argv[]) {
                ste_gf[i] = 0.;
                rho_ex_gf[i] = 0.;
                ste_ex_gf[i] = 0.;
+               sv_ex_gf[i] = 0.;
                for (int j = 0; j < dim; j++)
                {
                   int index = i + j*pmesh->GetNE();
@@ -1566,16 +1569,14 @@ int main(int argc, char *argv[]) {
       }
 
       /* Compute relative errors */
-      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf);
-      rho_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
+      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf), sv_ex_coeff(&sv_ex_gf);
+
+      // Velocity errors
       vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
-
-      rho_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
       vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);
-
-      rho_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
       vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
 
+      // Specific volume and specific total energy
       /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
       if (problem == 6)
       {
@@ -1585,6 +1586,10 @@ int main(int argc, char *argv[]) {
             te_gf[i] = rho_gf[i] * ste_gf[i];
             te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
          }
+         sv_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
+         sv_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
+         sv_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
+
          GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
          ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
          ste_L2_error_n = te_gf.ComputeL2Error(te_ex_coeff) / te_ex_gf.ComputeL2Error(zero);
@@ -1592,6 +1597,10 @@ int main(int argc, char *argv[]) {
       }
       else 
       {
+         sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / sv_ex_gf.ComputeL1Error(zero);
+         sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / sv_ex_gf.ComputeL2Error(zero);
+         sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / sv_ex_gf.ComputeMaxError(zero);
+
          ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
          ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
          ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
@@ -1599,9 +1608,9 @@ int main(int argc, char *argv[]) {
    }
 
    /* Get composite errors values, will return 0 if exact solution is not known */
-   const double L1_error = (rho_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
-   const double L2_error = (rho_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
-   const double Max_error = (rho_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
+   const double L1_error = (sv_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
+   const double L2_error = (sv_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
+   const double Max_error = (sv_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
 
    /* In either case, write convergence file. */
    if (Mpi::Root())
@@ -1624,10 +1633,10 @@ int main(int argc, char *argv[]) {
                         << to_string(rp_levels + rs_levels) << "\n"
                         << "n_Dofs " << global_vSize << "\n"
                         << "h " << hmin << "\n"
-                        // rho
-                        << "rho_L1_Error " << rho_L1_error_n << "\n"
-                        << "rho_L2_Error " << rho_L2_error_n << "\n"
-                        << "rho_Linf_Error " << rho_Max_error_n << "\n"
+                        // sv
+                        << "sv_L1_Error " << sv_L1_error_n << "\n"
+                        << "sv_L2_Error " << sv_L2_error_n << "\n"
+                        << "sv_Linf_Error " << sv_Max_error_n << "\n"
                         // vel
                         << "vel_L1_Error " << vel_L1_error_n << "\n"
                         << "vel_L2_Error " << vel_L2_error_n << "\n"

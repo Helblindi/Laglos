@@ -1353,6 +1353,11 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   {
                      MFEM_ABORT("3D not implemented\n");
                   }
+                  case 4: // should only be in sod radial and sedov problems, radial mesh boundary
+                  {
+                     assert(pb->get_indicator() == "SodRadial" || pb->get_indicator() == "Sedov");
+                     break;
+                  }
                   default:
                   {
                      MFEM_ABORT("Invalid boundary attribute\n");

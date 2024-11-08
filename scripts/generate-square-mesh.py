@@ -2,11 +2,11 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 31
-   ny_gridpoints = 31
-   xL = -1.
+   nx_gridpoints = 16
+   ny_gridpoints = 16
+   xL = 0.
    xR = 1.
-   yL = -1.
+   yL = 0.
    yR = 1.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)

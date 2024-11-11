@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
    string _convergence = output_path + "convergence";
    string _temp_output = _convergence + "/temp_output";
    string _state_vectors = output_path + "state_vectors";
-   // string _visit = output_path + "visit"
+   string _visit = output_path + "visit/";
 
    const char* path = output_path.c_str();
    boost::filesystem::path output_path_dir(path);
@@ -281,7 +281,6 @@ int main(int argc, char *argv[]) {
 
    gfprint_path = gfprint_path_ss.str();
 
-   string _visit = gfprint_path + "visit/";
    const char* _visit_basename = _visit.c_str();
    if (visit)
    {

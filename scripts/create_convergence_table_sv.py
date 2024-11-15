@@ -217,7 +217,8 @@ def compute_rates(vals):
         if i == 0:
             table.append([vals['n_Dofs'][i], vals['L1_Error'][i], "{---}", 
                         #   vals['L2_Error'][i], "{---}", vals['Linf_Error'][i], "{---}", 
-                          vals['mass_loss'][i], "{---}"])
+                        #   vals['mass_loss'][i], "{---}"
+                          ])
         else:
             if (vals['L1_Error'][i-1] != 0):
                 L1_rate = np.around(np.log(vals['L1_Error'][i]/vals['L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
@@ -239,18 +240,21 @@ def compute_rates(vals):
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
                         #   vals['L2_Error'][i], L2_rate,
                         #   vals['Linf_Error'][i], Linf_rate,
-                          vals['mass_loss'][i], mass_loss_rate])
+                        #   vals['mass_loss'][i], mass_loss_rate
+                          ])
             else:
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
                         #   vals['L2_Error'][i], L2_rate,
                         #   vals['Linf_Error'][i], Linf_rate,
-                          vals['mass_loss'][i], "{---}"])
+                        #   vals['mass_loss'][i], "{---}"
+                          ])
             
 
     s_table = tabulate(table,
                        headers=["# dof", "L1 Error", "Rate", 
                               #   "L2 Error", "Rate", "L-Inf Error", "Rate", 
-                                "Mass Loss", "Rate"],
+                              #   "Mass Loss", "Rate"
+                                ],
                        tablefmt="latex")
 
     # Output table to console

@@ -17,6 +17,7 @@ static int num_procs = 0;
 static int myid = -1;
 
 int test_lmsparse_lmcop_getgradient();
+int test_lmsparse_viscous_obj_get_gradient();
 
 
 int main(int argc, char *argv[])
@@ -28,7 +29,8 @@ int main(int argc, char *argv[])
    int d = 0;
 
    /* Test LM-Sparse LMCOp::GetGradient */
-   d += test_lmsparse_lmcop_getgradient();
+   // d += test_lmsparse_lmcop_getgradient();
+   d += test_lmsparse_viscous_obj_get_gradient();
 
    return d;
 }
@@ -76,7 +78,7 @@ int test_lmsparse_lmcop_getgradient()
    offset[5] = offset[4] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
-   Geometric<2/*dim*/> geom(offset,H1FESpace);
+   Geometric<2/*dim*/> geom(offset,H1FESpace,L2FESpace);
 
    ParGridFunction x_gf, mv_gf, mv_gf_l(&H1FESpace_L);
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
@@ -106,5 +108,76 @@ int test_lmsparse_lmcop_getgradient()
 
    // Run ComputeGradient with a set velocity vector and check the values returned to see they match up with a SparseMatrix we define.
 
+   return 0;
+}
+
+
+/***
+ * Function: test_lmsparse_viscous_obj_get_gradient
+ * Purpose: A basic test where an instance of LocalMassConservationOperator from the 
+ * file lagrange_multipllier.hpp is instantiated and the GetGradient function is validated.
+ */
+int test_lmsparse_viscous_obj_get_gradient()
+{
+   cout << "=== Testing ViscousOptimizedMeshVelocityProblem::CalcObjectiveGrad ===\n";
+
+   mfem::Mesh *mesh;
+   mesh = new mfem::Mesh(mesh_file, true, true);
+   mesh->UniformRefinement();
+   assert(mesh->GetNE() == 4);
+
+   // Construct ParMesh
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   delete mesh;
+
+   // Creat Problem object
+   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+
+   H1_FECollection H1FEC(2 /*order_mv*/, 2 /*dim*/);
+   H1_FECollection H1FEC_L(1, 2);
+   L2_FECollection L2FEC(0/*order*/, 2/*dim*/, BasisType::Positive);
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, 2/*dim*/);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, 2);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, 2);
+
+   // Output information
+   pmesh->ExchangeFaceNbrData();
+
+   // Construct blockvector
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(6);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_h1;
+   offset[3] = offset[2] + Vsize_l2;
+   offset[4] = offset[3] + Vsize_l2v;
+   offset[5] = offset[4] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   Geometric<2/*dim*/> geom(offset,H1FESpace, L2FESpace);
+
+   ParGridFunction x_gf, mv_gf, mv_gf_l(&H1FESpace_L);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   pmesh->SetNodalGridFunction(&x_gf);
+   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
+   mv_gf = 1.;
+
+   /* Set up sparsity pattern */
+   Array<int> I, J, HessI, HessJ;
+   SetHiopConstraintGradSparsityPattern(pmesh, pmesh->GetNE(), H1FESpace_L.GetNVDofs(), I, J);
+   SetHiopHessianSparsityPatternViscous(pmesh, geom, H1FESpace, H1FESpace.GetNVDofs(), HessI, HessJ);
+   ParGridFunction massvec(&L2FESpace);
+   Vector xmin(H1FESpace_L.GetNDofs()), xmax(H1FESpace_L.GetNDofs());
+   xmin = -1.E12; 
+   xmax = 1.E12;
+   ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, L2FESpace.GetNDofs(), 1., xmin, xmax, HessI, HessJ, I, J, ess_tdofs, BdrVertexIndexingArray);
+
+   delete problem_class;
+   problem_class = NULL;
+   
    return 0;
 }

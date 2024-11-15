@@ -43,11 +43,14 @@ def main():
    df_exact = df_exact.drop(columns=['cell_type'], axis=1)
    
    # Plot
-   ax.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[1]], 'k-', label="Exact solution")
    _label = "# dofs = " + str(dofs)
-   ax.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[1]], label=_label, s=.1)
+   ax.scatter(df_approx[df_approx.columns[0]], df_approx[df_approx.columns[2]], label=_label, s=2)
+   ax.plot(df_exact[df_exact.columns[0]], df_exact[df_exact.columns[2]], 'k-', label="Exact solution")
    
    ax.legend()
+   ax.set_xlim((0.,1.2))
+   ax.set_xlabel("$x$")
+   ax.set_ylabel("Velocity")
    # plt.show()
    dpi = fig.get_dpi()
    fig.savefig("Fig1py.png", dpi=dpi)

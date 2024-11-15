@@ -13,7 +13,7 @@ Note: The label in the plot must be modified according to the mesh
       size of the problem.
 
 Example:
-> python3 create_refinement_plot.py "/Users/madisonsheridan/Workspace/Laglos/build/results/state_vectors/ 2"
+> python3 create_refinement_plot.py "/Users/madisonsheridan/Workspace/Laglos/build/results/state_vectors/"
 """
 
 import numpy as np

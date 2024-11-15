@@ -233,6 +233,7 @@ public:
 
    // Check Jacobians to ensure mesh hasn't collapsed
    bool IsMeshCollapsed();
+   bool IsMeshCollapsedGeom(const Vector &S);
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);

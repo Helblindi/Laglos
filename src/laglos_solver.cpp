@@ -753,6 +753,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    if (check_mesh)
    {
       isCollapsed = IsMeshCollapsed();
+      // isCollapsed = IsMeshCollapsedGeom(S);
    }
 } 
 
@@ -1047,6 +1048,84 @@ bool LagrangianLOOperator<dim>::IsMeshCollapsed()
       }
    }
 
+   return false;
+}
+
+/****************************************************************************************************
+* Function: IsMeshCollapsedGeom
+*
+* Purpose:
+*     Verify if the mesh has collapsed. If collapsed, return true.
+*     This method checks each cell to see if any corner node has 
+*     passed the opposite face. This is accomplished by iterating
+*     over the faces of a cell and checking the two nodes that are
+*     not adjacent to the face. The vector 1F and 2F are dotted 
+*     with the outward normal at F. If either of [these quantities 
+*     is positive, we know the mesh has inverted.
+*
+*           1----------2
+*           |          |
+*           |          |
+*           |          |
+*           |          |
+*           3----F-----4
+*
+****************************************************************************************************/
+template<int dim>
+bool LagrangianLOOperator<dim>::IsMeshCollapsedGeom(const Vector &S)
+{
+   mfem::Mesh::FaceInformation FI;
+   Array<int> fids, oris, verts, face_dofs;
+   Vector n_vec(dim), temp_vec(dim), face_x(dim), vert_x(dim);
+   int face_dof;
+
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      if (dim != 2)
+      {
+         MFEM_ABORT("Function IsMeshCollapsed is hardcoded for dim == 2.")
+      }
+
+      pmesh->GetElementVertices(ci, verts);
+      pmesh->GetElementEdges(ci, fids, oris);
+
+      // cout << "cell: " << ci << endl;
+
+      for (int j=0; j < fids.Size(); j++) // Face iterator
+      {
+         FI = pmesh->GetFaceInformation(fids[j]);
+         H1.GetFaceDofs(fids[j], face_dofs);
+         // cout << "\tface: " << fids[j];
+         face_dof = face_dofs[2];
+
+         // Get outward normal
+         CalcOutwardNormalInt(S, ci, fids[j], n_vec);
+
+         // Get nodal loc of face dof
+         geom.GetNodePositionFromBV(S, face_dof, face_x);
+
+         // Iterate over corner vertices of cell
+         for (int k=0; k < verts.Size(); k++)
+         {
+            // We only care about verts opposite to the face
+            if (face_dofs.Find(verts[k]) == -1)
+            {
+               // cout << ", opp node: " << verts[k];
+               geom.GetNodePositionFromBV(S, verts[k], vert_x);
+               subtract(vert_x, face_x, temp_vec);
+               double indicator = temp_vec * n_vec;
+               if (indicator > 0.)
+               {
+                  cout << "mesh should collapse\n";
+                  return true;
+               }
+            }
+         }
+         // cout << endl;
+      }
+
+   }
+   // MFEM_ABORT("End check.");
    return false;
 }
 

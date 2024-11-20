@@ -7956,6 +7956,83 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
 }
 
 /****************************************************************************************************
+* Function:  ComputeVelocityLumpedMass
+* Parameters:
+*  row_sums - Vector representing the diagonal from the lumped mass matrix, to be changed
+*             in this function
+*
+* Purpose:
+*  This function computes the lumped mass matrix for the velocity space.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
+{
+   // cout << "=======================================\n"
+   //      << "       ComputeVelocityLumpedMass       \n"
+   //      << "=======================================\n";
+
+   /* Compute the Mis for the velocity discretization */
+   row_sums.SetSize(H1Lc.GetNDofs());
+   BilinearForm pbl(&H1Lc);
+   Coefficient *sigma = new ConstantCoefficient(1.0);
+   pbl.AddDomainIntegrator(new MassIntegrator());
+   pbl.Assemble();
+   SparseMatrix mass;
+   pbl.FormSystemMatrix(mfem::Array<int>(), mass);
+   // Vector row_sums(81);
+   mass.GetRowSums(row_sums);
+
+   // cout << "row_sums: " << endl;
+   // row_sums.Print(cout);
+   // cout << "mass matrix: \n";
+   // mass.Print(cout);
+   // assert(false);
+   // delete sigma;
+   // assert(false);
+}
+
+
+/****************************************************************************************************
+* Function:  ComputeVelocityLumpedMass
+* Parameters:
+*  row_sums - Vector representing the diagonal from the lumped mass matrix, to be changed
+*             in this function
+*
+* Purpose:
+*  This function computes the lumped mass matrix for the velocity space.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S, Vector & row_sums)
+{
+   cout << "=======================================\n"
+        << "     ComputeVelocityLumpedMassHand     \n"
+        << "=======================================\n";
+   row_sums.SetSize(H1Lc.GetNDofs());
+   Array<int> cells_row;
+
+   /* Compute the Mis for the velocity discretization */
+   for (int i = 0; i < H1Lc.GetNDofs(); i++)
+   {
+      // cout << "--- i: " << i << endl;
+      vertex_element->GetRow(i, cells_row);
+      int cells_length = cells_row.Size();
+      double sum = 0.;
+      for (int cell_it = 0; cell_it < cells_length; cell_it++)
+      {
+         /* Get cell index and volume */
+         int el_index = cells_row[cell_it];
+         double Kcn = pmesh->GetElementVolume(el_index);
+         // cout << "\tel: " << el_index << ", vol: " << Kcn << endl;
+         sum += Kcn;
+
+      }
+      sum *= 1./3.;
+      row_sums[i] = sum;
+   }
+}
+
+
+/****************************************************************************************************
 * Function:  SolveHiOp
 * Parameters:
 *  S        - BlockVector representing FiniteElement information at tn+1
@@ -8095,12 +8172,25 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
             for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
          }
 
+         /* Compute lumped mass in velocity space */
+         // Vector _vel_lumped_mass, _vel_lumped_mass_hand;
+         // ComputeVelocityLumpedMass(_vel_lumped_mass);
+         // ComputeVelocityLumpedMassByHand(S, _vel_lumped_mass_hand);
+         // cout << "_vel_lumped_mass: ";
+         // _vel_lumped_mass.Print(cout);
+         // cout << "_vel_lumped_mass_hand: ";
+         // _vel_lumped_mass_hand.Print(cout);
+         // assert(false);
+         Vector _vel_lumped_mass;
+         ComputeVelocityLumpedMassByHand(S, _vel_lumped_mass);
+
          /* Instantiate problem */
          omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(
             geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
-            ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff);
+            ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
+            _vel_lumped_mass);
          break;
       }
       case 2: // Viscous objective function

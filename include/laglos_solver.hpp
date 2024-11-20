@@ -298,6 +298,8 @@ public:
    void CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l);
    void ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v);
    void DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf);
+   void ComputeVelocityLumpedMass(Vector & row_sums);
+   void ComputeVelocityLumpedMassByHand(const Vector &S, Vector & row_sums);
    void SolveHiOp(const Vector &S, const Vector &S_old, const int &lm_option, const int &target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    void SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l);
    

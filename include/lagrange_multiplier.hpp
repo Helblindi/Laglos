@@ -638,7 +638,10 @@ private:
    const Vector xmin, xmax;
    const Vector &massvec;
    const Vector bdr_vals;
-   const Vector velLumpedMass;
+   // Possible weights for the objective function. These may include
+   //    1) Lumped Mass Matrix from the velocity space
+   //    2) Average mass at a given vertex
+   const Vector vecWeights;
    // const Vector &d_lo, d_hi;
    const LocalMassConservationOperator<dim> LMCoper;
    // const BoundaryConditionsOperator<dim> BCoper;
@@ -667,7 +670,7 @@ public:
       Array<double> _GradDData, Array<double> &_bdr_vals, 
       Array<int> _ess_tdofs, Array<int> _BdrVertexIndexingArray,
       const double &mv_target_visc_coeff,
-      const Vector &_velLumpedMass)
+      const Vector &_vecWeights)
       : geom(_geom),
         X(_X),
         dt(dt),
@@ -678,7 +681,7 @@ public:
         V_target(_V_target), 
         massvec(_massvec), 
         bdr_vals(_bdr_vals, _bdr_vals.Size()),
-        velLumpedMass(_velLumpedMass),
+        vecWeights(_vecWeights),
       //   d_lo(_massvec), d_hi(_massvec),
         n_bdr_dofs(_ess_tdofs.Size()),
       //   d_lo(bdr_vals), d_hi(bdr_vals),
@@ -704,6 +707,7 @@ public:
       assert(_massvec.Size() == _num_cells);
       assert(_V_target.Size() == input_size);
       assert(_bdr_vals.Size() == n_bdr_dofs);
+      assert(_vecWeights.Size() == num_vertices);
 
       C = &LMCoper;
       SetEqualityConstraint(massvec);
@@ -753,7 +757,7 @@ public:
          assert(Vi_diff.Size() == dim);
    
          /* contribution from x coord */
-         double ix_val = velLumpedMass[ix] * Vi_diff[0] * Vi_diff[0];
+         double ix_val = vecWeights[ix] * Vi_diff[0] * Vi_diff[0];
          if (ess_tdofs.Find(ix) != -1) {
             val += exterior_multiplier * ix_val; 
          } else { // interior node
@@ -761,7 +765,7 @@ public:
          }
          /* contribution from y coord */
          int iy = ix + num_vertices;
-         double iy_val = velLumpedMass[ix] * Vi_diff[1] * Vi_diff[1];
+         double iy_val = vecWeights[ix] * Vi_diff[1] * Vi_diff[1];
          if (ess_tdofs.Find(iy) != -1) {
             val += exterior_multiplier * iy_val; 
          } else { // interior node
@@ -812,7 +816,7 @@ public:
       for (int ix = 0; ix < num_vertices; ix++)
       {
          /* contribution from x coord */
-         double ix_val = velLumpedMass[ix] * 2.*(V(ix) - V_target(ix));
+         double ix_val = vecWeights[ix] * 2.*(V(ix) - V_target(ix));
          if (ess_tdofs.Find(ix) != -1) {
             grad(ix) += exterior_multiplier * ix_val;
          } else {
@@ -820,7 +824,7 @@ public:
          }
          /* contribution from x coord */
          iy = ix + num_vertices;
-         double iy_val = velLumpedMass[ix] * 2.*(V(iy) - V_target(iy));
+         double iy_val = vecWeights[ix] * 2.*(V(iy) - V_target(iy));
          if (ess_tdofs.Find(iy) != -1) {
             grad(iy) += exterior_multiplier * iy_val;
          } else {
@@ -874,16 +878,16 @@ public:
          /* Target velocity portion */
          /* contribution from x coord */
          if (ess_tdofs.Find(ix) != -1) {
-            hessf.Elem(ix,ix) += velLumpedMass[ix] * 2. * exterior_multiplier; 
+            hessf.Elem(ix,ix) += vecWeights[ix] * 2. * exterior_multiplier; 
          } else { // interior node
-            hessf.Elem(ix,ix) += velLumpedMass[ix] * 2. * interior_multiplier;
+            hessf.Elem(ix,ix) += vecWeights[ix] * 2. * interior_multiplier;
          }
          /* contribution from y coord */
          int iy = ix + num_vertices;
          if (ess_tdofs.Find(iy) != -1) {
-            hessf.Elem(iy,iy) += velLumpedMass[ix] * 2. * exterior_multiplier;
+            hessf.Elem(iy,iy) += vecWeights[ix] * 2. * exterior_multiplier;
          } else { // interior node
-            hessf.Elem(iy,iy) += velLumpedMass[ix] * 2. * interior_multiplier;
+            hessf.Elem(iy,iy) += vecWeights[ix] * 2. * interior_multiplier;
          }
 
          /* For the viscosity component, we only care about the interior vertices */

@@ -8004,9 +8004,9 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S, Vector & row_sums)
 {
-   cout << "=======================================\n"
-        << "     ComputeVelocityLumpedMassHand     \n"
-        << "=======================================\n";
+   // cout << "=======================================\n"
+   //      << "     ComputeVelocityLumpedMassHand     \n"
+   //      << "=======================================\n";
    row_sums.SetSize(H1Lc.GetNDofs());
    Array<int> cells_row;
 
@@ -8028,6 +8028,44 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S,
       }
       sum *= 1./3.;
       row_sums[i] = sum;
+   }
+}
+
+
+/****************************************************************************************************
+* Function:  ComputeAverageMassAtGeo
+* Parameters:
+*  S           - BlockVector representing FiniteElement information at tn+1
+*  vec_weights - Vector representing average mass of the adjacent cells to a given node
+*
+* Purpose:
+*  Compute the average mass of the adjacent cells to a given node.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeAverageMassAtGeo(const Vector &S, Vector &vec_weights)
+{
+   vec_weights.SetSize(H1Lc.GetNDofs());
+   Array<int> cells_row;
+
+   /* Iterate over geometric corner nodes */
+   for (int i = 0; i < H1Lc.GetNDofs(); i++)
+   {
+      /* Get adjacent cells*/
+      vertex_element->GetRow(i, cells_row);
+      int cells_length = cells_row.Size();
+
+      /* Compute average mass of adjacent cells*/
+      double avg = 0.;
+      for (int cell_it = 0; cell_it < cells_length; cell_it++)
+      {
+         int el_index = cells_row[cell_it];
+         const double m = m_hpv->Elem(cell_it);
+         avg += m;
+      }
+      avg /= cells_length;
+
+      /* Store that value */
+      vec_weights[i] = avg;
    }
 }
 
@@ -8173,16 +8211,10 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          }
 
          /* Compute lumped mass in velocity space */
-         // Vector _vel_lumped_mass, _vel_lumped_mass_hand;
-         // ComputeVelocityLumpedMass(_vel_lumped_mass);
-         // ComputeVelocityLumpedMassByHand(S, _vel_lumped_mass_hand);
-         // cout << "_vel_lumped_mass: ";
-         // _vel_lumped_mass.Print(cout);
-         // cout << "_vel_lumped_mass_hand: ";
-         // _vel_lumped_mass_hand.Print(cout);
-         // assert(false);
-         Vector _vel_lumped_mass;
-         ComputeVelocityLumpedMassByHand(S, _vel_lumped_mass);
+         Vector _vecWeights;
+         // ComputeVelocityLumpedMass(_vecWeights);
+         // ComputeVelocityLumpedMassByHand(S, _vecWeights);
+         ComputeAverageMassAtGeo(S, _vecWeights);
 
          /* Instantiate problem */
          omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(
@@ -8190,7 +8222,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
             ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
-            _vel_lumped_mass);
+            _vecWeights);
          break;
       }
       case 2: // Viscous objective function

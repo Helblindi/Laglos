@@ -1709,11 +1709,19 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S)
       const double sv_new_mc = k_new / m;
 
       // If needed, replace sv with mass conservative sv
-      if (abs(sv_new - sv_new_mc) > 1.E-12)
+      if (pb->get_indicator() == "IsentropicVortex" && cell_bdr_flag_gf[cell_it] != -1)
       {
-         num_corrected_cells += 1;
-         sv_gf.Elem(cell_it) = sv_new_mc;
+         // Don't postprocess sv on boundary cells in the case of the isentropic vortex problem
+         continue;
       }
+      else {
+         if (abs(sv_new - sv_new_mc) > 1.E-12)
+         {
+            num_corrected_cells += 1;
+            sv_gf.Elem(cell_it) = sv_new_mc;
+         }
+      }
+      
    }
    // Output percentage of cells that needed correction
    cout << "pct corrected cells: " << double(num_corrected_cells)/NDofs_L2 << endl;

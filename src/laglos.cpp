@@ -80,6 +80,7 @@
 #include <fstream>
 #include <chrono>
 #include <boost/filesystem.hpp>
+#include <sstream>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -119,6 +120,7 @@ int main(int argc, char *argv[]) {
    double dt = 0.001;
    bool visualization = false;
    int vis_steps = 5;
+   bool pview = false;
    bool visit = false;
    bool gfprint = false;
    int precision = 12;
@@ -142,7 +144,6 @@ int main(int argc, char *argv[]) {
    double dm_val = 0.; // Parameter to distort the mesh, overrides file val
    string sv_output_prefix;
    string output_path;
-   string gfprint_path;
 
    OptionsParser args(argc, argv);
 
@@ -165,6 +166,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable GLVis visualization.");
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
+   args.AddOption(&pview, "-pview", "--paraview", "-no-pview", "--no-paraview",
+                  "Enable or disable ParaView visualization.");
    args.AddOption(&visit, "-visit", "--visit", "-no-visit", "--no-visit",
                   "Enable or disable VisIt visualization.");
    args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
@@ -249,10 +252,21 @@ int main(int argc, char *argv[]) {
    }
 
    // We must manually create all corresponding output directories
+   ostringstream _refinement_path_ss;
+   _refinement_path_ss << output_path
+                       << "r"
+                       << setfill('0')
+                       << setw(2)
+                       << to_string(rp_levels + rs_levels)
+                       << "/";
+   string _refinement_path = _refinement_path_ss.str();
+
    string _convergence = output_path + "convergence";
    string _temp_output = _convergence + "/temp_output";
    string _state_vectors = output_path + "state_vectors";
-   string _visit = output_path + "visit/";
+   string _visit = _refinement_path + "VisIt/";
+   string _pview = _refinement_path + "ParaView/";
+   string gfprint_path = _refinement_path + "gfs/";
 
    const char* path = output_path.c_str();
    boost::filesystem::path output_path_dir(path);
@@ -266,20 +280,18 @@ int main(int argc, char *argv[]) {
    boost::filesystem::path temp_output_dir(path);
    boost::filesystem::create_directory(temp_output_dir);
 
+   sv_output_prefix = output_path + "state_vectors/";
    path = _state_vectors.c_str();
    boost::filesystem::path state_vectors_dir(path);
    boost::filesystem::create_directory(state_vectors_dir);
 
-   // In all cases, set directory to print final grid functions
-   ostringstream gfprint_path_ss;
-   gfprint_path_ss << output_path
-                   << "gfs_r"
-                   << setfill('0') 
-                   << setw(2)
-                   << to_string(rp_levels + rs_levels)
-                   << "/";
+   path = _refinement_path.c_str();
+   boost::filesystem::path refinement_dir(path);
+   boost::filesystem::create_directory(refinement_dir);
 
-   gfprint_path = gfprint_path_ss.str();
+   path = gfprint_path.c_str();
+   boost::filesystem::path gfprint_output_dir(path);
+   boost::filesystem::create_directory(gfprint_output_dir);
 
    const char* _visit_basename = _visit.c_str();
    if (visit)
@@ -288,11 +300,12 @@ int main(int argc, char *argv[]) {
       boost::filesystem::create_directory(visit_output_dir);
    }
 
-   path = gfprint_path.c_str();
-   boost::filesystem::path gfprint_output_dir(path);
-   boost::filesystem::create_directory(gfprint_output_dir);
-
-   sv_output_prefix = output_path + "state_vectors/";
+   const char* _pview_basename = _pview.c_str();
+   if (pview)
+   {
+      boost::filesystem::path pview_output_dir(_pview_basename);
+      boost::filesystem::create_directory(pview_output_dir);
+   }
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
@@ -843,7 +856,7 @@ int main(int argc, char *argv[]) {
    }
 
    // Compute the density if we need to visualize it
-   if (visualization || gfprint || visit)
+   if (visualization || gfprint || visit || pview)
    {
       // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
@@ -1051,6 +1064,22 @@ int main(int argc, char *argv[]) {
       visit_dc.Save();
    }
 
+   ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
+   if (pview)
+   {
+      // paraview_dc.SetPrefixPath("ParaView");
+      paraview_dc.SetLevelsOfDetail(order_u);
+      paraview_dc.SetDataFormat(VTKFormat::BINARY);
+      paraview_dc.SetHighOrderOutput(true);
+      paraview_dc.RegisterField("Specific Volume", &sv_gf);
+      paraview_dc.RegisterField("Density", &rho_gf);
+      paraview_dc.RegisterField("Velocity", &v_gf);
+      paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
+      paraview_dc.SetCycle(0);
+      paraview_dc.SetTime(0.0); 
+      paraview_dc.Save();
+   }
+
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
    // LagrangianLOOperator.MakeTimeStep() funcall.
@@ -1162,7 +1191,7 @@ int main(int argc, char *argv[]) {
          }
 
          // Compute the density if we need to visualize it
-         if (visualization || gfprint || visit)
+         if (visualization || gfprint || visit || pview)
          {
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
@@ -1298,6 +1327,13 @@ int main(int argc, char *argv[]) {
             visit_dc.SetCycle(ti);
             visit_dc.SetTime(t);
             visit_dc.Save();
+         }
+
+         if (pview)
+         {
+            paraview_dc.SetCycle(ti);
+            paraview_dc.SetTime(t);
+            paraview_dc.Save();
          }
 
          if (gfprint)

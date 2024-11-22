@@ -231,7 +231,7 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      if (t == 0) { return pow(10, -4); }
+      if (t == 0) { return pow(10, -5); }
       else {
          double _p = p0(x,t);
          double _rho = rho0(x,t);

@@ -1042,6 +1042,7 @@ int main(int argc, char *argv[]) {
    VisItDataCollection visit_dc(_visit_basename, pmesh);
    if (visit)
    {
+      visit_dc.RegisterField("Specific Volume", &sv_gf);
       visit_dc.RegisterField("Density", &rho_gf);
       visit_dc.RegisterField("Velocity", &v_gf);
       visit_dc.RegisterField("Specific Total Energy", &ste_gf);

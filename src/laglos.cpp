@@ -1053,32 +1053,24 @@ int main(int argc, char *argv[]) {
    }
 
    VisItDataCollection visit_dc(_visit_basename, pmesh);
-   if (visit)
-   {
-      visit_dc.RegisterField("Specific Volume", &sv_gf);
-      visit_dc.RegisterField("Density", &rho_gf);
-      visit_dc.RegisterField("Velocity", &v_gf);
-      visit_dc.RegisterField("Specific Total Energy", &ste_gf);
-      visit_dc.SetCycle(0);
-      visit_dc.SetTime(0.0);
-      visit_dc.Save();
-   }
+   visit_dc.RegisterField("Specific Volume", &sv_gf);
+   visit_dc.RegisterField("Density", &rho_gf);
+   visit_dc.RegisterField("Velocity", &v_gf);
+   visit_dc.RegisterField("Specific Total Energy", &ste_gf);
+   visit_dc.SetCycle(0);
+   visit_dc.SetTime(0.0);
+   visit_dc.Save();
 
    ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   if (pview)
-   {
-      // paraview_dc.SetPrefixPath("ParaView");
-      paraview_dc.SetLevelsOfDetail(order_u);
-      paraview_dc.SetDataFormat(VTKFormat::BINARY);
-      paraview_dc.SetHighOrderOutput(true);
-      paraview_dc.RegisterField("Specific Volume", &sv_gf);
-      paraview_dc.RegisterField("Density", &rho_gf);
-      paraview_dc.RegisterField("Velocity", &v_gf);
-      paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
-      paraview_dc.SetCycle(0);
-      paraview_dc.SetTime(0.0); 
-      paraview_dc.Save();
-   }
+   paraview_dc.SetLevelsOfDetail(order_u);
+   paraview_dc.SetDataFormat(VTKFormat::BINARY);
+   paraview_dc.RegisterField("Specific Volume", &sv_gf);
+   paraview_dc.RegisterField("Density", &rho_gf);
+   paraview_dc.RegisterField("Velocity", &v_gf);
+   paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
+   paraview_dc.SetCycle(0);
+   paraview_dc.SetTime(0.0); 
+   paraview_dc.Save();
 
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
@@ -1321,20 +1313,6 @@ int main(int argc, char *argv[]) {
                
             }
          }
-         
-         if (visit)
-         {
-            visit_dc.SetCycle(ti);
-            visit_dc.SetTime(t);
-            visit_dc.Save();
-         }
-
-         if (pview)
-         {
-            paraview_dc.SetCycle(ti);
-            paraview_dc.SetTime(t);
-            paraview_dc.Save();
-         }
 
          if (gfprint)
          {
@@ -1425,7 +1403,22 @@ int main(int argc, char *argv[]) {
             std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
             rho_cont_ofs.precision(8);
             rho_cont_gf.SaveAsOne(rho_cont_ofs);
-            rho_cont_ofs.close();         
+            rho_cont_ofs.close();    
+
+
+            if (visit)
+            {
+               visit_dc.SetCycle(ti);
+               visit_dc.SetTime(t);
+               visit_dc.Save();
+            }
+
+            if (pview)
+            {
+               paraview_dc.SetCycle(ti);
+               paraview_dc.SetTime(t);
+               paraview_dc.Save();
+            }     
          }
       }
       // cout << "finished step\n";
@@ -1507,6 +1500,16 @@ int main(int argc, char *argv[]) {
       rho_cont_ofs.precision(8);
       rho_cont_gf.SaveAsOne(rho_cont_ofs);
       rho_cont_ofs.close();
+
+      /* Always save last VisIt files */
+      visit_dc.SetCycle(ti);
+      visit_dc.SetTime(t);
+      visit_dc.Save();
+
+      /* Always save last ParaView files */
+      paraview_dc.SetCycle(ti);
+      paraview_dc.SetTime(t);
+      paraview_dc.Save();
    } // End print final grid functions
 
    if (problem_class->has_exact_solution())

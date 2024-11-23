@@ -134,8 +134,8 @@ int main(int argc, char *argv[]) {
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
    int fv_option = 2;
-   int mv_it_option = 2;
-   int mv_n_iterations = 10;
+   int mv_it_option = 0;
+   int mv_n_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
    bool optimize_timestep = true;
    bool convergence_testing = false;

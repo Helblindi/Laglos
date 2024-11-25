@@ -837,6 +837,7 @@ int main(int argc, char *argv[]) {
    int  visport   = 19916;
 
    ParGridFunction rho_gf(&L2FESpace);
+   ParGridFunction rho_cont_gf(&H1FESpace);
    ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
@@ -863,6 +864,9 @@ int main(int argc, char *argv[]) {
       {
          rho_gf[i] = 1./sv_gf[i];
       } 
+      // Continuous projection
+      GridFunctionCoefficient rho_gf_coeff(&rho_gf);
+      rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
    if (visualization)
@@ -1055,6 +1059,7 @@ int main(int argc, char *argv[]) {
    VisItDataCollection visit_dc(_visit_basename, pmesh);
    visit_dc.RegisterField("Specific Volume", &sv_gf);
    visit_dc.RegisterField("Density", &rho_gf);
+   visit_dc.RegisterField("Density c", &rho_cont_gf);
    visit_dc.RegisterField("Velocity", &v_gf);
    visit_dc.RegisterField("Specific Total Energy", &ste_gf);
    visit_dc.SetCycle(0);
@@ -1066,6 +1071,7 @@ int main(int argc, char *argv[]) {
    paraview_dc.SetDataFormat(VTKFormat::BINARY);
    paraview_dc.RegisterField("Specific Volume", &sv_gf);
    paraview_dc.RegisterField("Density", &rho_gf);
+   paraview_dc.RegisterField("Density c", &rho_cont_gf);
    paraview_dc.RegisterField("Velocity", &v_gf);
    paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
    paraview_dc.SetCycle(0);
@@ -1392,7 +1398,6 @@ int main(int argc, char *argv[]) {
 
             // Print continuous interpolation of density
             GridFunctionCoefficient rho_gf_coeff(&rho_gf);
-            ParGridFunction rho_cont_gf(&H1FESpace);
             rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
             std::ostringstream rho_cont_name;
             rho_cont_name  << gfprint_path 
@@ -1491,7 +1496,6 @@ int main(int argc, char *argv[]) {
 
       // Print continuous interpolation of density
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
-      ParGridFunction rho_cont_gf(&H1FESpace);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
       std::ostringstream rho_cont_name;
       rho_cont_name  << gfprint_path 

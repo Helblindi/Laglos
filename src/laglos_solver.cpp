@@ -741,19 +741,29 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    pmesh->NewNodes(x_gf, false);
 
    /* Optionally post process the density to be mass conservative */
+   double pct_corrected = 0., rel_mass_corrected = 0.;
    if (post_process_density)
    {
-      SetMassConservativeDensity(S);
+      SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+      ts_ppd_pct_cells.Append(pct_corrected);
+      ts_ppd_rel_mag.Append(rel_mass_corrected);
    }
 
+   /* Compute time series data */
+   ts_mws.Append(dij_sparse->MaxNorm());
+   ts_timestep.Append(dt);
+   int minDetJCell;
+   double minDetJ;
+   ComputeMinDetJ(minDetJCell, minDetJ); // Alternative to IsMeshCollapsed()
+   ts_min_detJ.Append(minDetJ);
+   ts_min_detJ_cell.Append(minDetJCell);
+
    /*
-   Check if mesh has tangled. If so, modify isCollapsed parameter
-   to stop computation and print final data
+   If mesh has tangled, modify isCollapsed parameter to stop computation and print final data
    */
-   if (check_mesh)
+   if (check_mesh & (minDetJ < 0.))
    {
-      isCollapsed = IsMeshCollapsed();
-      // isCollapsed = IsMeshCollapsedGeom(S);
+      isCollapsed = true;
    }
 } 
 
@@ -1049,6 +1059,50 @@ bool LagrangianLOOperator<dim>::IsMeshCollapsed()
    }
 
    return false;
+}
+
+
+/****************************************************************************************************
+* Function: ComputeMinDetJ
+* Parameters:
+*  minDetJ - Minimum value for the determinant of the cell transformation over the mesh
+*  cell    - coresponding cell
+*
+* Purpose:
+*     Compute the minimum determinant of the jacobian of a cell transformation for all cells in the mesh.
+*     This value can be used to verify if the mesh has collapsed. If minDetJ < 0., then the mesh has collapsed.
+*     The Jacobian is checked at the following quadrature points:
+*        (.211, .211)
+*        (.789, .211)
+*        (.789, .789)
+*        (.211, .789)
+*     If the determinant of the Jacobian at any of the above points
+*     is negative, this means that our element transformation has 
+*     reversed orientation, or twisted, and thus the mesh has 
+*     collapsed.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeMinDetJ(int &cell, double &minDetJ)
+{
+   ElementTransformation * trans;
+   minDetJ = 100.;
+
+   for (int el = 0; el < L2.GetNE(); el++)
+   {
+      trans = pmesh->GetElementTransformation(el);
+      /* Iterate over 4 integration points */
+      for (int i = 0; i < RT_ir.GetNPoints(); i++)
+      {
+         const IntegrationPoint &ip = RT_ir.IntPoint(i);
+         trans->SetIntPoint(&ip);
+         double detJ = trans->Weight();
+         if (detJ < minDetJ)
+         {
+            minDetJ = detJ;
+            cell = el;
+         }
+      }
+   }
 }
 
 /****************************************************************************************************
@@ -1686,7 +1740,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
 *  after the mesh motion has been calculated.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S)
+void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
 {
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
@@ -1695,6 +1749,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S)
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf;
    sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   rel_mass_corrected = 0.;
 
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
    {
@@ -1715,16 +1770,19 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S)
          continue;
       }
       else {
-         if (abs(sv_new - sv_new_mc) > 1.E-12)
+         double val = abs(sv_new - sv_new_mc);
+         if (val > 1.E-12)
          {
             num_corrected_cells += 1;
             sv_gf.Elem(cell_it) = sv_new_mc;
+            rel_mass_corrected += val / sv_new_mc;
          }
       }
       
    }
-   // Output percentage of cells that needed correction
-   cout << "pct corrected cells: " << double(num_corrected_cells)/NDofs_L2 << endl;
+
+   // Set pct corrected to be appended to timeseries data
+   pct_corrected = double(num_corrected_cells)/NDofs_L2;
 }
 
 
@@ -2440,6 +2498,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
    double cell_ratio = (double)counter / (double)NDofs_L2;
 
    cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl
+   ///TODO: Add in pct cells ppd if -ppd is enabled
         << "Initial mass sum: " << denom 
         << ", Current mass sum: " << current_mass_sum << endl
         << "Mass Error: " << num / denom << endl
@@ -3252,6 +3311,58 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       else 
       {
          fstream_sv << "bdr\n";
+      }
+   }
+}
+
+/****************************************************************************************************
+* Function: SaveTimeSeriesArraysToFile
+* Parameters:
+*  output_file_prefix - Parameters used to define output file location
+*  output_file_suffix - See above.
+*
+* Purpose:
+*  Save timeseries arrays to file.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix)
+{
+   const int num_timesteps = ts_timestep.Size();
+
+   // Verify all timeseries arrays are the proper size
+   assert(ts_min_detJ.Size() == num_timesteps);
+   assert(ts_min_detJ_cell.Size() == num_timesteps);
+
+   if (post_process_density)
+   {
+      assert(ts_ppd_pct_cells.Size() == num_timesteps);
+      assert(ts_ppd_rel_mag.Size() == num_timesteps);
+   }
+
+   // Form filenames and ofstream objects
+   std::string sv_file = output_file_prefix + output_file_suffix;
+   std::ofstream fstream_sv(sv_file.c_str());
+   fstream_sv << "timestep,dt,mws,minDetJ,minDetJCell,ppdPctCells,ppdRelMag\n";
+
+   for (int i = 0; i < num_timesteps; i++)
+   {
+      // Output to file
+      fstream_sv << i << ","
+                 << ts_timestep[i] << ","
+                 << ts_mws[i] << ","
+                 << ts_min_detJ[i] << ","
+                 << ts_min_detJ_cell[i];
+
+      // Save ppd values if enabled
+      if (post_process_density)
+      {
+         fstream_sv << ","
+                    << ts_ppd_pct_cells[i] << ","
+                    << ts_ppd_rel_mag[i] << "\n";
+      }
+      else 
+      {
+         fstream_sv << "\n";
       }
    }
 }

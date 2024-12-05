@@ -81,6 +81,7 @@
 #include <chrono>
 #include <boost/filesystem.hpp>
 #include <sstream>
+#include <string>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -143,6 +144,7 @@ int main(int argc, char *argv[]) {
    double CFL = 0.5;
    double dm_val = 0.; // Parameter to distort the mesh, overrides file val
    string sv_output_prefix;
+   string ts_output_prefix;
    string output_path;
 
    OptionsParser args(argc, argv);
@@ -284,6 +286,11 @@ int main(int argc, char *argv[]) {
    path = _state_vectors.c_str();
    boost::filesystem::path state_vectors_dir(path);
    boost::filesystem::create_directory(state_vectors_dir);
+
+   ts_output_prefix = output_path + "timeseries/";
+   path = ts_output_prefix.c_str();
+   boost::filesystem::path ts_dir(path);
+   boost::filesystem::create_directory(ts_dir);
 
    path = _refinement_path.c_str();
    boost::filesystem::path refinement_dir(path);
@@ -1454,7 +1461,15 @@ int main(int argc, char *argv[]) {
                       << to_string(rp_levels + rs_levels)
                       << ".out";
 
+   ostringstream ts_filename_suffix;
+   ts_filename_suffix << "tsData_"
+                      << setfill('0')
+                      << setw(2)
+                      << to_string(rp_levels + rs_levels)
+                      << ".data";
+
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
+   hydro.SaveTimeSeriesArraysToFile(ts_output_prefix, ts_filename_suffix.str());
 
    // In all cases, print the final grid functions
    {

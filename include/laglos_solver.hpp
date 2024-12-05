@@ -142,6 +142,9 @@ protected:
    Array<int> add_ess_tdofs;
    Array<double> add_bdr_vals;
 
+   /* Time series data */
+   Array<double> ts_timestep, ts_mws, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
+
 public:
    enum DofEntity {corner, face, cell};
 
@@ -233,6 +236,7 @@ public:
 
    // Check Jacobians to ensure mesh hasn't collapsed
    bool IsMeshCollapsed();
+   void ComputeMinDetJ(int &cell, double &minDetJ);
    bool IsMeshCollapsedGeom(const Vector &S);
 
    // Normal vector mesh motion
@@ -317,7 +321,7 @@ public:
    void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
 
    // Enforce Mass Conservation
-   void SetMassConservativeDensity(Vector &S);
+   void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);
@@ -325,6 +329,7 @@ public:
 
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
+   void SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix);
 };
 
 } // end ns hydrodynamics

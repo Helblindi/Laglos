@@ -508,6 +508,8 @@ int main(int argc, char *argv[]) {
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
    ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
+   /* Finite element space solely constructed for continuous representation of density field */
+   ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
@@ -836,8 +838,7 @@ int main(int argc, char *argv[]) {
    char vishost[] = "localhost";
    int  visport   = 19916;
 
-   ParGridFunction rho_gf(&L2FESpace);
-   ParGridFunction rho_cont_gf(&H1FESpace);
+   ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
    ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
@@ -1061,19 +1062,27 @@ int main(int argc, char *argv[]) {
    visit_dc.RegisterField("Density", &rho_gf);
    visit_dc.RegisterField("Density c", &rho_cont_gf);
    visit_dc.RegisterField("Velocity", &v_gf);
+   visit_dc.RegisterField("Mesh Velocity", &mv_gf);
    visit_dc.RegisterField("Specific Total Energy", &ste_gf);
+   visit_dc.RegisterField("Mass Loss", &mc_gf);
+   visit_dc.RegisterField("Pressure", &press_gf);
+   visit_dc.RegisterField("Gamma", &gamma_gf);
    visit_dc.SetCycle(0);
    visit_dc.SetTime(0.0);
    visit_dc.Save();
 
    ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   paraview_dc.SetLevelsOfDetail(order_u);
-   paraview_dc.SetDataFormat(VTKFormat::BINARY);
+   paraview_dc.SetLevelsOfDetail(order_mv);
+   paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
    paraview_dc.RegisterField("Specific Volume", &sv_gf);
    paraview_dc.RegisterField("Density", &rho_gf);
    paraview_dc.RegisterField("Density c", &rho_cont_gf);
    paraview_dc.RegisterField("Velocity", &v_gf);
+   paraview_dc.RegisterField("Mesh Velocity", &mv_gf);
    paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
+   paraview_dc.RegisterField("Mass Loss", &mc_gf);
+   paraview_dc.RegisterField("Pressure", &press_gf);
+   paraview_dc.RegisterField("Gamma", &gamma_gf);
    paraview_dc.SetCycle(0);
    paraview_dc.SetTime(0.0); 
    paraview_dc.Save();

@@ -3,7 +3,6 @@ list(APPEND HEADERS
    "${PROJECT_SOURCE_DIR}/include/initial_vals.hpp"
    "${PROJECT_SOURCE_DIR}/include/laglos_solver.hpp"
    "${PROJECT_SOURCE_DIR}/include/riemann1D.hpp"
-   "${PROJECT_SOURCE_DIR}/include/lambda_max_lagrange.h"
    "${PROJECT_SOURCE_DIR}/include/sedov_exact.hpp"
    "${PROJECT_SOURCE_DIR}/include/geometry.hpp"
    "${PROJECT_SOURCE_DIR}/include/lagrange_multiplier.hpp"

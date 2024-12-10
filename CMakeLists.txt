@@ -88,7 +88,7 @@ find_package(Boost REQUIRED COMPONENTS filesystem)
 list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})
 
 # Add in Fortran libraries
-list(APPEND _laglos_libraries comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
+list(APPEND _laglos_libraries comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
 
 # Add in quick fix to sparse stuff
 # list(APPEND _laglos_libraries "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libgfortran.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libquadmath.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/gcc/aarch64-apple-darwin23/14/libgcc.a")

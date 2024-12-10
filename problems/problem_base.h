@@ -17,6 +17,14 @@ extern "C" {
       double *lambda_maxr_out, double *pstar, int *k, double *b_covolume);
 }
 
+// Fortran subroutine from Lagrangian code (GREEDY)
+extern "C" {
+   void __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(
+      double *in_rhol, double *in_ul, double *in_el, double *in_pl,
+      double *in_rhor, double *in_ur, double *in_er, double *in_pr,
+      double *in_tol, bool *want_iter,double *lambda_max, double *pstar, int *k); ///TODO: , double *b_covolume);
+}
+
 // Fortran subroutine from Eulerian code
 extern "C" {
    void __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
@@ -172,16 +180,28 @@ public:
          _b = b_covolume;
       }
 
-      __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
-         &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);
+      const bool greedy = true;
+      double lambda_max = 1.;
+      if (greedy)
+      {
+         // cout << "inul: " << in_ul << ", inur: " << in_ur << endl;
+         __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(
+            &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+            &want_iter,&lambda_max, &pstar,&k);
+      }
+      else 
+      {
+         __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
+            &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+            &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);
 
-      // bool no_iter = false; 
-      // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
-      //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-      //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
+         // bool no_iter = false; 
+         // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
+         //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
+         //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
 
-      double lambda_max = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
+         lambda_max = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
+      }
 
       if (isnan(lambda_max))
       {
@@ -203,6 +223,7 @@ public:
       // cout << "UR. Density: " << 1./U_j[0] << ", vel: " << U_j[1] << ", ste: " << U_j[dim+1] << ", p: " << in_pr << endl;
       // cout << "lamba L: " << std::abs(lambda_maxl_out) << ", lambda_R: " <<  std::abs(lambda_maxr_out) << endl;
 
+      // cout << "lambda_max: " << lambda_max << endl;
       return lambda_max;
       // return 0.5;
    }

@@ -1,7 +1,7 @@
 !===Authors: Bennett Clayton, Jean-Luc Guermond, and Bojan Popov, Texas A&M, April 5, 2021
-MODULE arbitrary_eos_lambda_module
+MODULE arbitrary_eos_lagrangian_greedy_lambda_module
   IMPLICIT NONE
-  PUBLIC               :: lambda_arbitrary_eos !===Main function
+  PUBLIC               :: greedy_lambda_arbitrary_eos !===Main function
   PUBLIC               :: rhostar, ustar, phi  !===Optional functions. Can be removed
   REAL(KIND=8), PUBLIC :: b_covolume = 0.0d0   !===Covolume constant, if known
   PRIVATE
@@ -9,7 +9,7 @@ MODULE arbitrary_eos_lambda_module
   REAL(KIND=NUMBER), PARAMETER :: zero = 0
   REAL(KIND=NUMBER), PARAMETER :: one = 1
   REAL(KIND=NUMBER), PARAMETER :: half = 0.5d0
-  REAL(KIND=NUMBER), PARAMETER :: five_third = 5.d0/3.d0, epsilon=1.d-10
+  REAL(KIND=NUMBER), PARAMETER :: five_third = 5.d0/3.d0, epsilon=1.d-2
   REAL(KIND=NUMBER) :: rhol, ul, pl, el
   REAL(KIND=NUMBER) :: rhor, ur, pr, er
   REAL(KIND=NUMBER) :: gammal, al, alphal, capAl, capBl, capCl, expol
@@ -23,7 +23,7 @@ MODULE arbitrary_eos_lambda_module
 
 CONTAINS
 
-  SUBROUTINE lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
+  SUBROUTINE greedy_lambda_arbitrary_eos(in_rhol,in_ul,in_el,in_pl,in_rhor,in_ur,in_er,in_pr,in_tol,no_iter,&
        lambda_max,pstar,k)
     IMPLICIT NONE
     REAL(KIND=8), INTENT(IN) :: in_rhol, in_el, in_rhor, in_er, in_tol
@@ -123,7 +123,7 @@ CONTAINS
 !!$          k = k+1
 !!$       END DO
 !!$    END IF
-  END SUBROUTINE lambda_arbitrary_eos
+  END SUBROUTINE greedy_lambda_arbitrary_eos
 
   SUBROUTINE init(rho,e,p,gamma,a,alpha,capA,capB,capC,expo)
     IMPLICIT NONE
@@ -210,12 +210,12 @@ CONTAINS
     tau_min = 1/max(rhol,rhor)
     IF (0.d0< phi_pmin) THEN !===two expansions
        x = b_covolume + (1/rhol - b_covolume)*(pl/p2)**(1/gammal)
-       y = b_covolume + (1/rhol - b_covolume)*(pl/p2)**(1/gammal)
+       y = b_covolume + (1/rhor - b_covolume)*(pr/p2)**(1/gammar)
        tau_max = MAX(tau_max, x, y)
     ELSE IF (0.d0< phi_pmax) THEN !===one expansions one shock
        !===Shock
        x = rho_min*(p2/p_min + (gamma_min-1)/(gamma_min+1)) &
-            /((p2/p_min)*(gamma_min-1+2*b_covolume)/(gamma_min+1)+(gamma_min+1-2*b_covolume)/(gamma_min+1))
+            /((p2/p_min)*(gamma_min-1+2*b_covolume*rho_min)/(gamma_min+1)+(gamma_min+1-2*b_covolume*rho_min)/(gamma_min+1))
        tau_min = min(tau_min,1/x)
        !===Expansion
        x = b_covolume + (1/rho_max - b_covolume)*(p_max/p2)**(1/gammal)
@@ -223,9 +223,9 @@ CONTAINS
     ELSE !===two shocks
        !===Shock
        x = rho_min*(p2/p_min + (gamma_min-1)/(gamma_min+1)) &
-            /((p2/p_min)*(gamma_min-1+2*b_covolume)/(gamma_min+1)+(gamma_min+1-2*b_covolume)/(gamma_min+1))
+            /((p2/p_min)*(gamma_min-1+2*b_covolume*rho_min)/(gamma_min+1)+(gamma_min+1-2*b_covolume*rho_min)/(gamma_min+1))
        y = rho_max*(p2/p_max + (gamma_max-1)/(gamma_max+1)) &
-            /((p2/p_max)*(gamma_max-1+2*b_covolume)/(gamma_max+1)+(gamma_max+1-2*b_covolume)/(gamma_max+1))
+            /((p2/p_max)*(gamma_max-1+2*b_covolume*rho_max)/(gamma_max+1)+(gamma_max+1-2*b_covolume*rho_max)/(gamma_max+1))
        tau_min = min(tau_min,1/x,1/y)
     END IF
 
@@ -326,4 +326,4 @@ CONTAINS
     END IF
   END FUNCTION rhostar
 
-END MODULE arbitrary_eos_lambda_module
+END MODULE arbitrary_eos_lagrangian_greedy_lambda_module

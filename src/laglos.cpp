@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    bool mc = false;
    bool use_viscosity = true;
+   bool greedy = false;
    bool mm = true;
    bool check_mesh = true;
    bool post_process_density = false;
@@ -178,6 +179,8 @@ int main(int argc, char *argv[]) {
    args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
                   "--no-viscosity",
                   "Enable or disable the use of artificial viscosity.");
+   args.AddOption(&greedy, "-greedy", "--use-greedy-viscosity", "-no-greedy", "--no-greedy-viscosity",
+                  "Enable or disable greedy viscosity computation.");
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
    args.AddOption(&check_mesh, "-cm", "--check-mesh", "-no-cm", "--no-check-mesh",
@@ -819,6 +822,7 @@ int main(int argc, char *argv[]) {
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
+   hydro.SetViscOption(greedy);
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);
    hydro.SetDensityPP(post_process_density);

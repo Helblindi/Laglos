@@ -389,7 +389,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 
          // Finally compute lambda max
          // cout << "pre compute lambda max\n";
-         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, pb->get_b());
+         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
          d = lambda_max * c_norm; 
 
          dij_sparse->Elem(c,cp) = d;

@@ -120,6 +120,7 @@ protected:
    bool use_viscosity;
    bool mm;
    bool check_mesh;
+   bool use_greedy_viscosity;
    bool post_process_density;
    int mv_option = 0;
    bool do_mv_linearization;
@@ -168,7 +169,7 @@ public:
    void SetProblem(const int _problem) { this->problem = _problem; }
    void SetMeshCheck(const bool _check_mesh) { this->check_mesh = _check_mesh; }
    void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
-
+   void SetViscOption(const bool _use_greedy_viscosity) { this->use_greedy_viscosity = _use_greedy_viscosity; }
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
    void CreateBdrElementIndexingArray();

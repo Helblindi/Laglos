@@ -125,6 +125,7 @@ public:
                                     const Vector & n_ij,
                                     double in_pl,
                                     double in_pr,
+                                    const bool &use_greedy_viscosity,
                                     double b_covolume=-1.,
                                     const string flag="NA")
    {
@@ -180,9 +181,8 @@ public:
          _b = b_covolume;
       }
 
-      const bool greedy = true;
       double lambda_max = 1.;
-      if (greedy)
+      if (use_greedy_viscosity)
       {
          // cout << "inul: " << in_ul << ", inur: " << in_ur << endl;
          __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(

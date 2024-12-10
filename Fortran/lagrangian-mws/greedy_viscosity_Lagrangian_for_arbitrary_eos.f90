@@ -9,7 +9,7 @@ MODULE arbitrary_eos_lagrangian_greedy_lambda_module
   REAL(KIND=NUMBER), PARAMETER :: zero = 0
   REAL(KIND=NUMBER), PARAMETER :: one = 1
   REAL(KIND=NUMBER), PARAMETER :: half = 0.5d0
-  REAL(KIND=NUMBER), PARAMETER :: five_third = 5.d0/3.d0, epsilon=1.d-2
+  REAL(KIND=NUMBER), PARAMETER :: five_third = 5.d0/3.d0, epsilon=1.d-3
   REAL(KIND=NUMBER) :: rhol, ul, pl, el
   REAL(KIND=NUMBER) :: rhor, ur, pr, er
   REAL(KIND=NUMBER) :: gammal, al, alphal, capAl, capBl, capCl, expol

@@ -246,7 +246,7 @@ CONTAINS
        tau_min = MIN(tau_min,1/x)
        !===Expansion
        x = b_covolume + (1/rho_max - b_covolume)*(p_max/p2)**(1/gammal)
-       tau_max = MAX(tau_max, 1/x)
+       tau_max = MAX(tau_max, x)
     ELSE !===two shocks
        !===Shock
        x = rho_min*(p2/p_min + (gamma_min-1)/(gamma_min+1)) &
@@ -298,11 +298,13 @@ CONTAINS
        ttt = 1.d3/lambda_max_safe
     END IF
     lambda_max = MAX(lambda_max,1.d0/ttt)
-    lambda_max = MIN(lambda_max, lambda_max_safe)
-    !if (lambda_max > lambda_max_safe) THEN 
-    !  WRITE(*,*) "lambda_max: ", lambda_max, ", safe: ", lambda_max_safe
-    !  STOP
-    !end if
+    IF (lambda_max > 1.01*lambda_max_safe) THEN
+       WRITE(*,*) ' Problem here ', lambda_max, lambda_max_safe
+       write(*,*) rhol, rhor, ul, ur, pl, pr
+       STOP
+    END IF
+    !write(*,*) 'lambda_max, lambda_max_safe', lambda_max, lambda_max_safe
+    
   END SUBROUTINE no_iter_update_lambda
 
   FUNCTION lambdaz(rhoz,uz,pz,az,gammaz,pstar,z) RESULT(vv)

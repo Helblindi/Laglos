@@ -1469,7 +1469,7 @@ int main(int argc, char *argv[]) {
                       << setfill('0')
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
-                      << ".data";
+                      << ".csv";
 
    hydro.SaveStateVecsToFile(S, sv_output_prefix, sv_filename_suffix.str());
    hydro.SaveTimeSeriesArraysToFile(ts_output_prefix, ts_filename_suffix.str());

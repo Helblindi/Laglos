@@ -144,7 +144,7 @@ protected:
    Array<double> add_bdr_vals;
 
    /* Time series data */
-   Array<double> ts_timestep, ts_mws, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
+   Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
 
 public:
    enum DofEntity {corner, face, cell};

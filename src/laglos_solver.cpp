@@ -352,7 +352,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
    mfem::Mesh::FaceInformation FI;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
-   double F, lambda_max, d;
+   double F, lambda_max, d, dij_avg = 0.;
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
@@ -388,9 +388,9 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
-         // cout << "pre compute lambda max\n";
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
          d = lambda_max * c_norm; 
+         dij_avg += d;
 
          dij_sparse->Elem(c,cp) = d;
          dij_sparse->Elem(cp,c) = d;
@@ -401,6 +401,8 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          }
       }
    } // End face iterator
+   dij_avg = dij_avg / num_faces;
+   ts_dijavg.Append(dij_avg);
    // cout << "Printing dij_sparse:\n";
    // dij_sparse->Print(cout);
 }
@@ -750,7 +752,8 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    }
 
    /* Compute time series data */
-   ts_mws.Append(dij_sparse->MaxNorm());
+   ts_dijmax.Append(dij_sparse->MaxNorm());
+   ts_t.Append(t);
    ts_timestep.Append(dt);
    int minDetJCell;
    double minDetJ;
@@ -3342,14 +3345,16 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "timestep,dt,mws,minDetJ,minDetJCell,ppdPctCells,ppdRelMag\n";
+   fstream_sv << "timestep,t,dt,dij_max,dij_avg,minDetJ,minDetJCell,ppdPctCells,ppdRelMag\n";
 
    for (int i = 0; i < num_timesteps; i++)
    {
       // Output to file
       fstream_sv << i << ","
+                 << ts_t[i] << ","
                  << ts_timestep[i] << ","
-                 << ts_mws[i] << ","
+                 << ts_dijmax[i] << ","
+                 << ts_dijavg[i] << ","
                  << ts_min_detJ[i] << ","
                  << ts_min_detJ_cell[i];
 

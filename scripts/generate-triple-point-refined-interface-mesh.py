@@ -23,7 +23,7 @@ def main():
    print("y_arr: ", y_arr)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
    # filename = home_dir + "data/vortex-square-131044.mesh"
-   filename = home_dir + "data/triple-point-refined-interface-2.mesh"
+   filename = home_dir + "data/triple-point-refined-interface-slant.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -103,6 +103,12 @@ def main():
       x = x_arr[i]
       for j in range(0, ny_gridpoints):
          y = y_arr[j]
-         f.write("%.2f %.2f\n" % (x, y))
+         # Slant vertices above interface 
+         if (y > 1.4 and x >= 1.2 and x < 2.5):
+            # xmod = x - .1 * np.sin(np.pi * x / 3.) * x
+            xmod = x - .15
+            f.write("%.2f %.2f\n" % (xmod, y))
+         else:
+            f.write("%.2f %.2f\n" % (x, y))
 
 main()

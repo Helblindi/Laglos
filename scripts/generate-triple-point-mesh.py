@@ -2,17 +2,26 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 15
-   ny_gridpoints = 7
+   refinement = 2
+   nx_gridpoints = 7*(2**refinement) + 1
+   ny_gridpoints = 3*(2**refinement) + 1
    xL = 0.
+   x1 = 1.
+   x2 = 2.
    xR = 7.
    yL = 0.
    yR = 3.
-   x_arr = np.linspace(xL,xR,nx_gridpoints)
+   x0_arr = np.linspace(xL, x1, int((nx_gridpoints -1) / 7), endpoint=False)
+   refin_mult = 1
+   x1_arr = np.linspace(x1, x2, int(refin_mult * ((nx_gridpoints - 1) / 7)), endpoint=False)
+   x2_arr = np.linspace(x2, xR, int((nx_gridpoints -1) * 5./7 + 1))
+   x_arr = np.concatenate([x0_arr, x1_arr, x2_arr])
+   # x_arr = np.linspace(xL,xR,nx_gridpoints)
+   print("x_arr: ", x_arr)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
    # filename = home_dir + "data/vortex-square-131044.mesh"
-   filename = home_dir + "data/triple-point.mesh"
+   filename = home_dir + "data/triple-point-slant.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -92,6 +101,18 @@ def main():
       x = x_arr[i]
       for j in range(0, ny_gridpoints):
          y = y_arr[j]
-         f.write("%.2f %.2f\n" % (x, y))
+         # if (x > 1. and y > 1. and y < 2.):
+         if (x > 1.):
+            # xmod = x + 3.*(y/3.)*(1. - y/3.) * np.cos(np.pi * (x-1.) / 12.)
+            # xmod = x + (3.-y)*np.sin(np.pi * x / 7.)*np.sin(np.pi*y/3.)
+            b = 5.
+            xmod = x + 0.25 * (3.-y) * np.sin(np.pi * (x + b) / (b + 7.))
+            # xmod = x + 0.25*(-x / 6. + 7./6.) * (3.-y) * np.sin(np.pi * (x + b) / (b + 7.))
+            # xmod = x +  (3./y - 1.)* np.sin(np.pi * (x + b) / (b + 7.))
+            f.write("%.6f %.6f\n" % (xmod, y))
+         else:
+             f.write("%.6f %.6f\n" % (x, y))
+
+         
 
 main()

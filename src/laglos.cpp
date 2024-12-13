@@ -205,8 +205,9 @@ int main(int argc, char *argv[]) {
    args.AddOption(&fv_option, "-fv", "--face-velocity-option",
                   "Choose how to compute face velocities:"
                   "\n\t 0 - Do nothing,"
-                  "\n\t 1 - Mass conservative bubble,"
-                  "\n\t 2 - Average, Q1 type");
+                  "\n\t 1 - Mass conservative bubble, Q2"
+                  "\n\t 2 - Average, Q1 type,"
+                  "\n\t 3 - Butterfly, Q2");
    args.AddOption(&mv_it_option, "-mv-it-op", "--mv-it-op",
                   "Set the desired type of mesh velocity iteration to use");
    args.AddOption(&mv_n_iterations, "-mv-iter-n", "--mv-num-iterations",

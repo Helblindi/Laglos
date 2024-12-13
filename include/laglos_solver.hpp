@@ -226,6 +226,7 @@ public:
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
    void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void FillFaceVelocitiesWithButterfly(Vector &S);
 
    // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);

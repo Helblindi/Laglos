@@ -1002,6 +1002,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          case 2:
             FillFaceVelocitiesWithAvg(S);
             break;
+
+         case 3:
+            FillFaceVelocitiesWithButterfly(S);
+            break;
          
          default:
             /* Do nothing */
@@ -3115,6 +3119,158 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(Vector &S, const strin
       }
 
       // Lastly, put face velocity into gridfunction object
+      geom.UpdateNodeVelocity(S, face_dof, face_velocity);
+   }
+}
+
+
+/****************************************************************************************************
+* Function: FillFaceVelocitiesWithButterfly
+* Parameters:
+*   S        - BlockVector representing FiniteElement information
+*
+* Purpose:
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(Vector &S)
+{
+   mfem::Mesh::FaceInformation FI;
+   Vector face_velocity(dim), tmp_vel(dim), vdof1_v(dim), vdof2_v(dim);
+   Vector macro_v1(dim), macro_v2(dim), sub_vel(dim);
+   Array<int> row, edge_row, cell_faces, side_faces, tmp_row;
+   bool is_singular_macro = false;
+   int sub_index;
+
+   for (int face = 0; face < num_faces; face++)
+   {
+      // cout << "======================\n";
+      // cout << "face: " << face << endl;
+      face_velocity = 0.;
+      FI = pmesh->GetFaceInformation(face);
+
+      /* adjacent corner indices */
+      H1.GetFaceDofs(face, row);
+      int face_vdof1 = row[0], face_vdof2 = row[1], face_dof = row[2];
+
+      // retrieve corner velocities
+      geom.GetNodeVelocity(S, face_vdof1, vdof1_v);
+      geom.GetNodeVelocity(S, face_vdof2, vdof2_v);
+
+      /* If boundary cell, take average of adjacent vertices */
+      if (FI.IsBoundary())
+      {
+         for (int j = 0; j < dim; j++)
+         {
+            face_velocity[j] = (vdof1_v[j] + vdof2_v[j]) / 2.;
+         }
+      }
+      else {
+         assert(FI.IsInterior());
+         is_singular_macro = false;
+         /* Get faces of adjacent cells ---> side_faces */
+         int c = FI.element[0].index, cp = FI.element[1].index;
+         element_face.GetRow(c, side_faces);
+         element_face.GetRow(cp, cell_faces);
+         side_faces.Append(cell_faces);
+         // cout << "side faces: ";
+         // side_faces.Print(cout);
+
+         /* adj node 1, comput macro_v1 */
+         vertex_edge.GetRow(face_vdof1, edge_row);
+         if (edge_row.Size() == 4)
+         {
+            add(0.75, vdof1_v, 0.375, vdof2_v, macro_v1);
+            // cout << "node 1: " << face_vdof1 << "\n"
+            //      << "\tadj edges: ";
+            // edge_row.Print(cout);
+            /* Find adj face not in side faces */
+            for (int vert_adj_face_it = 0; vert_adj_face_it < edge_row.Size(); vert_adj_face_it++)
+            {
+               int vert_adj_face = edge_row[vert_adj_face_it];
+               if (side_faces.Find(vert_adj_face) == -1)
+               {
+                  /* face not found */
+                  // cout << "face " << vert_adj_face << " is the face you seek!!!\n";
+
+                  /* Get sub vel */
+                  H1.GetFaceDofs(vert_adj_face, tmp_row);
+                  sub_index = (tmp_row[0] == face_vdof1) ? tmp_row[1] : tmp_row[0];
+                  // cout << "face dofs we seek. Face: " << vert_adj_face << ". vdof1: " << tmp_row[0] << ". vdof2: " << tmp_row[1] << ". Subindex: " << sub_index << endl;
+                  geom.GetNodeVelocity(S, sub_index, sub_vel);
+                  // cout << "sub index: " << sub_index << ", vel: ";
+                  // sub_vel.Print(cout);
+
+                  macro_v1.Add(-.125, sub_vel);
+                  // cout << "macro_v1: ";
+                  // macro_v1.Print(cout);
+               }
+            }
+         }
+         else
+         {
+            // cout << "node 1 is not an interior node.\n";
+            is_singular_macro = true;
+            macro_v1 = 0.;
+         }
+         
+
+         /* adj node 2, comput macro_v2 */
+         vertex_edge.GetRow(face_vdof2, edge_row);
+         if (edge_row.Size() == 4)
+         {
+            add(0.75, vdof2_v, 0.375, vdof1_v, macro_v2);
+            // cout << "node 1: " << face_vdof2 << "\n"
+            //      << "\tadj edges: ";
+            // edge_row.Print(cout);
+            /* Find adj face not in side faces */
+            for (int vert_adj_face_it = 0; vert_adj_face_it < edge_row.Size(); vert_adj_face_it++)
+            {
+               int vert_adj_face = edge_row[vert_adj_face_it];
+               if (side_faces.Find(vert_adj_face) == -1)
+               {
+                  /* face not found */
+                  // cout << "face " << vert_adj_face << " is the face you seek!!!\n";
+
+                  /* Get sub vel */
+                  H1.GetFaceDofs(vert_adj_face, tmp_row);
+                  sub_index = (tmp_row[0] == face_vdof2) ? tmp_row[1] : tmp_row[0];
+                  // cout << "face dofs we seek. Face: " << vert_adj_face << ". vdof1: " << tmp_row[0] << ". vdof2: " << tmp_row[1] << ". Subindex: " << sub_index << endl;
+                  geom.GetNodeVelocity(S, sub_index, sub_vel);
+                  // cout << "sub index: " << sub_index << ", vel: ";
+                  // sub_vel.Print(cout);
+
+                  macro_v2.Add(-.125, sub_vel);
+                  // cout << "macro_v1: ";
+                  // macro_v2.Print(cout);
+               }
+            }
+         }
+         else
+         {
+            // cout << "node 2 is not an interior node.\n";
+            is_singular_macro = true;
+            macro_v2 = 0.;
+         }
+
+         /* Lastly put macro_v1 and macro_v2 together */
+         if (!is_singular_macro)
+         {
+            add(0.5, macro_v1, 0.5, macro_v2, face_velocity);
+         }
+         else
+         {
+            // cout << "---had a singular macro---\n";
+            add(1., macro_v1, 1., macro_v2, face_velocity);
+         }
+      }
+      
+
+      // Lastly, put face velocity into gridfunction object
+      if (face_velocity[0] != face_velocity[0] || face_velocity[1] != face_velocity[1])
+      {
+         MFEM_ABORT("NaN values encountered in corrective face velocity calculation.\n");
+      }
+
       geom.UpdateNodeVelocity(S, face_dof, face_velocity);
    }
 }

@@ -30,7 +30,9 @@
 * ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 8 -vis  ## Vdw3 
 * ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis ## Vdw4
 *
+* --------------------------------------------------------------
 * ----- 2D -----
+* --------------------------------------------------------------
 * ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4             ## Smooth wave in 2D
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4           ## Sod in 2D
 * ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4     ## Sod Distorted
@@ -40,7 +42,11 @@
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.25 -rs 6         ## Noh
 * ./Laglos -m data/ref-square.mesh -p 6 -tf .9 -cfl 0.1 -rs 5              ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
-* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point
+* ----- Fails -----
+* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point [Fails]
+* ----- Untested -----
+* ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
+* ./Laglos -m data/ref-square.mesh -p 15 -tf 0.6 -cfl 0.5 -rs 4            ## Kidder [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
@@ -468,6 +474,11 @@ int main(int argc, char *argv[]) {
       case 14: // ICF
       {
          problem_class = new ICFProblem<dim>();
+         break;
+      }
+      case 15: // Kidder
+      {
+         problem_class = new KidderProblem<dim>();
          break;
       }
       case 20: // Riemann Problem

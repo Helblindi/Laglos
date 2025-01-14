@@ -21,4 +21,5 @@
 #include "icf.h"
 #include "riemann_problem.h"
 #include "test_bcs.h"
+#include "kidder.h"
 #endif

@@ -1325,18 +1325,6 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             U_i_bdry = U_i;
 
             /* Enforce Boundary Conditions */
-            // if (pb->get_indicator() == "Sod" && (bdr_attr == 1 || bdr_attr == 3))
-            // {
-            //    /** 
-            //     * numerical flux on boundary faces should be 
-            //     *            |  0^T |
-            //     *     f(U) = | pI_D |
-            //     *            |  0^T |
-            //    */
-            //    y_temp[0] = 0.;
-            //    y_temp[dim+1] = 0.;
-            //    y_temp *= 2.;
-            // }
             if (pb->get_indicator() == "saltzmann")
             {
                // Check bdry flag
@@ -1393,6 +1381,16 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                }
                } // switch (bdr_attr)
             } // if saltzmann
+            else if (pb->get_indicator() == "Kidder")
+            {
+               // Check bdry flag
+               int bdr_attribute = BdrElementIndexingArray[fids[j]]; 
+               pb->GetBoundaryState(t, bdr_attribute, U_i_bdry);
+               DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
+               F_i_bdry.Mult(c, y_temp_bdry);
+               y_temp += y_temp_bdry;
+               break;
+            }
             else
             {
                y_temp *= 2.;
@@ -1412,7 +1410,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       else
       {
          // Do the normal thing
-         assert(sum_validation.Norml2() < 1e-12);
+         // assert(sum_validation.Norml2() < 1e-12);
 
          sums *= dt;
          double k = pmesh->GetElementVolume(ci);

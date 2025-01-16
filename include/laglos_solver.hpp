@@ -145,6 +145,7 @@ protected:
 
    /* Time series data */
    Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
+   Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int;
 
 public:
    enum DofEntity {corner, face, cell};
@@ -332,6 +333,9 @@ public:
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
    void SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix);
+
+   // Kidder specific function
+   void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);
 };
 
 } // end ns hydrodynamics

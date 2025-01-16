@@ -46,7 +46,7 @@
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point [Fails]
 * ----- Untested -----
 * ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
-* ./Laglos -m data/ref-square.mesh -p 15 -tf 0.6 -cfl 0.5 -rs 4            ## Kidder [Untested]
+* ./Laglos -m data/full_ring.mesh -p 15 -tf 0.2203 -cfl 0.5 -rs 0          ## Kidder [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 

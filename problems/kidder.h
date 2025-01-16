@@ -41,22 +41,38 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   const double r1 = 0.9, r2 = 1.0, P1 = 0.1, P2 = 10., rho2 = .01;
    const double _a = 0., _b = 0., _gamma = 5./3.;
+   const double r1 = 0.9, r2 = 1.0, rho1 = 1., rho2 = 2., s = 1.;
+   const double P1 = pow(rho1, _gamma), P2 = pow(rho2, _gamma);
+   const double tau;
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
    bool _bcs = false; // Indicator for boundary conditions
    string _indicator = "Kidder"; // Possible: saltzmann
 
-   // CFL change, can remove if not needed
-   bool _change_cfl = false;
-   double _cfl_first = 0.5;
-   double _cfl_second = 0.5;
-   double _cfl_time_change = 0.01;
+   /* Initialize focusing time */
+   double compute_focusing_time()
+   {
+
+      double c1 = sqrt(this->get_gamma()*P1/rho1);
+      double c2 = sqrt(this->get_gamma()*P2/rho2);
+
+      double num = (this->get_gamma() - 1.) * (pow(r2,2) - pow(r1,2));
+      double denom = 2. * (pow(c2,2) - pow(c1,2));
+      double tau = sqrt(num / denom);
+      return tau;
+   }
 
 public:
-   KidderProblem()
+   KidderProblem() : tau(compute_focusing_time())
    {
+      cout << "rho1: " << rho1 << endl;
+      cout << "rho2: " << rho2 << endl;
+      cout << "r1: " << r1 << endl;
+      cout << "r2: " << r2 << endl;
+      cout << "P1: " << P1 << endl;
+      cout << "P2: " << P2 << endl;
+      cout << "focusing time: " << tau << endl;
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
@@ -64,11 +80,6 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
-      // CFL change
-      this->set_cfl_change(_change_cfl);
-      this->set_cfl_first(_cfl_first);
-      this->set_cfl_second(_cfl_second);
-      this->set_cfl_time_change(_cfl_time_change);
    }
 
    /* Optionally overridden, or removed */
@@ -92,19 +103,7 @@ public:
       double r = x.Norml2();
       if (t < 1e-12)
       {
-         double s = P2 / (pow(rho2, this->get_gamma()));
-         if (r < r1)
-         {
-            return P1;
-         }
-         else if (r < r2)
-         {
-            return s * pow(rho0(x,t), this->get_gamma());
-         }
-         else 
-         {
-            return P2;
-         }
+         return pow(rho0(x,t), this->get_gamma());
       }
       else 
       {
@@ -117,23 +116,10 @@ public:
       double r = x.Norml2();
       if (t < 1e-12)
       { 
-         double rho1 = rho2 * pow(P1/P2, 1./this->get_gamma());
-         if (r < r1)
-         {
-            return rho1;
-         }
-         else if (r < r2)
-         {
-            double val = (pow(r2,2) - pow(r,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
-            val += (pow(r,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
-            val = pow(val, 1./(this->get_gamma()-1.));
-            return val;
-         }
-         else 
-         {
-            return rho2;
-         }
-         
+         double val = (pow(r2,2) - pow(r,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
+         val += (pow(r,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
+         val = pow(val, 1./(this->get_gamma()-1.));
+         return val;
       }
       else 
       {
@@ -162,48 +148,64 @@ public:
    /*********************************************************
     * Problem specific functions
     *********************************************************/
-   double compute_focusing_time()
-   {
-      double rho1 = rho2 * pow(P1/P2, 1./this->get_gamma());
-      double s = P2 / (pow(rho2, this->get_gamma()));
-      double c1 = sqrt(s*this->get_gamma()*pow(rho1, this->get_gamma()-1.));
-      double c2 = sqrt(s*this->get_gamma()*pow(rho2, this->get_gamma()-1.));
-
-      double num = (this->get_gamma() - 1.) * (pow(r2,2) - pow(r1,2));
-      double denom = 2. * (pow(c2,2) - pow(c1,2));
-      double tau = sqrt(num / denom);
-      return tau;
-   }
    double h(const double t)
    {
-      double tau = compute_focusing_time();
       return sqrt(1. - pow(t/tau, 2));
    }
+   double dhdt(const double t)
+   {
+      return t / pow(tau, 2) / h(t);     
+   }
 
-   void GetBoundaryState(const double &t, const int &bdr_attr, Vector &state) override
+   void GetBoundaryState(const Vector &x, const double &t, const int &bdr_attr, Vector &state) override
    { 
+      // cout << "Kidder::GetBoundaryState\n";
       state.SetSize(dim + 2);
       state = 0.;
 
+      Vector vel(dim);
+      double norm_x = x.Norml2();
+      vel = x;
+      vel *= -1.;
+      vel /= norm_x;
+      double _dhdt = dhdt(t);
       double hmult = pow(h(t), 2. * this->get_gamma() / (1. - this->get_gamma()));
       double P1t = P1 * hmult;
       double P2t = P2 * hmult;
-      double s = P2 / (pow(rho2, this->get_gamma()));
-      double rho2t = pow(P2t / s, 1. / this->get_gamma());
-      double rho1t = rho2t * pow(P1t/P2t, 1./this->get_gamma());
+      double rho1t = rho1 * hmult;
+      double rho2t = rho2 * hmult;
 
       switch (bdr_attr)
       {
       case 4: // inner radius
       {
-         double rho1 = rho2 * pow(P1/P2, 1./this->get_gamma());
-         state[0] = rho1;
-         state[3] = P1t / rho1 / (this->get_gamma() - 1.);
+         // Specific volume
+         state[0] = 1. / rho1t;
+         // Velocity
+         vel *= r1 * _dhdt;
+         state[1] = vel[0];
+         state[2] = vel[1];
+         // Specific total energy
+         const double ke = vel * vel;
+         state[3] = P1t / rho1t / (this->get_gamma() - 1.) + 0.5 * ke;
+         break;
       }
       case 5: // outer radius
       {
-         state[0] = rho2;
-         state[3] = P2t / rho2 / (this->get_gamma() - 1.);
+         // Specific volume
+         state[0] = 1. / rho2t;
+         // Velocity
+         vel *= r2 * _dhdt;
+         state[1] = vel[0];
+         state[2] = vel[1];
+         // Specific total energy
+         const double ke = vel * vel;
+         state[3] = P2t / rho2t / (this->get_gamma() - 1.) + 0.5 * ke;
+         break;
+      }
+      default:
+      {
+         MFEM_ABORT("Invalid boundary condition for Kidder problem.\n");
       }
       } 
    }

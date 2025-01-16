@@ -309,7 +309,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    }
 
    // Initialize SparseMatrix
-   dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces);
+   dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces+1);
 
    // Create dummy coefficients
    using namespace std::placeholders;
@@ -330,6 +330,9 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 
    HypreParMatrix * k_hpm = k.ParallelAssemble();
    k_hpm->MergeDiagAndOffd(*dij_sparse);
+
+   // dij_sparse->Print(cout);
+   // assert(false);
 
    if (k_hpm) { delete k_hpm; } // Clear memory to avoid leak
    // From here, we can modify the sparse matrix according to the sparsity pattern
@@ -403,8 +406,6 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
    } // End face iterator
    dij_avg = dij_avg / num_faces;
    ts_dijavg.Append(dij_avg);
-   // cout << "Printing dij_sparse:\n";
-   // dij_sparse->Print(cout);
 }
 
 
@@ -760,6 +761,14 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    ComputeMinDetJ(minDetJCell, minDetJ); // Alternative to IsMeshCollapsed()
    ts_min_detJ.Append(minDetJ);
    ts_min_detJ_cell.Append(minDetJCell);
+   if (pb->get_indicator() == "Kidder")
+   {
+      // Compute average exterior and interior radius
+      double avg_rad_int, avg_rad_ext;
+      ComputeKidderAvgIntExtRadii(S, avg_rad_int, avg_rad_ext);
+      ts_kidder_avg_rad_int.Append(avg_rad_int);
+      ts_kidder_avg_rad_ext.Append(avg_rad_ext);
+   }
 
    /*
    If mesh has tangled, modify isCollapsed parameter to stop computation and print final data
@@ -769,6 +778,55 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
       isCollapsed = true;
    }
 } 
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext)
+{
+   // cout << "ComputeKidderAvgIntExtRadii\n";
+   Vector face_x(dim);
+   Array<int> face_dofs_row;
+   int num_int_faces = 0, num_ext_faces = 0;
+   avg_rad_int = 0., avg_rad_ext = 0.;
+
+   /* Iterate over boundary faces */
+   for (int i = 0; i < pmesh->GetNBE(); i++)
+   {
+      // Get Face coords
+      int bdr_attr = pmesh->GetBdrAttribute(i);
+      int face = pmesh->GetBdrElementFaceIndex(i);
+      H1.GetFaceDofs(face, face_dofs_row);
+      int face_dof = face_dofs_row[2];
+      geom.GetNodePositionFromBV(S, face_dof, face_x);
+
+      if (bdr_attr == 4)
+      {
+         // cout << "interior face\n";
+         double val = face_x.Norml2();
+         avg_rad_int += val;
+         num_int_faces++;
+      }
+      else if (bdr_attr == 5)
+      {
+         // cout << "exterior face\n";
+         double val = face_x.Norml2();
+         avg_rad_ext += val;
+         num_ext_faces++;
+      }
+      else
+      {
+         // cout << "other boundary face\n";
+         MFEM_ABORT("Only full ring is implemented in Kidder problem.\n");
+      }
+   }
+   
+   /* By definition */
+   assert(num_int_faces == num_ext_faces);
+
+   /* Compute average */
+   avg_rad_int /= num_int_faces;
+   avg_rad_ext /= num_ext_faces;
+}
 
 
 /****************************************************************************************************
@@ -1383,13 +1441,34 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             } // if saltzmann
             else if (pb->get_indicator() == "Kidder")
             {
-               // Check bdry flag
-               int bdr_attribute = BdrElementIndexingArray[fids[j]]; 
-               pb->GetBoundaryState(t, bdr_attribute, U_i_bdry);
-               DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
-               F_i_bdry.Mult(c, y_temp_bdry);
-               y_temp += y_temp_bdry;
-               break;
+               int bdr_attribute = BdrElementIndexingArray[fids[j]];
+               // cout << "Kidder bdr attr: " << bdr_attribute << ", face: " << fids[j] << endl;  
+
+               switch (bdr_attribute)
+               {
+               case 4: // inner radius
+               case 5: // outer radius
+               {
+                  // Need face_x for boundary velocity
+                  Array<int> face_dofs;
+                  Vector face_x(dim);
+                  H1.GetFaceDofs(fids[j], face_dofs);
+                  int face_dof = face_dofs[2];
+                  geom.GetNodePositionFromBV(S,face_dof, face_x);
+                  pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
+                  DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
+                  F_i_bdry.Mult(c, y_temp_bdry);
+                  y_temp += y_temp_bdry;
+                  break;
+               }
+               default:
+               {
+                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+                  y_temp *= 2.; 
+                  break;
+               }
+               }
+               
             }
             else
             {
@@ -3499,7 +3578,19 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "timestep,t,dt,dij_max,dij_avg,minDetJ,minDetJCell,ppdPctCells,ppdRelMag\n";
+   fstream_sv << "timestep,t,dt,dij_max,dij_avg,minDetJ,minDetJCell";
+
+   /* Add optional entries dependent on command line options and problem */
+   if (post_process_density)
+   {
+      fstream_sv << ",ppdPctCells,ppdRelMag";
+   }
+   if (pb->get_indicator() == "Kidder")
+   {
+      fstream_sv << ",avgInteriorRadius,avgExteriorRadius";
+   }
+   fstream_sv << "\n";
+
 
    for (int i = 0; i < num_timesteps; i++)
    {
@@ -3517,12 +3608,16 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
       {
          fstream_sv << ","
                     << ts_ppd_pct_cells[i] << ","
-                    << ts_ppd_rel_mag[i] << "\n";
+                    << ts_ppd_rel_mag[i];
       }
-      else 
+      // Save interior and exterior radius in case of Kidder problem
+      if (pb->get_indicator() == "Kidder")
       {
-         fstream_sv << "\n";
+         fstream_sv << ","
+                    << ts_kidder_avg_rad_int[i] << ","
+                    << ts_kidder_avg_rad_ext[i];
       }
+      fstream_sv << "\n";
    }
 }
 

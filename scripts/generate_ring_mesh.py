@@ -95,8 +95,8 @@ def write_mesh_file(vertices, elements, boundaries, filename="full_ring_mesh.mes
 # Parameters
 inner_radius = 0.9
 outer_radius = 1.0
-num_radial = 12  # Number of subdivisions in the radial direction
-num_angular = 96  # Number of subdivisions in the angular direction (equally spaced)
+num_radial = 5  # Number of subdivisions in the radial direction
+num_angular = 20*num_radial  # Number of subdivisions in the angular direction (equally spaced)
 
 # Generate mesh
 vertices, elements, boundaries = generate_full_ring_mesh(
@@ -104,7 +104,7 @@ vertices, elements, boundaries = generate_full_ring_mesh(
 )
 
 # Write mesh to file
-output_filename = "full_ring_mesh.mesh"
+output_filename = "full_ring.mesh"
 write_mesh_file(vertices, elements, boundaries, output_filename)
 
 print(f"Mesh written to {output_filename}")

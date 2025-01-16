@@ -318,21 +318,15 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 
    FunctionCoefficient rho_coeff(rho0_static);
 
-   Vector ones(dim); ones = 1.;
-   VectorConstantCoefficient ones_coeff(ones);
-
    // Assemble SparseMatrix object
    ParBilinearForm k(&L2);
-   k.AddInteriorFaceIntegrator(new DGTraceIntegrator(rho_coeff, ones_coeff, 1.0, 1.0));
+   k.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(rho_coeff, 1.0, 1.0));
 
    k.Assemble();
    k.Finalize();
 
    HypreParMatrix * k_hpm = k.ParallelAssemble();
    k_hpm->MergeDiagAndOffd(*dij_sparse);
-
-   // dij_sparse->Print(cout);
-   // assert(false);
 
    if (k_hpm) { delete k_hpm; } // Clear memory to avoid leak
    // From here, we can modify the sparse matrix according to the sparsity pattern

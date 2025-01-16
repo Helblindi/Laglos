@@ -1433,37 +1433,37 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                }
                } // switch (bdr_attr)
             } // if saltzmann
-            else if (pb->get_indicator() == "Kidder")
-            {
-               int bdr_attribute = BdrElementIndexingArray[fids[j]];
-               // cout << "Kidder bdr attr: " << bdr_attribute << ", face: " << fids[j] << endl;  
+            // else if (pb->get_indicator() == "Kidder")
+            // {
+            //    int bdr_attribute = BdrElementIndexingArray[fids[j]];
+            //    // cout << "Kidder bdr attr: " << bdr_attribute << ", face: " << fids[j] << endl;  
 
-               switch (bdr_attribute)
-               {
-               case 4: // inner radius
-               case 5: // outer radius
-               {
-                  // Need face_x for boundary velocity
-                  Array<int> face_dofs;
-                  Vector face_x(dim);
-                  H1.GetFaceDofs(fids[j], face_dofs);
-                  int face_dof = face_dofs[2];
-                  geom.GetNodePositionFromBV(S,face_dof, face_x);
-                  pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
-                  DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
-                  F_i_bdry.Mult(c, y_temp_bdry);
-                  y_temp += y_temp_bdry;
-                  break;
-               }
-               default:
-               {
-                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
-                  y_temp *= 2.; 
-                  break;
-               }
-               }
+            //    switch (bdr_attribute)
+            //    {
+            //    case 4: // inner radius
+            //    case 5: // outer radius
+            //    {
+            //       // Need face_x for boundary velocity
+            //       Array<int> face_dofs;
+            //       Vector face_x(dim);
+            //       H1.GetFaceDofs(fids[j], face_dofs);
+            //       int face_dof = face_dofs[2];
+            //       geom.GetNodePositionFromBV(S,face_dof, face_x);
+            //       pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
+            //       DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
+            //       F_i_bdry.Mult(c, y_temp_bdry);
+            //       y_temp += y_temp_bdry;
+            //       break;
+            //    }
+            //    default:
+            //    {
+            //       MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+            //       y_temp *= 2.; 
+            //       break;
+            //    }
+            //    }
                
-            }
+            // }
             else
             {
                y_temp *= 2.;
@@ -1479,6 +1479,13 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       if (pb->get_indicator() == "IsentropicVortex" && is_boundary_cell)
       {
          EnforceExactBCOnCell(S, ci, t, dt, val);
+      }
+      else if (pb->get_indicator() == "Kidder" && is_boundary_cell)
+      {
+         Vector cell_x(dim);
+         int cell_vdof = NVDofs_H1 + num_faces + ci;
+         geom.GetNodePositionFromBV(S,cell_vdof, cell_x);
+         pb->GetBoundaryState(cell_x, t, cell_bdr_arr[0], val);
       }
       else
       {

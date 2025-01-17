@@ -100,43 +100,69 @@ public:
     *********************************************************/
    double p0(const Vector &x, const double & t) override
    {
+      double _h = h(t);
       double r = x.Norml2();
+
+      /* Get original coord */
+      double _r0 = r / _h;
+      Vector x0 = x;
+      x0 *= _r0 / r;
+
+      /* Get initial pressure */
+      double _p0 = pow(rho0(x0,0), this->get_gamma());
+
       if (t < 1e-12)
       {
-         return pow(rho0(x,t), this->get_gamma());
+         return _p0;
       }
       else 
       {
-         MFEM_ABORT("P0 must be overridden\n");
+         return _p0 * pow(_h, 2 * this->get_gamma() / (1. - this->get_gamma()));
       }
       return 0.;
    }
    double rho0(const Vector &x, const double & t) override
    {
+      double _h = h(t);
       double r = x.Norml2();
+
+      /* Get original coord */
+      double _r0 = r / _h;
+      Vector x0 = x;
+      x0 *= _r0 / r;
+
+      /* Get initial density */
+      double _rho0 = (pow(r2,2) - pow(_r0,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
+      _rho0 += (pow(_r0,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
+      _rho0 = pow(_rho0, 1./(this->get_gamma()-1.));
       if (t < 1e-12)
       { 
-         double val = (pow(r2,2) - pow(r,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
-         val += (pow(r,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
-         val = pow(val, 1./(this->get_gamma()-1.));
-         return val;
+         return _rho0;
       }
       else 
       {
-         MFEM_ABORT("rho0 must be overridden\n");
+         return _rho0 * pow(_h, 2 * this->get_gamma() / (1. - this->get_gamma()));
       }
-
-      return 0.;
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
+      double _h = h(t);
+      double r = x.Norml2();
+
+      /* Get original radius */
+      double _r0 = r / _h;
+      v = x;
+      v /= r;
+      double _dhdt = dhdt(t);
+
       if (t < 1e-12)
       {
          v = 0.;
       }
       else 
       {
-         MFEM_ABORT("v0 must be overridden\n");
+         double u = _r0 * _dhdt;
+         v *= u;
       }
       return;
    }

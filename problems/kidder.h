@@ -41,7 +41,7 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   const double _a = 0., _b = 0., _gamma = 5./3.;
+   const double _a = 0., _b = 0., _gamma = 2.;
    const double r1 = 0.9, r2 = 1.0, rho1 = 1., rho2 = 2., s = 1.;
    const double P1 = pow(rho1, _gamma), P2 = pow(rho2, _gamma);
    const double tau;

@@ -1433,37 +1433,53 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                }
                } // switch (bdr_attr)
             } // if saltzmann
-            // else if (pb->get_indicator() == "Kidder")
-            // {
-            //    int bdr_attribute = BdrElementIndexingArray[fids[j]];
-            //    // cout << "Kidder bdr attr: " << bdr_attribute << ", face: " << fids[j] << endl;  
+            else if (pb->get_indicator() == "Kidder")
+            {
+               int bdr_attribute = BdrElementIndexingArray[fids[j]];
 
-            //    switch (bdr_attribute)
-            //    {
-            //    case 4: // inner radius
-            //    case 5: // outer radius
-            //    {
-            //       // Need face_x for boundary velocity
-            //       Array<int> face_dofs;
-            //       Vector face_x(dim);
-            //       H1.GetFaceDofs(fids[j], face_dofs);
-            //       int face_dof = face_dofs[2];
-            //       geom.GetNodePositionFromBV(S,face_dof, face_x);
-            //       pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
-            //       DenseMatrix F_i_bdry = pb->flux(U_i_bdry, pmesh->GetAttribute(ci));
-            //       F_i_bdry.Mult(c, y_temp_bdry);
-            //       y_temp += y_temp_bdry;
-            //       break;
-            //    }
-            //    default:
-            //    {
-            //       MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
-            //       y_temp *= 2.; 
-            //       break;
-            //    }
-            //    }
-               
-            // }
+               switch (bdr_attribute)
+               {
+               case 4: // inner radius
+               case 5: // outer radius
+               {
+                  // Need face_x for boundary velocity
+                  Array<int> face_dofs;
+                  Vector face_x(dim), cell_v(dim), cell_vp(dim);
+                  H1.GetFaceDofs(fids[j], face_dofs);
+                  int face_dof = face_dofs[2];
+                  geom.GetNodePositionFromBV(S,face_dof, face_x);
+                  pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
+
+                  /* 
+                  * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
+                  * So instead of this call:
+                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
+                  * We modify just the pressure in the flux F_i
+                  */
+                  DenseMatrix F_i_bdry = F_i;
+                  F_i_bdry.GetRow(0, cell_v);
+                  cell_v *= -1.; // Negate the velocity
+                  double _press = pb->pressure(U_i_bdry, bdr_attribute);
+                  for (int i = 0; i < dim; i++)
+                  {
+                     F_i_bdry(i+1, i) = _press;
+                  }
+                  cell_vp = cell_v;
+                  cell_vp *= _press;
+                  F_i_bdry.SetRow(dim+1, cell_vp);
+
+                  F_i_bdry.Mult(c, y_temp_bdry);
+                  y_temp += y_temp_bdry;
+                  break;
+               }
+               default:
+               {
+                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+                  y_temp *= 2.; 
+                  break;
+               }
+               }
+            }
             else
             {
                y_temp *= 2.;
@@ -1480,19 +1496,16 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       {
          EnforceExactBCOnCell(S, ci, t, dt, val);
       }
-      else if (pb->get_indicator() == "Kidder" && is_boundary_cell)
-      {
-         Vector cell_x(dim);
-         int cell_vdof = NVDofs_H1 + num_faces + ci;
-         geom.GetNodePositionFromBV(S,cell_vdof, cell_x);
-         pb->GetBoundaryState(cell_x, t, cell_bdr_arr[0], val);
-      }
       else
       {
          // Do the normal thing
          // assert(sum_validation.Norml2() < 1e-12);
 
          sums *= dt;
+         /* 
+         Compute current mass, rather than assume mass is conserved
+         In several methods we've attempted, mass has not been conserved
+         */
          double k = pmesh->GetElementVolume(ci);
          double _mass = k / U_i[0];
          sums /= _mass;

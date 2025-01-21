@@ -762,6 +762,10 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
       ComputeKidderAvgIntExtRadii(S, avg_rad_int, avg_rad_ext);
       ts_kidder_avg_rad_int.Append(avg_rad_int);
       ts_kidder_avg_rad_ext.Append(avg_rad_ext);
+      double avg_density, avg_entropy;
+      ComputeKidderAvgDensityAndEntropy(S, avg_density, avg_entropy);
+      ts_kidder_avg_density.Append(avg_density);
+      ts_kidder_avg_entropy.Append(avg_entropy);
    }
 
    /*
@@ -821,6 +825,32 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, dou
    avg_rad_int /= num_int_faces;
    avg_rad_ext /= num_ext_faces;
 }
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy)
+{
+   ParGridFunction sv_gf;
+   Vector* sptr = const_cast<Vector*>(&S);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   Vector U(dim+2);
+   avg_density = 0., avg_entropy = 0.;
+
+   for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
+   {
+      GetCellStateVector(S, cell_it, U);
+      double density = 1. / U[0]; 
+      double pressure = pb->pressure(U, pmesh->GetAttribute(cell_it));
+      double entropy = pressure / pow(density, pb->get_gamma());
+
+      avg_density += density;
+      avg_entropy += entropy;
+   }
+
+   avg_density /= NDofs_L2;
+   avg_entropy /= NDofs_L2;
+}
+
 
 
 /****************************************************************************************************
@@ -3601,7 +3631,7 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
    }
    if (pb->get_indicator() == "Kidder")
    {
-      fstream_sv << ",avgInteriorRadius,avgExteriorRadius";
+      fstream_sv << ",avgInteriorRadius,avgExteriorRadius,avgDensity,avgEntropy";
    }
    fstream_sv << "\n";
 
@@ -3629,7 +3659,9 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
       {
          fstream_sv << ","
                     << ts_kidder_avg_rad_int[i] << ","
-                    << ts_kidder_avg_rad_ext[i];
+                    << ts_kidder_avg_rad_ext[i] << ","
+                    << ts_kidder_avg_density[i] << ","
+                    << ts_kidder_avg_entropy[i];
       }
       fstream_sv << "\n";
    }

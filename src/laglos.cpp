@@ -46,7 +46,7 @@
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point [Fails]
 * ----- Untested -----
 * ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
-* ./Laglos -m data/full_ring.mesh -p 15 -tf 0.2203 -cfl 0.5 -rs 0          ## Kidder [Untested]
+* ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
@@ -378,7 +378,8 @@ int main(int argc, char *argv[]) {
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
    // parallel mesh is defined, the serial mesh can be deleted.
-   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   ParMesh *pmesh0 = new ParMesh(MPI_COMM_WORLD, *mesh);
    delete mesh;
    for (int lev = 0; lev < rp_levels; lev++)
    {
@@ -892,6 +893,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
+   /* Initial visualization */
    if (visualization)
    {
       // Make sure all MPI ranks have sent their 'v' solution before initiating
@@ -929,7 +931,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 6 || problem == 12)
+      if (problem == 6 || problem == 12 || problem == 15)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -945,42 +947,73 @@ int main(int argc, char *argv[]) {
       Wx = 0;
       Wy += offy;
 
-      // Compute errors
-      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
-
       if (problem_class->has_exact_solution())
       {
-         if (problem_class->get_indicator() == "Vdw1")
+         ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf), p_err(press_gf);
+
+         // Set current time for exact solution coefficient variables
+         rho_coeff.SetTime(t_init);
+         v_coeff.SetTime(t_init);
+         ste_coeff.SetTime(t_init);
+         p_coeff.SetTime(t_init);
+
+         if (problem_class->get_indicator() == "Kidder")
          {
-            problem_class->update(x_gf);
+            ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
+            ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
+
+            ParGridFunction rho_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder), p_k_ex_gf(&L2FESpace_kidder);
+            rho_k_ex_gf.ProjectCoefficient(rho_coeff);
+            vel_k_ex_gf.ProjectCoefficient(v_coeff);
+            ste_k_ex_gf.ProjectCoefficient(ste_coeff);
+            p_k_ex_gf.ProjectCoefficient(p_coeff);
+
+            rho_err -= rho_k_ex_gf;
+            vel_err -= vel_k_ex_gf;
+            ste_err -= ste_k_ex_gf;
+            p_err -= p_k_ex_gf;
          }
+         else
+         {
+            if (problem_class->get_indicator() == "Vdw1")
+            {
+               problem_class->update(x_gf);
+            }
 
-         rho_ex_gf.ProjectCoefficient(rho_coeff);
-         vel_ex_gf.ProjectCoefficient(v_coeff);
-         ste_ex_gf.ProjectCoefficient(ste_coeff);
-         p_ex_gf.ProjectCoefficient(p_coeff);
+            // Compute errors
+            ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
+            rho_ex_gf.ProjectCoefficient(rho_coeff);
+            vel_ex_gf.ProjectCoefficient(v_coeff);
+            ste_ex_gf.ProjectCoefficient(ste_coeff);
+            p_ex_gf.ProjectCoefficient(p_coeff);
 
-         ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf);
-         rho_err -= rho_ex_gf;
-         vel_err -= vel_ex_gf;
-         ste_err -= ste_ex_gf;
+            rho_err -= rho_ex_gf;
+            vel_err -= vel_ex_gf;
+            ste_err -= ste_ex_gf;
+            p_err -= p_ex_gf;
 
-         // Visualize difference between exact and approx
-         VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
-                        "Exact: Density", Wx, Wy, Ww, Wh);
-         
-         Wx += offx;
-         VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
-                        "Exact: Velocity", Wx, Wy, Ww, Wh);
-         
-         Wx += offx;
-         VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
-                        "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-         Wx += offx;
-         VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
-                        "Exact: Pressure", Wx, Wy, Ww, Wh);
-         Wx = 0;
-         Wy += offy;
+            // Visualize difference between exact and approx
+            VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
+                           "Exact: Density", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
+                           "Exact: Velocity", Wx, Wy, Ww, Wh);
+            
+            Wx += offx;
+            VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
+                           "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+
+            if (problem == 6 || problem == 12)
+            {
+               Wx += offx;
+               VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
+                              "Exact: Pressure", Wx, Wy, Ww, Wh);
+            }
+            
+            Wx = 0;
+            Wy += offy;
+         }
 
          // Visualize difference between exact and approx
          VisualizeField(vis_rho_err, vishost, visport, rho_err,
@@ -993,90 +1026,93 @@ int main(int argc, char *argv[]) {
          Wx += offx;
          VisualizeField(vis_ste_err, vishost, visport, ste_err,
                         "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
+         
+         if (problem == 6 || problem == 12 || problem == 15)
+         {
+            Wx += offx;
+            VisualizeField(vis_p_err, vishost, visport, p_err,
+                           "Error: Pressure", Wx, Wy, Ww, Wh);
+         }
       }
    }
 
    // Print initialized mesh and gridfunctions
    // Can be visualized with glvis -np # -m *.mesh
    //                        glvis -m *.mesh -g *.gf
-   if (gfprint)
+   std::ostringstream mesh_name, rho_name, v_name, ste_name, mv_name;
+   mesh_name << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << ".mesh";
+   rho_name  << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << "_rho.gf";
+   v_name << gfprint_path 
+            << setfill('0') 
+            << setw(6)
+            << 0
+            << "_v.gf";
+   ste_name << gfprint_path 
+            << setfill('0') 
+            << setw(6)
+            << 0
+            << "_ste.gf";
+   mv_name << gfprint_path 
+            << setfill('0') 
+            << setw(6)
+            << 0
+            << "_mv.gf";
+
+   std::ofstream mesh_ofs(mesh_name.str().c_str());
+   mesh_ofs.precision(8);
+   pmesh->PrintAsOne(mesh_ofs);
+   mesh_ofs.close();
+
+   std::ofstream rho_ofs(rho_name.str().c_str());
+   rho_ofs.precision(8);
+   rho_gf.SaveAsOne(rho_ofs);
+   rho_ofs.close();
+
+   std::ofstream v_ofs(v_name.str().c_str());
+   v_ofs.precision(8);
+   v_gf.SaveAsOne(v_ofs);
+   v_ofs.close();
+
+   std::ofstream ste_ofs(ste_name.str().c_str());
+   ste_ofs.precision(8);
+   ste_gf.SaveAsOne(ste_ofs);
+   ste_ofs.close();
+
+   std::ofstream mv_ofs(mv_name.str().c_str());
+   mv_ofs.precision(8);
+   mv_gf.SaveAsOne(mv_ofs);
+   mv_ofs.close();
+
+   /* Print gamma/pressure grid function for Triple Point problem */
+   if (problem == 6 || problem == 12 || problem == 15) 
    {
-      // Save initial mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, mv_name;
-      mesh_name << gfprint_path 
-                  << setfill('0') 
-                  << setw(6)
-                  << 0
-                  << ".mesh";
-      rho_name  << gfprint_path 
-                  << setfill('0') 
-                  << setw(6)
-                  << 0
-                  << "_rho.gf";
-      v_name << gfprint_path 
-               << setfill('0') 
-               << setw(6)
-               << 0
-               << "_v.gf";
-      ste_name << gfprint_path 
-               << setfill('0') 
-               << setw(6)
-               << 0
-               << "_ste.gf";
-      mv_name << gfprint_path 
-              << setfill('0') 
-              << setw(6)
-              << 0
-              << "_mv.gf";
+      std::ostringstream _press_name;
+      _press_name << gfprint_path 
+                  << "press.gf";
 
-      std::ofstream mesh_ofs(mesh_name.str().c_str());
-      mesh_ofs.precision(8);
-      pmesh->PrintAsOne(mesh_ofs);
-      mesh_ofs.close();
+      std::ofstream press_ofs(_press_name.str().c_str());
+      press_ofs.precision(8);
+      press_gf.SaveAsOne(press_ofs);
+      press_ofs.close();
+   }
+   if (problem == 12)
+   {
+      std::ostringstream gamma_name;
+      gamma_name << gfprint_path 
+                  << "gamma.gf";
 
-      std::ofstream rho_ofs(rho_name.str().c_str());
-      rho_ofs.precision(8);
-      rho_gf.SaveAsOne(rho_ofs);
-      rho_ofs.close();
-
-      std::ofstream v_ofs(v_name.str().c_str());
-      v_ofs.precision(8);
-      v_gf.SaveAsOne(v_ofs);
-      v_ofs.close();
-
-      std::ofstream ste_ofs(ste_name.str().c_str());
-      ste_ofs.precision(8);
-      ste_gf.SaveAsOne(ste_ofs);
-      ste_ofs.close();
-
-      std::ofstream mv_ofs(mv_name.str().c_str());
-      mv_ofs.precision(8);
-      mv_gf.SaveAsOne(mv_ofs);
-      mv_ofs.close();
-
-      /* Print gamma/pressure grid function for Triple Point problem */
-      if (problem == 6 || problem == 12) 
-      {
-         std::ostringstream _press_name;
-         _press_name << gfprint_path 
-                    << "press.gf";
-
-         std::ofstream press_ofs(_press_name.str().c_str());
-         press_ofs.precision(8);
-         press_gf.SaveAsOne(press_ofs);
-         press_ofs.close();
-      }
-      if (problem == 12)
-      {
-         std::ostringstream gamma_name;
-         gamma_name << gfprint_path 
-                    << "gamma.gf";
-
-         std::ofstream gamma_ofs(gamma_name.str().c_str());
-         gamma_ofs.precision(8);
-         gamma_gf.SaveAsOne(gamma_ofs);
-         gamma_ofs.close();
-      }
+      std::ofstream gamma_ofs(gamma_name.str().c_str());
+      gamma_ofs.precision(8);
+      gamma_gf.SaveAsOne(gamma_ofs);
+      gamma_ofs.close();
    }
 
    VisItDataCollection visit_dc(_visit_basename, pmesh);
@@ -1111,7 +1147,7 @@ int main(int argc, char *argv[]) {
 
    // Perform the time-integration by looping over time iterations
    // ti with a time step dt.  The main function call here is the
-   // LagrangianLOOperator.MakeTimeStep() funcall.
+   // LagrangianLOOperator<dim>::MakeTimeStep() funcall.
    double t = t_init;
 
    if (convergence_testing)
@@ -1229,6 +1265,7 @@ int main(int argc, char *argv[]) {
             } 
          }
 
+         /* Visualize at time t */
          if (visualization)
          {            
             int Wx = 0, Wy = 0; // window position
@@ -1247,7 +1284,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 6 || problem == 12) // Triple Point
+            if (problem == 6 || problem == 12 || problem == 15) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
@@ -1262,7 +1299,7 @@ int main(int argc, char *argv[]) {
                VisualizeField(vis_press, vishost, visport, press_gf,
                               "Pressure", Wx, Wy, Ww, Wh);
             }
-            if (problem == 12)
+            if (problem == 12) // Visualize gamma
             {
                vis_gamma.precision(8);
                ParGridFunction gamma_gf(&L2FESpace);
@@ -1286,50 +1323,75 @@ int main(int argc, char *argv[]) {
 
             if (problem_class->has_exact_solution())
             {
-               ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
+               ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf), p_err(press_gf);
 
-               if (problem_class->get_indicator() == "Vdw1")
-               {
-                  problem_class->update(x_gf, t);
-               }
-
+               // Set current time for exact solution coefficient variables
                rho_coeff.SetTime(t);
                v_coeff.SetTime(t);
                ste_coeff.SetTime(t);
                p_coeff.SetTime(t);
 
-               rho_ex_gf.ProjectCoefficient(rho_coeff);
-               rho_ex_gf[0] = rho_gf[0];
-               vel_ex_gf.ProjectCoefficient(v_coeff);
-               ste_ex_gf.ProjectCoefficient(ste_coeff);
-               p_ex_gf.ProjectCoefficient(p_coeff);
-
-               ParGridFunction rho_err(rho_gf), vel_err(v_gf), ste_err(ste_gf), p_err(press_gf);
-               rho_err -= rho_ex_gf;
-               vel_err -= vel_ex_gf;
-               ste_err -= ste_ex_gf;
-               p_err -= p_ex_gf;
-
-               // Visualize difference between exact and approx
-               VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
-                              "Exact: Density", Wx, Wy, Ww, Wh);
-               
-               Wx += offx;
-               VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
-                              "Exact: Velocity", Wx, Wy, Ww, Wh);
-               Wx += offx;
-               VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
-                              "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-               if (problem == 6)
+               /* Kidder exact solution is defined in terms of initial partical locations, hence must use Finite Element Spaces defined on the undisturbed mesh */
+               if (problem_class->get_indicator() == "Kidder")
                {
-                  Wx += offx;
-                  VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
-                                 "Exact: Pressure", Wx, Wy, Ww, Wh);
-               }
-               
-               Wx = 0;
-               Wy += offy;
+                  ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
+                  ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
 
+                  ParGridFunction rho_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder), p_k_ex_gf(&L2FESpace_kidder);
+                  rho_k_ex_gf.ProjectCoefficient(rho_coeff);
+                  rho_k_ex_gf[0] = rho_gf[0];
+                  vel_k_ex_gf.ProjectCoefficient(v_coeff);
+                  ste_k_ex_gf.ProjectCoefficient(ste_coeff);
+                  p_k_ex_gf.ProjectCoefficient(p_coeff);
+
+                  rho_err -= rho_k_ex_gf;
+                  vel_err -= vel_k_ex_gf;
+                  ste_err -= ste_k_ex_gf;
+                  p_err -= p_k_ex_gf;
+
+                  /* Visualizing the exact solution is not possible since the grid functions
+                   representing the exact solution are defined based on the initial mesh, so
+                   the solution that would be plotted would not correspond to the mesh. */
+               }
+               else
+               {
+                  if (problem_class->get_indicator() == "Vdw1")
+                  {
+                     problem_class->update(x_gf, t);
+                  }
+
+                  ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
+                  rho_ex_gf.ProjectCoefficient(rho_coeff);
+                  rho_ex_gf[0] = rho_gf[0];
+                  vel_ex_gf.ProjectCoefficient(v_coeff);
+                  ste_ex_gf.ProjectCoefficient(ste_coeff);
+                  p_ex_gf.ProjectCoefficient(p_coeff);
+
+                  rho_err -= rho_ex_gf;
+                  vel_err -= vel_ex_gf;
+                  ste_err -= ste_ex_gf;
+                  p_err -= p_ex_gf;
+
+                  // Visualize exact solution
+                  VisualizeField(vis_rho_ex, vishost, visport, rho_ex_gf,
+                                 "Exact: Density", Wx, Wy, Ww, Wh);
+                  
+                  Wx += offx;
+                  VisualizeField(vis_v_ex, vishost, visport, vel_ex_gf,
+                                 "Exact: Velocity", Wx, Wy, Ww, Wh);
+                  Wx += offx;
+                  VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
+                                 "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
+                  if (problem == 6 || problem == 12)
+                  {
+                     Wx += offx;
+                     VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
+                                    "Exact: Pressure", Wx, Wy, Ww, Wh);
+                  }
+                  
+                  Wx = 0;
+                  Wy += offy;
+               }
 
                // Visualize difference between exact and approx
                VisualizeField(vis_rho_err, vishost, visport, rho_err,
@@ -1341,7 +1403,7 @@ int main(int argc, char *argv[]) {
                VisualizeField(vis_ste_err, vishost, visport, ste_err,
                               "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
                
-               if (problem == 6)
+               if (problem == 6 || problem == 12 || problem == 15)
                {
                   Wx += offx;
                   VisualizeField(vis_p_err, vishost, visport, p_err,
@@ -1457,7 +1519,6 @@ int main(int argc, char *argv[]) {
             }     
          }
       }
-      // cout << "finished step\n";
    } // End time step iteration
 
    chrono.Stop();
@@ -1591,7 +1652,7 @@ int main(int argc, char *argv[]) {
    }
 
    /* 
-   * Whether or not the exact solution is known, we are still interesting
+   * Whether or not the exact solution is known, we are still interested
    * in the mass defect convergence.  In the case an exact solution is known,
    * print the cooresponding L1, L2, Linf errors as well.
    */
@@ -1605,89 +1666,120 @@ int main(int argc, char *argv[]) {
 
    if (problem_class->has_exact_solution())
    {
-      if (problem_class->get_indicator() == "Vdw1")
-      {
-         problem_class->update(x_gf, t);
-      }
-      
-      // Compute errors
-      ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
-
+      /* Set coefficients to final time */
       rho_coeff.SetTime(t);
       v_coeff.SetTime(t);
       ste_coeff.SetTime(t);
       sv_coeff.SetTime(t);
 
-      rho_ex_gf.ProjectCoefficient(rho_coeff);
-      vel_ex_gf.ProjectCoefficient(v_coeff);
-      ste_ex_gf.ProjectCoefficient(ste_coeff);
-      sv_ex_gf.ProjectCoefficient(sv_coeff);
-
-      // In the case of the Noh Problem, project 0 on the boundary of approx and exact
-      if (problem_class->get_indicator() == "Noh")
+      if (problem_class->get_indicator() == "Kidder")
       {
-         cout << "[Noh] Projecting zero on the boundary cells.\n";
-         ParGridFunction cell_bdr_flag_gf;
-         hydro.GetCellBdrFlagGF(cell_bdr_flag_gf);
+         ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
+         ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
 
-         for (int i = 0; i < pmesh->GetNE(); i++)
+         ParGridFunction sv_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder);
+         sv_k_ex_gf.ProjectCoefficient(sv_coeff);
+         vel_k_ex_gf.ProjectCoefficient(v_coeff);
+         ste_k_ex_gf.ProjectCoefficient(ste_coeff);
+
+         /* Compute relative errors */
+         GridFunctionCoefficient vel_ex_coeff(&vel_k_ex_gf), ste_ex_coeff(&ste_k_ex_gf), sv_ex_coeff(&sv_k_ex_gf);
+
+         // Velocity errors
+         vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_k_ex_gf.ComputeL1Error(zero);
+         vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_k_ex_gf.ComputeL2Error(zero);
+         vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_k_ex_gf.ComputeMaxError(zero);
+
+         // Specific volume and specific total energy
+         sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / sv_k_ex_gf.ComputeL1Error(zero);
+         sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / sv_k_ex_gf.ComputeL2Error(zero);
+         sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / sv_k_ex_gf.ComputeMaxError(zero);
+
+         ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_k_ex_gf.ComputeL1Error(zero);
+         ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_k_ex_gf.ComputeL2Error(zero);
+         ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_k_ex_gf.ComputeMaxError(zero);
+      }
+      else
+      {
+         if (problem_class->get_indicator() == "Vdw1")
          {
-            if (cell_bdr_flag_gf[i] != -1)
+            problem_class->update(x_gf, t);
+         }
+         // Compute errors
+         ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
+         rho_ex_gf.ProjectCoefficient(rho_coeff);
+         vel_ex_gf.ProjectCoefficient(v_coeff);
+         ste_ex_gf.ProjectCoefficient(ste_coeff);
+         sv_ex_gf.ProjectCoefficient(sv_coeff);
+
+         // In the case of the Noh Problem, project 0 on the boundary of approx and exact
+         if (problem_class->get_indicator() == "Noh")
+         {
+            cout << "[Noh] Projecting zero on the boundary cells.\n";
+            ParGridFunction cell_bdr_flag_gf;
+            hydro.GetCellBdrFlagGF(cell_bdr_flag_gf);
+
+            for (int i = 0; i < pmesh->GetNE(); i++)
             {
-               // We have a boundary cell
-               rho_gf[i] = 0.;
-               ste_gf[i] = 0.;
-               rho_ex_gf[i] = 0.;
-               ste_ex_gf[i] = 0.;
-               sv_ex_gf[i] = 0.;
-               for (int j = 0; j < dim; j++)
+               if (cell_bdr_flag_gf[i] != -1)
                {
-                  int index = i + j*pmesh->GetNE();
-                  v_gf[index] = 0.;
-                  vel_ex_gf[index] = 0.;
+                  // We have a boundary cell
+                  rho_gf[i] = 0.;
+                  ste_gf[i] = 0.;
+                  rho_ex_gf[i] = 0.;
+                  ste_ex_gf[i] = 0.;
+                  sv_ex_gf[i] = 0.;
+                  for (int j = 0; j < dim; j++)
+                  {
+                     int index = i + j*pmesh->GetNE();
+                     v_gf[index] = 0.;
+                     vel_ex_gf[index] = 0.;
+                  }
                }
             }
          }
-      }
 
-      /* Compute relative errors */
-      GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf), sv_ex_coeff(&sv_ex_gf);
+         /* Compute relative errors */
+         GridFunctionCoefficient rho_ex_coeff(&rho_ex_gf), vel_ex_coeff(&vel_ex_gf), ste_ex_coeff(&ste_ex_gf), sv_ex_coeff(&sv_ex_gf);
 
-      // Velocity errors
-      vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
-      vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);
-      vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
+         // Velocity errors
+         vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / vel_ex_gf.ComputeL1Error(zero);
+         vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / vel_ex_gf.ComputeL2Error(zero);
+         vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / vel_ex_gf.ComputeMaxError(zero);
 
-      // Specific volume and specific total energy
-      /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
-      if (problem == 6)
-      {
-         ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
-         for (int i = 0; i < ste_ex_gf.Size(); i++)
+         // Specific volume and specific total energy
+         /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
+         if (problem == 6)
          {
-            te_gf[i] = rho_gf[i] * ste_gf[i];
-            te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
+            ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
+            for (int i = 0; i < ste_ex_gf.Size(); i++)
+            {
+               te_gf[i] = rho_gf[i] * ste_gf[i];
+               te_ex_gf[i] = rho_ex_gf[i] * ste_ex_gf[i];
+            }
+            sv_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
+            sv_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
+            sv_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
+
+            GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
+            ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
+            ste_L2_error_n = te_gf.ComputeL2Error(te_ex_coeff) / te_ex_gf.ComputeL2Error(zero);
+            ste_Max_error_n = te_gf.ComputeMaxError(te_ex_coeff) / te_ex_gf.ComputeMaxError(zero);
          }
-         sv_L1_error_n = rho_gf.ComputeL1Error(rho_ex_coeff) / rho_ex_gf.ComputeL1Error(zero);
-         sv_L2_error_n = rho_gf.ComputeL2Error(rho_ex_coeff) / rho_ex_gf.ComputeL2Error(zero);
-         sv_Max_error_n = rho_gf.ComputeMaxError(rho_ex_coeff) / rho_ex_gf.ComputeMaxError(zero);
+         else 
+         {
+            sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / sv_ex_gf.ComputeL1Error(zero);
+            sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / sv_ex_gf.ComputeL2Error(zero);
+            sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / sv_ex_gf.ComputeMaxError(zero);
 
-         GridFunctionCoefficient te_ex_coeff(&te_ex_gf);
-         ste_L1_error_n = te_gf.ComputeL1Error(te_ex_coeff) / te_ex_gf.ComputeL1Error(zero);
-         ste_L2_error_n = te_gf.ComputeL2Error(te_ex_coeff) / te_ex_gf.ComputeL2Error(zero);
-         ste_Max_error_n = te_gf.ComputeMaxError(te_ex_coeff) / te_ex_gf.ComputeMaxError(zero);
-      }
-      else 
-      {
-         sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / sv_ex_gf.ComputeL1Error(zero);
-         sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / sv_ex_gf.ComputeL2Error(zero);
-         sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / sv_ex_gf.ComputeMaxError(zero);
+            ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
+            ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
+            ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
+         }
 
-         ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / ste_ex_gf.ComputeL1Error(zero);
-         ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_ex_gf.ComputeL2Error(zero);
-         ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_ex_gf.ComputeMaxError(zero);
-      }
-   }
+      } // End all other test problems
+      
+   } // End if problem has exact solution
 
    /* Get composite errors values, will return 0 if exact solution is not known */
    const double L1_error = (sv_L1_error_n + vel_L1_error_n + ste_L1_error_n) / 3.;
@@ -1761,6 +1853,7 @@ int main(int argc, char *argv[]) {
         << "===========================================================\n";
    
    delete pmesh;
+   delete pmesh0;
    delete CRFEC;
    delete problem_class;
    delete m;

@@ -46,7 +46,7 @@ private:
    const double P1 = pow(rho1, _gamma), P2 = pow(rho2, _gamma);
    const double tau;
    bool _distort_mesh = false;
-   bool _known_exact_solution = false;
+   bool _known_exact_solution = true;
    bool _bcs = false; // Indicator for boundary conditions
    string _indicator = "Kidder"; // Possible: saltzmann
 
@@ -97,43 +97,34 @@ public:
 
    /*********************************************************
     * Initial State functions
+    * NOTE: the exact solution for pressure, density, and 
+    * velocity are in terms of initial particle locations.
+    * Hence these functions assume that the first parameter 
+    * is the initial particle location, rather than the 
+    * particle location at time t.
     *********************************************************/
    double p0(const Vector &x, const double & t) override
    {
-      double _h = h(t);
-      double r = x.Norml2();
-
-      /* Get original coord */
-      double _r0 = r / _h;
-      Vector x0 = x;
-      x0 *= _r0 / r;
-
       /* Get initial pressure */
-      double _p0 = pow(rho0(x0,0), this->get_gamma());
+      double _p0 = pow(rho0(x,0), this->get_gamma());
 
       if (t < 1e-12)
       {
          return _p0;
       }
       else 
-      {
-         return _p0 * pow(_h, 2 * this->get_gamma() / (1. - this->get_gamma()));
+     {
+         double _h = h(t);
+         return _p0 * pow(_h, 2. * this->get_gamma() / (1. - this->get_gamma()));
       }
       return 0.;
    }
    double rho0(const Vector &x, const double & t) override
    {
-      double _h = h(t);
       double r = x.Norml2();
-
-      /* Get original coord */
-      double _r0 = r / _h;
-      Vector x0 = x;
-      x0 *= _r0 / r;
-
       /* Get initial density */
-      double _rho0 = (pow(r2,2) - pow(_r0,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
-      _rho0 += (pow(_r0,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
+      double _rho0 = (pow(r2,2) - pow(r,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho1, this->get_gamma()-1);
+      _rho0 += (pow(r,2) - pow(r1,2)) / (pow(r2,2) - pow(r1,2)) * pow(rho2, this->get_gamma()-1);
       _rho0 = pow(_rho0, 1./(this->get_gamma()-1.));
       if (t < 1e-12)
       { 
@@ -141,28 +132,22 @@ public:
       }
       else 
       {
-         return _rho0 * pow(_h, 2 * this->get_gamma() / (1. - this->get_gamma()));
+         double _h = h(t);
+         return _rho0 * pow(_h, 2. / (1. - this->get_gamma()));
       }
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
-      double _h = h(t);
-      double r = x.Norml2();
-
-      /* Get original radius */
-      double _r0 = r / _h;
-      v = x;
-      v /= r;
-      double _dhdt = dhdt(t);
-
       if (t < 1e-12)
       {
          v = 0.;
       }
       else 
       {
-         double u = _r0 * _dhdt;
-         v *= u;
+         // double r = x.Norml2();
+         double _dhdt = dhdt(t);
+         v = x;
+         v *= -_dhdt; // ||v|| is r * dhdt, however must divide x by r to normalize. So r cancels
       }
       return;
    }

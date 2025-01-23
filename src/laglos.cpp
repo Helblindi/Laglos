@@ -47,6 +47,7 @@
 * ----- Untested -----
 * ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
 * ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder [Untested]
+* ./Laglos -m data/ref-square-c0-N30.mesh -p 16 -tf 0.5 -cfl 0.5 -rs 1     ## Taylor-Green [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
@@ -480,6 +481,11 @@ int main(int argc, char *argv[]) {
       case 15: // Kidder
       {
          problem_class = new KidderProblem<dim>();
+         break;
+      }
+      case 16: // Taylor-Green
+      {
+         problem_class = new TaylorGreenProblem<dim>();
          break;
       }
       case 20: // Riemann Problem

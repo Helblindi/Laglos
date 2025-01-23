@@ -22,4 +22,5 @@
 #include "riemann_problem.h"
 #include "test_bcs.h"
 #include "kidder.h"
+#include "taylor_green.h"
 #endif

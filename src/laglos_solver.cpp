@@ -630,7 +630,8 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
                   pb->get_indicator() == "TriplePoint" || 
                   pb->get_indicator() == "riemann" ||
                   pb->get_indicator() == "Sedov" || 
-                  pb->get_indicator() == "SodRadial")
+                  pb->get_indicator() == "SodRadial" || 
+                  pb->get_indicator() == "TaylorGreen")
          {
             // Mark corner vertices as 5
             // These nodes should not move at all during the simulation
@@ -1596,7 +1597,8 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                         pb->get_indicator() == "Vdw1" ||
                         pb->get_indicator() == "Vdw2" ||
                         pb->get_indicator() == "Vdw3" ||
-                        pb->get_indicator() == "Vdw4")
+                        pb->get_indicator() == "Vdw4" ||
+                        pb->get_indicator() == "TaylorGreen")
                {
                   switch (cell_bdr)
                   {
@@ -1728,7 +1730,8 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       pb->get_indicator() == "Vdw1" ||
       pb->get_indicator() == "Vdw2" ||
       pb->get_indicator() == "Vdw3" ||
-      pb->get_indicator() == "Vdw4")
+      pb->get_indicator() == "Vdw4" ||
+      pb->get_indicator() == "TaylorGreen")
    {
       int bdr_ind = 0;
       Vector node_v(dim);

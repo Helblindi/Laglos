@@ -2,12 +2,12 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 16
-   ny_gridpoints = 16
-   xL = 0.
-   xR = 1.
+   nx_gridpoints = 11
+   ny_gridpoints = 6
+   xL = -3.
+   xR = 3.
    yL = 0.
-   yR = 1.
+   yR = 3.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
@@ -49,10 +49,15 @@ def main():
    # BOUNDARY
    f.write("boundary\n")
 
-   bdry_left = 1
-   bdry_bottom = 2
-   bdry_right = 1
-   bdry_top = 2
+   # bdry_left = 1
+   # bdry_bottom = 2
+   # bdry_right = 1
+   # bdry_top = 2
+
+   bdry_left = 5
+   bdry_bottom = 5
+   bdry_right = 5
+   bdry_top = 5
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints - 1) + 2 * (ny_gridpoints - 1)) + "\n")

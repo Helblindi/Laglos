@@ -214,7 +214,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals);
+         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
 
          ess_tdofs.Append(add_ess_tdofs);
          bdr_vals.Append(add_bdr_vals);
@@ -875,9 +875,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    /* Set mesh velocity for the previous iteration before we make 
    any modifications to the mesh velocity object contained in S */
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf, mv_gf_l(&H1_L), mv_gf_prev_it;
+   ParGridFunction mv_gf, mv_gf_l(&H1_L), mv_gf_prev_it, x_gf;
    
    mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);  
    mv_gf_l.ProjectGridFunction(mv_gf);
 
    if (mm)
@@ -891,7 +892,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
          // bdr_vals.GetSubArray(ess_tdofs_cart_size, add_bdr_vals.Size(), mutable_bdr_vals);
          /// TODO: Too bad there isn't a method to get a reference to a sub array or to set a sub array.
          bdr_vals.SetSize(ess_tdofs_cart_size);
-         pb->update_additional_BCs(t, timestep_first, add_bdr_vals);
+         pb->update_additional_BCs(t, timestep_first, add_bdr_vals, geom, x_gf);
          bdr_vals.Append(add_bdr_vals);
       }
 
@@ -1523,6 +1524,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       } // End Face iterator
 
       // Enforce exact condition on boundary for Isentropic Vortex
+      // if ((pb->get_indicator() == "KidderBall" || pb->get_indicator() == "IsentropicVortex") && is_boundary_cell)
       if (pb->get_indicator() == "IsentropicVortex" && is_boundary_cell)
       {
          EnforceExactBCOnCell(S, ci, t, dt, val);

@@ -42,12 +42,13 @@
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.25 -rs 6         ## Noh
 * ./Laglos -m data/ref-square.mesh -p 6 -tf .9 -cfl 0.1 -rs 5              ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
+* ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder shell
 * ----- Fails -----
 * ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point [Fails]
 * ----- Untested -----
 * ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
-* ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder [Untested]
-* ./Laglos -m data/ref-square-c0-N30.mesh -p 16 -tf 0.5 -cfl 0.5 -rs 1     ## Taylor-Green [Untested]
+* ./Laglos -m data/ref-rectangle-q1q2.mesh -p 16 -tf 2 -cfl 0.5 -rs 0      ## Kidder ball [Untested]
+* ./Laglos -m data/ref-square-c0-N30.mesh -p 17 -tf 0.5 -cfl 0.5 -rs 1     ## Taylor-Green [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
@@ -478,12 +479,17 @@ int main(int argc, char *argv[]) {
          problem_class = new ICFProblem<dim>();
          break;
       }
-      case 15: // Kidder
+      case 15: // Kidder shell
       {
          problem_class = new KidderProblem<dim>();
          break;
       }
-      case 16: // Taylor-Green
+      case 16: // Kidder ball
+      {
+         problem_class = new KidderBallProblem<dim>();
+         break;
+      }
+      case 17: // Taylor-Green
       {
          problem_class = new TaylorGreenProblem<dim>();
          break;

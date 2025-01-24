@@ -221,8 +221,8 @@ public:
       } 
    }
 
-   virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals) override { }
-   virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals) override { }
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override { }
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override { }
 }; // End class
 
 } // ns hydrodynamics

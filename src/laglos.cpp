@@ -40,7 +40,7 @@
 * ./Laglos -m data/square-vortex.mesh -p 5 -tf 10 -cfl 0.5 -rs 3           ## Isentropic Vortex
 * ./Laglos -m data/noh-nonuniform.mesh -p 4 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.25 -rs 6         ## Noh
-* ./Laglos -m data/ref-square.mesh -p 6 -tf .9 -cfl 0.1 -rs 5              ## Sedov
+* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 0.1 -rs 5          ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
 * ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder shell
 * ----- Fails -----
@@ -136,6 +136,7 @@ int main(int argc, char *argv[]) {
    bool mc = false;
    bool use_viscosity = true;
    bool greedy = false;
+   int gmv_to_greedy_steps = 0;
    bool mm = true;
    bool check_mesh = true;
    bool post_process_density = false;
@@ -189,6 +190,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable the use of artificial viscosity.");
    args.AddOption(&greedy, "-greedy", "--use-greedy-viscosity", "-no-greedy", "--no-greedy-viscosity",
                   "Enable or disable greedy viscosity computation.");
+   args.AddOption(&gmv_to_greedy_steps, "-ggn", "--gmv-to-greedy-num-steps",
+                  "Number of steps of GMV to take before switching to greedy viscosity.");
    args.AddOption(&mm, "-mm", "--move-mesh", "-no-mm", "--no-move-mesh",
                   "Enable or disable mesh movement.");
    args.AddOption(&check_mesh, "-cm", "--check-mesh", "-no-cm", "--no-check-mesh",
@@ -847,7 +850,17 @@ int main(int argc, char *argv[]) {
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
-   hydro.SetViscOption(greedy);
+
+   /* 
+   If opting to use greedy viscosity, verify that you have not opted to use a few steps of GMV first. 
+   This options proves to be useful in the case of the Sedov problem, where the sie is initialized 
+   with a delta function.
+   */
+   if (gmv_to_greedy_steps == 0 && greedy)
+   {
+      hydro.SetViscOption(greedy);
+   }
+
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);
    hydro.SetDensityPP(post_process_density);
@@ -1191,6 +1204,11 @@ int main(int argc, char *argv[]) {
    for (; !last_step; ti++)
    {
       hydro.chrono_dij.Start();
+      /* Optionally enable greedy viscosity */
+      if (gmv_to_greedy_steps == ti && greedy)
+      {
+         hydro.SetViscOption(greedy);
+      }
       hydro.BuildDijMatrix(S);
       /* Check if we need to change CFL */
       if (problem_class->get_cfl_change() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())

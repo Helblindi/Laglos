@@ -12,6 +12,7 @@
 > - -mm
 > - -visc
 > - -greedy - Use greedy viscosity described in GMPST2024.
+> - -ggn - Number of GMV steps to take before using Greedy lambda
 > - -ms - maximum steps that the solver should take 
 > - -vs - the number of steps that should pass between visualizing the solution
 > - -vis - enable visualization

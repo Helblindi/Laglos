@@ -35,6 +35,23 @@ where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the me
 
 The percentage of cells in which mass loss is broken is simply the number of cells in which $\frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho} > 10^{-12}$ divided by the total number of cells in the mesh.
 
+# Select script insructions [located in ${source}/scripts directory]
+## Creating convergence tables
+> To show proper convergence of the utilized numerical method, one can construct a table of multiple error rates from a given test problem.  To valide the numerical method, a convergence order can then be computed from two different refinements.
+
+
+## Organize output pvtu files
+> When running a test problem with the flags `-pview -print -vs #`, pvtu and vtu files
+will be generated and placed in individual directories according to their timesteps.
+In an effort to make importing all these files faster in a visualization software 
+such as ParaView, it is helpful for all pvtu files to be in the same directory.  
+The following command (executed from the ${source}/scripts directory) will handle 
+renaming all pvtu files and replacing references to their corresponding vtu files
+for each processor.  
+```
+$ python3 reorganize_paraview.py <input_dir> <output_dir>
+````
+
 # Select HiOp Notes
 > ## SolveStatus
 > - 0 - Solve successful,

@@ -13,8 +13,8 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
                     int x, int y, int w, int h, bool vec)
 {
    gf.HostRead();
-   ParMesh &pmesh = *gf.ParFESpace()->GetParMesh();
-   MPI_Comm comm = pmesh.GetComm();
+   ParMesh &fine_pmesh = *gf.ParFESpace()->GetParMesh();
+   MPI_Comm comm = fine_pmesh.GetComm();
 
    int num_procs, myid;
    MPI_Comm_size(comm, &num_procs);
@@ -36,7 +36,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
          sock << "solution\n";
       }
 
-      pmesh.PrintAsOne(sock);
+      fine_pmesh.PrintAsOne(sock);
       gf.SaveAsOne(sock);
 
       if (myid == 0 && newly_opened)
@@ -65,12 +65,12 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 /****************************************************************************************************
 * Function: Constructor
 * Parameters:
-*  h1            - ParFiniteElementSpace to be used for the mesh motion.  The node corresponding to
+*  f_h1            - ParFiniteElementSpace to be used for the mesh motion.  The node corresponding to
 *                  the cell center is an averaged valued computed in FillCenterVelocitiesWithAvg
-*  l2            - ParFiniteElementSpace to be used for the hydrodynamics variables.  We use a DG0
+*  f_l2            - ParFiniteElementSpace to be used for the hydrodynamics variables.  We use a DG0
 *                  approximation in this code.
-*  l2v           - ParFiniteElementSpace for the velocity component.
-*  cr            - ParFiniteElementSpace to assist with the mesh velocity reconstruction.  This object
+*  f_l2v           - ParFiniteElementSpace for the velocity component.
+*  f_cr            - ParFiniteElementSpace to assist with the mesh velocity reconstruction.  This object
 *                  holds the intermediate face velocity object computed in equation (5.7) of the paper.
 *  m             - ParLinearForm containing the initial density of each cell to be used to compute the
 *                  initial cell mass, which is guaranteed to be conserved locally.
@@ -83,70 +83,77 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 * Purpose: Instantiate LagrangianLOOperator class.
 ****************************************************************************************************/
 template<int dim>
-LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
-                                                ParFiniteElementSpace &h1_l,
-                                                ParFiniteElementSpace &l2,
-                                                ParFiniteElementSpace &l2v,
-                                                ParFiniteElementSpace &cr,
+LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
+                                                ParFiniteElementSpace &f_h1_l,
+                                                ParFiniteElementSpace &f_l2,
+                                                ParFiniteElementSpace &f_l2v,
+                                                ParFiniteElementSpace &f_cr,
+                                                ParFiniteElementSpace &c_h1,
+                                                ParFiniteElementSpace &c_l2,
                                                 ParLinearForm *m,
                                                 ProblemBase<dim> *_pb,
                                                 Array<int> offset,
                                                 bool use_viscosity,
                                                 bool mm, 
                                                 double CFL) :
-   H1(h1),
-   H1_L(h1_l),
-   H1Lc(H1_L.GetParMesh(), H1_L.FEColl(), 1),
-   L2(l2),
-   L2V(l2v),
-   CR(cr),
-   CRc(CR.GetParMesh(), CR.FEColl(), 1),
-   v_CR_gf(&CR),
-   v_CR_gf_corrected(&CR), 
-   v_CR_gf_fluxes(&CR),
-   v_geo_gf(&H1_L),
-   cell_bdr_flag_gf(&L2),
-   LagrangeMultipliers(&L2),
-   pmesh(H1.GetParMesh()),
+   f_H1(f_h1),
+   f_H1_L(f_h1_l),
+   f_H1Lc(f_H1_L.GetParMesh(), f_H1_L.FEColl(), 1),
+   f_L2(f_l2),
+   f_L2V(f_l2v),
+   f_CR(f_cr),
+   f_CRc(f_CR.GetParMesh(), f_CR.FEColl(), 1),
+   c_H1(c_h1),
+   c_L2(c_l2),
+   v_CR_gf(&f_CR),
+   v_CR_gf_corrected(&f_CR), 
+   v_CR_gf_fluxes(&f_CR),
+   v_geo_gf(&f_H1_L),
+   c_x_gf(&c_h1),
+   cell_bdr_flag_gf(&f_L2),
+   LagrangeMultipliers(&f_L2),
+   fine_pmesh(f_H1.GetParMesh()),
+   coarse_pmesh(c_H1.GetParMesh()),
    m_lf(m),
    pb(_pb),
    block_offsets(offset),
-   geom(offset, H1, L2),
-   Vsize_H1(H1.GetVSize()),
-   TVSize_H1(H1.TrueVSize()),
-   GTVSize_H1(H1.GlobalTrueVSize()),
-   NDofs_H1(H1.GetNDofs()),
-   NDofs_H1L(H1_L.GetNDofs()),
-   Vsize_H1L(H1_L.GetVSize()),
-   NVDofs_H1(H1.GetNVDofs()), // Scalar vertex dofs
-   Vsize_L2(L2.GetVSize()),
-   TVSize_L2(L2.TrueVSize()),
-   GTVSize_L2(L2.GlobalTrueVSize()),
-   NDofs_L2(L2.GetNDofs()),
-   Vsize_L2V(L2V.GetVSize()),
-   TVSize_L2V(L2V.TrueVSize()),
-   GTVSize_L2V(L2V.GlobalTrueVSize()),
-   NDofs_L2V(L2V.GetNDofs()),
-   BdrElementIndexingArray(pmesh->GetNumFaces()),
-   BdrVertexIndexingArray(pmesh->GetNV()),
-   num_elements(L2.GetNE()),
-   num_faces(L2.GetNF()),
-   num_vertices(pmesh->GetNV()),
-   num_edges(pmesh->GetNEdges()),
-   vertex_element(pmesh->GetVertexToElementTable()),
-   face_element(pmesh->GetFaceToElementTable()),
-   edge_vertex(pmesh->GetEdgeVertexTable()),
-   ess_bdr(pmesh->bdr_attributes.Max()),
+   geom(offset, f_H1, f_L2),
+   Vsize_H1(f_H1.GetVSize()),
+   TVSize_H1(f_H1.TrueVSize()),
+   GTVSize_H1(f_H1.GlobalTrueVSize()),
+   NDofs_H1(f_H1.GetNDofs()),
+   NDofs_H1L(f_H1_L.GetNDofs()),
+   Vsize_H1L(f_H1_L.GetVSize()),
+   NVDofs_H1(f_H1.GetNVDofs()), // Scalar vertex dofs
+   Vsize_L2(f_L2.GetVSize()),
+   TVSize_L2(f_L2.TrueVSize()),
+   GTVSize_L2(f_L2.GlobalTrueVSize()),
+   NDofs_L2(f_L2.GetNDofs()),
+   Vsize_L2V(f_L2V.GetVSize()),
+   TVSize_L2V(f_L2V.TrueVSize()),
+   GTVSize_L2V(f_L2V.GlobalTrueVSize()),
+   NDofs_L2V(f_L2V.GetNDofs()),
+   BdrElementIndexingArray(fine_pmesh->GetNumFaces()),
+   BdrVertexIndexingArray(fine_pmesh->GetNV()),
+   num_elements(f_L2.GetNE()),
+   num_faces(f_L2.GetNF()),
+   num_vertices(fine_pmesh->GetNV()),
+   num_edges(fine_pmesh->GetNEdges()),
+   vertex_element(fine_pmesh->GetVertexToElementTable()),
+   face_element(fine_pmesh->GetFaceToElementTable()),
+   edge_vertex(fine_pmesh->GetEdgeVertexTable()),
+   ess_bdr(fine_pmesh->bdr_attributes.Max()),
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
    CFL(CFL)
 {
+   cout << "Instantiating hydro op\n";
+
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
    Transpose(*edge_vertex, vertex_edge);
 
-   cout << "Instantiating hydro op\n";
    cout << "block offsets: ";
    block_offsets.Print(cout);
    // block_offsets[0] = 0;
@@ -203,7 +210,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
          // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
          // i.e., we must enforce v_x/y/z = 0 for the velocity components.
          ess_bdr = 0; ess_bdr[d] = 1;
-         H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+         f_H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
          ess_tdofs.Append(dofs_list);
       }
       /* Set bdr_vals for dofs that should be 0 */
@@ -214,7 +221,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         pb->get_additional_BCs(f_H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
 
          ess_tdofs.Append(add_ess_tdofs);
          bdr_vals.Append(add_bdr_vals);
@@ -223,7 +230,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &h1,
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
-   RT_ir = IntRules.Get(CR.GetFE(0)->GetGeomType(), RT_ir_order);
+   RT_ir = IntRules.Get(f_CR.GetFE(0)->GetGeomType(), RT_ir_order);
 
    // Reset chronos
    chrono_mm.Clear();
@@ -256,6 +263,22 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
    delete dij_sparse;
    dij_sparse = nullptr;
+}
+
+template<int dim>
+void LagrangianLOOperator<dim>::InitPatchObjects()
+{
+   cout << "=======================================\n"
+        << "        Initialize Patch Objects       \n"
+        << "=======================================\n";
+   /* Initialize grid transfer objects */
+   gt_h1 = new InterpolationGridTransfer(c_H1, f_H1);
+   gt_l2 = new L2ProjectionGridTransfer(c_L2, f_L2);
+
+   /* Initialize coarse mesh grid locations */
+   coarse_pmesh->SetNodalGridFunction(&c_x_gf);
+   cout << "coase mesh locations: ";
+   c_x_gf.Print(cout);
 }
 
 
@@ -292,17 +315,17 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    {
       case 1: 
       {
-         el_num_faces = pmesh->GetElement(0)->GetNVertices();
+         el_num_faces = fine_pmesh->GetElement(0)->GetNVertices();
          break;
       }
       case 2: 
       {
-         el_num_faces = pmesh->GetElement(0)->GetNEdges();
+         el_num_faces = fine_pmesh->GetElement(0)->GetNEdges();
          break;
       }
       case 3: 
       {
-         el_num_faces = pmesh->GetElement(0)->GetNFaces();
+         el_num_faces = fine_pmesh->GetElement(0)->GetNFaces();
          break;
       }
       default: MFEM_ABORT("Wrong dimension given.\n");
@@ -319,7 +342,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    FunctionCoefficient rho_coeff(rho0_static);
 
    // Assemble SparseMatrix object
-   ParBilinearForm k(&L2);
+   ParBilinearForm k(&f_L2);
    k.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(rho_coeff, 1.0, 1.0));
 
    k.Assemble();
@@ -354,7 +377,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
    for (int face = 0; face < num_faces; face++) // face iterator
    {
       // cout << "face: " << face << endl;
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
       cp = FI.element[1].index;
 
@@ -381,8 +404,8 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          pb->lm_update(b_covolume);
 
          // Compute pressure with given EOS
-         double pl = pb->pressure(Uc,pmesh->GetAttribute(c));
-         double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+         double pl = pb->pressure(Uc,fine_pmesh->GetAttribute(c));
+         double pr = pb->pressure(Ucp,fine_pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
@@ -438,34 +461,34 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
       GetCellStateVector(S, ci, U_i);
 
       // Compute mass at time tn
-      const double k = pmesh->GetElementVolume(ci);
+      const double k = fine_pmesh->GetElementVolume(ci);
       mi = k / U_i[0];
 
       assert(mi > 0); // Assumption, equation (3.6)
 
-      H1.ExchangeFaceNbrData();
+      f_H1.ExchangeFaceNbrData();
 
       switch (dim)
       {
          case 1: 
          {
-            pmesh->GetElementVertices(ci, fids);
+            fine_pmesh->GetElementVertices(ci, fids);
             break;
          }
          case 2:
          {
-            pmesh->GetElementEdges(ci, fids, oris);
+            fine_pmesh->GetElementEdges(ci, fids, oris);
             break;
          }
          case 3:
          {
-            pmesh->GetElementFaces(ci, fids, oris);
+            fine_pmesh->GetElementFaces(ci, fids, oris);
          }
       }
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
-         FI = pmesh->GetFaceInformation(fids[j]);
+         FI = fine_pmesh->GetFaceInformation(fids[j]);
 
          if (FI.IsInterior())
          {
@@ -501,7 +524,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 /****************************************************************************************************
 * Function: GetEntityDof
 * Parameters:
-*     GDof   - Global degree of freedom with a max of H1.GetNDofs()
+*     GDof   - Global degree of freedom with a max of f_H1.GetNDofs()
 *     Entity - enum representing what type of node GDof corresponds to
 *     EDof   - Entity index of the GDof
 *
@@ -578,10 +601,10 @@ template<int dim>
 void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 {
    cout << "Constructing BdrElementIndexingArray:\n";
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < fine_pmesh->GetNBE(); i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int index = pmesh->GetBdrElementFaceIndex(i);
+      int bdr_attr = fine_pmesh->GetBdrAttribute(i);
+      int index = fine_pmesh->GetBdrElementFaceIndex(i);
       BdrElementIndexingArray[index] = bdr_attr;
    }
 }
@@ -606,12 +629,12 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
    Array<int> fids, oris;
    Array<int> verts;
 
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < fine_pmesh->GetNBE(); i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrElementFaceIndex(i);
+      int bdr_attr = fine_pmesh->GetBdrAttribute(i);
+      int face = fine_pmesh->GetBdrElementFaceIndex(i);
 
-      pmesh->GetEdgeVertices(face, verts);
+      fine_pmesh->GetEdgeVertices(face, verts);
       for (int k = 0; k < verts.Size(); k++)
       {
          int index = verts[k];
@@ -660,7 +683,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 * Function: FillCellBdrFlag
 *
 * Purpose: 
-*  To fill an L2 gridfunction of size NDofs_L2 (num cells) with a value indicating if the cell
+*  To fill an f_L2 gridfunction of size NDofs_L2 (num cells) with a value indicating if the cell
 *  is on the boundary or not.  This ParGridFunction can be retrieved with GetCellBdrFlagGF().
 *
 *  Note that this function will label a cell with 5 if that cell lies on the corner, indicating 
@@ -669,10 +692,10 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 template<int dim>
 void LagrangianLOOperator<dim>::FillCellBdrFlag()
 {
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < fine_pmesh->GetNBE(); i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrElementFaceIndex(i);
+      int bdr_attr = fine_pmesh->GetBdrAttribute(i);
+      int face = fine_pmesh->GetBdrElementFaceIndex(i);
 
       Array<int> row;
       // Get cell
@@ -730,13 +753,30 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
 
    ComputeMeshVelocities(S, S_old, t, dt);
 
-   // Move the mesh
+   /* Move the mesh(es) */
    Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+   x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
+   mv_gf.MakeRef(&f_H1, *sptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
-   UpdateMesh(S);
-   pmesh->NewNodes(x_gf, false);
+   f_H1.GetMesh()->NewNodes(x_gf, false);
+   f_L2.GetMesh()->NewNodes(x_gf, false);
+   fine_pmesh->NewNodes(x_gf, false);
+   /* Update coarse nodal grid function and move the mesh */
+   if (use_patch)
+   {
+      if (gt_h1->SupportsBackwardsOperator())
+      {
+         const Operator &P = gt_h1->BackwardOperator();
+         P.Mult(x_gf, c_x_gf);
+         c_H1.GetMesh()->NewNodes(c_x_gf, false);
+         c_L2.GetMesh()->NewNodes(c_x_gf, false);
+         coarse_pmesh->NewNodes(c_x_gf, false);
+      }
+      else
+      {
+         MFEM_ABORT("GridTransfer does not support backward operator.");
+      }
+   }
 
    /* Optionally post process the density to be mass conservative */
    double pct_corrected = 0., rel_mass_corrected = 0.;
@@ -789,12 +829,12 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, dou
    avg_rad_int = 0., avg_rad_ext = 0.;
 
    /* Iterate over boundary faces */
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < fine_pmesh->GetNBE(); i++)
    {
       // Get Face coords
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrElementFaceIndex(i);
-      H1.GetFaceDofs(face, face_dofs_row);
+      int bdr_attr = fine_pmesh->GetBdrAttribute(i);
+      int face = fine_pmesh->GetBdrElementFaceIndex(i);
+      f_H1.GetFaceDofs(face, face_dofs_row);
       int face_dof = face_dofs_row[2];
       geom.GetNodePositionFromBV(S, face_dof, face_x);
 
@@ -833,7 +873,7 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
 {
    ParGridFunction sv_gf;
    Vector* sptr = const_cast<Vector*>(&S);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
    Vector U(dim+2);
    avg_density = 0., avg_entropy = 0.;
 
@@ -841,7 +881,7 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
    {
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double pressure = pb->pressure(U, pmesh->GetAttribute(cell_it));
+      double pressure = pb->pressure(U, fine_pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
       avg_density += density;
@@ -875,10 +915,10 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
    /* Set mesh velocity for the previous iteration before we make 
    any modifications to the mesh velocity object contained in S */
    Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf, mv_gf_l(&H1_L), mv_gf_prev_it, x_gf;
+   ParGridFunction mv_gf, mv_gf_l(&f_H1_L), mv_gf_prev_it, x_gf;
    
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);  
+   mv_gf.MakeRef(&f_H1, *sptr, block_offsets[1]);
+   x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);  
    mv_gf_l.ProjectGridFunction(mv_gf);
 
    if (mm)
@@ -1060,7 +1100,7 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
             /* Optionally, Linearize velocity */
             if (this->do_mv_linearization)
             {
-               ParGridFunction mv_gf_l_linearized(&H1_L);
+               ParGridFunction mv_gf_l_linearized(&f_H1_L);
                ComputeLinearizedNodeVelocities(mv_gf_l, mv_gf_l_linearized, t, dt);
                mv_gf_l = mv_gf_l_linearized;
             }
@@ -1130,9 +1170,9 @@ bool LagrangianLOOperator<dim>::IsMeshCollapsed()
 {
    ElementTransformation * trans;
 
-   for (int el = 0; el < L2.GetNE(); el++)
+   for (int el = 0; el < f_L2.GetNE(); el++)
    {
-      trans = pmesh->GetElementTransformation(el);
+      trans = fine_pmesh->GetElementTransformation(el);
       /* Iterate over 4 integration points */
       for (int i = 0; i < RT_ir.GetNPoints(); i++)
       {
@@ -1178,9 +1218,9 @@ void LagrangianLOOperator<dim>::ComputeMinDetJ(int &cell, double &minDetJ)
    ElementTransformation * trans;
    minDetJ = 100.;
 
-   for (int el = 0; el < L2.GetNE(); el++)
+   for (int el = 0; el < f_L2.GetNE(); el++)
    {
-      trans = pmesh->GetElementTransformation(el);
+      trans = fine_pmesh->GetElementTransformation(el);
       /* Iterate over 4 integration points */
       for (int i = 0; i < RT_ir.GetNPoints(); i++)
       {
@@ -1231,15 +1271,15 @@ bool LagrangianLOOperator<dim>::IsMeshCollapsedGeom(const Vector &S)
          MFEM_ABORT("Function IsMeshCollapsed is hardcoded for dim == 2.")
       }
 
-      pmesh->GetElementVertices(ci, verts);
-      pmesh->GetElementEdges(ci, fids, oris);
+      fine_pmesh->GetElementVertices(ci, verts);
+      fine_pmesh->GetElementEdges(ci, fids, oris);
 
       // cout << "cell: " << ci << endl;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
-         FI = pmesh->GetFaceInformation(fids[j]);
-         H1.GetFaceDofs(fids[j], face_dofs);
+         FI = fine_pmesh->GetFaceInformation(fids[j]);
+         f_H1.GetFaceDofs(fids[j], face_dofs);
          // cout << "\tface: " << fids[j];
          face_dof = face_dofs[2];
 
@@ -1304,7 +1344,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
    double d;
 
    mfem::Mesh::FaceInformation FI;
-   H1.ExchangeFaceNbrData();
+   f_H1.ExchangeFaceNbrData();
 
    bool is_boundary_cell = false;
 
@@ -1323,17 +1363,17 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
       {
          case 1: 
          {
-            pmesh->GetElementVertices(ci, fids);
+            fine_pmesh->GetElementVertices(ci, fids);
             break;
          }
          case 2:
          {
-            pmesh->GetElementEdges(ci, fids, oris);
+            fine_pmesh->GetElementEdges(ci, fids, oris);
             break;
          }
          case 3:
          {
-            pmesh->GetElementFaces(ci, fids, oris);
+            fine_pmesh->GetElementFaces(ci, fids, oris);
             break;
          }
          default:
@@ -1342,7 +1382,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          }
       }
 
-      const DenseMatrix F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
+      const DenseMatrix F_i = pb->flux(U_i, fine_pmesh->GetAttribute(ci));
       sums = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -1352,7 +1392,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          c /= 2.;
          sum_validation.Add(1., c);
 
-         FI = pmesh->GetFaceInformation(fids[j]);
+         FI = fine_pmesh->GetFaceInformation(fids[j]);
 
          if (FI.IsInterior())
          {
@@ -1367,7 +1407,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
             GetCellStateVector(S, cj, U_j); 
 
             // flux contribution
-            DenseMatrix dm = pb->flux(U_j, pmesh->GetAttribute(cj));
+            DenseMatrix dm = pb->flux(U_j, fine_pmesh->GetAttribute(cj));
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -1449,7 +1489,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                //    {
                //       U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
                //    }
-               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry, pmesh->GetAttribute(i));
+               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry, fine_pmesh->GetAttribute(i));
                //    F_i_slip.Mult(c, y_temp_bdry);
                //    // y_temp *= 2.;
                //    break;
@@ -1477,7 +1517,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   // Need face_x for boundary velocity
                   Array<int> face_dofs;
                   Vector face_x(dim), cell_v(dim), cell_vp(dim);
-                  H1.GetFaceDofs(fids[j], face_dofs);
+                  f_H1.GetFaceDofs(fids[j], face_dofs);
                   int face_dof = face_dofs[2];
                   geom.GetNodePositionFromBV(S,face_dof, face_x);
                   pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
@@ -1485,7 +1525,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
                   /* 
                   * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
                   * So instead of this call:
-                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
+                  *    DenseMatrix F_i_bdry = pb->flux(U_i, fine_pmesh->GetAttribute(ci));
                   * We modify just the pressure in the flux F_i
                   */
                   DenseMatrix F_i_bdry = F_i;
@@ -1539,7 +1579,7 @@ void LagrangianLOOperator<dim>::ComputeStateUpdate(Vector &S, const double &t, c
          Compute current mass, rather than assume mass is conserved
          In several methods we've attempted, mass has not been conserved
          */
-         double k = pmesh->GetElementVolume(ci);
+         double k = fine_pmesh->GetElementVolume(ci);
          double _mass = k / U_i[0];
          sums /= _mass;
          val += sums;
@@ -1782,7 +1822,7 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       // Enforce
       // Vector* sptr = const_cast<Vector*>(&S);
       // ParGridFunction x_gf, mv_gf;
-      // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+      // mv_gf.MakeRef(&f_H1, *sptr, block_offsets[1]);
 
       Vector ex(dim);
       ex = 0.;
@@ -1852,13 +1892,13 @@ void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const dou
       // Boundary vertices should not move at all
       Vector* sptr = const_cast<Vector*>(&S);
       ParGridFunction x_gf, mv_gf;
-      mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+      mv_gf.MakeRef(&f_H1, *sptr, block_offsets[1]);
 
       Vector zero(dim);
       zero = 0.;
       VectorConstantCoefficient zero_coeff(zero);
 
-      mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
+      mv_gf.ProjectBdrCoefficient(zero_coeff, fine_pmesh->bdr_attributes);
    }
 }
 
@@ -1881,7 +1921,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
    int num_corrected_cells = 0;
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf;
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
    rel_mass_corrected = 0.;
 
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
@@ -1890,7 +1930,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
       const double m = m_hpv->Elem(cell_it);
 
       // Get new cell volume
-      const double k_new = pmesh->GetElementVolume(cell_it);
+      const double k_new = fine_pmesh->GetElementVolume(cell_it);
       const double sv_new= sv_gf.Elem(cell_it);
 
       // Compute sv that gives exact mass conservation
@@ -1944,9 +1984,9 @@ void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, const int ce
    // Retrieve information from BlockVector S
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, v_gf, ste_gf;
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
-   v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
-   ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
+   v_gf.MakeRef(&f_L2V, *sptr, block_offsets[3]);
+   ste_gf.MakeRef(&f_L2, *sptr, block_offsets[4]);
 
    // Retrieve specific volume on cell
    U[0] = sv_gf.Elem(cell);
@@ -1988,9 +2028,9 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S, const int cell, co
    // Get current state grid functions
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, v_gf, ste_gf;
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
-   v_gf.MakeRef(&L2V, *sptr, block_offsets[3]);
-   ste_gf.MakeRef(&L2, *sptr, block_offsets[4]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
+   v_gf.MakeRef(&f_L2V, *sptr, block_offsets[3]);
+   ste_gf.MakeRef(&f_L2, *sptr, block_offsets[4]);
 
    // Set subvectors according to U
    sv_gf.SetSubVector(dofs, U[0]);
@@ -2042,7 +2082,7 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 
    mfem::Mesh::FaceInformation FI;
    Array<int> row;
-   FI = pmesh->GetFaceInformation(face);
+   FI = fine_pmesh->GetFaceInformation(face);
 
    int c, cp, face_dof;
    c = FI.element[0].index;
@@ -2066,7 +2106,7 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
       }
       case 2:
       {
-         H1.GetFaceDofs(face, row);
+         f_H1.GetFaceDofs(face, row);
          int face_vdof1 = row[1], face_vdof2 = row[0];
          face_dof = row[2];
 
@@ -2149,7 +2189,7 @@ void LagrangianLOOperator<dim>::
    {
       // cout << "face: " << face << endl;
       Vf = 0.;
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
       cp = FI.element[1].index;
 
@@ -2181,14 +2221,14 @@ void LagrangianLOOperator<dim>::
             Vf *= 0.5;
             if (use_viscosity)
             {
-               // double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-               // double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+               // double pcp = pb->pressure(Ucp,fine_pmesh->GetAttribute(cp));
+               // double pc = pcp - pb->pressure(Uc,fine_pmesh->GetAttribute(c));
                // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
                Vf.Add(coeff, n_vec);
                // Vf.Add(coeff, tau_vec);
 
-               // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
+               // if (fine_pmesh->GetAttribute(cp) != fine_pmesh->GetAttribute(c))
                // {
                //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
                //    cout << "pressure differential: " << pc << endl;
@@ -2203,7 +2243,7 @@ void LagrangianLOOperator<dim>::
             // int ori = 0;
 
             // Array<int> element_face_row, element_face_oris;
-            // pmesh->GetElementEdges(c, element_face_row, element_face_oris);
+            // fine_pmesh->GetElementEdges(c, element_face_row, element_face_oris);
             // for (int i = 0; i < 4; i++) // 3DTODO
             // {
             //    if (element_face_row[i] == face)
@@ -2245,7 +2285,7 @@ void LagrangianLOOperator<dim>::
             case 2:
             {
                Array<int> row;
-               H1.GetFaceDofs(face, row);
+               f_H1.GetFaceDofs(face, row);
                face_dof = row[2];               
                break;
             }
@@ -2555,7 +2595,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
          continue;
       }
       const double m = m_hpv->Elem(ci);
-      const double k = pmesh->GetElementVolume(ci);
+      const double k = fine_pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
       num += abs((k / U_i[0]) - m);
       denom += abs(m);
@@ -2591,7 +2631,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
       const double m = m_hpv->Elem(ci);
-      const double k = pmesh->GetElementVolume(ci);
+      const double k = fine_pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
 
       current_mass = k / U_i[0];
@@ -2732,10 +2772,10 @@ void LagrangianLOOperator<dim>::
       face_velocity = 0.;
       Vf = 0.;
 
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
 
       /* adjacent corner indices */
-      H1.GetFaceDofs(face, row);
+      f_H1.GetFaceDofs(face, row);
       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
       // retrieve old face and corner locations
@@ -2952,11 +2992,11 @@ void LagrangianLOOperator<dim>::
       face_velocity = 0.;
       Vf = 0.;
 
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       GetCorrectedFaceVelocity(face, face_velocity);
 
       /* adjacent corner indices */
-      H1.GetFaceDofs(face, row);
+      f_H1.GetFaceDofs(face, row);
       int face_dof = row[2];
 
       if (FI.IsInterior())
@@ -3015,7 +3055,7 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 {
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
 
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector cell_x(dim), node_x(dim);
@@ -3048,7 +3088,7 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
       }
 
       cell_x = 0.;
-      pmesh->GetElementVertices(ci, verts);
+      fine_pmesh->GetElementVertices(ci, verts);
 
       for (int j = 0; j < verts.Size(); j++)
       {
@@ -3082,7 +3122,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction v_gf;
-   v_gf.MakeRef(&H1, *sptr, block_offsets[3]);
+   v_gf.MakeRef(&f_H1, *sptr, block_offsets[3]);
 
    Vector Uc(dim+2), node_v(dim);
 
@@ -3171,7 +3211,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
 
       if (dim == 1)
       {
-         pmesh->GetElementVertices(ci, verts);
+         fine_pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
             geom.GetNodeVelocity(S, verts[j], node_v);
@@ -3182,7 +3222,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
       // Average velocity from corner vertices
       else if (dim == 2)
       {
-         pmesh->GetElementVertices(ci, verts);
+         fine_pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
             geom.GetNodeVelocity(S, verts[j], node_v);
@@ -3222,10 +3262,10 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(Vector &S, const strin
    for (int face = 0; face < num_faces; face++) // face iterator
    {  
       face_velocity = 0.;
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
 
       /* adjacent corner indices */
-      H1.GetFaceDofs(face, row);
+      f_H1.GetFaceDofs(face, row);
       int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
       // retrieve old face and corner locations
@@ -3272,10 +3312,10 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(Vector &S)
       // cout << "======================\n";
       // cout << "face: " << face << endl;
       face_velocity = 0.;
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
 
       /* adjacent corner indices */
-      H1.GetFaceDofs(face, row);
+      f_H1.GetFaceDofs(face, row);
       int face_vdof1 = row[0], face_vdof2 = row[1], face_dof = row[2];
 
       // retrieve corner velocities
@@ -3319,7 +3359,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(Vector &S)
                   // cout << "face " << vert_adj_face << " is the face you seek!!!\n";
 
                   /* Get sub vel */
-                  H1.GetFaceDofs(vert_adj_face, tmp_row);
+                  f_H1.GetFaceDofs(vert_adj_face, tmp_row);
                   sub_index = (tmp_row[0] == face_vdof1) ? tmp_row[1] : tmp_row[0];
                   // cout << "face dofs we seek. Face: " << vert_adj_face << ". vdof1: " << tmp_row[0] << ". vdof2: " << tmp_row[1] << ". Subindex: " << sub_index << endl;
                   geom.GetNodeVelocity(S, sub_index, sub_vel);
@@ -3358,7 +3398,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(Vector &S)
                   // cout << "face " << vert_adj_face << " is the face you seek!!!\n";
 
                   /* Get sub vel */
-                  H1.GetFaceDofs(vert_adj_face, tmp_row);
+                  f_H1.GetFaceDofs(vert_adj_face, tmp_row);
                   sub_index = (tmp_row[0] == face_vdof2) ? tmp_row[1] : tmp_row[0];
                   // cout << "face dofs we seek. Face: " << vert_adj_face << ". vdof1: " << tmp_row[0] << ". vdof2: " << tmp_row[1] << ". Subindex: " << sub_index << endl;
                   geom.GetNodeVelocity(S, sub_index, sub_vel);
@@ -3459,7 +3499,7 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 // {
 //    Vector* sptr = const_cast<Vector*>(&S);
 //    ParGridFunction x_gf;
-//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+//    x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
 
 //    for (int i = 0; i < dim; i++)
 //    {
@@ -3484,7 +3524,7 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 // {
 //    Vector* sptr = const_cast<Vector*>(&S);
 //    ParGridFunction x_gf;
-//    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+//    x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
 
 //    for (int i = 0; i < dim; i++)
 //    {
@@ -3492,25 +3532,6 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 //       x[i] = x_gf[index];
 //    }
 // }
-
-
-/****************************************************************************************************
-* Function: UpdateMesh
-* Parameters:
-*   S    - BlockVector representing FiniteElement information
-*
-* Purpose:
-*  This function returns the cartesian location corresponding to a global node.
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::UpdateMesh(const Vector & S) const 
-{
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction x_gf;
-   x_gf.MakeRef(&H1, *sptr, 0);
-   H1.GetMesh()->NewNodes(x_gf, false);
-   L2.GetMesh()->NewNodes(x_gf, false);
-}
 
 
 /****************************************************************************************************
@@ -3541,16 +3562,16 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
       pb->velocity(U, vel);
-      pressure = pb->pressure(U, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(U, pmesh->GetAttribute(i));
+      pressure = pb->pressure(U, fine_pmesh->GetAttribute(i));
+      ss = pb->sound_speed(U, fine_pmesh->GetAttribute(i));
       
-      pmesh->GetElementCenter(i, center);
+      fine_pmesh->GetElementCenter(i, center);
 
       // We fill the x-coordinate depending on the problem.
       // This really depends on what kind of visualization is needed
       switch (problem)
       {
-      // Any radial plot, we take the L2 norm of the cell center
+      // Any radial plot, we take the f_L2 norm of the cell center
       case 4:  // Noh
       case 6:  // Sedov
       case 13: // Sod Radial
@@ -3749,7 +3770,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S, ParGridFuncti
       {
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
 
          // Retrieve corresponding normal (orientation doesn't matter)
          CalcOutwardNormalInt(S, FI.element[0].index, face, n_vec);
@@ -3833,7 +3854,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
                /* Just the velocity */
                Vf = 0.; 
                int face = faces_row[face_it];
-               FI = pmesh->GetFaceInformation(face);
+               FI = fine_pmesh->GetFaceInformation(face);
 
                c = FI.element[0].index;
                cp = FI.element[1].index;
@@ -3866,8 +3887,8 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
                Ri += y;
 
                /* Get viscosity contribution */
-               // pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-               // pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
+               // pcp = pb->pressure(Ucp,fine_pmesh->GetAttribute(cp));
+               // pc = pcp - pb->pressure(Uc,fine_pmesh->GetAttribute(c));
                // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                coeff = 0.5 * d * (Ucp[0] - Uc[0]) / c_norm; // This is how 5.7b is defined.
                if (BdrVertexIndexingArray[node] == -1)
@@ -4027,7 +4048,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
             {
                int el_index = element_row[element_it];
 
-               pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+               fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
                length_cell_faces = cell_faces_row.Size();
 
                // Iterate over cell faces
@@ -4055,7 +4076,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
                      // }
 
                      // Get average of face edge nodes
-                     H1.GetFaceDofs(face_index, face_dofs);
+                     f_H1.GetFaceDofs(face_index, face_dofs);
                      geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
                      geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                      face_x = vdof1_x;
@@ -4230,7 +4251,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEAT(Vector &S)
             {
                int face = faces_row[face_it];
                GetIntermediateFaceVelocity(face, Vf);
-               FI = pmesh->GetFaceInformation(face);
+               FI = fine_pmesh->GetFaceInformation(face);
                c = FI.element[0].index;
                cp = FI.element[1].index;
 
@@ -4424,7 +4445,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
                   {
                      int el_index = element_row[element_it];
 
-                     pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+                     fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
                      length_cell_faces = cell_faces_row.Size();
 
                      // Iterate over cell faces
@@ -4440,7 +4461,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
                            row_index = uniqueFaceIndices.size() - 1;
 
                            // Get adjacent cell information for the weighting
-                           FI = pmesh->GetFaceInformation(face_index);
+                           FI = fine_pmesh->GetFaceInformation(face_index);
                            c = FI.element[0].index;
                            cp = FI.element[1].index;
                            
@@ -4508,7 +4529,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
                   {
                      int el_index = element_row[element_it];
 
-                     pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+                     fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
                      length_cell_faces = cell_faces_row.Size();
 
                      // Iterate over cell faces
@@ -4529,7 +4550,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
                            CalcOutwardNormalInt(S, el_index, face_index, n_vec);
 
                            // Get average of face edge nodes
-                           H1.GetFaceDofs(face_index, face_dofs);
+                           f_H1.GetFaceDofs(face_index, face_dofs);
                            geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
                            geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                            face_x = vdof1_x;
@@ -4706,7 +4727,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
                   {
                      int el_index = element_row[element_it];
 
-                     pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+                     fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
                      length_cell_faces = cell_faces_row.Size();
 
                      // Iterate over cell faces
@@ -4722,7 +4743,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
                            row_index = uniqueFaceIndices.size() - 1;
 
                            // Get adjacent cell information for the weighting
-                           FI = pmesh->GetFaceInformation(face_index);
+                           FI = fine_pmesh->GetFaceInformation(face_index);
                            c = FI.element[0].index;
                            cp = FI.element[1].index;
                            
@@ -4797,7 +4818,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
                   {
                      int el_index = element_row[element_it];
 
-                     pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+                     fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
                      length_cell_faces = cell_faces_row.Size();
 
                      // Iterate over cell faces
@@ -4836,7 +4857,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
                            // double weight = 1.;
 
                            // Get average of face edge nodes
-                           H1.GetFaceDofs(face_index, face_dofs);
+                           f_H1.GetFaceDofs(face_index, face_dofs);
                            geom.GetNodePositionFromBV(S, face_dofs[1], vdof1_x);
                            geom.GetNodePositionFromBV(S, face_dofs[0], vdof2_x);
                            face_x = vdof1_x;
@@ -4964,7 +4985,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
    Array<int> faces_row, face_dofs_row;
    int faces_length;
    mfem::Mesh::FaceInformation FI;
-   H1.ExchangeFaceNbrData();
+   f_H1.ExchangeFaceNbrData();
    int Vadj_index, c, bdr_ind = 0;
    double F = 0.;
    double Vnode_n_comp = 0.; // The quantity we solve for in each face iteration
@@ -5020,7 +5041,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          // Get face information
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
 
          // Calculate outer normal
          c = FI.element[0].index;
@@ -5032,7 +5053,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
          /* adjacent corner indices */
          // preserve node orientation where cell to right 
          // of face is with lower cell index
-         H1.GetFaceDofs(face, face_dofs_row);
+         f_H1.GetFaceDofs(face, face_dofs_row);
          int face_vdof1 = face_dofs_row[1], 
              face_vdof2 = face_dofs_row[0], 
              face_dof = face_dofs_row[2]; 
@@ -5358,11 +5379,11 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
       face_velocity = 0.;
       Vf = 0.;
 
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       if (FI.IsInterior())
       {
          /* adjacent corner indices */
-         H1.GetFaceDofs(face, row);
+         f_H1.GetFaceDofs(face, row);
          int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
          // retrieve old face and corner locations
@@ -5521,7 +5542,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
    Array<int> faces_row, face_dofs_row;
    int faces_length;
    mfem::Mesh::FaceInformation FI;
-   H1.ExchangeFaceNbrData();
+   f_H1.ExchangeFaceNbrData();
    int Vadj_index, c, bdr_ind = 0;
    double F = 0.;
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
@@ -5571,12 +5592,12 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
          // Get face information
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
 
          /* adjacent corner indices */
          // preserve node orientation where cell to right 
          // of face is with lower cell index
-         H1.GetFaceDofs(face, face_dofs_row);
+         f_H1.GetFaceDofs(face, face_dofs_row);
          int face_vdof1 = face_dofs_row[1], 
              face_vdof2 = face_dofs_row[0], 
              face_dof = face_dofs_row[2]; 
@@ -5959,12 +5980,12 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
             // Get face information
             int face = faces_row[face_it];
             GetIntermediateFaceVelocity(face, Vf);
-            FI = pmesh->GetFaceInformation(face);
+            FI = fine_pmesh->GetFaceInformation(face);
 
             /* adjacent corner indices */
             // preserve node orientation where cell to right 
             // of face is with lower cell index
-            H1.GetFaceDofs(face, face_dofs_row);
+            f_H1.GetFaceDofs(face, face_dofs_row);
             int face_vdof1 = face_dofs_row[1], 
                face_vdof2 = face_dofs_row[0], 
                face_dof = face_dofs_row[2]; 
@@ -6085,11 +6106,11 @@ double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double 
    // Iterate over faces
    for (int face = 0; face < num_faces; face++) // face iterator
    {
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       if (FI.IsInterior())
       {
          /* adjacent corner indices */
-         H1.GetFaceDofs(face, row);
+         f_H1.GetFaceDofs(face, row);
          int face_vdof1 = row[1], face_vdof2 = row[0], face_dof = row[2]; // preserve node orientation discussed in appendix A
 
          // retrieve corner velocities
@@ -6135,7 +6156,7 @@ double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double 
 *  iteration.
 *
 *  Note: This function will modify mv_gf in the BlockVector S
-*  Note: The basis taken for the l2 norm is that formed by the normal and tangent
+*  Note: The basis taken for the f_l2 norm is that formed by the normal and tangent
 *  vectors at the half step.
 ****************************************************************************************************/
 template<int dim>
@@ -6155,7 +6176,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
    Array<int> faces_row, face_dofs_row;
    int faces_length;
    mfem::Mesh::FaceInformation FI;
-   H1.ExchangeFaceNbrData();
+   f_H1.ExchangeFaceNbrData();
    int Vadj_index, c, bdr_ind = 0;
    double F = 0.;
    double Vadj_n_comp = 0., Vadj_tau_comp = 0., vnode_tau_comp_prev = 0.;
@@ -6204,12 +6225,12 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
          // Get face information
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
 
          /* adjacent corner indices */
          // preserve node orientation where cell to right 
          // of face is with lower cell index
-         H1.GetFaceDofs(face, face_dofs_row);
+         f_H1.GetFaceDofs(face, face_dofs_row);
          int face_vdof1 = face_dofs_row[1], 
              face_vdof2 = face_dofs_row[0], 
              face_dof = face_dofs_row[2]; 
@@ -6496,8 +6517,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim);
@@ -6547,7 +6568,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
             // cout << "cell: " << el_index << endl;
             // cout << "cell: " << el_index << endl;
             /* Get remaining node locations and velocities */
-            pmesh->GetElementVertices(el_index, verts);
+            fine_pmesh->GetElementVertices(el_index, verts);
             int verts_length = verts.Size();
             int node_index = verts.Find(node);
             int l2_vi = verts[(node_index + 1) % verts_length],
@@ -6575,10 +6596,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
             /* Compute Bj, c, and b vector */
             // Bj
             // cout << "Elem: " << el_index << endl;
-            // cout << "Vol: " << pmesh->GetElementVolume(el_index);
+            // cout << "Vol: " << fine_pmesh->GetElementVolume(el_index);
             // cout << ", old sv: " << sv_old_gf.Elem(el_index);
             // cout << ", new sv: " << sv_gf.Elem(el_index) << endl;
-            Bj = sv_gf.Elem(el_index) * pmesh->GetElementVolume(el_index) / sv_old_gf.Elem(el_index);
+            Bj = sv_gf.Elem(el_index) * fine_pmesh->GetElementVolume(el_index) / sv_old_gf.Elem(el_index);
 
             // c and bvec
             subtract(al2_np1, al1_np1, temp_vec); // a_2^np1 - a_1^np1
@@ -6624,9 +6645,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
             {
                int face = faces_row[face_it];
                /* Get face normal and adjacent velocity */
-               FI = pmesh->GetFaceInformation(face);
+               FI = fine_pmesh->GetFaceInformation(face);
 
-               H1.GetFaceDofs(face, face_dofs_row);
+               f_H1.GetFaceDofs(face, face_dofs_row);
                int face_vdof1 = face_dofs_row[1],
                   face_vdof2 = face_dofs_row[0],
                   face_dof = face_dofs_row[2];
@@ -6718,8 +6739,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim);
@@ -6762,10 +6783,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
             int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
+            Kcn = fine_pmesh->GetElementVolume(el_index);
 
             /* Get remaining node locations and velocities */
-            pmesh->GetElementVertices(el_index, verts);
+            fine_pmesh->GetElementVertices(el_index, verts);
             int verts_length = verts.Size();
             int node_index = verts.Find(node);
             int l2_vi = verts[(node_index + 1) % verts_length],
@@ -6888,8 +6909,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim), Vnode_mv2(dim);
@@ -6931,10 +6952,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
             int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
+            Kcn = fine_pmesh->GetElementVolume(el_index);
 
             /* Get remaining node locations and velocities */
-            pmesh->GetElementVertices(el_index, verts);
+            fine_pmesh->GetElementVertices(el_index, verts);
             int verts_length = verts.Size();
             int node_index = verts.Find(node);
             int l2_vi = verts[(node_index + 1) % verts_length],
@@ -7057,8 +7078,8 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim), Vnode_mv2(dim);
@@ -7103,10 +7124,10 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
             int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
+            Kcn = fine_pmesh->GetElementVolume(el_index);
 
             /* Get remaining node locations and velocities */
-            pmesh->GetElementVertices(el_index, verts);
+            fine_pmesh->GetElementVertices(el_index, verts);
             int verts_length = verts.Size();
             int node_index = verts.Find(node);
             int l2_vi = verts[(node_index + 1) % verts_length],
@@ -7181,9 +7202,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
             {
                int face = faces_row[face_it];
                /* Get face normal and adjacent velocity */
-               FI = pmesh->GetFaceInformation(face);
+               FI = fine_pmesh->GetFaceInformation(face);
 
-               H1.GetFaceDofs(face, face_dofs_row);
+               f_H1.GetFaceDofs(face, face_dofs_row);
                int face_vdof1 = face_dofs_row[1],
                   face_vdof2 = face_dofs_row[0],
                   face_dof = face_dofs_row[2];
@@ -7262,14 +7283,14 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
    double gamma_numer = 0., gamma_c_numer = 0., gamma_f_numer = 0., denom = 0.;
 
    ParGridFunction sv_gf, sv_old_gf, x_gf, mv_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
 
    // Move vertices of S_temp to compute cell volume norm
    Vector S_temp = S;
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
-   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[2]);
+   x_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[0]);
+   mv_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[1]);
+   sv_gf.MakeRef(&f_L2, *stemp_ptr, block_offsets[2]);
    add(x_gf, dt, mv_gf, x_gf);
 
    Array<int> cells_row;
@@ -7320,7 +7341,7 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
             int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
+            Kcn = fine_pmesh->GetElementVolume(el_index);
 
             sum_k += Kcn;
          }
@@ -7332,8 +7353,8 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
    // Iterate over all faces
    for (int face = 0; face < num_faces; face++)
    {
-      FI = pmesh->GetFaceInformation(face);
-      H1.GetFaceDofs(face,face_dofs_row);
+      FI = fine_pmesh->GetFaceInformation(face);
+      f_H1.GetFaceDofs(face,face_dofs_row);
       int face_dof1 = face_dofs_row[0], face_dof2 = face_dofs_row[1];
 
       geom.GetNodePositionFromBV(S, face_dof1, a1);
@@ -7382,7 +7403,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
       case 2:
       {
          // Get element nodes and positions
-         pmesh->GetElementVertices(cell, verts);
+         fine_pmesh->GetElementVertices(cell, verts);
          int verts_length = verts.Size();
          Vector a0(dim), a1(dim), a2(dim), a3(dim);
          geom.GetNodePositionFromBV(S, verts[0], a0);
@@ -7429,14 +7450,14 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
    Vector* sptr_old = const_cast<Vector*>(&S_old);
 
    ParGridFunction sv_gf, sv_old_gf, x_gf, mv_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
 
    // Move vertices of S_temp to compute cell volume norm
    Vector S_temp = S;
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
-   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[2]);
+   x_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[0]);
+   mv_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[1]);
+   sv_gf.MakeRef(&f_L2, *stemp_ptr, block_offsets[2]);
    add(x_gf, dt, mv_gf, x_gf);
 
    double num = 0., denom = 0.;
@@ -7486,14 +7507,14 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
    double alphaF = 0., alphaV = 0., denom = 0.;
 
    ParGridFunction sv_gf, sv_old_gf, x_gf, mv_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[2]);
+   sv_old_gf.MakeRef(&f_L2, *sptr_old, block_offsets[2]);
 
    // Move vertices of S_temp to compute cell volume norm
    Vector S_temp = S;
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
-   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[2]);
+   x_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[0]);
+   mv_gf.MakeRef(&f_H1, *stemp_ptr, block_offsets[1]);
+   sv_gf.MakeRef(&f_L2, *stemp_ptr, block_offsets[2]);
    add(x_gf, dt, mv_gf, x_gf);
 
    Array<int> cells_row;
@@ -7538,7 +7559,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
          for (int cell_it = 0; cell_it < cells_length; cell_it++)
          {
             int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
+            Kcn = fine_pmesh->GetElementVolume(el_index);
 
             GetCellStateVector(S, el_index, Uc);
             pb->velocity(Uc, Vcell);
@@ -7599,7 +7620,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
          {
             // Get face information
             int face = faces_row[face_it];
-            FI = pmesh->GetFaceInformation(face);
+            FI = fine_pmesh->GetFaceInformation(face);
 
             // Weight with F
             int c = FI.element[0].index;
@@ -7610,7 +7631,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
             /* adjacent corner indices */
             // preserve node orientation where cell to right 
             // of face is with lower cell index
-            H1.GetFaceDofs(face, face_dofs_row);
+            f_H1.GetFaceDofs(face, face_dofs_row);
             int face_vdof1 = face_dofs_row[1], 
                face_vdof2 = face_dofs_row[0], 
                face_dof = face_dofs_row[2]; 
@@ -7662,7 +7683,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
    Array<int> faces_row, face_dofs_row;
    int faces_length;
    mfem::Mesh::FaceInformation FI;
-   H1.ExchangeFaceNbrData();
+   f_H1.ExchangeFaceNbrData();
    int Vadj_index, c, bdr_ind = 0;
    double F = 0.;
    double Vnode_prev_it_nR_comp = 0., Vadj_n_comp = 0., Vadj_nR_comp = 0.;
@@ -7712,7 +7733,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
          // Get face information
          int face = faces_row[face_it];
          GetIntermediateFaceVelocity(face, Vf);
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
 
          // Calculate outer normal
          c = FI.element[0].index;
@@ -7724,7 +7745,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
          /* adjacent corner indices */
          // preserve node orientation where cell to right 
          // of face is with lower cell index
-         H1.GetFaceDofs(face, face_dofs_row);
+         f_H1.GetFaceDofs(face, face_dofs_row);
          int face_vdof1 = face_dofs_row[1], 
              face_vdof2 = face_dofs_row[0], 
              face_dof = face_dofs_row[2]; 
@@ -8107,7 +8128,7 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
       /* Add in contribution of cell */
       if (is_weighted) // weighted
       {
-         double Kcn = pmesh->GetElementVolume(el_index);
+         double Kcn = fine_pmesh->GetElementVolume(el_index);
          sum_k += Kcn;
          node_v.Add(Kcn, Vcell);
       }
@@ -8150,7 +8171,7 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const doub
 
    Vector *sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf;
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[2]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
 
    /* Iterate over all cells in mesh and compute constraint */
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
@@ -8228,7 +8249,7 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
 
    for (int face = 0; face < num_faces; face++) // face iterator
    {
-      FI = pmesh->GetFaceInformation(face);
+      FI = fine_pmesh->GetFaceInformation(face);
       if (FI.IsInterior())
       {
          c = FI.element[0].index; cp = FI.element[1].index;
@@ -8240,7 +8261,7 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
          GetCellStateVector(S, cp, Ucp);
 
          /* Get corner indices */
-         H1.GetFaceDofs(face, face_dofs_row);
+         f_H1.GetFaceDofs(face, face_dofs_row);
          node_i = face_dofs_row[0];
          node_j = face_dofs_row[1];
          geom.GetNodeVelocityVecL(mv_gf, node_i, Vi);
@@ -8286,9 +8307,9 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    MFEM_ABORT("Why are you using the dense implementation when Sparse is available?\n");
 
    Vector massvec(NDofs_L2);
-   ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
+   ParGridFunction x_gf, V_target(&f_H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
 
    OptimizationSolver *optsolver = NULL;
    const int optimizer_type = 2; // TODO: change this to be a set param
@@ -8396,8 +8417,8 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
    //      << "=======================================\n";
 
    /* Compute the Mis for the velocity discretization */
-   row_sums.SetSize(H1Lc.GetNDofs());
-   BilinearForm pbl(&H1Lc);
+   row_sums.SetSize(f_H1Lc.GetNDofs());
+   BilinearForm pbl(&f_H1Lc);
    Coefficient *sigma = new ConstantCoefficient(1.0);
    pbl.AddDomainIntegrator(new MassIntegrator());
    pbl.Assemble();
@@ -8431,11 +8452,11 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S,
    // cout << "=======================================\n"
    //      << "     ComputeVelocityLumpedMassHand     \n"
    //      << "=======================================\n";
-   row_sums.SetSize(H1Lc.GetNDofs());
+   row_sums.SetSize(f_H1Lc.GetNDofs());
    Array<int> cells_row;
 
    /* Compute the Mis for the velocity discretization */
-   for (int i = 0; i < H1Lc.GetNDofs(); i++)
+   for (int i = 0; i < f_H1Lc.GetNDofs(); i++)
    {
       // cout << "--- i: " << i << endl;
       vertex_element->GetRow(i, cells_row);
@@ -8445,7 +8466,7 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S,
       {
          /* Get cell index and volume */
          int el_index = cells_row[cell_it];
-         double Kcn = pmesh->GetElementVolume(el_index);
+         double Kcn = fine_pmesh->GetElementVolume(el_index);
          // cout << "\tel: " << el_index << ", vol: " << Kcn << endl;
          sum += Kcn;
 
@@ -8468,11 +8489,11 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S,
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeAverageMassAtGeo(const Vector &S, Vector &vec_weights)
 {
-   vec_weights.SetSize(H1Lc.GetNDofs());
+   vec_weights.SetSize(f_H1Lc.GetNDofs());
    Array<int> cells_row;
 
    /* Iterate over geometric corner nodes */
-   for (int i = 0; i < H1Lc.GetNDofs(); i++)
+   for (int i = 0; i < f_H1Lc.GetNDofs(); i++)
    {
       /* Get adjacent cells*/
       vertex_element->GetRow(i, cells_row);
@@ -8518,9 +8539,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    assert(mv_gf_l.Size() == Vsize_H1L);
 
    Vector massvec(NDofs_L2);
-   ParGridFunction x_gf, V_target(&H1_L), mv_gf_l_out(mv_gf_l);
+   ParGridFunction x_gf, V_target(&f_H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
 
    /* Set min/max velocities */
    Vector xmin(Vsize_H1L), xmax(Vsize_H1L);
@@ -8551,7 +8572,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    Calculate sparsity patterns for Gradient of the constraint vector as it is the same
    whether or not the target or viscous option is used
    */
-   SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
+   SetHiopConstraintGradSparsityPattern(fine_pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
 
    OptimizationProblem * omv_problem = NULL;
    switch (lm_option)
@@ -8568,11 +8589,11 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          /* Calculate sparsity pattern Hessian which depends on if we choose to use viscosity */
          if (use_obj_visc)
          {
-            SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+            SetHiopHessianSparsityPatternViscous(fine_pmesh, geom, f_H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
          }
          else 
          {
-            SetHiopHessianSparsityPattern(pmesh, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+            SetHiopHessianSparsityPattern(fine_pmesh, f_H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
          }
 
          // Sparsity pattern for Boundary Constraint implementation which did not yield good results
@@ -8662,7 +8683,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          }
 
          /* Hessian sparsity pattern is slightly different due to the different objective function */
-         SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
+         SetHiopHessianSparsityPatternViscous(fine_pmesh, geom, f_H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
          /* Instantiate problem */
          omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
@@ -8781,7 +8802,7 @@ void LagrangianLOOperator<dim>::ComputeCiGeo(const ParGridFunction &mv_gf_l, con
    for (int row_it = 0; row_it < row_length; row_it++)
    {
       int row_el = row[row_it];
-      double cell_vol = pmesh->GetElementVolume(row_el);
+      double cell_vol = fine_pmesh->GetElementVolume(row_el);
       denom += cell_vol;
 
       dm_temp = 0.;
@@ -8816,10 +8837,10 @@ void LagrangianLOOperator<dim>::IntGrad(const ParGridFunction &mv_gf_l, const in
    //      << "             IntGrad            \n"
    //      << "=======================================\n";
 
-   ParGridFunction H1Lc_gf(&H1Lc), mv_gf_copy(mv_gf_l);
-   const int _size = H1Lc.GetVSize();
+   ParGridFunction H1Lc_gf(&f_H1Lc), mv_gf_copy(mv_gf_l);
+   const int _size = f_H1Lc.GetVSize();
 
-   ElementTransformation * trans = pmesh->GetElementTransformation(cell);
+   ElementTransformation * trans = fine_pmesh->GetElementTransformation(cell);
    Vector grad(dim), row(dim);
    res.SetSize(dim);
    res = 0., row = 0.;
@@ -8832,7 +8853,7 @@ void LagrangianLOOperator<dim>::IntGrad(const ParGridFunction &mv_gf_l, const in
 
       for (int j = 0; j < dim; j++)
       {
-         H1Lc_gf.MakeRef(&H1Lc, mv_gf_copy, j*_size);
+         H1Lc_gf.MakeRef(&f_H1Lc, mv_gf_copy, j*_size);
          H1Lc_gf.GetGradient(*trans, grad);
 
          // Put information into Dense Matrix
@@ -9099,11 +9120,11 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
          // cout << "\t node: " << node << endl;
 
          Array<int> oris;
-         pmesh->GetElementEdges(el_index, cell_faces_row, oris);
+         fine_pmesh->GetElementEdges(el_index, cell_faces_row, oris);
          cell_faces_length = cell_faces_row.Size();
 
          // Get Transformation and IntegrationPoint
-         ElementTransformation * trans = pmesh->GetElementTransformation(el_index);
+         ElementTransformation * trans = fine_pmesh->GetElementTransformation(el_index);
          Vector node_x(dim);
          geom.GetNodePositionFromBV(S, node, node_x);
          IntegrationPoint ip;
@@ -9112,7 +9133,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
 
          // Get vector shape function evaluations
          DenseMatrix shape_funcs(4,2);
-         const FiniteElement * CR_fe = CR.GetFE(el_index);
+         const FiniteElement * CR_fe = f_CR.GetFE(el_index);
          CR_fe->CalcPhysVShape(*trans, shape_funcs);
 
          // Iterate over faces of this cell that touch vertex
@@ -9183,13 +9204,13 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
    zones_per_dof = 0;
 
    // Iterate over all cells and distribute its contribution to the nodes
-   for (int el = 0; el < L2.GetNE(); el++)
+   for (int el = 0; el < f_L2.GetNE(); el++)
    {
-      pmesh->GetElementEdges(el, cell_faces_row, oris);
+      fine_pmesh->GetElementEdges(el, cell_faces_row, oris);
       cell_faces_length = cell_faces_row.Size();
       
-      trans = pmesh->GetElementTransformation(el);
-      H1.GetElementDofs(el, vdofs);
+      trans = fine_pmesh->GetElementTransformation(el);
+      f_H1.GetElementDofs(el, vdofs);
 
       for (int i = 0; i < vdofs.Size(); i++)
       {
@@ -9202,7 +9223,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
          trans->SetIntPoint(&ip);
 
          // Get vector shape function evaluations
-         const FiniteElement * CR_fe = CR.GetFE(el);
+         const FiniteElement * CR_fe = f_CR.GetFE(el);
          CR_fe->CalcPhysVShape(*trans, shape_funcs);
 
          // Iterate over faces of this cell

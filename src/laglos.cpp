@@ -120,6 +120,7 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
+   bool use_patch = false;
    int order_mv = 2;  // Order of mesh movement approximation space
    int order_u = 0;
    double t_init = 0.0;
@@ -166,6 +167,8 @@ int main(int argc, char *argv[]) {
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
                   "Number of times to refine the mesh uniformly in parallel.");
+   args.AddOption(&use_patch, "-patch", "--patch", "-no-patch", "--no-patch",
+                  "Use macro mesh movement and mass conservation.");
    args.AddOption(&t_init, "-ti", "--t-init",
                   "Start time; default is 0.");               
    args.AddOption(&t_final, "-tf", "--t-final",
@@ -328,9 +331,17 @@ int main(int argc, char *argv[]) {
       boost::filesystem::create_directory(pview_output_dir);
    }
 
+   /* Create mesh and parmesh objects */
+   if (use_patch && rp_levels == 0)
+   {
+      MFEM_ABORT("If using patch mesh, you must parallel refine the initial mesh to construct coarse and fine meshes.\n");
+   }
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
    Mesh *mesh;
+   ParMesh *pmesh;
+   ParMesh *fine_pmesh;
+   ParMesh *fine_pmesh0;
    if (strncmp(mesh_file_location, "default", 7) != 0)
    {
       std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
@@ -366,39 +377,40 @@ int main(int argc, char *argv[]) {
 
 
    // Refine the mesh in serial to increase the resolution. In this example
-   // we do 'ser_ref_levels' of uniform refinement, where 'ser_ref_levels' is
-   // a command-line parameter. If the mesh is of NURBS type, we convert it
-   // to a (piecewise-polynomial) high-order mesh.
+   // we do 'rs_levels' of uniform refinement, where 'rs_levels' is
+   // a command-line parameter. 
    for (int lev = 0; lev < rs_levels; lev++)
    {
       mesh->UniformRefinement();
    }
-   // if (mesh->NURBSext)
-   // {
-   //    mesh->SetCurvature(max(mesh_order, 1));
-   // }
-
-   cout << "done with serial refinement\n";
+   pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
 
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
    // parallel mesh is defined, the serial mesh can be deleted.
-   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
-   ParMesh *pmesh0 = new ParMesh(MPI_COMM_WORLD, *mesh);
-   delete mesh;
-   for (int lev = 0; lev < rp_levels; lev++)
+   // Parallel refine rp - 1 times 
+   for (int lev = 0; lev < rp_levels - 1; lev++)
    {
       pmesh->UniformRefinement();
    }
+
+   // Refinal coarse fine_pmesh once
+   fine_pmesh = new ParMesh(MPI_COMM_WORLD, *pmesh);
+   fine_pmesh0 = new ParMesh(MPI_COMM_WORLD, *pmesh);
+   fine_pmesh->UniformRefinement();
+   fine_pmesh0->UniformRefinement();
+
+   delete mesh;
+   
    cout << "done with parallel refinement\n";
 
-   cout << "dim: " << pmesh->Dimension() << ", spacedim: " << pmesh->SpaceDimension() << endl;
+   cout << "dim: " << fine_pmesh->Dimension() << ", spacedim: " << fine_pmesh->SpaceDimension() << endl;
 
-   int NE = pmesh->GetNE(), ne_min, ne_max;
-   MPI_Reduce(&NE, &ne_min, 1, MPI_INT, MPI_MIN, 0, pmesh->GetComm());
-   MPI_Reduce(&NE, &ne_max, 1, MPI_INT, MPI_MAX, 0, pmesh->GetComm());
+   int NE = fine_pmesh->GetNE(), ne_min, ne_max;
+   MPI_Reduce(&NE, &ne_min, 1, MPI_INT, MPI_MIN, 0, fine_pmesh->GetComm());
+   MPI_Reduce(&NE, &ne_max, 1, MPI_INT, MPI_MAX, 0, fine_pmesh->GetComm());
    double hmin, hmax, kmin, kmax;
-   pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
+   fine_pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
    if (myid == 0)
    { cout << "Zones min/max: " << ne_min << " " << ne_max << endl; }
 
@@ -507,7 +519,7 @@ int main(int argc, char *argv[]) {
          MFEM_ABORT("Not implemented\n");
          assert(hmin == hmax);
          Vector params(2);
-         params[0] = hmax, params[1] = pmesh->GetElementVolume(0);
+         params[0] = hmax, params[1] = fine_pmesh->GetElementVolume(0);
 
          problem_class = new SedovProblem<dim>();
          problem_class->update(params, t_init);
@@ -543,65 +555,70 @@ int main(int argc, char *argv[]) {
       CRFEC = new RT_FECollection(0, dim);
    }
 
-   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
-   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
+   ParFiniteElementSpace f_H1FESpace(fine_pmesh, &H1FEC, dim);
+   ParFiniteElementSpace f_H1FESpace_L(fine_pmesh, &H1FEC_L, dim);
    /* Finite element space solely constructed for continuous representation of density field */
-   ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
-   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
-   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
-   ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
+   ParFiniteElementSpace f_H1cFESpace(fine_pmesh, &H1FEC, 1);
+   ParFiniteElementSpace f_L2FESpace(fine_pmesh, &L2FEC);
+   ParFiniteElementSpace f_L2VFESpace(fine_pmesh, &L2FEC, dim);
+   ParFiniteElementSpace f_CRFESpace(fine_pmesh, CRFEC, dim);
 
-   HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
+   /* Coarse Finite Element spaces */
+   ParFiniteElementSpace c_H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace c_H1FESpace_L(pmesh, &H1FEC_L, dim);
+   ParFiniteElementSpace c_L2FESpace(pmesh, &L2FEC);
+
+   HYPRE_BigInt global_vSize = f_L2FESpace.GlobalTrueVSize();
    cout << "global_vSize: " << global_vSize << endl;
-   cout << "N dofs: " << H1FESpace.GetNDofs() << endl;
-   cout << "Num Scalar Vertex DoFs: " << H1FESpace.GetNVDofs() << endl;
-   cout << "Num Scalar edge-interior DoFs: " << H1FESpace.GetNEDofs() << endl;
-   cout << "Num Scalar face-interior DoFs: " << H1FESpace.GetNFDofs() << endl;
-   cout << "Num faces: " << H1FESpace.GetNF() << endl;
+   cout << "N dofs: " << f_H1FESpace.GetNDofs() << endl;
+   cout << "Num Scalar Vertex DoFs: " << f_H1FESpace.GetNVDofs() << endl;
+   cout << "Num Scalar edge-interior DoFs: " << f_H1FESpace.GetNEDofs() << endl;
+   cout << "Num Scalar face-interior DoFs: " << f_H1FESpace.GetNFDofs() << endl;
+   cout << "Num faces: " << f_H1FESpace.GetNF() << endl;
    cout << "dim: " << dim << endl;
 
    // Print # DoFs
-   const HYPRE_Int glob_size_l2 = L2FESpace.GlobalTrueVSize();
-   const HYPRE_Int glob_size_h1 = H1FESpace.GlobalTrueVSize();
+   const HYPRE_Int glob_size_l2 = f_L2FESpace.GlobalTrueVSize();
+   const HYPRE_Int glob_size_h1 = f_H1FESpace.GlobalTrueVSize();
    if (Mpi::Root())
    {
       cout << "Number of kinematic (position, mesh velocity) dofs: "
            << glob_size_h1 << endl
            << "Corresponding NDofs: "
-           << H1FESpace.GetNDofs() << endl
+           << f_H1FESpace.GetNDofs() << endl
            << "Corresponding VDim: " 
-           << H1FESpace.GetVDim() << endl
+           << f_H1FESpace.GetVDim() << endl
            << "Corresponding Vsize: "
-           << H1FESpace.GetVSize() << endl;
+           << f_H1FESpace.GetVSize() << endl;
 
       cout << "Number of specific internal energy dofs: "
            << glob_size_l2 << endl
            << "Corresponding NDofs: "
-           << L2FESpace.GetNDofs() << endl
+           << f_L2FESpace.GetNDofs() << endl
            << "Corresponding VDim: " 
-           << L2FESpace.GetVDim() << endl
+           << f_L2FESpace.GetVDim() << endl
            << "Corresponding Vsize: "
-           << L2FESpace.GetVSize() << endl;
+           << f_L2FESpace.GetVSize() << endl;
       
       cout << "Number of velocity dofs: "
-           << L2VFESpace.GlobalTrueVSize() << endl
+           << f_L2VFESpace.GlobalTrueVSize() << endl
            << "Corresponding NDofs: "
-           << L2VFESpace.GetNDofs() << endl
+           << f_L2VFESpace.GetNDofs() << endl
            << "Corresponding VDim: " 
-           << L2VFESpace.GetVDim() << endl
+           << f_L2VFESpace.GetVDim() << endl
            << "Corresponding Vsize: "
-           << L2VFESpace.GetVSize() << endl;
+           << f_L2VFESpace.GetVSize() << endl;
    }
 
    /* Print Face Information */
-   pmesh->ExchangeFaceNbrData();
-   cout << "num interior faces: " << pmesh->GetNFbyType(FaceType::Interior) << endl;
-   cout << "num boundary faces: " << pmesh->GetNFbyType(FaceType::Boundary) << endl;
-   cout << "num total faces: " << pmesh->GetNumFaces() << endl;
+   fine_pmesh->ExchangeFaceNbrData();
+   cout << "num interior faces: " << fine_pmesh->GetNFbyType(FaceType::Interior) << endl;
+   cout << "num boundary faces: " << fine_pmesh->GetNFbyType(FaceType::Boundary) << endl;
+   cout << "num total faces: " << fine_pmesh->GetNumFaces() << endl;
 
    /* Print element information */
-   cout << "num boundary elements: " << pmesh->GetNBE() << endl;
-   cout << "num elements: " << pmesh->GetNE() << endl;
+   cout << "num boundary elements: " << fine_pmesh->GetNBE() << endl;
+   cout << "num elements: " << fine_pmesh->GetNE() << endl;
 
    /* The monolithic BlockVector stores unknown fields as:
    *   - 0 -> position
@@ -610,9 +627,9 @@ int main(int argc, char *argv[]) {
    *   - 3 -> velocity (L2V)
    *   - 4 -> speific total energy
    */
-   const int Vsize_l2 = L2FESpace.GetVSize();
-   const int Vsize_l2v = L2VFESpace.GetVSize();
-   const int Vsize_h1 = H1FESpace.GetVSize();
+   const int Vsize_l2 = f_L2FESpace.GetVSize();
+   const int Vsize_l2v = f_L2VFESpace.GetVSize();
+   const int Vsize_h1 = f_H1FESpace.GetVSize();
    Array<int> offset(6);
    offset[0] = 0;
    offset[1] = offset[0] + Vsize_h1;
@@ -626,28 +643,35 @@ int main(int argc, char *argv[]) {
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
    ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
-   x_gf.MakeRef(&H1FESpace, S, offset[0]);
-   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
-   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
-   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
-   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+   x_gf.MakeRef(&f_H1FESpace, S, offset[0]);
+   mv_gf.MakeRef(&f_H1FESpace, S, offset[1]);
+   sv_gf.MakeRef(&f_L2FESpace, S, offset[2]);
+   v_gf.MakeRef(&f_L2VFESpace, S, offset[3]);
+   ste_gf.MakeRef(&f_L2FESpace, S, offset[4]);
+
+   ParGridFunction c_x_gf(&c_H1FESpace);
 
    // Initialize x_gf using starting mesh positions
-   pmesh->SetNodalGridFunction(&x_gf);
+   fine_pmesh->SetNodalGridFunction(&x_gf);
+   pmesh->SetNodalGridFunction(&c_x_gf);
 
    /* Distort Mesh for Saltzman Problem */
    if (problem_class->get_distort_mesh() || dm_val != 0.)
    {
       cout << "distort mesh.\n";
+      if (use_patch)
+      {
+         MFEM_ABORT("Not implemented.\n");
+      }
       switch (problem)
       {
       case 1: // Sod
       {
          // Random distortion based on min mesh size
          Array<double> coords(dim);
-         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+         for (int vertex = 0; vertex < f_H1FESpace.GetNDofs(); vertex++)
          {
-            int index = vertex + H1FESpace.GetNDofs();
+            int index = vertex + f_H1FESpace.GetNDofs();
             coords[0] = x_gf[vertex];
             coords[1] = x_gf[index];
 
@@ -676,11 +700,11 @@ int main(int argc, char *argv[]) {
       case 7: // Saltzmann
       {
          Array<double> coords(dim);
-         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+         for (int vertex = 0; vertex < f_H1FESpace.GetNDofs(); vertex++)
          {
             for (int i = 0; i < dim; i++)
             {
-               int index = vertex + i * H1FESpace.GetNDofs();
+               int index = vertex + i * f_H1FESpace.GetNDofs();
                coords[i] = x_gf[index];
             }
             // Only the x-coord is distorted, according to Guermond, Popov, Saavedra
@@ -695,11 +719,11 @@ int main(int argc, char *argv[]) {
          double mesh_distortion_factor = 0.1;
          // Random distortion based on min mesh size
          Array<double> coords(dim);
-         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
+         for (int vertex = 0; vertex < f_H1FESpace.GetNDofs(); vertex++)
          {
             for (int i = 0; i < dim; i++)
             {
-               int index = vertex + i * H1FESpace.GetNDofs();
+               int index = vertex + i * f_H1FESpace.GetNDofs();
                coords[i] = x_gf[index];
 
                // Generate a random number between -1 and 1
@@ -716,20 +740,20 @@ int main(int argc, char *argv[]) {
 
       // Adjust all face nodes to be averages of their adjacent corners
       mfem::Mesh::FaceInformation FI;
-      for (int face = 0; face < pmesh->GetNumFaces(); face++)
+      for (int face = 0; face < fine_pmesh->GetNumFaces(); face++)
       {
-         FI = pmesh->GetFaceInformation(face);
+         FI = fine_pmesh->GetFaceInformation(face);
          Array<int> face_dof_row;
-         H1FESpace.GetFaceDofs(face, face_dof_row);
+         f_H1FESpace.GetFaceDofs(face, face_dof_row);
 
          int face_dof = face_dof_row[2];
          int index0 = face_dof_row[0];
          int index1 = face_dof_row[1];
          for (int i = 0; i < dim; i++)
          {
-            int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
-            int node0_index = index0 + i * H1FESpace.GetNDofs();
-            int node1_index = index1 + i * H1FESpace.GetNDofs();
+            int face_dof_index = face_dof + i * f_H1FESpace.GetNDofs();
+            int node0_index = index0 + i * f_H1FESpace.GetNDofs();
+            int node1_index = index1 + i * f_H1FESpace.GetNDofs();
             x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
          }
       }
@@ -737,7 +761,7 @@ int main(int argc, char *argv[]) {
       // Adjust all cell center to be averages of corners
       Vector cell_x(dim);
       Array<int> verts;
-      for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
+      for (int ci = 0; ci < f_L2FESpace.GetNDofs(); ci++)
       {
          int cell_vdof;
          cell_x = 0.;
@@ -746,9 +770,9 @@ int main(int argc, char *argv[]) {
          {
          case 1:
          {
-            cell_vdof = L2FESpace.GetNF() + ci;
+            cell_vdof = f_L2FESpace.GetNF() + ci;
 
-            pmesh->GetElementVertices(ci, verts);
+            fine_pmesh->GetElementVertices(ci, verts);
 
             for (int j = 0; j < verts.Size(); j++)
             {
@@ -760,20 +784,20 @@ int main(int argc, char *argv[]) {
          }
          case 2:
          {
-            cell_vdof = H1FESpace.GetNVDofs() + L2FESpace.GetNF() + ci;
+            cell_vdof = f_H1FESpace.GetNVDofs() + f_L2FESpace.GetNF() + ci;
 
-            pmesh->GetElementVertices(ci, verts);
+            fine_pmesh->GetElementVertices(ci, verts);
 
             for (int j = 0; j < verts.Size(); j++)
             {
                cell_x[0] += x_gf[verts[j]];
-               int index = verts[j] + H1FESpace.GetNDofs();
+               int index = verts[j] + f_H1FESpace.GetNDofs();
                cell_x[1] += x_gf[index];
             }
             cell_x /= verts.Size();
 
             x_gf[cell_vdof] = cell_x[0];
-            int index = cell_vdof + H1FESpace.GetNDofs();
+            int index = cell_vdof + f_H1FESpace.GetNDofs();
             x_gf[index] = cell_x[1];
             break;
          }
@@ -784,8 +808,8 @@ int main(int argc, char *argv[]) {
          }
       } // end cell center average
 
-      // Update pmesh reference grid function
-      pmesh->NewNodes(x_gf, false);
+      // Update fine_pmesh reference grid function
+      fine_pmesh->NewNodes(x_gf, false);
       cout << "Mesh distorted\n";
    } // End distort mesh
 
@@ -836,7 +860,7 @@ int main(int argc, char *argv[]) {
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
-   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   ParLinearForm *m = new ParLinearForm(&f_L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
@@ -844,7 +868,9 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(f_H1FESpace, f_H1FESpace_L, f_L2FESpace, f_L2VFESpace, f_CRFESpace, 
+                                   c_H1FESpace, c_L2FESpace,
+                                   m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -864,6 +890,11 @@ int main(int argc, char *argv[]) {
    hydro.SetProblem(problem);
    hydro.SetMeshCheck(check_mesh);
    hydro.SetDensityPP(post_process_density);
+   if (use_patch)
+   {
+      hydro.SetUsePatch(use_patch);
+      hydro.InitPatchObjects();
+   }
    hydro.SetMVTargetViscCoeff(mv_target_visc_coeff);
    if (mv_n_iterations != 0)
    {
@@ -886,12 +917,12 @@ int main(int argc, char *argv[]) {
    char vishost[] = "localhost";
    int  visport   = 19916;
 
-   ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
-   ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
+   ParGridFunction rho_gf(&f_L2FESpace), rho_cont_gf(&f_H1cFESpace);
+   ParGridFunction mc_gf(&f_L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
    /* Gridfunctions used in Triple Point */
-   ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
+   ParGridFunction press_gf(&f_L2FESpace), gamma_gf(&f_L2FESpace);
 
    if (problem == 6 || problem == 12)
    {
@@ -899,9 +930,9 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < press_gf.Size(); i++)
       {
          hydro.GetCellStateVector(S, i, U);
-         double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+         double pressure = problem_class->pressure(U, fine_pmesh->GetAttribute(i));
          press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+         gamma_gf[i] = problem_class->get_gamma(fine_pmesh->GetAttribute(i));
       }
    }
 
@@ -923,7 +954,7 @@ int main(int argc, char *argv[]) {
    {
       // Make sure all MPI ranks have sent their 'v' solution before initiating
       // another set of GLVis connections (one from each rank):
-      MPI_Barrier(pmesh->GetComm());
+      MPI_Barrier(fine_pmesh->GetComm());
 
       vis_rho.precision(8);
       vis_v.precision(8);
@@ -984,8 +1015,8 @@ int main(int argc, char *argv[]) {
 
          if (problem_class->get_indicator() == "Kidder")
          {
-            ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
-            ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
+            ParFiniteElementSpace L2FESpace_kidder(fine_pmesh0, &L2FEC);
+            ParFiniteElementSpace L2VFESpace_kidder(fine_pmesh0, &L2FEC, dim);
 
             ParGridFunction rho_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder), p_k_ex_gf(&L2FESpace_kidder);
             rho_k_ex_gf.ProjectCoefficient(rho_coeff);
@@ -1006,7 +1037,7 @@ int main(int argc, char *argv[]) {
             }
 
             // Compute errors
-            ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
+            ParGridFunction rho_ex_gf(&f_L2FESpace), vel_ex_gf(&f_L2VFESpace), ste_ex_gf(&f_L2FESpace), p_ex_gf(&f_L2FESpace);
             rho_ex_gf.ProjectCoefficient(rho_coeff);
             vel_ex_gf.ProjectCoefficient(v_coeff);
             ste_ex_gf.ProjectCoefficient(ste_coeff);
@@ -1064,7 +1095,12 @@ int main(int argc, char *argv[]) {
    // Print initialized mesh and gridfunctions
    // Can be visualized with glvis -np # -m *.mesh
    //                        glvis -m *.mesh -g *.gf
-   std::ostringstream mesh_name, rho_name, v_name, ste_name, mv_name;
+   std::ostringstream coarse_mesh_name, mesh_name, rho_name, v_name, ste_name, mv_name;
+   coarse_mesh_name << gfprint_path 
+                   << setfill('0') 
+                   << setw(6)
+                   << 0
+                   << "_coarse.mesh";
    mesh_name << gfprint_path 
                << setfill('0') 
                << setw(6)
@@ -1091,9 +1127,14 @@ int main(int argc, char *argv[]) {
             << 0
             << "_mv.gf";
 
+   std::ofstream coarse_mesh_ofs(coarse_mesh_name.str().c_str());
+   coarse_mesh_ofs.precision(8);
+   pmesh->PrintAsOne(coarse_mesh_ofs);
+   coarse_mesh_ofs.close();
+
    std::ofstream mesh_ofs(mesh_name.str().c_str());
    mesh_ofs.precision(8);
-   pmesh->PrintAsOne(mesh_ofs);
+   fine_pmesh->PrintAsOne(mesh_ofs);
    mesh_ofs.close();
 
    std::ofstream rho_ofs(rho_name.str().c_str());
@@ -1140,7 +1181,7 @@ int main(int argc, char *argv[]) {
       gamma_ofs.close();
    }
 
-   VisItDataCollection visit_dc(_visit_basename, pmesh);
+   VisItDataCollection visit_dc(_visit_basename, fine_pmesh);
    visit_dc.RegisterField("Specific Volume", &sv_gf);
    visit_dc.RegisterField("Density", &rho_gf);
    visit_dc.RegisterField("Density c", &rho_cont_gf);
@@ -1154,7 +1195,7 @@ int main(int argc, char *argv[]) {
    visit_dc.SetTime(0.0);
    visit_dc.Save();
 
-   ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
+   ParaViewDataCollection paraview_dc(_pview_basename, fine_pmesh);
    paraview_dc.SetLevelsOfDetail(order_mv);
    paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
    paraview_dc.RegisterField("Specific Volume", &sv_gf);
@@ -1249,7 +1290,21 @@ int main(int argc, char *argv[]) {
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
-      pmesh->NewNodes(x_gf, false);
+      fine_pmesh->NewNodes(x_gf, false);
+      if (use_patch)
+      {
+         GridTransfer *gt = new InterpolationGridTransfer(c_H1FESpace, f_H1FESpace);
+         if (gt->SupportsBackwardsOperator())
+         {
+            const Operator &P = gt->BackwardOperator();
+            P.Mult(x_gf, c_x_gf);
+            pmesh->NewNodes(c_x_gf);
+         }
+         else
+         {
+            MFEM_ABORT("BackwardOperator not supported by the GridTransfer object.");
+         }
+      }
 
       if (last_step || (ti % vis_steps) == 0)
       {
@@ -1261,7 +1316,7 @@ int main(int argc, char *argv[]) {
          }
 
          double lnorm = ste_gf * ste_gf, norm;
-         MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
+         MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, fine_pmesh->GetComm());
  
          if (Mpi::Root())
          {
@@ -1320,7 +1375,7 @@ int main(int argc, char *argv[]) {
                for (int i = 0; i < press_gf.Size(); i++)
                {
                   hydro.GetCellStateVector(S, i, U);
-                  double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+                  double pressure = problem_class->pressure(U, fine_pmesh->GetAttribute(i));
                   press_gf[i] = pressure;
                }
                Wx += offx;
@@ -1332,10 +1387,10 @@ int main(int argc, char *argv[]) {
             if (problem == 12) // Visualize gamma
             {
                vis_gamma.precision(8);
-               ParGridFunction gamma_gf(&L2FESpace);
+               ParGridFunction gamma_gf(&f_L2FESpace);
                for (int i = 0; i < gamma_gf.Size(); i++)
                {
-                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+                  gamma_gf[i] = problem_class->get_gamma(fine_pmesh->GetAttribute(i));
                }
                // gamma
                Wx += offx;
@@ -1364,8 +1419,8 @@ int main(int argc, char *argv[]) {
                /* Kidder exact solution is defined in terms of initial partical locations, hence must use Finite Element Spaces defined on the undisturbed mesh */
                if (problem_class->get_indicator() == "Kidder")
                {
-                  ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
-                  ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
+                  ParFiniteElementSpace L2FESpace_kidder(fine_pmesh0, &L2FEC);
+                  ParFiniteElementSpace L2VFESpace_kidder(fine_pmesh0, &L2FEC, dim);
 
                   ParGridFunction rho_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder), p_k_ex_gf(&L2FESpace_kidder);
                   rho_k_ex_gf.ProjectCoefficient(rho_coeff);
@@ -1390,7 +1445,7 @@ int main(int argc, char *argv[]) {
                      problem_class->update(x_gf, t);
                   }
 
-                  ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
+                  ParGridFunction rho_ex_gf(&f_L2FESpace), vel_ex_gf(&f_L2VFESpace), ste_ex_gf(&f_L2FESpace), p_ex_gf(&f_L2FESpace);
                   rho_ex_gf.ProjectCoefficient(rho_coeff);
                   rho_ex_gf[0] = rho_gf[0];
                   vel_ex_gf.ProjectCoefficient(v_coeff);
@@ -1446,7 +1501,12 @@ int main(int argc, char *argv[]) {
          if (gfprint)
          {
             // Save mesh and gfs to files
-            std::ostringstream mesh_name, rho_name, v_name, ste_name, press_name, mass_name, mv_name;
+            std::ostringstream coarse_mesh_name, mesh_name, rho_name, v_name, ste_name, press_name, mass_name, mv_name;
+            coarse_mesh_name << gfprint_path 
+                            << setfill('0') 
+                            << setw(6)
+                            << ti
+                            << "_coarse.mesh";
             mesh_name << gfprint_path 
                       << setfill('0') 
                       << setw(6)
@@ -1483,9 +1543,14 @@ int main(int argc, char *argv[]) {
                     << ti 
                     << "_mv.gf";
 
+            std::ofstream coarse_mesh_ofs(coarse_mesh_name.str().c_str());
+            coarse_mesh_ofs.precision(8);
+            pmesh->PrintAsOne(coarse_mesh_ofs);
+            coarse_mesh_ofs.close();
+
             std::ofstream mesh_ofs(mesh_name.str().c_str());
             mesh_ofs.precision(8);
-            pmesh->PrintAsOne(mesh_ofs);
+            fine_pmesh->PrintAsOne(mesh_ofs);
             mesh_ofs.close();
 
             std::ofstream rho_ofs(rho_name.str().c_str());
@@ -1580,7 +1645,9 @@ int main(int argc, char *argv[]) {
    // In all cases, print the final grid functions
    {
       // Save mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
+      std::ostringstream coarse_mesh_name, mesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
+      coarse_mesh_name << gfprint_path 
+                       << "finalCoarse.mesh";
       mesh_name << gfprint_path 
                 << "final.mesh";
       rho_name  << gfprint_path 
@@ -1593,10 +1660,15 @@ int main(int argc, char *argv[]) {
                  << "mass_loss.gf";
       mv_name << gfprint_path 
              << "mv_final.gf";
+      
+      std::ofstream coarse_mesh_ofs(coarse_mesh_name.str().c_str());
+      coarse_mesh_ofs.precision(8);
+      pmesh->PrintAsOne(coarse_mesh_ofs);
+      coarse_mesh_ofs.close();
 
       std::ofstream mesh_ofs(mesh_name.str().c_str());
       mesh_ofs.precision(8);
-      pmesh->PrintAsOne(mesh_ofs);
+      fine_pmesh->PrintAsOne(mesh_ofs);
       mesh_ofs.close();
 
       std::ofstream rho_ofs(rho_name.str().c_str());
@@ -1652,11 +1724,11 @@ int main(int argc, char *argv[]) {
       BlockVector S_exact(offset, Device::GetMemoryType());
       ParGridFunction x_gf_exact, mv_gf_exact, sv_ex_gf, vel_ex_gf, ste_ex_gf;
 
-      x_gf_exact.MakeRef(&H1FESpace, S_exact, offset[0]);
-      mv_gf_exact.MakeRef(&H1FESpace, S_exact, offset[1]);
-      sv_ex_gf.MakeRef(&L2FESpace, S_exact, offset[2]);
-      vel_ex_gf.MakeRef(&L2VFESpace, S_exact, offset[3]);
-      ste_ex_gf.MakeRef(&L2FESpace, S_exact, offset[4]);
+      x_gf_exact.MakeRef(&f_H1FESpace, S_exact, offset[0]);
+      mv_gf_exact.MakeRef(&f_H1FESpace, S_exact, offset[1]);
+      sv_ex_gf.MakeRef(&f_L2FESpace, S_exact, offset[2]);
+      vel_ex_gf.MakeRef(&f_L2VFESpace, S_exact, offset[3]);
+      ste_ex_gf.MakeRef(&f_L2FESpace, S_exact, offset[4]);
 
       // Project exact solution
       if (problem_class->get_indicator() == "Vdw1")
@@ -1704,8 +1776,12 @@ int main(int argc, char *argv[]) {
 
       if (problem_class->get_indicator() == "Kidder")
       {
-         ParFiniteElementSpace L2FESpace_kidder(pmesh0, &L2FEC);
-         ParFiniteElementSpace L2VFESpace_kidder(pmesh0, &L2FEC, dim);
+         if (use_patch)
+         {
+            MFEM_ABORT("Using coarse or fine mesh to calculate errors?\n");
+         }
+         ParFiniteElementSpace L2FESpace_kidder(fine_pmesh0, &L2FEC);
+         ParFiniteElementSpace L2VFESpace_kidder(fine_pmesh0, &L2FEC, dim);
 
          ParGridFunction sv_k_ex_gf(&L2FESpace_kidder), vel_k_ex_gf(&L2VFESpace_kidder), ste_k_ex_gf(&L2FESpace_kidder);
          sv_k_ex_gf.ProjectCoefficient(sv_coeff);
@@ -1736,7 +1812,7 @@ int main(int argc, char *argv[]) {
             problem_class->update(x_gf, t);
          }
          // Compute errors
-         ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
+         ParGridFunction rho_ex_gf(&f_L2FESpace), vel_ex_gf(&f_L2VFESpace), ste_ex_gf(&f_L2FESpace), sv_ex_gf(&f_L2FESpace);
          rho_ex_gf.ProjectCoefficient(rho_coeff);
          vel_ex_gf.ProjectCoefficient(v_coeff);
          ste_ex_gf.ProjectCoefficient(ste_coeff);
@@ -1749,7 +1825,7 @@ int main(int argc, char *argv[]) {
             ParGridFunction cell_bdr_flag_gf;
             hydro.GetCellBdrFlagGF(cell_bdr_flag_gf);
 
-            for (int i = 0; i < pmesh->GetNE(); i++)
+            for (int i = 0; i < fine_pmesh->GetNE(); i++)
             {
                if (cell_bdr_flag_gf[i] != -1)
                {
@@ -1761,7 +1837,7 @@ int main(int argc, char *argv[]) {
                   sv_ex_gf[i] = 0.;
                   for (int j = 0; j < dim; j++)
                   {
-                     int index = i + j*pmesh->GetNE();
+                     int index = i + j*fine_pmesh->GetNE();
                      v_gf[index] = 0.;
                      vel_ex_gf[index] = 0.;
                   }
@@ -1781,7 +1857,7 @@ int main(int argc, char *argv[]) {
          /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
          if (problem == 6)
          {
-            ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
+            ParGridFunction te_ex_gf(&f_L2FESpace), te_gf(&f_L2FESpace);
             for (int i = 0; i < ste_ex_gf.Size(); i++)
             {
                te_gf[i] = rho_gf[i] * ste_gf[i];
@@ -1867,7 +1943,7 @@ int main(int argc, char *argv[]) {
    }
 
    cout << "Program took " << chrono.RealTime() << "s.\n";
-   double temp_denom = ti * L2FESpace.GetNE();
+   double temp_denom = ti * f_L2FESpace.GetNE();
    double time_per_gp_ts = chrono.RealTime() / temp_denom;
    cout << "This amounts to " << time_per_gp_ts << " s per timestep per gridpoint.\n";
 
@@ -1882,8 +1958,8 @@ int main(int argc, char *argv[]) {
         << "  State Update calculation: " << setw(14) << hydro.chrono_state.RealTime() << " | " << hydro.chrono_state.RealTime() / temp_denom << endl
         << "===========================================================\n";
    
-   delete pmesh;
-   delete pmesh0;
+   delete fine_pmesh;
+   delete fine_pmesh0;
    delete CRFEC;
    delete problem_class;
    delete m;

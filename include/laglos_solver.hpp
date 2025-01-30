@@ -32,14 +32,14 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 struct TimingData
 {
    // Total times for all major computations:
-   // CG solves (H1 and L2) / force RHS assemblies / quadrature computations.
+   // CG solves (f_H1 and f_L2) / force RHS assemblies / quadrature computations.
    StopWatch sw_cgH1, sw_cgL2, sw_force, sw_qdata;
 
    // Store the number of dofs of the corresponding local CG
    const HYPRE_Int L2dof;
 
    // These accumulate the total processed dofs or quad points:
-   // #(CG iterations) for the L2 CG solve.
+   // #(CG iterations) for the f_L2 CG solve.
    // #quads * #(RK sub steps) for the quadrature data computations.
    HYPRE_Int H1iter, L2iter;
    HYPRE_Int quad_tstep;
@@ -53,18 +53,22 @@ template <int dim>
 class LagrangianLOOperator
 {
 protected:
-   ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
-   ParFiniteElementSpace &H1_L;
-   ParFiniteElementSpace H1Lc;
+   ParFiniteElementSpace &f_H1, &f_L2, &f_L2V, &f_CR, f_CRc;
+   ParFiniteElementSpace &f_H1_L, f_H1Lc;
+   ParFiniteElementSpace &c_H1, &c_L2;
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    ParGridFunction cell_bdr_flag_gf;  // Element indexing vector
    ParGridFunction LagrangeMultipliers;
+   ParGridFunction c_x_gf;   // coarse mesh locations and mesh velocities
+
+   /* Objects to transfer between coarse and fine meshes */
+   GridTransfer *gt_l2, *gt_h1;
    // Stores mesh velocities from the previous iteration 
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
-   ParMesh *pmesh;
+   ParMesh *coarse_pmesh, *fine_pmesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
 
@@ -119,6 +123,7 @@ protected:
 
    bool use_viscosity;
    bool mm;
+   bool use_patch;
    bool check_mesh;
    bool use_greedy_viscosity;
    bool post_process_density;
@@ -155,6 +160,8 @@ public:
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
+                        ParFiniteElementSpace &c_h1,
+                        ParFiniteElementSpace &c_l2,
                         ParLinearForm *m,
                         ProblemBase<dim> *_pb,
                         Array<int> offset,
@@ -163,11 +170,14 @@ public:
                         double CFL);
    ~LagrangianLOOperator();
 
+   void InitPatchObjects();
+
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
+   void SetUsePatch(const bool _use_patch) { this->use_patch = _use_patch; }
    void SetMeshCheck(const bool _check_mesh) { this->check_mesh = _check_mesh; }
    void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
    void SetViscOption(const bool _use_greedy_viscosity) { this->use_greedy_viscosity = _use_greedy_viscosity; }
@@ -216,8 +226,6 @@ public:
    void GetLambdaMaxVec(Vector &lambda_max_vec) { lambda_max_vec = this->lambda_max_vec; }
    void GetVGeogf(ParGridFunction & _v_geo_gf) { _v_geo_gf = this->v_geo_gf; }
    void GetVCRgf(ParGridFunction & _v_CR_gf) { _v_CR_gf = this->v_CR_gf; }
-
-   void UpdateMesh(const Vector &S) const;
    
    // Face velocity functions
    void ComputeIntermediateFaceVelocities(const Vector &S, 

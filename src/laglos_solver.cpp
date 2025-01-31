@@ -13,8 +13,8 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
                     int x, int y, int w, int h, bool vec)
 {
    gf.HostRead();
-   ParMesh &fine_pmesh = *gf.ParFESpace()->GetParMesh();
-   MPI_Comm comm = fine_pmesh.GetComm();
+   ParMesh &pmesh = *gf.ParFESpace()->GetParMesh();
+   MPI_Comm comm = pmesh.GetComm();
 
    int num_procs, myid;
    MPI_Comm_size(comm, &num_procs);
@@ -36,7 +36,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
          sock << "solution\n";
       }
 
-      fine_pmesh.PrintAsOne(sock);
+      pmesh.PrintAsOne(sock);
       gf.SaveAsOne(sock);
 
       if (myid == 0 && newly_opened)
@@ -90,7 +90,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
                                                 ParFiniteElementSpace &f_cr,
                                                 ParFiniteElementSpace &c_h1,
                                                 ParFiniteElementSpace &c_l2,
-                                                ParLinearForm *m,
+                                                FunctionCoefficient &rho_coeff,
                                                 ProblemBase<dim> *_pb,
                                                 Array<int> offset,
                                                 bool use_viscosity,
@@ -111,10 +111,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
    v_geo_gf(&f_H1_L),
    c_x_gf(&c_h1),
    cell_bdr_flag_gf(&f_L2),
+   coarse_cell_bdr_flag_gf(&c_L2),
    LagrangeMultipliers(&f_L2),
    fine_pmesh(f_H1.GetParMesh()),
    coarse_pmesh(c_H1.GetParMesh()),
-   m_lf(m),
    pb(_pb),
    block_offsets(offset),
    geom(offset, f_H1, f_L2),
@@ -141,6 +141,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
    num_edges(fine_pmesh->GetNEdges()),
    vertex_element(fine_pmesh->GetVertexToElementTable()),
    face_element(fine_pmesh->GetFaceToElementTable()),
+   coarse_face_element(coarse_pmesh->GetFaceToElementTable()),
    edge_vertex(fine_pmesh->GetEdgeVertexTable()),
    ess_bdr(fine_pmesh->bdr_attributes.Max()),
    // Options
@@ -175,12 +176,27 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
    // Fill cell boundaries
    cell_bdr_flag_gf = -1.;
    FillCellBdrFlag();
+   coarse_cell_bdr_flag_gf = -1.;
+   FillCoarseCellBdrFlag();
 
    // Initialize LagrangeMultipliers
    LagrangeMultipliers = 0; // TODO: Play with different value here for initialization???
 
    // Build mass vector
-   m_hpv = m_lf->ParallelAssemble();
+   ParLinearForm *f_m_lf = new ParLinearForm(&f_L2);
+   f_m_lf->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   f_m_lf->Assemble();
+   f_m_hpv = f_m_lf->ParallelAssemble();
+
+   ParLinearForm *c_m_lf = new ParLinearForm(&c_L2);
+   c_m_lf->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   c_m_lf->Assemble();
+   c_m_hpv = c_m_lf->ParallelAssemble();
+
+   delete f_m_lf;
+   f_m_lf = nullptr;
+   delete c_m_lf;
+   c_m_lf = nullptr;
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
@@ -198,7 +214,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
    // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
    // Initialize Dij sparse
-   InitializeDijMatrix();   
+   InitializeDijMatrix(rho_coeff);   
 
    // Initialize arrays of tdofs
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
@@ -261,8 +277,20 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(ParFiniteElementSpace &f_h1,
 template<int dim>
 LagrangianLOOperator<dim>::~LagrangianLOOperator()
 {
+   if (use_patch)
+   {
+      delete gt_h1;
+      gt_h1 = nullptr;
+      delete gt_l2;
+      gt_l2 = nullptr;
+   }
+
    delete dij_sparse;
    dij_sparse = nullptr;
+   delete f_m_hpv;
+   f_m_hpv = nullptr;
+   delete c_m_hpv;
+   c_m_hpv = nullptr;
 }
 
 template<int dim>
@@ -275,10 +303,14 @@ void LagrangianLOOperator<dim>::InitPatchObjects()
    gt_h1 = new InterpolationGridTransfer(c_H1, f_H1);
    gt_l2 = new L2ProjectionGridTransfer(c_L2, f_L2);
 
+   /* Check that backwards operators are supported */
+   if (!gt_h1->SupportsBackwardsOperator() || !gt_l2->SupportsBackwardsOperator())
+   {
+      MFEM_ABORT("GridTransfer does not support backward operator.\n");
+   }
+
    /* Initialize coarse mesh grid locations */
    coarse_pmesh->SetNodalGridFunction(&c_x_gf);
-   cout << "coase mesh locations: ";
-   c_x_gf.Print(cout);
 }
 
 
@@ -286,7 +318,7 @@ void LagrangianLOOperator<dim>::InitPatchObjects()
 * Function: InitializeDijMatrix
 *
 * Purpose:
-*  The purpose of this function is to initialize a SparseMatrix with the sparsity pattern
+*  The purpose of this function is to initialize a Spars eMatrix with the sparsity pattern
 *  that corresponds to the adjacency matrix of the mesh.  I.E. this functions constructs a matrix
 *  of size num_elements x num_elements where the nonzero elements are for each element row
 *  are the cell indices in the stencil. This SparseMatrix will encode the max wave speed of
@@ -309,7 +341,7 @@ void LagrangianLOOperator<dim>::InitPatchObjects()
 *  5) HypreParMatrix::MergeDiagAndOffd --> SparseMatrix
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::InitializeDijMatrix()
+void LagrangianLOOperator<dim>::InitializeDijMatrix(FunctionCoefficient &rho_coeff)
 {
    switch (dim)
    {
@@ -333,13 +365,6 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 
    // Initialize SparseMatrix
    dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces+1);
-
-   // Create dummy coefficients
-   using namespace std::placeholders;
-   std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase<dim>::rho0, pb, std::placeholders::_1, std::placeholders::_2);
-
-   FunctionCoefficient rho_coeff(rho0_static);
 
    // Assemble SparseMatrix object
    ParBilinearForm k(&f_L2);
@@ -725,6 +750,54 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
 
 
 /****************************************************************************************************
+* Function: FillCellBdrFlagMacro
+*
+* Purpose: 
+*  To fill an f_L2 gridfunction of size NDofs_L2 (num cells) with a value indicating if the cell
+*  is on the boundary or not.  This ParGridFunction can be retrieved with GetCellBdrFlagGF().
+*
+*  Note that this function will label a cell with 5 if that cell lies on the corner, indicating 
+*  that the cell velocity should be set to 0 to preserve the slip BCs on both of its faces.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::FillCoarseCellBdrFlag()
+{
+   cout << "===== fill coarse cell bdr flag =====\n";
+   Array<int> row;
+   for (int i = 0; i < coarse_pmesh->GetNBE(); i++)
+   {
+      int bdr_attr = coarse_pmesh->GetBdrAttribute(i);
+      int face = coarse_pmesh->GetBdrElementFaceIndex(i);
+
+      // Get cell
+      coarse_face_element->GetRow(face, row);
+
+      cout << "coarse size: " << coarse_cell_bdr_flag_gf.Size()
+           << ", index: " << row[0]
+           << endl;
+      
+      // Each face should only have 1 adjacent cell
+      assert(row.Size() == 1);
+
+      if (coarse_cell_bdr_flag_gf[row[0]] != -1 && 
+          (pb->get_indicator() == "Sod" || 
+           pb->get_indicator() == "TriplePoint" || 
+           pb->get_indicator() == "riemann" ||
+           pb->get_indicator() == "Sedov" || 
+           pb->get_indicator() == "SodRadial"))
+      {
+         // Corner cell
+         coarse_cell_bdr_flag_gf[row[0]] = 5;
+      }
+      else
+      {
+         coarse_cell_bdr_flag_gf[row[0]] = bdr_attr;
+      }
+   }
+}
+
+
+/****************************************************************************************************
 * Function: MakeTimeStep
 * Parameters:
 *     S  - BlockVector that stores mesh information, mesh velocity, and state variables.
@@ -742,7 +815,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    // cout << "========================================\n"
    //      << "             MakeTimeStep               \n"
    //      << "========================================\n";
-   ParGridFunction x_gf, mv_gf;
+   ParGridFunction x_gf, mv_gf, sv_gf;
 
    // Get sv from current timestep before update
    // This value is used to move the mesh and we want to ensure it remains unchanged.
@@ -757,6 +830,7 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&f_H1, *sptr, block_offsets[0]);
    mv_gf.MakeRef(&f_H1, *sptr, block_offsets[1]);
+   sv_gf.MakeRef(&f_L2, *sptr, block_offsets[2]);
    add(x_gf, dt, mv_gf, x_gf);
    f_H1.GetMesh()->NewNodes(x_gf, false);
    f_L2.GetMesh()->NewNodes(x_gf, false);
@@ -764,25 +838,41 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
    /* Update coarse nodal grid function and move the mesh */
    if (use_patch)
    {
-      if (gt_h1->SupportsBackwardsOperator())
-      {
-         const Operator &P = gt_h1->BackwardOperator();
-         P.Mult(x_gf, c_x_gf);
-         c_H1.GetMesh()->NewNodes(c_x_gf, false);
-         c_L2.GetMesh()->NewNodes(c_x_gf, false);
-         coarse_pmesh->NewNodes(c_x_gf, false);
-      }
-      else
-      {
-         MFEM_ABORT("GridTransfer does not support backward operator.");
-      }
+      const Operator &P = gt_h1->BackwardOperator();
+      P.Mult(x_gf, c_x_gf);
+      c_H1.GetMesh()->NewNodes(c_x_gf, false);
+      c_L2.GetMesh()->NewNodes(c_x_gf, false);
+      coarse_pmesh->NewNodes(c_x_gf, false);
    }
 
    /* Optionally post process the density to be mass conservative */
    double pct_corrected = 0., rel_mass_corrected = 0.;
    if (post_process_density)
    {
-      SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+      if (use_patch)
+      {
+         /* Project updated density on coarse mesh */
+         ParGridFunction c_sv_gf(&c_L2);
+         const Operator &P = gt_l2->BackwardOperator();
+         P.Mult(sv_gf, c_sv_gf);
+
+         /* Set coarse density that conserves mass on coarse mesh */
+         SetMassConservativeDensityCoarse(c_sv_gf, pct_corrected, rel_mass_corrected);
+
+         cout << "coarse sv: ";
+         c_sv_gf.Print(cout);
+         cout << "fine sv pre coarse mass correction: ";
+         sv_gf.Print(cout);
+         /* Project mass corrected density back on fine mesh */
+         const Operator &R = gt_l2->ForwardOperator();
+         R.Mult(c_sv_gf, sv_gf);
+         cout << "fine sv post coarse mass correction: ";
+         sv_gf.Print(cout);
+      }
+      else
+      {
+         SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+      }
       ts_ppd_pct_cells.Append(pct_corrected);
       ts_ppd_rel_mag.Append(rel_mass_corrected);
    }
@@ -1927,7 +2017,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
    {
       // Get cell mass
-      const double m = m_hpv->Elem(cell_it);
+      const double m = f_m_hpv->Elem(cell_it);
 
       // Get new cell volume
       const double k_new = fine_pmesh->GetElementVolume(cell_it);
@@ -1951,11 +2041,61 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
             rel_mass_corrected += val / sv_new_mc;
          }
       }
-      
    }
 
    // Set pct corrected to be appended to timeseries data
    pct_corrected = double(num_corrected_cells)/NDofs_L2;
+}
+
+
+/****************************************************************************************************
+* Function: SetMassConservativeDensityCoarse
+* Parameters:
+*
+* Purpose:
+*  Postprocess the density to be exactly mass conservative.  This function must be called
+*  after the mesh motion has been calculated.
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::SetMassConservativeDensityCoarse(ParGridFunction &c_sv_gf, double &pct_corrected, double &rel_mass_corrected)
+{
+   // cout << "========================================\n"
+   //      << "       SetMassConservativeDensity       \n"
+   //      << "========================================\n";
+   int num_corrected_cells = 0;
+   rel_mass_corrected = 0.;
+
+   for (int macro_cell_it = 0; macro_cell_it < c_L2.GetNDofs(); macro_cell_it++)
+   {
+      // Get cell mass
+      const double m = c_m_hpv->Elem(macro_cell_it);
+
+      // Get new cell volume
+      const double k_new = coarse_pmesh->GetElementVolume(macro_cell_it);
+      const double sv_new= c_sv_gf.Elem(macro_cell_it);
+
+      // Compute sv that gives exact mass conservation
+      const double sv_new_mc = k_new / m;
+
+      // If needed, replace sv with mass conservative sv
+      if (pb->get_indicator() == "IsentropicVortex" && coarse_cell_bdr_flag_gf[macro_cell_it] != -1)
+      {
+         // Don't postprocess sv on boundary cells in the case of the isentropic vortex problem
+         continue;
+      }
+      else {
+         double val = abs(sv_new - sv_new_mc);
+         if (val > 1.E-12)
+         {
+            num_corrected_cells += 1;
+            c_sv_gf.Elem(macro_cell_it) = sv_new_mc;
+            rel_mass_corrected += val / sv_new_mc;
+         }
+      }
+   }
+
+   // Set pct corrected to be appended to timeseries data
+   pct_corrected = double(num_corrected_cells)/c_L2.GetNDofs();
 }
 
 
@@ -2594,7 +2734,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
          // Skip boundary cells
          continue;
       }
-      const double m = m_hpv->Elem(ci);
+      const double m = f_m_hpv->Elem(ci);
       const double k = fine_pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
       num += abs((k / U_i[0]) - m);
@@ -2630,7 +2770,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
    
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      const double m = m_hpv->Elem(ci);
+      const double m = f_m_hpv->Elem(ci);
       const double k = fine_pmesh->GetElementVolume(ci);
       GetCellStateVector(S, ci, U_i);
 
@@ -8159,7 +8299,7 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
 *  HiOp implementation of the Lagrange Multiplier method to solve for the 
 *  mesh velocity that guarantees mass conservation cell-wise.
 *
-*  Note: This function assumes that m_hpv has been populated and contains
+*  Note: This function assumes that f_m_hpv has been populated and contains
 *  the initial mass of all cells in the mesh.
 ****************************************************************************************************/
 template<int dim>
@@ -8177,7 +8317,7 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const doub
    for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
    {
       double Tnp1 = sv_gf.Elem(cell_it);
-      double m = m_hpv->Elem(cell_it);
+      double m = f_m_hpv->Elem(cell_it);
 
       /* Compute constraint on cell */
       double val = Tnp1 * m;
@@ -8432,7 +8572,7 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
    // cout << "mass matrix: \n";
    // mass.Print(cout);
    // assert(false);
-   // delete sigma;
+   delete sigma;
    // assert(false);
 }
 
@@ -8504,7 +8644,7 @@ void LagrangianLOOperator<dim>::ComputeAverageMassAtGeo(const Vector &S, Vector 
       for (int cell_it = 0; cell_it < cells_length; cell_it++)
       {
          int el_index = cells_row[cell_it];
-         const double m = m_hpv->Elem(cell_it);
+         const double m = f_m_hpv->Elem(cell_it);
          avg += m;
       }
       avg /= cells_length;
@@ -8725,11 +8865,11 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    mv_gf_l = mv_gf_l_out;
 
    /* Properly dispose of allocated memory */
-   delete tmp_opt_ptr;
+   // delete tmp_opt_ptr;
    delete omv_problem;
    optsolver = nullptr;
    omv_problem = nullptr;
-   tmp_opt_ptr = nullptr;
+   // tmp_opt_ptr = nullptr;
 }
 
 

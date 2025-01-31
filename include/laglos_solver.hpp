@@ -59,7 +59,7 @@ protected:
    ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
-   ParGridFunction cell_bdr_flag_gf;  // Element indexing vector
+   ParGridFunction cell_bdr_flag_gf, coarse_cell_bdr_flag_gf;  // Element indexing vector
    ParGridFunction LagrangeMultipliers;
    ParGridFunction c_x_gf;   // coarse mesh locations and mesh velocities
 
@@ -69,8 +69,7 @@ protected:
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
    ParMesh *coarse_pmesh, *fine_pmesh;
-   ParLinearForm *m_lf;
-   HypreParVector *m_hpv;
+   HypreParVector *f_m_hpv, *c_m_hpv;
 
    // Problem specific
    ProblemBase<dim> * pb;
@@ -110,6 +109,7 @@ protected:
    Table * vertex_element;
    Table * face_element;
    Table * edge_vertex;
+   Table * coarse_face_element;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray; // Array to identify boundary faces
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
@@ -162,7 +162,7 @@ public:
                         ParFiniteElementSpace &cr,
                         ParFiniteElementSpace &c_h1,
                         ParFiniteElementSpace &c_l2,
-                        ParLinearForm *m,
+                        FunctionCoefficient &rho_coeff,
                         ProblemBase<dim> *_pb,
                         Array<int> offset,
                         bool use_viscosity,
@@ -186,6 +186,7 @@ public:
    void CreateBdrElementIndexingArray();
    void CreateBdrVertexIndexingArray();
    void FillCellBdrFlag();
+   void FillCoarseCellBdrFlag();
    void GetCellBdrFlagGF(ParGridFunction &_cell_bdr_flag_gf) { _cell_bdr_flag_gf = this->cell_bdr_flag_gf; }
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
@@ -193,7 +194,7 @@ public:
    void MakeTimeStep(Vector &S, const double & t, const double & dt, bool &isCollapsed);
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
 
-   void InitializeDijMatrix();
+   void InitializeDijMatrix(FunctionCoefficient &rho_coeff);
    void BuildDijMatrix(const Vector &S);
    void CalculateTimestep(const Vector &S);
 
@@ -333,6 +334,7 @@ public:
 
    // Enforce Mass Conservation
    void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
+   void SetMassConservativeDensityCoarse(ParGridFunction &c_sv_gf, double &pct_corrected, double &rel_mass_corrected);
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

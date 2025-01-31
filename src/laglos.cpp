@@ -371,7 +371,6 @@ int main(int argc, char *argv[]) {
            << "Aborting program.\n";
       return -1;
    }
-   cout << "Meshing done\n";
 
    // mesh->SetCurvature(2);
 
@@ -860,17 +859,13 @@ int main(int argc, char *argv[]) {
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
-   ParLinearForm *m = new ParLinearForm(&f_L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
-   m->Assemble();
 
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator<dim> hydro(f_H1FESpace, f_H1FESpace_L, f_L2FESpace, f_L2VFESpace, f_CRFESpace, 
-                                   c_H1FESpace, c_L2FESpace,
-                                   m, problem_class, offset, use_viscosity, mm, CFL);
+                                   c_H1FESpace, c_L2FESpace, rho_coeff, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -1304,6 +1299,8 @@ int main(int argc, char *argv[]) {
          {
             MFEM_ABORT("BackwardOperator not supported by the GridTransfer object.");
          }
+         delete gt;
+         gt = nullptr;
       }
 
       if (last_step || (ti % vis_steps) == 0)
@@ -1960,9 +1957,9 @@ int main(int argc, char *argv[]) {
    
    delete fine_pmesh;
    delete fine_pmesh0;
+   delete pmesh;
    delete CRFEC;
    delete problem_class;
-   delete m;
 
    return 0;
 }

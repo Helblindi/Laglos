@@ -186,8 +186,12 @@ public:
    void CreateBdrElementIndexingArray();
    void CreateBdrVertexIndexingArray();
    void FillCellBdrFlag();
-   void FillCoarseCellBdrFlag();
    void GetCellBdrFlagGF(ParGridFunction &_cell_bdr_flag_gf) { _cell_bdr_flag_gf = this->cell_bdr_flag_gf; }
+
+   /* Coarse Mesh Functions */
+   void FillCoarseCellBdrFlag();
+   void SetMassConservativeDensityCoarse(ParGridFunction &c_sv_gf, double &pct_corrected, double &rel_mass_corrected);
+   void RedistributeFineMassesL1(const ParGridFunction &c_sv_gf, ParGridFunction &sv_gf);
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
@@ -334,7 +338,6 @@ public:
 
    // Enforce Mass Conservation
    void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
-   void SetMassConservativeDensityCoarse(ParGridFunction &c_sv_gf, double &pct_corrected, double &rel_mass_corrected);
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

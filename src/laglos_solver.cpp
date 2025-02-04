@@ -859,15 +859,15 @@ void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const 
          /* Set coarse density that conserves mass on coarse mesh */
          SetMassConservativeDensityCoarse(c_sv_gf, pct_corrected, rel_mass_corrected);
 
-         cout << "coarse sv: ";
-         c_sv_gf.Print(cout);
-         cout << "fine sv pre coarse mass correction: ";
-         sv_gf.Print(cout);
+         // cout << "coarse sv: ";
+         // c_sv_gf.Print(cout);
+         // cout << "fine sv pre coarse mass correction: ";
+         // sv_gf.Print(cout);
          /* Project mass corrected density back on fine mesh */
-         const Operator &R = gt_l2->ForwardOperator();
-         R.Mult(c_sv_gf, sv_gf);
-         cout << "fine sv post coarse mass correction: ";
-         sv_gf.Print(cout);
+         RedistributeFineMassesL1(c_sv_gf, sv_gf);
+
+         // cout << "fine sv post coarse mass correction: ";
+         // sv_gf.Print(cout);
       }
       else
       {
@@ -2096,6 +2096,112 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensityCoarse(ParGridFunction
 
    // Set pct corrected to be appended to timeseries data
    pct_corrected = double(num_corrected_cells)/c_L2.GetNDofs();
+}
+
+
+/****************************************************************************************************
+* Function: RedistributeFineMassesL1
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::RedistributeFineMassesL1(const ParGridFunction &c_sv_gf, ParGridFunction &sv_gf)
+{
+   // cout << "========================================\n"
+   //      << "        RedistributeFineMassesL1        \n"
+   //      << "========================================\n";
+
+   for (int macro_cell_it = 0; macro_cell_it < c_L2.GetNDofs(); macro_cell_it++)
+   {
+      // Get macro cell mass
+      double m_macro = c_m_hpv->Elem(macro_cell_it);
+
+      // Get fine cell indices and masses
+      int a_ind = 4.*macro_cell_it, b_ind = 4.*macro_cell_it + 1, c_ind = 4.*macro_cell_it + 2, d_ind = 4.*macro_cell_it + 3;
+      double ma0 = f_m_hpv->Elem(a_ind);
+      double mb0 = f_m_hpv->Elem(b_ind);
+      double mc0 = f_m_hpv->Elem(c_ind);
+      double md0 = f_m_hpv->Elem(d_ind);
+
+      // cout << "macro cell: " << macro_cell_it 
+      //      << "\ta_ind: " << a_ind
+      //      << "\tb_ind: " << b_ind
+      //      << "\tc_ind: " << c_ind
+      //      << "\td_ind: " << d_ind << endl;
+
+      /*** Get squeeze factor ***/
+      // Actual volumes
+      double va = fine_pmesh->GetElementVolume(a_ind);
+      double vb = fine_pmesh->GetElementVolume(b_ind);
+      double vc = fine_pmesh->GetElementVolume(c_ind);
+      double vd = fine_pmesh->GetElementVolume(d_ind);
+
+      // Actual masses
+      double maa = va / sv_gf.Elem(a_ind);
+      double mba = vb / sv_gf.Elem(b_ind);
+      double mca = vc / sv_gf.Elem(c_ind);
+      double mda = vd / sv_gf.Elem(d_ind);
+
+      // Actual macro mass
+      double m_macro_actual = maa + mba + mca + mda;
+      // cout << "exact mass: " << m_macro << ", actual: " << m_macro_actual << endl;
+
+      double squeeze_factor = m_macro / m_macro_actual;
+
+      // Pump up fine cells
+      double map = squeeze_factor * maa;
+      double mbp = squeeze_factor * mba;
+      double mcp = squeeze_factor * mca;
+      double mdp = squeeze_factor * mda;
+
+      assert(abs(map + mbp + mcp + mdp - m_macro) < 1.E-12);
+
+      /*** Compute L1 optimal correction ***/
+      Array<double> alpha_arr(4), beta_arr(4), gamma_arr(4), residual_arr(4);
+      /* First residual */
+      alpha_arr[0] = ma0 / map;
+      beta_arr[0] = mb0 / mbp;
+      gamma_arr[0] = mc0 / mcp;
+      residual_arr[0] = abs(md0 - m_macro + alpha_arr[0] * map + beta_arr[0] * mbp + gamma_arr[0] * mcp);
+
+      /* Second residual */
+      alpha_arr[1] = ma0 / map;
+      beta_arr[1] = mb0 / mbp;
+      gamma_arr[1] = (m_macro - md0 - alpha_arr[1] * map - beta_arr[1] * mbp) / mcp;
+      residual_arr[1] = abs(mc0 - gamma_arr[1] * mcp);
+
+      /* Third residual */
+      alpha_arr[2] = ma0 / map;
+      gamma_arr[2] = mc0 / mcp;
+      beta_arr[2] = (m_macro - md0 - alpha_arr[2] * map - gamma_arr[2] * mcp) / mbp;
+      residual_arr[2] = abs(mb0 - beta_arr[2] * mbp);
+
+      /* Fourth resiual */
+      beta_arr[3] = mb0 / mbp;
+      gamma_arr[3] = mc0 / mcp;
+      alpha_arr[3] = (m_macro - md0 - beta_arr[3] * mbp - gamma_arr[3] * mcp) / map;
+      residual_arr[3] = abs(ma0 - alpha_arr[3] * map);
+
+      double residual_min = residual_arr.Min();
+      int residual_min_index = residual_arr.Find(residual_min);
+
+      // cout << "resid min: " << residual_min << ", index: " << residual_min_index << endl;
+      // cout << "residual_arr: ";
+      // residual_arr.Print(cout);
+
+      /* Define corrected fine masses */
+      double mac = alpha_arr[residual_min_index] * map;
+      double mbc = beta_arr[residual_min_index] * mbp;
+      double mcc = gamma_arr[residual_min_index] * mcp;
+      double mdc = m_macro - mac - mbc - mcc;
+
+      /* Postprocess fine specific volumes */
+      sv_gf.Elem(a_ind) = va / mac;
+      sv_gf.Elem(b_ind) = vb / mbc;
+      sv_gf.Elem(c_ind) = vc / mcc;
+      sv_gf.Elem(d_ind) = vd / mdc;
+   } // End macro cell iteration
 }
 
 

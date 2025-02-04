@@ -40,7 +40,7 @@
 * ./Laglos -m data/square-vortex.mesh -p 5 -tf 10 -cfl 0.5 -rs 3           ## Isentropic Vortex
 * ./Laglos -m data/noh-nonuniform.mesh -p 4 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
 * ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.25 -rs 6         ## Noh
-* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 0.1 -rs 5          ## Sedov
+* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 0.5 -rs 5          ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
 * ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder shell
 * ----- Fails -----
@@ -658,10 +658,7 @@ int main(int argc, char *argv[]) {
    if (problem_class->get_distort_mesh() || dm_val != 0.)
    {
       cout << "distort mesh.\n";
-      if (use_patch)
-      {
-         MFEM_ABORT("Not implemented.\n");
-      }
+      
       switch (problem)
       {
       case 1: // Sod
@@ -809,6 +806,25 @@ int main(int argc, char *argv[]) {
 
       // Update fine_pmesh reference grid function
       fine_pmesh->NewNodes(x_gf, false);
+
+      // Update coarse node locations
+      if (use_patch)
+      {
+         GridTransfer *gt = new InterpolationGridTransfer(c_H1FESpace, f_H1FESpace);
+         if (gt->SupportsBackwardsOperator())
+         {
+            const Operator &P = gt->BackwardOperator();
+            P.Mult(x_gf, c_x_gf);
+            pmesh->NewNodes(c_x_gf);
+         }
+         else
+         {
+            MFEM_ABORT("BackwardOperator not supported by the GridTransfer object.");
+         }
+         delete gt;
+         gt = nullptr;
+      }
+
       cout << "Mesh distorted\n";
    } // End distort mesh
 

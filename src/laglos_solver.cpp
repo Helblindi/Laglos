@@ -2112,7 +2112,7 @@ void LagrangianLOOperator<dim>::RedistributeFineMassesL1(const ParGridFunction &
    //      << "        RedistributeFineMassesL1        \n"
    //      << "========================================\n";
 
-   bool _use_relative = true;
+   // bool _use_relative = true;
 
    for (int macro_cell_it = 0; macro_cell_it < c_L2.GetNDofs(); macro_cell_it++)
    {
@@ -2160,58 +2160,63 @@ void LagrangianLOOperator<dim>::RedistributeFineMassesL1(const ParGridFunction &
       assert(abs(map + mbp + mcp + mdp - m_macro) < 1.E-12);
 
       /*** Compute L1 optimal correction ***/
-      Array<double> alpha_arr(4), beta_arr(4), gamma_arr(4), residual_arr(4);
+      // Array<double> alpha_arr(4), beta_arr(4), gamma_arr(4), residual_arr(4);
       /* First residual */
-      alpha_arr[0] = ma0 / map;
-      beta_arr[0] = mb0 / mbp;
-      gamma_arr[0] = mc0 / mcp;
-      residual_arr[0] = abs(md0 - m_macro + alpha_arr[0] * map + beta_arr[0] * mbp + gamma_arr[0] * mcp);
+      // alpha_arr[0] = ma0 / map;
+      // beta_arr[0] = mb0 / mbp;
+      // gamma_arr[0] = mc0 / mcp;
+      // residual_arr[0] = abs(md0 - m_macro + alpha_arr[0] * map + beta_arr[0] * mbp + gamma_arr[0] * mcp);
 
-      /* Second residual */
-      alpha_arr[1] = ma0 / map;
-      beta_arr[1] = mb0 / mbp;
-      gamma_arr[1] = (m_macro - md0 - alpha_arr[1] * map - beta_arr[1] * mbp) / mcp;
-      residual_arr[1] = abs(mc0 - gamma_arr[1] * mcp);
+      // /* Second residual */
+      // alpha_arr[1] = ma0 / map;
+      // beta_arr[1] = mb0 / mbp;
+      // gamma_arr[1] = (m_macro - md0 - alpha_arr[1] * map - beta_arr[1] * mbp) / mcp;
+      // residual_arr[1] = abs(mc0 - gamma_arr[1] * mcp);
 
-      /* Third residual */
-      alpha_arr[2] = ma0 / map;
-      gamma_arr[2] = mc0 / mcp;
-      beta_arr[2] = (m_macro - md0 - alpha_arr[2] * map - gamma_arr[2] * mcp) / mbp;
-      residual_arr[2] = abs(mb0 - beta_arr[2] * mbp);
+      // /* Third residual */
+      // alpha_arr[2] = ma0 / map;
+      // gamma_arr[2] = mc0 / mcp;
+      // beta_arr[2] = (m_macro - md0 - alpha_arr[2] * map - gamma_arr[2] * mcp) / mbp;
+      // residual_arr[2] = abs(mb0 - beta_arr[2] * mbp);
 
-      /* Fourth resiual */
-      beta_arr[3] = mb0 / mbp;
-      gamma_arr[3] = mc0 / mcp;
-      alpha_arr[3] = (m_macro - md0 - beta_arr[3] * mbp - gamma_arr[3] * mcp) / map;
-      residual_arr[3] = abs(ma0 - alpha_arr[3] * map);
+      // /* Fourth resiual */
+      // beta_arr[3] = mb0 / mbp;
+      // gamma_arr[3] = mc0 / mcp;
+      // alpha_arr[3] = (m_macro - md0 - beta_arr[3] * mbp - gamma_arr[3] * mcp) / map;
+      // residual_arr[3] = abs(ma0 - alpha_arr[3] * map);
 
-      /* Optionally, look at the relative residual */
-      if (_use_relative)
-      {
-         residual_arr[0] *= md0;
-         residual_arr[1] *= mc0;
-         residual_arr[2] *= mb0;
-         residual_arr[3] *= ma0;
-      }
+      // /* Optionally, look at the relative residual */
+      // if (_use_relative)
+      // {
+      //    residual_arr[0] *= md0;
+      //    residual_arr[1] *= mc0;
+      //    residual_arr[2] *= mb0;
+      //    residual_arr[3] *= ma0;
+      // }
 
-      double residual_min = residual_arr.Min();
-      int residual_min_index = residual_arr.Find(residual_min);
+      // double residual_min = residual_arr.Min();
+      // int residual_min_index = residual_arr.Find(residual_min);
 
-      // cout << "resid min: " << residual_min << ", index: " << residual_min_index << endl;
-      // cout << "residual_arr: ";
-      // residual_arr.Print(cout);
+      // // cout << "resid min: " << residual_min << ", index: " << residual_min_index << endl;
+      // // cout << "residual_arr: ";
+      // // residual_arr.Print(cout);
 
-      /* Define corrected fine masses */
-      double mac = alpha_arr[residual_min_index] * map;
-      double mbc = beta_arr[residual_min_index] * mbp;
-      double mcc = gamma_arr[residual_min_index] * mcp;
-      double mdc = m_macro - mac - mbc - mcc;
+      // /* Define corrected fine masses */
+      // double mac = alpha_arr[residual_min_index] * map;
+      // double mbc = beta_arr[residual_min_index] * mbp;
+      // double mcc = gamma_arr[residual_min_index] * mcp;
+      // double mdc = m_macro - mac - mbc - mcc;
 
-      /* Postprocess fine specific volumes */
-      sv_gf.Elem(a_ind) = va / mac;
-      sv_gf.Elem(b_ind) = vb / mbc;
-      sv_gf.Elem(c_ind) = vc / mcc;
-      sv_gf.Elem(d_ind) = vd / mdc;
+      // /* Postprocess fine specific volumes */
+      // sv_gf.Elem(a_ind) = va / mac;
+      // sv_gf.Elem(b_ind) = vb / mbc;
+      // sv_gf.Elem(c_ind) = vc / mcc;
+      // sv_gf.Elem(d_ind) = vd / mdc;
+
+      sv_gf.Elem(a_ind) = va / map;
+      sv_gf.Elem(b_ind) = vb / mbp;
+      sv_gf.Elem(c_ind) = vc / mcp;
+      sv_gf.Elem(d_ind) = vd / mdp;
    } // End macro cell iteration
 }
 

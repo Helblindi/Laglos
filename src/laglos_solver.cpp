@@ -2112,6 +2112,8 @@ void LagrangianLOOperator<dim>::RedistributeFineMassesL1(const ParGridFunction &
    //      << "        RedistributeFineMassesL1        \n"
    //      << "========================================\n";
 
+   bool _use_relative = true;
+
    for (int macro_cell_it = 0; macro_cell_it < c_L2.GetNDofs(); macro_cell_it++)
    {
       // Get macro cell mass
@@ -2182,6 +2184,15 @@ void LagrangianLOOperator<dim>::RedistributeFineMassesL1(const ParGridFunction &
       gamma_arr[3] = mc0 / mcp;
       alpha_arr[3] = (m_macro - md0 - beta_arr[3] * mbp - gamma_arr[3] * mcp) / map;
       residual_arr[3] = abs(ma0 - alpha_arr[3] * map);
+
+      /* Optionally, look at the relative residual */
+      if (_use_relative)
+      {
+         residual_arr[0] *= md0;
+         residual_arr[1] *= mc0;
+         residual_arr[2] *= mb0;
+         residual_arr[3] *= ma0;
+      }
 
       double residual_min = residual_arr.Min();
       int residual_min_index = residual_arr.Find(residual_min);

@@ -35,12 +35,12 @@ public:
    inline int GetNVDofs_H1() const { return NVDofs_H1; }
    inline int GetNumFaces() const { return num_faces; }
 
-   void UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel) const;
-   void UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const;
-   void UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, const Vector &x) const;
-   void GetNodeVelocity(const Vector &S, const int & node, Vector & vel) const;
-   void GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel) const;
-   void GetNodeVelocityVecL(const Vector &mv_gf_l, const int & node, Vector & vel) const;
+   void UpdateNodeVelocity(Vector &dSdt, const int & node, const Vector & vel) const;
+   void UpdateNodeVelocity(ParGridFunction &dxdt, const int &node, const Vector &vel) const;
+   void UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, const Vector &x) const;
+   void GetNodeVelocity(const Vector &dSdt, const int & node, Vector & vel) const;
+   void GetNodeVelocity(const ParGridFunction &dxdt, const int & node, Vector & vel) const;
+   void GetNodeVelocityVecL(const Vector &dxdt_l, const int & node, Vector & vel) const;
    void UpdateNodePosition(Vector &S, const int & node, const Vector &x) const;
    void GetNodePositionFromBV(const Vector &S, const int & node, Vector & x) const;
    void GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector & x) const;

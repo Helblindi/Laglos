@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
    int rp_levels = 0;
    int order_mv = 2;  // Order of mesh movement approximation space
    int order_u = 0;
+   int ode_solver_type = 1;
    double t_init = 0.0;
    double t_final = 0.6;
    int max_tsteps = -1;
@@ -158,7 +159,6 @@ int main(int argc, char *argv[]) {
 
    OptionsParser args(argc, argv);
 
-   args.AddOption(&problem, "-p", "--problem", "Test problem to run.");
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&output_flag, "-of", "--output-flag", 
                   "Directory that output files should be placed");
@@ -166,6 +166,11 @@ int main(int argc, char *argv[]) {
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
                   "Number of times to refine the mesh uniformly in parallel.");
+   args.AddOption(&problem, "-p", "--problem", "Test problem to run.");
+   args.AddOption(&ode_solver_type, "-s", "--ode-solver",
+                  "ODE solver: 1 - Forward Euler,\n\t"
+                  "            2 - RK2 SSP, 3 - RK3 SSP, 4 - RK4, 6 - RK6,\n\t"
+                  "            7 - RK2Avg.");
    args.AddOption(&t_init, "-ti", "--t-init",
                   "Start time; default is 0.");               
    args.AddOption(&t_final, "-tf", "--t-final",
@@ -551,6 +556,27 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
 
+   // Define the explicit ODE solver used for time integration.
+   ODESolver *ode_solver = NULL;
+   switch (ode_solver_type)
+   {
+      case 1: ode_solver = new ForwardEulerSolver; break;
+      // case 2: ode_solver = new RK2Solver(0.5); break;
+      // case 3: ode_solver = new RK3SSPSolver; break;
+      // case 4: ode_solver = new RK4Solver; break;
+      // case 6: ode_solver = new RK6Solver; break;
+      // case 7: ode_solver = new RK2AvgSolver; break;
+      default:
+         MFEM_ABORT("ode_solver_type not implemented\n");
+         // if (myid == 0)
+         // {
+         //    cout << "Unknown ODE solver type: " << ode_solver_type << '\n';
+         // }
+         // delete pmesh;
+         // MPI_Finalize();
+         // return 3;
+   }
+
    HYPRE_BigInt global_vSize = L2FESpace.GlobalTrueVSize();
    cout << "global_vSize: " << global_vSize << endl;
    cout << "N dofs: " << H1FESpace.GetNDofs() << endl;
@@ -613,24 +639,22 @@ int main(int argc, char *argv[]) {
    const int Vsize_l2 = L2FESpace.GetVSize();
    const int Vsize_l2v = L2VFESpace.GetVSize();
    const int Vsize_h1 = H1FESpace.GetVSize();
-   Array<int> offset(6);
+   Array<int> offset(5);
    offset[0] = 0;
    offset[1] = offset[0] + Vsize_h1;
-   offset[2] = offset[1] + Vsize_h1;
-   offset[3] = offset[2] + Vsize_l2;
-   offset[4] = offset[3] + Vsize_l2v;
-   offset[5] = offset[4] + Vsize_l2;
+   offset[2] = offset[1] + Vsize_l2;
+   offset[3] = offset[2] + Vsize_l2v;
+   offset[4] = offset[3] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
-   ParGridFunction x_gf, mv_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
-   mv_gf.MakeRef(&H1FESpace, S, offset[1]);
-   sv_gf.MakeRef(&L2FESpace, S, offset[2]);
-   v_gf.MakeRef(&L2VFESpace, S, offset[3]);
-   ste_gf.MakeRef(&L2FESpace, S, offset[4]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[1]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[2]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[3]);
 
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
@@ -789,10 +813,9 @@ int main(int argc, char *argv[]) {
       cout << "Mesh distorted\n";
    } // End distort mesh
 
-   // Initialize mesh velocity
-   ConstantCoefficient zero(0.0);
-   mv_gf.ProjectCoefficient(zero);
-
+   // Sync the data location of x_gf with its base, S
+   x_gf.SyncAliasMemory(S);
+   
    // Change class variables into static std::functions since virtual static member functions are not an option
    // and Coefficient class requires std::function arguments
    using namespace std::placeholders;
@@ -844,7 +867,7 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -1111,11 +1134,6 @@ int main(int argc, char *argv[]) {
    ste_gf.SaveAsOne(ste_ofs);
    ste_ofs.close();
 
-   std::ofstream mv_ofs(mv_name.str().c_str());
-   mv_ofs.precision(8);
-   mv_gf.SaveAsOne(mv_ofs);
-   mv_ofs.close();
-
    /* Print gamma/pressure grid function for Triple Point problem */
    if (problem == 6 || problem == 12 || problem == 15) 
    {
@@ -1145,7 +1163,6 @@ int main(int argc, char *argv[]) {
    visit_dc.RegisterField("Density", &rho_gf);
    visit_dc.RegisterField("Density c", &rho_cont_gf);
    visit_dc.RegisterField("Velocity", &v_gf);
-   visit_dc.RegisterField("Mesh Velocity", &mv_gf);
    visit_dc.RegisterField("Specific Total Energy", &ste_gf);
    visit_dc.RegisterField("Mass Loss", &mc_gf);
    visit_dc.RegisterField("Pressure", &press_gf);
@@ -1161,7 +1178,6 @@ int main(int argc, char *argv[]) {
    paraview_dc.RegisterField("Density", &rho_gf);
    paraview_dc.RegisterField("Density c", &rho_cont_gf);
    paraview_dc.RegisterField("Velocity", &v_gf);
-   paraview_dc.RegisterField("Mesh Velocity", &mv_gf);
    paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
    paraview_dc.RegisterField("Mass Loss", &mc_gf);
    paraview_dc.RegisterField("Pressure", &press_gf);
@@ -1170,18 +1186,19 @@ int main(int argc, char *argv[]) {
    paraview_dc.SetTime(0.0); 
    paraview_dc.Save();
 
-   // Perform the time-integration by looping over time iterations
-   // ti with a time step dt.  The main function call here is the
-   // LagrangianLOOperator<dim>::MakeTimeStep() funcall.
+   // Perform time-integration (looping over the time iterations, ti, with a
+   // time-step dt). The object oper is of type LagrangianLOOperator that
+   // defines the Mult() method that used by the time integrators.
+   ode_solver->Init(hydro);
    double t = t_init;
+   bool last_step = false;
+   int steps = 0;
+   BlockVector S_old(S);
 
    if (convergence_testing)
    {
       dt = hmin; // Set timestep to smalled h val for convergence testing
    }
-
-   bool last_step = false;
-   BlockVector S_old(S);
 
    cout << "Entering time loop\n";
    chrono.Clear();
@@ -1235,8 +1252,24 @@ int main(int argc, char *argv[]) {
 
       S_old = S;
       
-      hydro.MakeTimeStep(S, t, dt, isCollapsed);
-      t += dt;
+      ode_solver->Step(S, t, dt);
+      steps++;
+      cout << "dt: " << dt << endl;
+
+      // Make sure that the mesh corresponds to the new solution state. This is
+      // needed, because some time integrators use different S-type vectors
+      // and the oper object might have redirected the mesh positions to those.
+      pmesh->NewNodes(x_gf, false);
+      
+      // Optionally, post process the density
+      if (post_process_density)
+      {
+         double pct_corrected, rel_mass_corrected;
+         hydro.SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+      }
+
+      MFEM_WARNING("Want adaptive time step control");
+      MFEM_WARNING("Need new call to check mesh");
 
       /* End iteration if the mesh has collapsed */
       if (isCollapsed)
@@ -1246,10 +1279,13 @@ int main(int argc, char *argv[]) {
       
       if (S_old.GetData() == S.GetData()) { cout << "\t State has not changed with step.\n"; return -1; }
 
-      // Make sure that the mesh corresponds to the new solution state. This is
-      // needed, because some time integrators use different S-type vectors
-      // and the oper object might have redirected the mesh positions to those.
-      pmesh->NewNodes(x_gf, false);
+      // Ensure the sub-vectors x_gf, v_gf, and e_gf know the location of the
+      // data in S. This operation simply updates the Memory validity flags of
+      // the sub-vectors to match those of S.
+      x_gf.SyncAliasMemory(S);
+      sv_gf.SyncAliasMemory(S);
+      v_gf.SyncAliasMemory(S);
+      ste_gf.SyncAliasMemory(S);
 
       if (last_step || (ti % vis_steps) == 0)
       {
@@ -1514,11 +1550,6 @@ int main(int argc, char *argv[]) {
             mc_gf.SaveAsOne(mass_ofs);
             mass_ofs.close();
 
-            std::ofstream mv_ofs(mv_name.str().c_str());
-            mv_ofs.precision(8);
-            mv_gf.SaveAsOne(mv_ofs);
-            mv_ofs.close();
-
             // Print continuous interpolation of density
             GridFunctionCoefficient rho_gf_coeff(&rho_gf);
             rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
@@ -1550,8 +1581,16 @@ int main(int argc, char *argv[]) {
          }
       }
    } // End time step iteration
-
    chrono.Stop();
+
+   switch (ode_solver_type)
+   {
+      case 2: steps *= 2; break;
+      case 3: steps *= 3; break;
+      case 4: steps *= 4; break;
+      case 6: steps *= 6; break;
+      case 7: steps *= 2;
+   }
 
    // Last time computing density
    for (int i = 0; i < sv_gf.Size(); i++)
@@ -1619,11 +1658,6 @@ int main(int argc, char *argv[]) {
       mc_gf.SaveAsOne(mc_ofs);
       mc_ofs.close();
 
-      std::ofstream mv_ofs(mv_name.str().c_str());
-      mv_ofs.precision(8);
-      mv_gf.SaveAsOne(mv_ofs);
-      mv_ofs.close();
-
       // Print continuous interpolation of density
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
@@ -1650,13 +1684,12 @@ int main(int argc, char *argv[]) {
    {
       // Save exact to file as well
       BlockVector S_exact(offset, Device::GetMemoryType());
-      ParGridFunction x_gf_exact, mv_gf_exact, sv_ex_gf, vel_ex_gf, ste_ex_gf;
+      ParGridFunction x_gf_exact, sv_ex_gf, vel_ex_gf, ste_ex_gf;
 
       x_gf_exact.MakeRef(&H1FESpace, S_exact, offset[0]);
-      mv_gf_exact.MakeRef(&H1FESpace, S_exact, offset[1]);
-      sv_ex_gf.MakeRef(&L2FESpace, S_exact, offset[2]);
-      vel_ex_gf.MakeRef(&L2VFESpace, S_exact, offset[3]);
-      ste_ex_gf.MakeRef(&L2FESpace, S_exact, offset[4]);
+      sv_ex_gf.MakeRef(&L2FESpace, S_exact, offset[1]);
+      vel_ex_gf.MakeRef(&L2VFESpace, S_exact, offset[2]);
+      ste_ex_gf.MakeRef(&L2FESpace, S_exact, offset[3]);
 
       // Project exact solution
       if (problem_class->get_indicator() == "Vdw1")
@@ -1689,6 +1722,9 @@ int main(int argc, char *argv[]) {
    ostringstream convergence_filename;
    convergence_filename << output_path << "convergence/temp_output/np" << num_procs;
 
+   /* Coefficient to assist in computation of errors */
+   ConstantCoefficient zero(0.0);
+   
    /* Values to store numerators, to be computed on case by case basis since exact solutions vary */
    double sv_L1_error_n = 0., rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
           sv_L2_error_n = 0., rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,

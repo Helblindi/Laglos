@@ -30,24 +30,24 @@ Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFini
 /****************************************************************************************************
 * Function: UpdateNodeVelocity
 * Parameters:
-*   S    - BlockVector representing FiniteElement information
+*   dSdt - BlockVector representing time derivative of FiniteElement information
 *   node - Global index of node in question.
 *   vel  - Velocity computed at node to be used to move the mesh
 * Purpose:
 *   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vector & vel) const
+void Geometric<dim>::UpdateNodeVelocity(Vector &dSdt, const int & node, const Vector & vel) const
 {
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf;
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   assert(mv_gf.Size() == dim*NDofs_H1);
+   ParGridFunction dxdt;
+   MFEM_ABORT("Need to remove mv_gf implementation\n");
+   dxdt.MakeRef(&H1, dSdt, block_offsets[0]);
+   assert(dxdt.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      mv_gf[index] = vel[i];
+      dxdt[index] = vel[i];
    }
 }
 
@@ -62,13 +62,13 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &S, const int & node, const Vecto
 *   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node, const Vector &vel) const
+void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &dxdt, const int &node, const Vector &vel) const
 {
-   assert(mv_gf.Size() == dim*NDofs_H1);
+   assert(dxdt.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      mv_gf[index] = vel[i];
+      dxdt[index] = vel[i];
    }
 }
 
@@ -76,21 +76,21 @@ void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &mv_gf, const int &node,
 /****************************************************************************************************
 * Function: UpdateNodeVelocityVecL
 * Parameters:
-*   mv_gf_l - Vector on the first order FESpace representing velocity on geometric
+*   dxdt_l  - Vector on the first order FESpace representing velocity on geometric
 *             corner nodes of the mesh
 *   node    - Global index of node in question.
 *   vel     - Velocity at given node
 * Purpose:
-*   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
+*   This function is used to update the dxdt ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, const Vector &vel) const
+void Geometric<dim>::UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, const Vector &vel) const
 {
-   assert(mv_gf_l.Size() == dim*NVDofs_H1);
+   assert(dxdt_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
-      mv_gf_l[index] = vel[i];
+      dxdt_l[index] = vel[i];
    }
 
 }
@@ -99,7 +99,7 @@ void Geometric<dim>::UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, c
 /****************************************************************************************************
 * Function: GetNodeVelocity
 * Parameters:
-*   S    - BlockVector representing FiniteElement information
+*   dSdt - BlockVector representing time derivative of FiniteElement information
 *   node - Global index of node in question.
 *   vel  - Velocity at given node
 *
@@ -107,17 +107,17 @@ void Geometric<dim>::UpdateNodeVelocityVecL(Vector &mv_gf_l, const int & node, c
 *  This function returns the velocity at the given global node.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector & vel) const
+void Geometric<dim>::GetNodeVelocity(const Vector &dSdt, const int & node, Vector & vel) const
 {
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction mv_gf;
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   assert(mv_gf.Size() == dim*NDofs_H1);
+   Vector* sptr = const_cast<Vector*>(&dSdt);
+   ParGridFunction dxdt;
+   dxdt.MakeRef(&H1, *sptr, block_offsets[1]);
+   assert(dxdt.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      vel[i] = mv_gf[index];
+      vel[i] = dxdt[index];
    }
 }  
 
@@ -125,28 +125,28 @@ void Geometric<dim>::GetNodeVelocity(const Vector &S, const int & node, Vector &
 /****************************************************************************************************
 * Function: GetNodeVelocityGF
 * Parameters:
-*   S    - BlockVector representing FiniteElement information
-*   node - Global index of node in question.
-*   vel  - Velocity at given node
+*   dxdt  - Vector of mesh nodal velocities 
+*   node  - Global index of node in question.
+*   vel   - Velocity at given node
 *
 * Purpose:
 *  This function returns the velocity at the given global node.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & node, Vector & vel) const
+void Geometric<dim>::GetNodeVelocity(const ParGridFunction &dxdt, const int & node, Vector & vel) const
 {
-   assert(mv_gf.Size() == dim*NDofs_H1);
+   assert(dxdt.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;
-      vel[i] = mv_gf[index];
+      vel[i] = dxdt[index];
    }
 }
 
 /****************************************************************************************************
 * Function: GetNodeVelocityVecL
 * Parameters:
-*   mv_gf_l - Vector on the first order FESpace representing velocity on geometric
+*   dxdt_l  - Vector on the first order FESpace representing velocity on geometric
 *             corner nodes of the mesh
 *   node    - Global index of node in question.
 *   vel     - Velocity at given node
@@ -156,13 +156,13 @@ void Geometric<dim>::GetNodeVelocity(const ParGridFunction &mv_gf, const int & n
 * Note: L indicates grid function is the low order form.
 ****************************************************************************************************/
 template<int dim>
-void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf_l, const int & node, Vector & vel) const
+void Geometric<dim>::GetNodeVelocityVecL(const Vector &dxdt_l, const int & node, Vector & vel) const
 {
-   assert(mv_gf_l.Size() == dim*NVDofs_H1);
+   assert(dxdt_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
-      vel[i] = mv_gf_l[index];
+      vel[i] = dxdt_l[index];
    }
 }
 
@@ -180,9 +180,8 @@ void Geometric<dim>::GetNodeVelocityVecL(const Vector &mv_gf_l, const int & node
 template<int dim>
 void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vector &x) const
 {
-   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   x_gf.MakeRef(&H1, S, block_offsets[0]);
    assert(x_gf.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)

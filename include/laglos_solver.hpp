@@ -50,13 +50,14 @@ struct TimingData
 
 //
 template <int dim>
-class LagrangianLOOperator
+class LagrangianLOOperator : public TimeDependentOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1Lc;
-   ParGridFunction v_CR_gf; // 5.7(b)
+   mutable ParGridFunction x_gf;
+   mutable ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
    ParGridFunction cell_bdr_flag_gf;  // Element indexing vector
@@ -150,7 +151,8 @@ protected:
 public:
    enum DofEntity {corner, face, cell};
 
-   LagrangianLOOperator(ParFiniteElementSpace &h1,
+   LagrangianLOOperator(const int size,
+                        ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &h1_l,
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
@@ -162,6 +164,8 @@ public:
                         bool mm,
                         double CFL);
    ~LagrangianLOOperator();
+
+   virtual void Mult(const Vector &S, Vector &dS_dt) const;
 
    double GetCFL() { return this->CFL; }
    double GetTimestep() { return timestep; }
@@ -182,16 +186,18 @@ public:
 
    void MakeTimeStep(Vector &S, const double & t, const double & dt, bool &isCollapsed);
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
+   void SolveHydro(const Vector &S, Vector &dS_dt) const;
+   void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
 
    void InitializeDijMatrix();
    void BuildDijMatrix(const Vector &S);
    void CalculateTimestep(const Vector &S);
 
-   void GetCellStateVector(const Vector &S, const int cell, Vector &U);
-   void SetCellStateVector(Vector &S_new, const int cell, const Vector &U);
+   void GetCellStateVector(const Vector &S, const int cell, Vector &U) const;
+   void SetCellStateVector(Vector &S_new, const int cell, const Vector &U) const;
 
    /* cij comp */
-   void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res);
+   void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const;
 
    /* System timing */
    StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin, chrono_hiop;
@@ -205,7 +211,7 @@ public:
    void SetMVIteration(const int num_iterations);
    void SetMMViscFace(const double mm_visc);
    void SetMMCell(const double mm_consistency);
-   void GetIntermediateFaceVelocity(const int & face, Vector & vel);
+   void GetIntermediateFaceVelocity(const int & face, Vector & vel) const;
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
    void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
@@ -220,14 +226,11 @@ public:
    void UpdateMesh(const Vector &S) const;
    
    // Face velocity functions
-   void ComputeIntermediateFaceVelocities(const Vector &S, 
-                                             const double t,
-                                             const string ="NA", 
-                                             void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
+   void ComputeIntermediateFaceVelocities(const Vector &S) const;
    void ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
    void ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt);
-   void FillFaceVelocitiesWithAvg(Vector &S, const string ="NA", void (*test_vel)(const Vector&, const double&, Vector&) = NULL);
-   void FillFaceVelocitiesWithButterfly(Vector &S);
+   void FillFaceVelocitiesWithAvg(ParGridFunction &dxdt) const;
+   void FillFaceVelocitiesWithButterfly(ParGridFunction &dxdt) const;
 
    // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);
@@ -243,8 +246,8 @@ public:
    bool IsMeshCollapsedGeom(const Vector &S);
 
    // Normal vector mesh motion
-   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
-   void ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l);
+   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
+   void ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l) const;
 
    // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)
    void ComputeGeoVNormalDistributedViscosity(Vector &S);

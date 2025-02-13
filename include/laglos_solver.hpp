@@ -182,9 +182,7 @@ public:
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
-   void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
    void SolveHydro(const Vector &S, Vector &dS_dt) const;
-   void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
 
    void InitializeDijMatrix();
    void BuildDijMatrix(const Vector &S);
@@ -200,6 +198,7 @@ public:
    StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin, chrono_hiop;
 
    /* Mesh movement */
+   void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
    void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);
    void SetMVLinOption(const bool & option) { this->do_mv_linearization = option; }
@@ -233,9 +232,6 @@ public:
    void SetCellCenterAsCenter(Vector &S);
    void FillCenterVelocitiesWithL2(Vector &S);
    void FillCenterVelocitiesWithAvg(Vector &S);
-
-   // Compute mesh velocities
-   void ComputeMeshVelocities(Vector &S, const Vector &S_old, const double &t, const double &dt);
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;

@@ -120,7 +120,6 @@ protected:
 
    bool use_viscosity;
    bool mm;
-   bool check_mesh;
    bool use_greedy_viscosity;
    bool post_process_density;
    int mv_option = 0;
@@ -172,7 +171,6 @@ public:
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
-   void SetMeshCheck(const bool _check_mesh) { this->check_mesh = _check_mesh; }
    void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
    void SetViscOption(const bool _use_greedy_viscosity) { this->use_greedy_viscosity = _use_greedy_viscosity; }
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
@@ -184,7 +182,6 @@ public:
 
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
-   void MakeTimeStep(Vector &S, const double & t, const double & dt, bool &isCollapsed);
    void ComputeStateUpdate(Vector &S_new, const double &t, const double dt);
    void SolveHydro(const Vector &S, Vector &dS_dt) const;
    void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
@@ -239,11 +236,6 @@ public:
 
    // Compute mesh velocities
    void ComputeMeshVelocities(Vector &S, const Vector &S_old, const double &t, const double &dt);
-
-   // Check Jacobians to ensure mesh hasn't collapsed
-   bool IsMeshCollapsed();
-   void ComputeMinDetJ(int &cell, double &minDetJ);
-   bool IsMeshCollapsedGeom(const Vector &S);
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
@@ -332,6 +324,11 @@ public:
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
+
+   // Compute various time series data
+   void ComputeMinDetJ(int &cell, double &minDetJ);
+   bool IsMeshCollapsedGeom(const Vector &S);
+   bool ComputeTimeSeriesData(const Vector &S, const double &t, const double &dt);
 
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);

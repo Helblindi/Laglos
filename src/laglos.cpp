@@ -815,7 +815,7 @@ int main(int argc, char *argv[]) {
 
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
-   
+
    // Change class variables into static std::functions since virtual static member functions are not an option
    // and Coefficient class requires std::function arguments
    using namespace std::placeholders;
@@ -885,7 +885,6 @@ int main(int argc, char *argv[]) {
    }
 
    hydro.SetProblem(problem);
-   hydro.SetMeshCheck(check_mesh);
    hydro.SetDensityPP(post_process_density);
    hydro.SetMVTargetViscCoeff(mv_target_visc_coeff);
    if (mv_n_iterations != 0)
@@ -1268,12 +1267,14 @@ int main(int argc, char *argv[]) {
          hydro.SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
       }
 
+      isCollapsed = hydro.ComputeTimeSeriesData(S,t,dt);
+
       MFEM_WARNING("Want adaptive time step control");
-      MFEM_WARNING("Need new call to check mesh");
 
       /* End iteration if the mesh has collapsed */
-      if (isCollapsed)
+      if (check_mesh && isCollapsed)
       {
+         cout << "\n\n!!!!!!!!!!!!!!! Mesh has collapsed. !!!!!!!!!!!!!!!\n\n";
          last_step = true;
       }
       

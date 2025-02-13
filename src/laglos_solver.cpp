@@ -1317,86 +1317,6 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
 }
 
 
-/****************************************************************************************************
-* Function: MakeTimeStep
-* Parameters:
-*     S  - BlockVector that stores mesh information, mesh velocity, and state variables.
-*     t  - Current time
-*     dt - Current timestep
-*
-* Purpose:
-*     This function first computes the new state variables at the (n+1)th timestep, then
-*     computes the mesh motion and moves the mesh accordingly.  Finally, we check mass
-*     conservation to ensure this is preserved locally.   
-****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::MakeTimeStep(Vector &S, const double & t, const double & dt, bool &isCollapsed)
-{
-   MFEM_ABORT("Function MakeTimeStep has been deprecated since LagrangianLOOperator is a TimeDependentOperator implementing the Mult() function.\n");
-   // cout << "========================================\n"
-   //      << "             MakeTimeStep               \n"
-   //      << "========================================\n";
-   ParGridFunction mv_gf;
-
-   // Get sv from current timestep before update
-   // This value is used to move the mesh and we want to ensure it remains unchanged.
-   const Vector S_old = S;
-
-   // Update state variables contained in S_new
-   ComputeStateUpdate(S, t, dt);
-
-   ComputeMeshVelocities(S, S_old, t, dt);
-
-   // Move the mesh
-   Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
-   MFEM_ABORT("Need to remove mv_gf implementation\n");
-   mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
-   add(x_gf, dt, mv_gf, x_gf);
-   UpdateMesh(S);
-   pmesh->NewNodes(x_gf, false);
-
-   /* Optionally post process the density to be mass conservative */
-   double pct_corrected = 0., rel_mass_corrected = 0.;
-   if (post_process_density)
-   {
-      SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
-      ts_ppd_pct_cells.Append(pct_corrected);
-      ts_ppd_rel_mag.Append(rel_mass_corrected);
-   }
-
-   /* Compute time series data */
-   ts_dijmax.Append(dij_sparse->MaxNorm());
-   ts_t.Append(t);
-   ts_timestep.Append(dt);
-   int minDetJCell;
-   double minDetJ;
-   ComputeMinDetJ(minDetJCell, minDetJ); // Alternative to IsMeshCollapsed()
-   ts_min_detJ.Append(minDetJ);
-   ts_min_detJ_cell.Append(minDetJCell);
-   if (pb->get_indicator() == "Kidder")
-   {
-      // Compute average exterior and interior radius
-      double avg_rad_int, avg_rad_ext;
-      ComputeKidderAvgIntExtRadii(S, avg_rad_int, avg_rad_ext);
-      ts_kidder_avg_rad_int.Append(avg_rad_int);
-      ts_kidder_avg_rad_ext.Append(avg_rad_ext);
-      double avg_density, avg_entropy;
-      ComputeKidderAvgDensityAndEntropy(S, avg_density, avg_entropy);
-      ts_kidder_avg_density.Append(avg_density);
-      ts_kidder_avg_entropy.Append(avg_entropy);
-   }
-
-   /*
-   If mesh has tangled, modify isCollapsed parameter to stop computation and print final data
-   */
-   if (check_mesh & (minDetJ < 0.))
-   {
-      isCollapsed = true;
-   }
-} 
-
-
 template<int dim>
 void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext)
 {
@@ -1731,49 +1651,6 @@ void LagrangianLOOperator<dim>::ComputeMeshVelocities(Vector &S, const Vector &S
 
 
 /****************************************************************************************************
-* Function: IsMeshCollapsed
-*
-* Purpose:
-*     Verify if the mesh has collapsed. If collapsed, return true.
-*     The Jacobian is checked at the following quadrature points:
-*        (.211, .211)
-*        (.789, .211)
-*        (.789, .789)
-*        (.211, .789)
-*     If the determinant of the Jacobian at any of the above points
-*     is negative, this means that our element transformation has 
-*     reversed orientation, or twisted, and thus the mesh has 
-*     collapsed.
-****************************************************************************************************/
-template<int dim>
-bool LagrangianLOOperator<dim>::IsMeshCollapsed()
-{
-   ElementTransformation * trans;
-
-   for (int el = 0; el < L2.GetNE(); el++)
-   {
-      trans = pmesh->GetElementTransformation(el);
-      /* Iterate over 4 integration points */
-      for (int i = 0; i < RT_ir.GetNPoints(); i++)
-      {
-         const IntegrationPoint &ip = RT_ir.IntPoint(i);
-         trans->SetIntPoint(&ip);
-         double detJ = trans->Weight();
-         if (detJ < 0.)
-         {
-            cout << "\t---Mesh collapsed---\n";
-            cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << endl;
-            cout << "Negative Jacobian at cell: " << el << " at ip: " << i << endl;
-            return true;
-         }
-      }
-   }
-
-   return false;
-}
-
-
-/****************************************************************************************************
 * Function: ComputeMinDetJ
 * Parameters:
 *  minDetJ - Minimum value for the determinant of the cell transformation over the mesh
@@ -1814,6 +1691,63 @@ void LagrangianLOOperator<dim>::ComputeMinDetJ(int &cell, double &minDetJ)
          }
       }
    }
+}
+
+
+/****************************************************************************************************
+* Function: ComputeTimeSeriesData
+* Parameters:
+*  t   - Current time
+*  dt  - Current timestep
+*
+* Purpose:
+*  This function computes various quantities that are saved at each time iteration
+*        ts_dijmax
+*        td_t
+*        td_timestep
+*        ts_min_detJ
+*        ts_min_detJ_cell
+*        ts_kidder_avg_rad_int
+*        ts_kidder_avg_rad_ext
+*        ts_kidder_avg_rad_density
+*        ts_kidder_avg_rad_entropy
+*
+*  In addition, if ts_min_detJ which is calculated in the routine ComputeMinDetJ returns negative,
+*  this function returns true to indicate that the mesh has collapsed.
+****************************************************************************************************/
+template<int dim>
+bool LagrangianLOOperator<dim>::ComputeTimeSeriesData(const Vector & S, const double &t, const double &dt)
+{
+   ts_dijmax.Append(dij_sparse->MaxNorm());
+   ts_t.Append(t);
+   ts_timestep.Append(dt);
+   int minDetJCell;
+   double minDetJ;
+   ComputeMinDetJ(minDetJCell, minDetJ); 
+   ts_min_detJ.Append(minDetJ);
+   ts_min_detJ_cell.Append(minDetJCell);
+   if (pb->get_indicator() == "Kidder")
+   {
+      // Compute average exterior and interior radius
+      double avg_rad_int, avg_rad_ext;
+      ComputeKidderAvgIntExtRadii(S, avg_rad_int, avg_rad_ext);
+      ts_kidder_avg_rad_int.Append(avg_rad_int);
+      ts_kidder_avg_rad_ext.Append(avg_rad_ext);
+      double avg_density, avg_entropy;
+      ComputeKidderAvgDensityAndEntropy(S, avg_density, avg_entropy);
+      ts_kidder_avg_density.Append(avg_density);
+      ts_kidder_avg_entropy.Append(avg_entropy);
+   }
+
+   /*
+   If mesh has tangled, modify isCollapsed parameter to stop computation and print final data
+   */
+   if (minDetJ < 0.)
+   {
+      return true;
+   }
+
+   return false;
 }
 
 /****************************************************************************************************
@@ -2537,6 +2471,10 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
 
    // Set pct corrected to be appended to timeseries data
    pct_corrected = double(num_corrected_cells)/NDofs_L2;
+
+   /* Append onto timeseries data */
+   ts_ppd_pct_cells.Append(pct_corrected);
+   ts_ppd_rel_mag.Append(rel_mass_corrected);
 }
 
 

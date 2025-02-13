@@ -293,7 +293,7 @@ void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
 template<int dim>
 void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 {
-   // chrono_state.Start();
+   chrono_state.Start();
 
    Vector rhs(dim+2), c(dim), n_int(dim), U_i(dim+2), U_j(dim+2);
    Array<int> fids, oris; 
@@ -630,7 +630,7 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
       // In either case, update dS_dt
       SetCellStateVector(dS_dt, ci, rhs);
    } // End cell iterator
-   // chrono_state.Stop();
+   chrono_state.Stop();
 }
 
 
@@ -640,10 +640,10 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 template<int dim>
 void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
 {
-   // MFEM_ABORT("Need to implement\n");
    // cout << "========================================\n"
    //      << "          SolveMeshVelocities           \n"
    //      << "========================================\n";
+   chrono_mm.Start();
    ParGridFunction dxdt_gf, dxdt_gf_l(&H1_L);
    Vector* dsptr = const_cast<Vector*>(&dS_dt);
    dxdt_gf.MakeRef(&H1, *dsptr, block_offsets[0]);
@@ -872,6 +872,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          break;
       } // End face velocity switch case
    }
+   chrono_mm.Stop();
 }
 
 /****************************************************************************************************

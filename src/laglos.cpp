@@ -1219,13 +1219,14 @@ int main(int argc, char *argv[]) {
    bool isCollapsed = false;
    for (; !last_step; ti++)
    {
-      hydro.chrono_dij.Start();
       /* Optionally enable greedy viscosity */
       if (gmv_to_greedy_steps == ti && greedy)
       {
          hydro.SetViscOption(greedy);
       }
+      hydro.chrono_dij.Start();
       hydro.BuildDijMatrix(S);
+      hydro.chrono_dij.Stop();
       /* Check if we need to change CFL */
       if (problem_class->get_cfl_change() && t > problem_class->get_cfl_time_change() && hydro.GetCFL() != problem_class->get_cfl_second())
       {
@@ -1239,7 +1240,6 @@ int main(int argc, char *argv[]) {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
       }
-      hydro.chrono_dij.Stop();
 
       if (t + dt >= t_final)
       {

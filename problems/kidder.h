@@ -3,7 +3,7 @@
 * Steps to implement a problem:
 *  1) Copy this file and rename in $PROJECT_SRC/include/ to 
 *     correspond to your problem
-*  2) Modify problem specific constants a, b, this->get_gamma()
+*  2) Modify problem specific constants a, b, gamma
 *  3) Override pressure function
 *  4) Specify initial conditions given by rho0, v0, and sie0
 *  5) Add corresponding problem option to laglos.cpp
@@ -12,11 +12,19 @@
 *     a) This may require edits to the following functions 
 *        depending on the type of BCs that will be 
 *        implemented
-*        - CreateBdrElementIndexingArray()
-*        - CreateBdrVertexIndexingArray()
-*        - FillCellBdrFlag()
-*        - ComputeStateUpdate()
-*        - EnforceMVBoundaryConditions()
+*        - LagrangianLOOperator::CreateBdrElementIndexingArray()
+*        - LagrangianLOOperator::CreateBdrVertexIndexingArray()
+*        - LagrangianLOOperator::FillCellBdrFlag()
+*        - LagrangianLOOperator::UpdateMeshVelocityBCs()
+*        - LagrangianLOOperator::EnforceL2BC()
+*        - ProblemBase::get_mv_bcs_need_updating()
+*        - ProblemBase::update_additional_BCs()
+*     b) To note about boundary conditions in the mesh file:
+*        1: vx = 0
+*        2: vy = 0
+*        3: vz = 0
+*        4: vr = 0 (radial boundary condition)
+*        5: Misc (possibly dirichlet condition)
 *  8) Edit SaveStateVecsToFile if the problem is a radial one.
 *********************************************************/
 

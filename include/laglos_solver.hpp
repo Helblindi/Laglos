@@ -317,7 +317,6 @@ public:
    // Enforce Boundary Conditions
    void EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                              const double &dt, Vector & state_val);
-   void EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt);
 
    // Enforce Mass Conservation
    void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);

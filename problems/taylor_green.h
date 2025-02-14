@@ -12,11 +12,19 @@
 *     a) This may require edits to the following functions 
 *        depending on the type of BCs that will be 
 *        implemented
-*        - CreateBdrElementIndexingArray()
-*        - CreateBdrVertexIndexingArray()
-*        - FillCellBdrFlag()
-*        - ComputeStateUpdate()
-*        - EnforceMVBoundaryConditions()
+*        - LagrangianLOOperator::CreateBdrElementIndexingArray()
+*        - LagrangianLOOperator::CreateBdrVertexIndexingArray()
+*        - LagrangianLOOperator::FillCellBdrFlag()
+*        - LagrangianLOOperator::UpdateMeshVelocityBCs()
+*        - LagrangianLOOperator::EnforceL2BC()
+*        - ProblemBase::get_mv_bcs_need_updating()
+*        - ProblemBase::update_additional_BCs()
+*     b) To note about boundary conditions in the mesh file:
+*        1: vx = 0
+*        2: vy = 0
+*        3: vz = 0
+*        4: vr = 0 (radial boundary condition)
+*        5: Misc (possibly dirichlet condition)
 *  8) Edit SaveStateVecsToFile if the problem is a radial one.
 *********************************************************/
 

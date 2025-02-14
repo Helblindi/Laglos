@@ -39,8 +39,8 @@
 * ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4           ## Sod Radial
 * ./Laglos -m data/square-vortex.mesh -p 5 -tf 10 -cfl 0.5 -rs 3           ## Isentropic Vortex
 * ./Laglos -m data/noh-nonuniform.mesh -p 4 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
-* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.25 -rs 6         ## Noh
-* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 0.1 -rs 5          ## Sedov
+* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.5 -rs 6          ## Noh
+* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 1 -rs 5            ## Sedov
 * ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
 * ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder shell
 * ----- Fails -----

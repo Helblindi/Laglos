@@ -45,9 +45,11 @@ private:
    const double r1 = 0.9, r2 = 1.0, rho1 = 1., rho2 = 2., s = 1.;
    const double P1 = pow(rho1, _gamma), P2 = pow(rho2, _gamma);
    const double tau;
+   double t_exact;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
    bool _bcs = false; // Indicator for boundary conditions
+   bool _mv_bcs_need_updating = true;
    string _indicator = "Kidder"; // Possible: saltzmann
 
    /* Initialize focusing time */
@@ -64,7 +66,7 @@ private:
    }
 
 public:
-   KidderProblem() : tau(compute_focusing_time())
+   KidderProblem() : tau(compute_focusing_time()), t_exact(0.)
    {
       cout << "rho1: " << rho1 << endl;
       cout << "rho2: " << rho2 << endl;
@@ -78,6 +80,7 @@ public:
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
+      this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
    }
@@ -168,9 +171,15 @@ public:
       return t / pow(tau, 2) / h(t);     
    }
 
-   void GetBoundaryState(const Vector &x, const double &t, const int &bdr_attr, Vector &state) override
+   void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t) override
    { 
-      // cout << "Kidder::GetBoundaryState\n";
+      double _t = 0.;
+      if (t == 0.) {
+         _t = t_exact;
+      } else {
+         _t = t;
+      }
+
       state.SetSize(dim + 2);
       state = 0.;
 
@@ -179,8 +188,8 @@ public:
       vel = x;
       vel *= -1.;
       vel /= norm_x;
-      double _dhdt = dhdt(t);
-      double hmult = pow(h(t), 2. * this->get_gamma() / (1. - this->get_gamma()));
+      double _dhdt = dhdt(_t);
+      double hmult = pow(h(_t), 2. * this->get_gamma() / (1. - this->get_gamma()));
       double P1t = P1 * hmult;
       double P2t = P2 * hmult;
       double rho1t = rho1 * hmult;
@@ -222,7 +231,11 @@ public:
    }
 
    void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override { }
-   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override { }
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override
+   {
+      // Need to update the current time since the function in LaglosSolver that calls GetBoundaryState does not have access to the current time
+      t_exact = t;
+   }
 }; // End class
 
 } // ns hydrodynamics

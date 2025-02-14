@@ -95,7 +95,7 @@ public:
    virtual void update(Vector vec, double t = 0.) {}
    virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
    virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
-   virtual void GetBoundaryState(const Vector &x, const double &t, const int &bdr_attr, Vector &state) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
+   virtual void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t=0.) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
 
    /* ProblemDescription */
    static double internal_energy(const Vector &U)

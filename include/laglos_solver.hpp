@@ -97,6 +97,9 @@ protected:
    const HYPRE_Int GTVSize_L2V;
    const int NDofs_L2V;
 
+   // Mesh information
+   const int NE, NBE;
+
    IntegrationRule RT_ir;
    const int RT_ir_order = 2;
 
@@ -116,7 +119,7 @@ protected:
 
    double CFL;
    double timestep = 0.001;
-   double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
+   mutable double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
 
    bool use_viscosity;
    bool mm;
@@ -139,9 +142,9 @@ protected:
 
    int ess_tdofs_cart_size;
    Array<int> ess_bdr, dofs_list, ess_tdofs;
-   Array<double> bdr_vals;
+   mutable Array<double> bdr_vals;
    Array<int> add_ess_tdofs;
-   Array<double> add_bdr_vals;
+   mutable Array<double> add_bdr_vals;
 
    /* Time series data */
    Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
@@ -167,7 +170,7 @@ public:
    virtual void Mult(const Vector &S, Vector &dS_dt) const;
 
    double GetCFL() { return this->CFL; }
-   double GetTimestep() { return timestep; }
+   double GetTimestep() const { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
@@ -183,6 +186,7 @@ public:
    bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
 
    void SolveHydro(const Vector &S, Vector &dS_dt) const;
+   void EnforceL2BC(Vector &S, const double &t, const double &dt);
 
    void InitializeDijMatrix();
    void BuildDijMatrix(const Vector &S);
@@ -198,6 +202,7 @@ public:
    mutable StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin, chrono_hiop;
 
    /* Mesh movement */
+   void UpdateMeshVelocityBCs(const double &t, const double &dt);
    void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
    void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);

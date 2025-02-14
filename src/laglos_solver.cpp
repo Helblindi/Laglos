@@ -130,6 +130,8 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    TVSize_L2V(L2V.TrueVSize()),
    GTVSize_L2V(L2V.GlobalTrueVSize()),
    NDofs_L2V(L2V.GetNDofs()),
+   NE(pmesh->GetNE()),
+   NBE(pmesh->GetNBE()),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
    num_elements(L2.GetNE()),
@@ -476,7 +478,12 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   H1.GetFaceDofs(fids[j], face_dofs);
                   int face_dof = face_dofs[2];
                   geom.GetNodePositionFromBV(S,face_dof, face_x);
-                  pb->GetBoundaryState(face_x, t, bdr_attribute, U_i_bdry);
+                  /* 
+                  Need boundary state for Kidder
+                  Note that t should have been set using update_additional_BCs
+                  */
+                  pb->GetBoundaryState(face_x, bdr_attribute, U_i_bdry);
+                  // MFEM_ABORT("Need to replace 't'\n");
 
                   /* 
                   * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
@@ -519,113 +526,13 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 
       } // End Face iterator
 
-      // Enforce exact condition on boundary for Isentropic Vortex
-      // if ((pb->get_indicator() == "KidderBall" || pb->get_indicator() == "IsentropicVortex") && is_boundary_cell)
-      if (pb->get_indicator() == "IsentropicVortex" && is_boundary_cell)
-      {  
-         // EnforceExactBCOnCell(S, ci, t, dt, val);
-         MFEM_ABORT("Must add a postprocessing step to strongly enforce BC in the case of isentropic vortex.\n");
-      }
-      else
-      {
-         /* 
-         Compute current mass, rather than assume mass is conserved
-         In several methods we've attempted, mass has not been conserved
-         */
-         double k = pmesh->GetElementVolume(ci);
-         double _mass = k / U_i[0];
-         rhs /= _mass;
-      }
-      
-      if (pb->has_boundary_conditions())
-      {
-         /* Iterate over cell boundaries, i.e. corner cells could have multiple bc flags */
-         // Post processing modify computed values to enforce BCs
-         if (is_boundary_cell)
-         {
-            for (int cell_bdr_it=0; cell_bdr_it < cell_bdr_arr.Size(); cell_bdr_it++)
-            {
-               int cell_bdr = cell_bdr_arr[cell_bdr_it];
-               Array<int> tmp_dofs(2);
-               tmp_dofs[0] = 1, tmp_dofs[1]=2;
-               Vector tmp_vel(dim), normal(dim);
-               normal = 0.;
-               rhs.GetSubVector(tmp_dofs, tmp_vel);
-
-               if (pb->get_indicator() == "saltzmann")
-               {
-                  if (cell_bdr == 1)
-                  {
-                     // Vx = 0
-                     tmp_vel[0] = 0.;
-                  }
-                  else if (cell_bdr == 2)
-                  {
-                     // Vy = 0
-                     tmp_vel[1] = 0.;
-                  }
-
-                  if (cell_bdr == 5)
-                  {
-                     // left
-                     tmp_vel = 0.;
-                     /* Ramping up to ex */
-                     // if (timestep_first == 0.)
-                     // {
-                     //    timestep_first = timestep;
-                     // }
-                     // double _xi = t / (2*timestep_first);
-                     // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-                     // tmp_vel[0] = 1. * _psi;
-                     tmp_vel[0] = 1.;
-                  }
-
-                  rhs.SetSubVector(tmp_dofs, tmp_vel);
-               }
-               else if (pb->get_indicator() == "Sod" ||
-                        pb->get_indicator() == "TriplePoint" || 
-                        pb->get_indicator() == "riemann" ||
-                        pb->get_indicator() == "SodRadial" ||
-                        pb->get_indicator() == "Sedov" || 
-                        pb->get_indicator() == "TestBCs" ||
-                        pb->get_indicator() == "Vdw1" ||
-                        pb->get_indicator() == "Vdw2" ||
-                        pb->get_indicator() == "Vdw3" ||
-                        pb->get_indicator() == "Vdw4" ||
-                        pb->get_indicator() == "TaylorGreen")
-               {
-                  switch (cell_bdr)
-                  {
-                  case 1: // Vx = 0
-                  {
-                     tmp_vel[0] = 0.;
-                     break;
-                  }
-                  case 2: // Vy = 0
-                  {
-                     tmp_vel[1] = 0.;
-                     break;
-                  }
-                  case 3: // Vz = 0
-                  {
-                     MFEM_ABORT("3D not implemented\n");
-                  }
-                  case 4: // should only be in sod radial and sedov problems, radial mesh boundary
-                  {
-                     assert(pb->get_indicator() == "SodRadial" || pb->get_indicator() == "Sedov");
-                     break;
-                  }
-                  default:
-                  {
-                     MFEM_ABORT("Invalid boundary attribute\n");
-                  }
-                  }
-                  rhs.SetSubVector(tmp_dofs, tmp_vel);
-               }
-            } // End post processing BC application
-         
-         } // End is_bdry_cell
-      } // End pb->has_boundary_conditions()
+      /* 
+      Compute current mass, rather than assume mass is conserved
+      In several methods we've attempted, mass has not been conserved
+      */
+      double k = pmesh->GetElementVolume(ci);
+      double _mass = k / U_i[0];
+      rhs /= _mass;
 
       // In either case, update dS_dt
       SetCellStateVector(dS_dt, ci, rhs);
@@ -634,9 +541,128 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 }
 
 
-/* 
-* this function should modify dxdt 
-*/
+/**
+ * @brief Enforces L2 boundary conditions on the state vector.
+ *
+ * This function modifies the state vector to enforce boundary conditions on the velocity components.
+ * It iterates over all boundary elements and applies the appropriate boundary conditions based on
+ * the boundary attribute.
+ *
+ * @tparam dim The dimension of the problem (1, 2, or 3).
+ * @param S The state vector to be modified.
+ * @param t The current time.
+ * @param dt The time step.
+ *
+ * @note This function should be run after the LagrangianLOOperator::Mult` function.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const double &dt)
+{
+   int el, info;
+   Array<int> vel_dofs(2);
+   vel_dofs[0] = 1, vel_dofs[1]=2;
+   Vector vel(dim), Ui(dim+2);
+
+   // Post processing modify computed values to enforce BCs
+   if (pb->has_boundary_conditions())
+   {
+      for (int bdr_ci = 0; bdr_ci < NBE; bdr_ci++)
+      {
+         /* Get bdr attr and adjacent cell to enforce conditions on */
+         int bdr_attr = pmesh->GetBdrAttribute(bdr_ci);
+         pmesh->GetBdrElementAdjacentElement(bdr_ci, el, info);
+
+         // cout << "bdr el " << bdr_ci << " has attr " << bdr_attr << " and adj cell " << el << endl;
+         GetCellStateVector(S, el, Ui);
+         
+         Ui.GetSubVector(vel_dofs, vel);
+
+         switch (bdr_attr)
+         {
+         case 1: // Vx = 0
+            vel[0] = 0.;
+            break;
+         case 2: // Vy = 0
+            vel[1] = 0.;
+            break;
+         case 3: // Vz = 0
+            vel[2] = 0.;
+            MFEM_ABORT("3D not implemented.\n");
+            break;
+         case 4: // Radial mesh boundary
+            assert(pb->get_indicator() == "SodRadial" || pb->get_indicator() == "Sedov");
+            MFEM_WARNING("Radial mesh boundary attributes not implemented.\n");
+            break;
+         default: // All other cases
+         {
+            if (pb->get_indicator() == "saltzmann")
+            {
+               if (bdr_attr == 5)
+               {
+                  // left
+                  double _psi = bdr_vals.Last();
+                  vel[0] = 1. * _psi;
+               }
+               else { MFEM_ABORT("Invalid boundary attribute provided.\n"); }
+            }
+            else if (pb->get_indicator() == "IsentropicVortex")
+            {
+               if (bdr_attr == 5) { EnforceExactBCOnCell(S, el, t, dt, Ui); }
+               else { MFEM_ABORT("Invalid boundary attribute provided.\n"); }
+            }
+            break;
+         } // end default
+         } // end switch(bdr_attr)
+
+         Ui.SetSubVector(vel_dofs, vel);
+         SetCellStateVector(S, el, Ui);
+      }
+   } // End pb->has_boundary_conditions()
+}
+
+
+/**
+ * @brief Updates the mesh velocity boundary conditions.
+ *
+ * This function updates the boundary conditions for the mesh velocity based on the current time and time step.
+ * It checks if the boundary conditions need updating and, if so, resets the additional boundary conditions
+ * from the previous iteration and updates them for the current time step.
+ *
+ * @tparam dim The dimension of the problem (1, 2, or 3).
+ * @param t The current time.
+ * @param dt The time step.
+ *
+ * @note This function should be run before the `ODESolver::Step` function.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::UpdateMeshVelocityBCs(const double &t, const double &dt)
+{
+   if (pb->get_mv_bcs_need_updating())
+   {
+      if (timestep_first == 0.)
+      {
+         timestep_first = GetTimestep();
+      }
+
+      /* Reset additional boundary conditions from previous iteration */
+      bdr_vals.SetSize(ess_tdofs_cart_size);
+      pb->update_additional_BCs(t, timestep_first, add_bdr_vals, geom, x_gf);
+      bdr_vals.Append(add_bdr_vals);
+   }
+}
+
+
+
+/**
+ * @brief Solves for the mesh velocities.
+ *
+ * This function computes the mesh velocities based on the current state vector. It handles both 1D and higher dimensions,
+ * applying different methods for computing the mesh velocities depending on the specified options.
+ *
+ * @tparam dim The dimension of the problem (1, 2, or 3).
+ * @param S The input state vector.
+ * @param dS_dt The output time derivative of the state vector.
+ */
 template<int dim>
 void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
 {
@@ -645,23 +671,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
    //      << "========================================\n";
    chrono_mm.Start();
    ParGridFunction dxdt_gf, dxdt_gf_l(&H1_L);
-   Vector* dsptr = const_cast<Vector*>(&dS_dt);
-   dxdt_gf.MakeRef(&H1, *dsptr, block_offsets[0]);
-
-   if (pb->get_mv_bcs_need_updating())
-   {
-      MFEM_ABORT("Need to modify how mv bcs are handled")
-      MFEM_ABORT("Need to update how saltzman first timestep is updated, cannot be here.\n");
-      // if (timestep_first == 0.)
-      // {
-      //    timestep_first = dt;
-      // }
-      // bdr_vals.GetSubArray(ess_tdofs_cart_size, add_bdr_vals.Size(), mutable_bdr_vals);
-      /// TODO: Too bad there isn't a method to get a reference to a sub array or to set a sub array.
-      // bdr_vals.SetSize(ess_tdofs_cart_size);
-      // pb->update_additional_BCs(t, timestep_first, add_bdr_vals, geom, x_gf);
-      // bdr_vals.Append(add_bdr_vals);
-   }
+   dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
 
    ComputeIntermediateFaceVelocities(S);
 
@@ -834,7 +844,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          /* Optionally, Linearize velocity */
          if (this->do_mv_linearization)
          {
-            MFEM_ABORT("CMesh velocity linearization is not currently available\n");
+            MFEM_ABORT("Mesh velocity linearization is not currently available\n");
             // ParGridFunction dxdt_gf_l_linearized(&H1_L);
             // ComputeLinearizedNodeVelocities(dxdt_gf_l, dxdt_gf_l_linearized, t, dt);
             // mv_gf_l = mv_gf_l_linearized;
@@ -843,7 +853,10 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          /* Optionally, enforce boundary conditions */
          if (pb->has_boundary_conditions())
          {
-            for (int i = 0; i < ess_tdofs.Size(); i++) { dxdt_gf_l(ess_tdofs[i]) = bdr_vals[i]; }
+            for (int i = 0; i < ess_tdofs.Size(); i++) { 
+               // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
+               dxdt_gf_l(ess_tdofs[i]) = bdr_vals[i]; 
+            }
             // EnforceMVBoundaryConditions(S,t,dt);
          }
       }
@@ -1640,154 +1653,153 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
 *
 *  Note that this function assumes dim > 1.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt)
-{
-   // cout << "========================================\n"
-   //      << "     EnforcingMVBoundaryConditions      \n"
-   //      << "========================================\n";
-   assert(dim > 1);
+// template<int dim>
+// void LagrangianLOOperator<dim>::EnforceMVBoundaryConditions(Vector &S, const double &t, const double &dt)
+// {
+//    // cout << "========================================\n"
+//    //      << "     EnforcingMVBoundaryConditions      \n"
+//    //      << "========================================\n";
+//    assert(dim > 1);
 
-   if (pb->get_indicator() == "Sod" ||
-      pb->get_indicator() == "TriplePoint" ||
-      pb->get_indicator() == "riemann" ||
-      pb->get_indicator() == "Sedov" ||
-      pb->get_indicator() == "SodRadial" || 
-      pb->get_indicator() == "TestBCs" ||
-      pb->get_indicator() == "Vdw1" ||
-      pb->get_indicator() == "Vdw2" ||
-      pb->get_indicator() == "Vdw3" ||
-      pb->get_indicator() == "Vdw4" ||
-      pb->get_indicator() == "TaylorGreen")
-   {
-      int bdr_ind = 0;
-      Vector node_v(dim);
+//    if (pb->get_indicator() == "Sod" ||
+//       pb->get_indicator() == "TriplePoint" ||
+//       pb->get_indicator() == "riemann" ||
+//       pb->get_indicator() == "Sedov" ||
+//       pb->get_indicator() == "SodRadial" || 
+//       pb->get_indicator() == "TestBCs" ||
+//       pb->get_indicator() == "Vdw1" ||
+//       pb->get_indicator() == "Vdw2" ||
+//       pb->get_indicator() == "Vdw3" ||
+//       pb->get_indicator() == "Vdw4" ||
+//       pb->get_indicator() == "TaylorGreen")
+//    {
+//       int bdr_ind = 0;
+//       Vector node_v(dim);
       
-      for (int i = 0; i < NVDofs_H1; i++)
-      {
-         // cout << "enforcing MV BCs on vertex: " << i << endl;
-         bdr_ind = BdrVertexIndexingArray[i];
-         /* Correct node velocity accordingly */
-         geom.GetNodeVelocity(S, i, node_v);
+//       for (int i = 0; i < NVDofs_H1; i++)
+//       {
+//          // cout << "enforcing MV BCs on vertex: " << i << endl;
+//          bdr_ind = BdrVertexIndexingArray[i];
+//          /* Correct node velocity accordingly */
+//          geom.GetNodeVelocity(S, i, node_v);
 
-         switch (bdr_ind)
-         {
-         case 1: // Vx = 0
-            node_v[0] = 0.;
-            break;
+//          switch (bdr_ind)
+//          {
+//          case 1: // Vx = 0
+//             node_v[0] = 0.;
+//             break;
          
-         case 2: // Vy = 0
-            node_v[1] = 0.;
-            break;
+//          case 2: // Vy = 0
+//             node_v[1] = 0.;
+//             break;
 
-         case 5:
-            node_v = 0.;
-            geom.UpdateNodeVelocity(S, i, node_v);
-            MFEM_ABORT("We need to fix this implementation if this function to enforce BCs is to stay relevant.\n");
-            continue;
+//          case 5:
+//             node_v = 0.;
+//             geom.UpdateNodeVelocity(S, i, node_v);
+//             MFEM_ABORT("We need to fix this implementation if this function to enforce BCs is to stay relevant.\n");
+//             continue;
          
-         case -1:
-            // Not a boundary vertex
-            continue;
+//          case -1:
+//             // Not a boundary vertex
+//             continue;
 
-         default:
-            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
-            break;
-         }
+//          default:
+//             MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+//             break;
+//          }
 
-         if (bdr_ind == -1) 
-         {
-            MFEM_ABORT("Dont correct interior vertices.\n");
-         }
-         geom.UpdateNodeVelocity(S, i, node_v);
-      }
-   }
-   else if (pb->get_indicator() == "saltzmann")
-   {
-      // Enforce
-      // Vector* sptr = const_cast<Vector*>(&S);
-      // ParGridFunction mv_gf;
-      // MFEM_ABORT("Need to remove mv_gf implementation\n");
-      // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+//          if (bdr_ind == -1) 
+//          {
+//             MFEM_ABORT("Dont correct interior vertices.\n");
+//          }
+//          geom.UpdateNodeVelocity(S, i, node_v);
+//       }
+//    }
+//    else if (pb->get_indicator() == "saltzmann")
+//    {
+//       // Enforce
+//       // Vector* sptr = const_cast<Vector*>(&S);
+//       // ParGridFunction mv_gf;
+//       // MFEM_ABORT("Need to remove mv_gf implementation\n");
+//       // mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
-      Vector ex(dim);
-      ex = 0.;
-      /* Ramping up to ex */
-      // if (timestep_first == 0.)
-      // {
-      //    timestep_first = timestep;
-      // }
-      // double _xi = t / (2*timestep_first);
-      // double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
-      // ex[0] = 1. * _psi;
-      ex[0] = 1.;
+//       Vector ex(dim);
+//       ex = 0.;
+//       /* Ramping up to ex */
+//       if (timestep_first == 0.)
+//       {
+//          timestep_first = timestep;
+//       }
+//       double _xi = t / (2*timestep_first);
+//       double _psi = (4 - (_xi + 1) * (_xi - 2) * ((_xi - 2) - (abs(_xi-2) + (_xi-2)) / 2)) / 4.;
+//       ex[0] = 1. * _psi;
 
-      // VectorConstantCoefficient left_wall_coeff(ex);
-      // Array<int> left_wall_attr(1);
-      // left_wall_attr[0] = 1;
+//       // VectorConstantCoefficient left_wall_coeff(ex);
+//       // Array<int> left_wall_attr(1);
+//       // left_wall_attr[0] = 1;
 
-      // mv_gf.ProjectBdrCoefficient(left_wall_coeff, left_wall_attr);
+//       // mv_gf.ProjectBdrCoefficient(left_wall_coeff, left_wall_attr);
 
-      /* Enforce v.n=0 on rest of boundary */
-      int bdr_ind = 0;
-      Vector normal(dim), node_v(dim);
-      for (int i = 0; i < NVDofs_H1; i++)
-      {
-         bdr_ind = BdrVertexIndexingArray[i];
-         /* Correct node velocity accordingly */
-         geom.GetNodeVelocity(S, i, node_v);
+//       /* Enforce v.n=0 on rest of boundary */
+//       int bdr_ind = 0;
+//       Vector normal(dim), node_v(dim);
+//       for (int i = 0; i < NVDofs_H1; i++)
+//       {
+//          bdr_ind = BdrVertexIndexingArray[i];
+//          /* Correct node velocity accordingly */
+//          geom.GetNodeVelocity(S, i, node_v);
 
-         /* Get corresponding normal vector */
-         switch (bdr_ind)
-         {
-         case 4: // left
-            geom.UpdateNodeVelocity(S,i,ex);
-            continue;
+//          /* Get corresponding normal vector */
+//          switch (bdr_ind)
+//          {
+//          case 4: // left
+//             geom.UpdateNodeVelocity(S,i,ex);
+//             continue;
          
-         case 1: // Vx = 0
-            node_v[0] = 0.;
-            break;
+//          case 1: // Vx = 0
+//             node_v[0] = 0.;
+//             break;
          
-         case 2: // Vy = 0
-            node_v[1] = 0.;
-            break;
+//          case 2: // Vy = 0
+//             node_v[1] = 0.;
+//             break;
          
-         case -1:
-            // Not a boundary vertex
-            continue;
+//          case -1:
+//             // Not a boundary vertex
+//             continue;
 
-         default:
-            MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
-            break;
-         }
+//          default:
+//             MFEM_ABORT("Incorrect bdr attribute encountered while enforcing mesh velocity BCs.\n");
+//             break;
+//          }
 
-         if (bdr_ind == -1) 
-         {
-            MFEM_ABORT("Dont correct interior vertices.\n");
-         }
-         else if (bdr_ind == 4)
-         {
-            MFEM_ABORT("Left wall BCs already handled.\n");
-         }
+//          if (bdr_ind == -1) 
+//          {
+//             MFEM_ABORT("Dont correct interior vertices.\n");
+//          }
+//          else if (bdr_ind == 4)
+//          {
+//             MFEM_ABORT("Left wall BCs already handled.\n");
+//          }
 
-         geom.UpdateNodeVelocity(S, i, node_v);
-      }
-   }
-   else if (pb->get_indicator() == "IsentropicVortex")
-   {
-      // Boundary vertices should not move at all
-      Vector* sptr = const_cast<Vector*>(&S);
-      ParGridFunction mv_gf;
-      MFEM_ABORT("Need to remove mv_gf implementation\n");
-      mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
+//          geom.UpdateNodeVelocity(S, i, node_v);
+//       }
+//    }
+//    else if (pb->get_indicator() == "IsentropicVortex")
+//    {
+//       // Boundary vertices should not move at all
+//       Vector* sptr = const_cast<Vector*>(&S);
+//       ParGridFunction mv_gf;
+//       MFEM_ABORT("Need to remove mv_gf implementation\n");
+//       mv_gf.MakeRef(&H1, *sptr, block_offsets[1]);
 
-      Vector zero(dim);
-      zero = 0.;
-      VectorConstantCoefficient zero_coeff(zero);
+//       Vector zero(dim);
+//       zero = 0.;
+//       VectorConstantCoefficient zero_coeff(zero);
 
-      mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
-   }
-}
+//       mv_gf.ProjectBdrCoefficient(zero_coeff, pmesh->bdr_attributes);
+//    }
+// }
 
 
 /****************************************************************************************************
@@ -1823,21 +1835,13 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
       const double sv_new_mc = k_new / m;
 
       // If needed, replace sv with mass conservative sv
-      if (pb->get_indicator() == "IsentropicVortex" && cell_bdr_flag_gf[cell_it] != -1)
+      double val = abs(sv_new - sv_new_mc);
+      if (val > 1.E-12)
       {
-         // Don't postprocess sv on boundary cells in the case of the isentropic vortex problem
-         continue;
+         num_corrected_cells += 1;
+         sv_gf.Elem(cell_it) = sv_new_mc;
+         rel_mass_corrected += val / sv_new_mc;
       }
-      else {
-         double val = abs(sv_new - sv_new_mc);
-         if (val > 1.E-12)
-         {
-            num_corrected_cells += 1;
-            sv_gf.Elem(cell_it) = sv_new_mc;
-            rel_mass_corrected += val / sv_new_mc;
-         }
-      }
-      
    }
 
    // Set pct corrected to be appended to timeseries data

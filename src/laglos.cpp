@@ -1250,10 +1250,10 @@ int main(int argc, char *argv[]) {
       if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
-      
+      hydro.UpdateMeshVelocityBCs(t,dt);
       ode_solver->Step(S, t, dt);
+      hydro.EnforceL2BC(S, t, dt);
       steps++;
-      cout << "dt: " << dt << endl;
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -1269,7 +1269,7 @@ int main(int argc, char *argv[]) {
 
       isCollapsed = hydro.ComputeTimeSeriesData(S,t,dt);
 
-      MFEM_WARNING("Want adaptive time step control");
+      // MFEM_WARNING("Want adaptive time step control");
 
       /* End iteration if the mesh has collapsed */
       if (check_mesh && isCollapsed)

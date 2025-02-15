@@ -23,6 +23,8 @@ if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 endif ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
 project(Laglos LANGUAGES C CXX Fortran)
+set(${PROJECT_NAME}_VERSION 1.0)
+string(TOUPPER "${PROJECT_NAME}" PROJECT_NAME_UC)
 
 # Import MFEM. The following variables can be used to help CMake find MFEM:
 #  * MFEM_DIR - absolute path to the MFEM build or install prefix.
@@ -46,6 +48,11 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+# CMake needs to know where to find things
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMake)
+
+# Load Laglos CMake utilities
+include(LaglosCmakeUtilities)
 
 #
 # Start finding everything
@@ -54,7 +61,6 @@ set(_laglos_compile_defs)
 set(_laglos_compile_opts)
 set(_laglos_include_dirs)
 set(_laglos_libraries)
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMake)
 
 
 # if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
@@ -72,9 +78,6 @@ if (LAGLOS_USE_HIOP)
 endif()
 
 message(STATUS "Laglos build type: CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
-# message(STATUS "GLVis opts: ${_glvis_compile_opts}")
-# message(STATUS "GLVis include dirs: ${_glvis_include_dirs}")
-# message(STATUS "GLVis libraries: ${_glvis_libraries}")
 message(STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}")
 
 # Boost required for filesystem modification
@@ -87,18 +90,120 @@ find_package(Boost REQUIRED COMPONENTS filesystem)
 # https://stackoverflow.com/questions/9235679/create-a-directory-if-it-doesnt-exist
 list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})
 
-# Add in Fortran libraries
-list(APPEND _laglos_libraries comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
+# List all possible libraries in order of dependencies.
+# [METIS < SuiteSparse]:
+#    With newer versions of SuiteSparse which include METIS header using 64-bit
+#    integers, the METIS header (with 32-bit indices, as used by mfem) needs to
+#    be before SuiteSparse.
+set(LAGLOS_TPLS mfem BOOST COINHSL HIOP)
 
-# Add in quick fix to sparse stuff
-# list(APPEND _laglos_libraries "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libgfortran.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/libquadmath.a" "/opt/homebrew/Cellar/gcc/14.1.0_2/lib/gcc/14/gcc/aarch64-apple-darwin23/14/libgcc.a")
+# Add all *_FOUND libraries in the variable TPL_LIBRARIES.
+set(TPL_LIBRARIES "")
+set(TPL_INCLUDE_DIRS "")
+foreach(TPL IN LISTS LAGLOS_TPLS)
+  if (${TPL}_FOUND)
+    message(STATUS "LAGLOS: using package ${TPL}")
+    list(APPEND TPL_LIBRARIES ${${TPL}_LIBRARIES})
+    list(APPEND TPL_INCLUDE_DIRS ${${TPL}_INCLUDE_DIRS})
+  endif()
+endforeach(TPL)
+list(REVERSE TPL_LIBRARIES)
+list(REMOVE_DUPLICATES TPL_LIBRARIES)
+list(REVERSE TPL_LIBRARIES)
+list(REMOVE_DUPLICATES TPL_INCLUDE_DIRS)
+message(STATUS "TPL_INCLUDE_DIRS = ${TPL_INCLUDE_DIRS}")
 
-#
-# Setup the GLVis library target
-#
+#-------------------------------------------------------------------------------
+# Define and configure the MFEM library
+#-------------------------------------------------------------------------------
+
+# Headers and sources
+set(SOURCES "")
+set(HEADERS "")
+set(LAGLOS_SOURCE_DIRS include src problems)
+set(LAGLOS_FORTRAN_LIBS "")
 include_directories(include problems ${CMAKE_BINARY_DIR})
 add_subdirectory(Fortran)
 add_subdirectory(src)
+# Add in Fortran libraries
+list(APPEND _laglos_libraries ${LAGLOS_FORTRAN_LIBS})
+
+MESSAGE(STATUS "LAGLOS_FORTRAN_LIBS: ${LAGLOS_FORTRAN_LIBS}")
+
+#-------------------------------------------------------------------------------
+# Installation
+#-------------------------------------------------------------------------------
+include(GenerateExportHeader)
+set(INSTALL_INCLUDE_DIR include
+  CACHE PATH "Relative path for installing header files.")
+set(INSTALL_BIN_DIR bin
+  CACHE PATH "Relative path for installing the binaries.")
+set(INSTALL_LIB_DIR lib
+  CACHE PATH "Relative path for installing the library.")
+set(INSTALL_CMAKE_DIR lib/cmake
+  CACHE PATH "Relative path for installing cmake config files.")
+add_library(Laglos SHARED ${SOURCES} ${HEADERS})
+set_property(TARGET Laglos PROPERTY VERSION ${Laglos_VERSION})
+
+target_compile_definitions(Laglos PUBLIC "${_laglos_compile_defs}")
+target_compile_options(Laglos PUBLIC "${_laglos_compile_opts}")
+target_include_directories(Laglos SYSTEM PUBLIC "${_laglos_include_dirs}")
+target_link_libraries(Laglos PUBLIC "${_laglos_libraries}")
+
+install(TARGETS ${PROJECT_NAME}
+   EXPORT ${PROJECT_NAME_UC}Targets
+   RUNTIME DESTINATION ${INSTALL_BIN_DIR}
+   LIBRARY DESTINATION ${INSTALL_LIB_DIR}
+   ARCHIVE DESTINATION ${INSTALL_LIB_DIR}
+   INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR}
+)
+
+install(DIRECTORY ${LAGLOS_SOURCE_DIRS}
+  DESTINATION ${INSTALL_INCLUDE_DIR}
+  FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+
+# Package the whole thing up nicely
+include(CMakePackageConfigHelpers)
+
+export(TARGETS ${PROJECT_NAME} ${LAGLOS_FORTRAN_LIBS}
+   FILE "${PROJECT_BINARY_DIR}/LaglosTargets.cmake")
+export(PACKAGE ${PROJECT_NAME})
+
+###
+# version to be installed
+set(INCLUDE_INSTALL_DIRS ${INSTALL_INCLUDE_DIR}  ${TPL_INCLUDE_DIRS})
+set(LIB_INSTALL_DIR ${INSTALL_LIB_DIR})
+configure_package_config_file(CMake/LAGLOSConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LAGLOSConfig.cmake
+  INSTALL_DESTINATION ${INSTALL_CMAKE_DIR}
+  PATH_VARS INCLUDE_INSTALL_DIRS LIB_INSTALL_DIR)
+
+# Write the version file (same for build and install tree)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/LAGLOSConfigVersion.cmake
+  VERSION ${${PROJECT_NAME}_VERSION}
+  COMPATIBILITY AnyNewerVersion )
+
+# Install the config files
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LAGLOSConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/LAGLOSConfigVersion.cmake
+  DESTINATION ${INSTALL_CMAKE_DIR})
+
+# Install the export set for use with the install-tree
+install(EXPORT ${PROJECT_NAME_UC}Targets
+   FILE ${PROJECT_NAME}Targets.cmake
+   NAMESPACE hydrodynamics:: 
+   DESTINATION ${INSTALL_CMAKE_DIR})
+
+install(EXPORT LaglosFortranTargets
+      FILE LaglosFortranTargets.cmake
+      NAMESPACE hydrodynamics:: 
+      DESTINATION ${INSTALL_CMAKE_DIR})
+
+###
+
+
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/convergence/temp_output")
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/results/state_vectors")
 
@@ -109,8 +214,8 @@ configure_file("${PROJECT_SOURCE_DIR}/include/hiop_fr_template.options" "${PROJE
 
 # Finally, add the executable
 add_executable(laglos-exe src/laglos.cpp)
-set_target_properties(laglos-exe PROPERTIES OUTPUT_NAME laglos)
-target_link_libraries(laglos-exe PRIVATE laglos)
+set_target_properties(laglos-exe PROPERTIES OUTPUT_NAME Laglos)
+target_link_libraries(laglos-exe PRIVATE Laglos)
 
 # Enable testing
 # if(ENABLE_TESTS)

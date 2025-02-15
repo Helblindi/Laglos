@@ -2,7 +2,7 @@
 
 namespace mfem
 {
-namespace hydrodynamics
+namespace hydroLO
 {
 template<int problem, int dim>
 class InitialValues
@@ -222,6 +222,6 @@ inline void InitialValues<problem, dim>::v0(const Vector &x, Vector &v)
    }
 }
 
-} // ns hydrodynamics
+} // ns hydroLO
 
 } // ns mfem

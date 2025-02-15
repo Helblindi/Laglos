@@ -8,7 +8,7 @@
 
 using namespace mfem;
 using namespace std;
-using namespace hydrodynamics;
+using namespace hydroLO;
 
 // Problem
 const int dim = 1;

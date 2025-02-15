@@ -18,7 +18,7 @@ using namespace std;
 namespace mfem
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 
 /// Visualize the given parallel grid function, using a GLVis server on the
@@ -339,7 +339,7 @@ public:
    void ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy);
 };
 
-} // end ns hydrodynamics
+} // end ns hydroLO
 
 } // end ns mfem
 

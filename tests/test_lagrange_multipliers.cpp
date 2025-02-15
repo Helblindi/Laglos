@@ -6,7 +6,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 
 
 // Problem

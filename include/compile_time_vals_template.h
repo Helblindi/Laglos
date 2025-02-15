@@ -10,7 +10,7 @@
 
 namespace mfem
 {
-namespace hydrodynamics
+namespace hydroLO
 {
 namespace CompileTimeVals
 {

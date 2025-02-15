@@ -9,7 +9,7 @@ using namespace std;
 namespace mfem
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 /**
  * Class to represent the local mass conservation
@@ -280,7 +280,7 @@ public:
    }
 };
 
-} // End ns hydrodynamics
+} // End ns hydroLO
 
 } // End ns mfem
 

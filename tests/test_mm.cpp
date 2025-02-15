@@ -9,7 +9,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 
 /* ------------- Problem Parameters ------------- */
 const int dim = 2;
@@ -152,7 +152,7 @@ int TestWeightedCellAverageVelocityAtNode()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    Vector vbar(dim), pos(dim);

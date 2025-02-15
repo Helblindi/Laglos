@@ -8,7 +8,7 @@ using namespace std;
 namespace mfem
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 
 template <int dim>

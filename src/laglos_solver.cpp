@@ -5,7 +5,7 @@
 namespace mfem
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 
 void VisualizeField(socketstream &sock, const char *vishost, int visport,
@@ -8915,6 +8915,6 @@ template class LagrangianLOOperator<1>;
 template class LagrangianLOOperator<2>;
 template class LagrangianLOOperator<3>;
 
-} // end ns hydrodynamics
+} // end ns hydroLO
 
 } // end ns mfem

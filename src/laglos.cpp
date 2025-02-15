@@ -98,8 +98,11 @@
 #endif
 
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 using namespace std;
+
+/* forward declarations */
+static void display_banner(std::ostream&);
 
 
 int main(int argc, char *argv[]) {
@@ -110,6 +113,9 @@ int main(int argc, char *argv[]) {
    const int num_procs = Mpi::WorldSize();
    const int myid = Mpi::WorldRank();
    // Hypre::Init();
+
+   // Print the banner.
+   if (Mpi::Root()) { display_banner(cout); }
 
    const int dim = CompileTimeVals::dim;
    const string results_dir = CompileTimeVals::results_dir;
@@ -1926,4 +1932,15 @@ int main(int argc, char *argv[]) {
    delete m;
 
    return 0;
+}
+
+static void display_banner(std::ostream &os)
+{
+   os << endl
+      << "       __                __                 " << endl
+      << "      / /   ____  ____  / /____  _____   " << endl
+      << "     / /   / __ `/ __ `/ / __ \\/ ___/ " << endl
+      << "    / /___/ /_/ / /_/ / / /_/ (__  )    " << endl
+      << "   /_____/\\__,_/\\__,_/_/\\____/____/  " << endl
+      << "               /____/                       " << endl << endl;
 }

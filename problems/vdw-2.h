@@ -38,7 +38,7 @@ using namespace std;
 
 namespace mfem
 {
-namespace hydrodynamics
+namespace hydroLO
 {
 
 template<int dim>
@@ -153,5 +153,5 @@ public:
 
 }; // End class
 
-} // ns hydrodynamics
+} // ns hydroLO
 } // ns mfem

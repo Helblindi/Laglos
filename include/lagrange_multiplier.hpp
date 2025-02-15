@@ -10,7 +10,7 @@ using namespace std;
 namespace mfem
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 /**
  * Helper functions to set the sparsity pattern that pertains to this implementation
@@ -1279,7 +1279,7 @@ public:
    int get_nnz_sparse_Hess_Lagr() const { return nnz_sparse_Hess_Lagr; }
 };
 
-} // End ns hydrodynamics
+} // End ns hydroLO
 
 } // End ns mfem
 

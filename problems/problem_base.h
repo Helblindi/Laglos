@@ -37,7 +37,7 @@ extern "C" {
 
 namespace mfem
 {
-namespace hydrodynamics
+namespace hydroLO
 {
 
 template<int dim>
@@ -306,7 +306,7 @@ public:
 }; // End ProblemBase
 
 
-} // ns hydrodynamics
+} // ns hydroLO
 } // ns mfem
 
 #endif // PROBLEM_BASE

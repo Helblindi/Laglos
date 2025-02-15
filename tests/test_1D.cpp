@@ -9,7 +9,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
@@ -210,7 +210,7 @@ int test_flux()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    double _error = 0.;
 
@@ -335,7 +335,7 @@ int test_1d_mesh()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "x_gf:\n";
    x_gf.Print(cout);
@@ -355,7 +355,7 @@ int test_1d_mesh()
       assert(k >= 0.);
    }
 
-   hydrodynamics::LagrangianLOOperator<dim>::DofEntity _dof_entity;
+   hydroLO::LagrangianLOOperator<dim>::DofEntity _dof_entity;
    int edof;
    for (int dof = 0; dof < H1FESpace.GetNDofs(); dof++)
    {      
@@ -473,7 +473,7 @@ Purpose:
 
 //    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-//    mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+//    mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
 //    Vector _vel(dim), vec_res(dim);
 //    double t = 0., dt = 1.;
@@ -510,11 +510,11 @@ Purpose:
 //    int offx = Ww+10, offy = Wh+45;
 
 
-//    hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
+//    hydroLO::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
 
 //    Wx += offx;
 
-//    hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
+//    hydroLO::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
 
 
 //    /* ************************
@@ -655,7 +655,7 @@ int test_CSV_getter_setter()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);

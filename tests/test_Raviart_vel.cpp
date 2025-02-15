@@ -11,7 +11,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 namespace plt = matplotlibcpp;
 
 /* ---------------- Parameters to be used for tests ---------------- */
@@ -184,7 +184,7 @@ int test_Ci_geo()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix Cgeo(dim), Cgeo_0(dim), C_error(dim);
@@ -315,7 +315,7 @@ void plot_velocities()
 
    ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
@@ -542,15 +542,15 @@ void plot_velocities()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vgeo, vishost, visport, v_geo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vgeo, vishost, visport, v_geo_gf, "Geometric velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
-   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vh, vishost, visport, mv_gf, "Mesh Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
-   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "Exact Velocity", Wx, Wy, Ww, Wh);
 
    // Plots cell errors using Python's matplotlib library
    // if (!suppress_test_output)

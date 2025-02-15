@@ -9,7 +9,7 @@
 
 using namespace std;
 using namespace mfem;
-using namespace hydrodynamics;
+using namespace hydroLO;
 
 /* ---------------- Parameters to be used for tests ---------------- */
 // Linear velocity field
@@ -206,7 +206,7 @@ int tester()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
 
@@ -346,7 +346,7 @@ int test_flux()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
 
@@ -499,7 +499,7 @@ int test_vel_field_1()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -528,23 +528,23 @@ int test_vel_field_1()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
-   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D: Exact Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D: Exact Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
    ParGridFunction v_CR_gf(&CRFESpace);
    hydro.GetVCRgf(v_CR_gf);
 
-   hydrodynamics::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D: v_CR_gf", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D: v_CR_gf", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
    ParGridFunction ifv_exact(&CRFESpace);
    ifv_exact.ProjectCoefficient(v_exact_coeff);
-   hydrodynamics::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D: ifv_exact", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D: ifv_exact", Wx, Wy, Ww, Wh);
 
 
    /* ************************
@@ -690,7 +690,7 @@ int test_CSV_getter_setter()
 
    ProblemBase<dim> * problem_class = new SodProblem<dim>();
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);
@@ -863,7 +863,7 @@ int test_sod_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1028,7 +1028,7 @@ int test_sod_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1287,7 +1287,7 @@ int test_smooth_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim_1d> hydro_1d(H1FESpace_1d, H1FESpace_1d_L, L2FESpace_1d, L2VFESpace_1d, CRFESpace_1d, m_1d, problem_class_1d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1449,7 +1449,7 @@ int test_smooth_hydro()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim_2d> hydro_2d(H1FESpace_2d, H1FESpace_2d_L, L2FESpace_2d, L2VFESpace_2d, CRFESpace_2d, m_2d, problem_class_2d, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1673,7 +1673,7 @@ void plot_mv_smooth()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydrodynamics::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -1700,23 +1700,23 @@ void plot_mv_smooth()
    const int Ww = 350, Wh = 350;
    int offx = Ww+10, offy = Wh+45;
 
-   hydrodynamics::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D Smooth: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vh, vishost, visport, mv_gf, "2D Smooth: Reconstructed Mesh Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
-   hydrodynamics::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D Smooth: Exact Velocity", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vexact, vishost, visport, v_exact_gf, "2D Smooth: Exact Velocity", Wx, Wy, Ww, Wh);
 
    Wx += offx;
    ParGridFunction v_CR_gf(&CRFESpace);
    hydro.GetVCRgf(v_CR_gf);
 
-   hydrodynamics::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D Smooth: v_CR_gf", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_vcrgf, vishost, visport, v_CR_gf, "2D Smooth: v_CR_gf", Wx, Wy, Ww, Wh);
 
    Wx += offx;
 
    ParGridFunction ifv_exact(&CRFESpace);
    ifv_exact.ProjectCoefficient(v_exact_coeff);
-   hydrodynamics::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D Smooth: ifv_exact", Wx, Wy, Ww, Wh);
+   hydroLO::VisualizeField(vis_ifv_exact, vishost, visport, ifv_exact, "2D Smooth: ifv_exact", Wx, Wy, Ww, Wh);
 
    /* ************************
    Move the mesh according to previously computed nodal velocities

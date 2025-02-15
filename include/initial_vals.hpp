@@ -31,7 +31,7 @@
 
 namespace mfem
 {
-namespace hydrodynamics
+namespace hydroLO
 {
 template<int dim, int problem>
 class InitialValues
@@ -658,6 +658,6 @@ inline double InitialValues<dim, problem>::IV_pressure(const Vector & x, const d
    return 0.0;
 }
 
-} // ns hydrodynamics
+} // ns hydroLO
 
 } // ns mfem

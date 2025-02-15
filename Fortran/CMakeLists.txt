@@ -13,8 +13,8 @@ set(LAGLOS_FORTRAN_LIBS ${LAGLOS_FORTRAN_LIBS}
    vdw_fortran
    PARENT_SCOPE)
 
-install(TARGETS comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran
-        EXPORT LaglosFortranTargets
-        LIBRARY DESTINATION ${INSTALL_LIB_DIR}
-        ARCHIVE DESTINATION ${INSTALL_LIB_DIR}
-        INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR})
+# install(TARGETS comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran
+#         EXPORT LaglosTargets
+#         LIBRARY DESTINATION ${INSTALL_LIB_DIR}
+#         ARCHIVE DESTINATION ${INSTALL_LIB_DIR}
+#         INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR})

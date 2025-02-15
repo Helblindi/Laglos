@@ -4,7 +4,7 @@
 namespace mfem 
 {
 
-namespace hydrodynamics
+namespace hydroLO
 {
 
 /**
@@ -377,5 +377,5 @@ template class Geometric<1>;
 template class Geometric<2>;
 template class Geometric<3>;
 
-} // ns hydrodynamics
+} // ns hydroLO
 } // ns mfem

@@ -120,7 +120,7 @@ message(STATUS "TPL_INCLUDE_DIRS = ${TPL_INCLUDE_DIRS}")
 # Headers and sources
 set(SOURCES "")
 set(HEADERS "")
-set(LAGLOS_SOURCE_DIRS include src problems)
+set(LAGLOS_SOURCE_DIRS include/ problems/) # appending / will copy the contents of this directory
 set(LAGLOS_FORTRAN_LIBS "")
 include_directories(include problems ${CMAKE_BINARY_DIR})
 add_subdirectory(Fortran)
@@ -150,7 +150,7 @@ target_compile_options(Laglos PUBLIC "${_laglos_compile_opts}")
 target_include_directories(Laglos SYSTEM PUBLIC "${_laglos_include_dirs}")
 target_link_libraries(Laglos PUBLIC "${_laglos_libraries}")
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ${PROJECT_NAME} comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran
    EXPORT ${PROJECT_NAME_UC}Targets
    RUNTIME DESTINATION ${INSTALL_BIN_DIR}
    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
@@ -191,14 +191,10 @@ install(FILES
   DESTINATION ${INSTALL_CMAKE_DIR})
 
 # Install the export set for use with the install-tree
-# install(EXPORT ${PROJECT_NAME_UC}Targets
-#    FILE ${PROJECT_NAME}Targets.cmake
-#    NAMESPACE hydrodynamics:: 
-#    DESTINATION ${INSTALL_CMAKE_DIR})
+install(EXPORT ${PROJECT_NAME_UC}Targets
+   FILE ${PROJECT_NAME}Targets.cmake
+   DESTINATION ${INSTALL_CMAKE_DIR})
 
-install(EXPORT LaglosFortranTargets
-      FILE LaglosFortranTargets.cmake
-      DESTINATION ${INSTALL_CMAKE_DIR})
 
 ###
 

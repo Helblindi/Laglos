@@ -165,7 +165,7 @@ install(DIRECTORY ${LAGLOS_SOURCE_DIRS}
 # Package the whole thing up nicely
 include(CMakePackageConfigHelpers)
 
-export(TARGETS ${PROJECT_NAME} ${LAGLOS_FORTRAN_LIBS}
+export(TARGETS ${PROJECT_NAME} comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran
    FILE "${PROJECT_BINARY_DIR}/LaglosTargets.cmake")
 export(PACKAGE ${PROJECT_NAME})
 
@@ -191,14 +191,13 @@ install(FILES
   DESTINATION ${INSTALL_CMAKE_DIR})
 
 # Install the export set for use with the install-tree
-install(EXPORT ${PROJECT_NAME_UC}Targets
-   FILE ${PROJECT_NAME}Targets.cmake
-   NAMESPACE hydrodynamics:: 
-   DESTINATION ${INSTALL_CMAKE_DIR})
+# install(EXPORT ${PROJECT_NAME_UC}Targets
+#    FILE ${PROJECT_NAME}Targets.cmake
+#    NAMESPACE hydrodynamics:: 
+#    DESTINATION ${INSTALL_CMAKE_DIR})
 
 install(EXPORT LaglosFortranTargets
       FILE LaglosFortranTargets.cmake
-      NAMESPACE hydrodynamics:: 
       DESTINATION ${INSTALL_CMAKE_DIR})
 
 ###

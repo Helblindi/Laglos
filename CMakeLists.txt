@@ -73,8 +73,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MFEM_CXX_FLAGS}")
 list(APPEND _laglos_include_dirs "${MFEM_INCLUDE_DIRS}")
 list(APPEND _laglos_libraries "${MFEM_LIBRARIES}")
 if (LAGLOS_USE_HIOP)
-  include(LaglosFindHIOP)
-  list(APPEND _laglos_libraries HiOp::hiop_tpl)
+#   include(LaglosFindHIOP)
+#   list(APPEND _laglos_libraries HiOp::hiop_tpl)
+   find_package(HIOP REQUIRED HINTS LAGLOS_HIOP_DIR "${LAGLOS_HIOP_DIR}/install")
+   if (HIOP_FOUND)
+      MESSAGE(STATUS "HIOP FOUND")
+      # HiOp defines imported targets rather than variables. Must define those.
+      if (TARGET HiOp::HiOp)
+         message(STATUS "HIOP target found.")
+         set(HIOP_LIBRARIES HiOp::HiOp)
+         get_target_property(HIOP_INCLUDE_DIRS HiOp::HiOp INTERFACE_INCLUDE_DIRECTORIES)
+      endif()
+   endif()
 endif()
 
 message(STATUS "Laglos build type: CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
@@ -88,14 +98,14 @@ endif()
 find_package(Boost REQUIRED COMPONENTS filesystem)
 # Include libraries needed by lboost_filesystem
 # https://stackoverflow.com/questions/9235679/create-a-directory-if-it-doesnt-exist
-list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})
+# list(APPEND _laglos_libraries ${Boost_FILESYSTEM_LIBRARY})
 
 # List all possible libraries in order of dependencies.
 # [METIS < SuiteSparse]:
 #    With newer versions of SuiteSparse which include METIS header using 64-bit
 #    integers, the METIS header (with 32-bit indices, as used by mfem) needs to
 #    be before SuiteSparse.
-set(LAGLOS_TPLS mfem BOOST COINHSL HIOP)
+set(LAGLOS_TPLS mfem Boost COINHSL HIOP)
 
 # Add all *_FOUND libraries in the variable TPL_LIBRARIES.
 set(TPL_LIBRARIES "")
@@ -103,6 +113,7 @@ set(TPL_INCLUDE_DIRS "")
 foreach(TPL IN LISTS LAGLOS_TPLS)
   if (${TPL}_FOUND)
     message(STATUS "LAGLOS: using package ${TPL}")
+    message(STATUS "${TPL}_INCLUDE_DIRS = ${${TPL}_INCLUDE_DIRS}")
     list(APPEND TPL_LIBRARIES ${${TPL}_LIBRARIES})
     list(APPEND TPL_INCLUDE_DIRS ${${TPL}_INCLUDE_DIRS})
   endif()
@@ -111,7 +122,10 @@ list(REVERSE TPL_LIBRARIES)
 list(REMOVE_DUPLICATES TPL_LIBRARIES)
 list(REVERSE TPL_LIBRARIES)
 list(REMOVE_DUPLICATES TPL_INCLUDE_DIRS)
+message(STATUS "TPL_LIBRARIES = ${TPL_LIBRARIES}")
 message(STATUS "TPL_INCLUDE_DIRS = ${TPL_INCLUDE_DIRS}")
+
+list(APPEND _laglos_libraries ${TPL_LIBRARIES})
 
 #-------------------------------------------------------------------------------
 # Define and configure the MFEM library
@@ -150,8 +164,11 @@ target_compile_options(Laglos PUBLIC "${_laglos_compile_opts}")
 target_include_directories(Laglos SYSTEM PUBLIC "${_laglos_include_dirs}")
 target_link_libraries(Laglos PUBLIC "${_laglos_libraries}")
 
-install(TARGETS ${PROJECT_NAME} comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran
-   EXPORT ${PROJECT_NAME_UC}Targets
+MESSAGE(STATUS "_laglos_include_dirs: ${_laglos_include_dirs}")
+MESSAGE(STATUS "_laglos_libraries: ${_laglos_libraries}")
+
+install(TARGETS ${PROJECT_NAME} comp_lambda_lagrangian_greedy comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran 
+   EXPORT ${PROJECT_NAME}Targets
    RUNTIME DESTINATION ${INSTALL_BIN_DIR}
    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
    ARCHIVE DESTINATION ${INSTALL_LIB_DIR}
@@ -191,7 +208,7 @@ install(FILES
   DESTINATION ${INSTALL_CMAKE_DIR})
 
 # Install the export set for use with the install-tree
-install(EXPORT ${PROJECT_NAME_UC}Targets
+install(EXPORT ${PROJECT_NAME}Targets
    FILE ${PROJECT_NAME}Targets.cmake
    DESTINATION ${INSTALL_CMAKE_DIR})
 

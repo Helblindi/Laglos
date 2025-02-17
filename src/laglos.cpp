@@ -19,44 +19,44 @@
 * Example run time parameters:
 *
 * ----- 1D -----
-* ./Laglos -m data/ref-segment.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 8            ## Smooth
-* ./Laglos -m data/ref-segment.mesh -p 1 -tf 0.225 -cfl 2. -rs 8           ## Sod
-* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.15 -cfl 0.5 -rs 8           ## Lax
-# ./Laglos -m data/ref-segment.mesh -p 3 -tf 0.667 -cfl 0.2 -rs 8          ## Leblanc
+* ./Laglos -m data/ref-segment.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 8            ## Smooth
+* ./Laglos -m data/ref-segment.mesh -p 2 -tf 0.225 -cfl 2. -rs 8            ## Sod
+* ./Laglos -m data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8           ## Lax
+# ./Laglos -m data/ref-segment.mesh -p 42 -tf 0.667 -cfl 0.2 -rs 8          ## Leblanc
 *
 * ----- vdw -----
-* ./Laglos -m data/ref-segment-c0.mesh -p 8 -cfl 0.5 -tf 0.5 -rs 8 -vis    ## Vdw1
-* ./Laglos -m data/segment-nhalf-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 8 -vis  ## Vdw2 
-* ./Laglos -m data/segment-nhalf-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 8 -vis  ## Vdw3 
-* ./Laglos -m data/segment-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis ## Vdw4
+* ./Laglos -m data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis    ## Vdw1
+* ./Laglos -m data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 8 -vis  ## Vdw2 
+* ./Laglos -m data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis   ## Vdw3 
+* ./Laglos -m data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis  ## Vdw4
 *
 * --------------------------------------------------------------
 * ----- 2D -----
 * --------------------------------------------------------------
-* ./Laglos -m data/ref-square.mesh -p 0 -tf 0.6 -cfl 0.5 -rs 4             ## Smooth wave in 2D
-* ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4           ## Sod in 2D
-* ./Laglos -m data/distorted-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4     ## Sod Distorted
-* ./Laglos -m data/ref-square.mesh -p 13 -tf 0.2 -cfl 0.25 -rs 4           ## Sod Radial
-* ./Laglos -m data/square-vortex.mesh -p 5 -tf 10 -cfl 0.5 -rs 3           ## Isentropic Vortex
-* ./Laglos -m data/noh-nonuniform.mesh -p 4 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
-* ./Laglos -m data/ref-square-c0.mesh -p 4 -tf 0.6 -cfl 0.5 -rs 6          ## Noh
-* ./Laglos -m data/ref-square-N15.mesh -p 6 -tf .9 -cfl 1 -rs 5            ## Sedov
-* ./Laglos -m data/rectangle_saltzmann.mesh -p 7 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
-* ./Laglos -m data/full_ring_r0.mesh -p 15 -tf 0.1887 -cfl 0.5 -rs 0       ## Kidder shell
+* ./Laglos -m data/ref-square.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 4             ## Smooth wave in 2D
+* ./Laglos -m data/ref-square.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 4            ## Sod in 2D
+* ./Laglos -m data/distorted-square.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 4      ## Sod Distorted
+* ./Laglos -m data/ref-square.mesh -p 8 -tf 0.2 -cfl 0.25 -rs 4             ## Sod Radial
+* ./Laglos -m data/square-vortex.mesh -p 9 -tf 10 -cfl 0.5 -rs 3            ## Isentropic Vortex
+* ./Laglos -m data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
+* ./Laglos -m data/ref-square-c0.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 6          ## Noh
+* ./Laglos -m data/ref-square-N15.mesh -p 1 -tf .9 -cfl 1 -rs 5             ## Sedov
+* ./Laglos -m data/rectangle_saltzmann.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
+* ./Laglos -m data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0        ## Kidder shell
 * ----- Fails -----
-* ./Laglos -m data/triple-point.mesh -p 12 -tf 5. -cfl 0.5 -rs 2           ## Triple Point [Fails]
+* ./Laglos -m data/triple-point.mesh -p 3 -tf 5. -cfl 0.5 -rs 2             ## Triple Point [Fails]
 * ----- Untested -----
-* ./Laglos -m data/ref-square.mesh -p 14 -tf 0.6 -cfl 0.5 -rs 4            ## ICF [Untested]
-* ./Laglos -m data/ref-rectangle-q1q2.mesh -p 16 -tf 2 -cfl 0.5 -rs 0      ## Kidder ball [Untested]
-* ./Laglos -m data/ref-square-c0-N30.mesh -p 17 -tf 0.5 -cfl 0.5 -rs 1     ## Taylor-Green [Untested]
+* ./Laglos -m data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4             ## ICF [Untested]
+* ./Laglos -m data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0       ## Kidder ball [Untested]
+* ./Laglos -m data/ref-square-c0-N30.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 1       ## Taylor-Green [Untested]
 *
 * ----- vdw -----
-* ./Laglos -m data/tube-np5-1.mesh -p 9 -cfl 0.5 -tf 1.25 -rs 2 -vis        ## Vdw2 
-* ./Laglos -m data/tube-np5-1.mesh -p 10 -cfl 0.5 -tf 0.4 -rs 2 -vis        ## Vdw3 
-* ./Laglos -m data/tube-n1p7-1.mesh -p 11 -cfl 1.3 -tf 0.005 -rs 8 -vis     ## Vdw4
+* ./Laglos -m data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis       ## Vdw2 
+* ./Laglos -m data/tube-np5-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 2 -vis        ## Vdw3 
+* ./Laglos -m data/tube-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis     ## Vdw4
 * 
 * --- General Riemann Problem, change riemann_problem.h ---
-* ./Laglos -m data/ref-segment-c0.mesh -p 20 -cfl 0.5 -tf 1 -rs 8 -vis     ## General Riemann Problem
+* ./Laglos -m data/ref-segment-c0.mesh -p 43 -cfl 0.5 -tf 1 -rs 8 -vis      ## General Riemann Problem
 *
 * --- To generate images for movies
 * -of "output-dir" = directory where files should be saved.
@@ -76,6 +76,32 @@
 * Sod
 * ./Laglos -m data/ref-square.mesh -p 1 -tf 0.225 -cfl 0.5 -rs 4 -mv 4 
 *
+* Test problems:
+*     p = 0  --> taylor green (smooth problem)
+*     p = 1  --> sedov
+*     p = 2  --> sod
+*     p = 3  --> tp
+*     p = 4  --> gresho vortex (smooth problem)
+*     p = 5  --> 2D Riemann problem, config. 12 of doi.org/10.1002/num.10025
+*     p = 6  --> 2D Riemann problem, config.  6 of doi.org/10.1002/num.10025
+*     p = 7  --> 2D Rayleigh-Taylor instability problem.
+*     p = 8  --> sod radial
+*     p = 9  --> isentropic vortex
+*     p = 10 --> noh
+*     p = 11 --> saltzman
+*     p = 12 --> vdw1
+*     p = 13 --> vdw2
+*     p = 14 --> vdw3
+*     p = 15 --> vdw4
+*     p = 16 --> Kidder shell
+*     p = 17 --> kidder ball
+*     p = 18 --> ICF
+*     p = 21 --> Sedov (Laura)
+*     p = 40 --> smooth wave
+*     p = 41 --> lax
+*     p = 42 --> leblanc
+*     p = 43 --> riemann
+*     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"
 #include "var-config.h"
@@ -417,102 +443,60 @@ int main(int argc, char *argv[]) {
    ProblemBase<dim> * problem_class = NULL;
    switch (problem)
    {
-      case 0: // Smooth
-      {
-         problem_class = new SmoothWave<dim>();
-         break;
-      }
-      case 1: // Sod
-      {
-         problem_class = new SodProblem<dim>();
-         break;
-      }
-      case 2: // Lax
-      {
-         problem_class = new LaxProblem<dim>();
-         break;
-      }
-      case 3: // Leblanc
-      {
-         problem_class = new LeblancProblem<dim>();
-         break;
-      }
-      case 4: // Noh
-      {
-         problem_class = new NohProblem<dim>();
-         break;
-      }
-      case 5: // Isentropic Vortex, stationary center
-      {
-         problem_class = new IsentropicVortex<dim>();
-         break;
-      }
-      case 6: // Sedov
-      {
-         problem_class = new SedovLLNLProblem<dim>();
-         break;
-      }
-      case 7: // Saltzmann
-      {
-         problem_class = new SaltzmannProblem<dim>();
-         break;
-      }
-      /* VDW */
-      case 8:
-      {
-         problem_class = new VdwTest1<dim>();
-         break;
-      }
-      case 9:
-      {
-         problem_class = new VdwTest2<dim>();
-         break;
-      }
-      case 10:
-      {
-         problem_class = new VdwTest3<dim>();
-         break;
-      }
-      case 11:
-      {
-         problem_class = new VdwTest4<dim>();
-         break;
-      }
-      case 12: // Triple Point
-      {
-         problem_class = new TriplePoint<dim>();
-         break;
-      }
-      case 13: // Radial Sod
-      {
-         problem_class = new SodRadial<dim>();
-         break;
-      }
-      case 14: // ICF
-      {
-         problem_class = new ICFProblem<dim>();
-         break;
-      }
-      case 15: // Kidder shell
-      {
-         problem_class = new KidderProblem<dim>();
-         break;
-      }
-      case 16: // Kidder ball
-      {
-         problem_class = new KidderBallProblem<dim>();
-         break;
-      }
-      case 17: // Taylor-Green
-      {
+      case 0: // Taylor-Green
          problem_class = new TaylorGreenProblem<dim>();
          break;
-      }
-      case 20: // Riemann Problem
-      {
-         problem_class = new RiemannProblem<dim>();
+      case 1: // Sedov
+         problem_class = new SedovLLNLProblem<dim>();
          break;
-      }
+      case 2: // Sod
+         problem_class = new SodProblem<dim>();
+         break;
+      case 3: // Triple Point
+         problem_class = new TriplePoint<dim>();
+         break;
+      case 4: // gresh vortex
+         break;
+      case 5: // 2D Riemann problem
+         break;
+      case 6: // 2D Riemann problem
+         break;
+      case 7: // 2D Rayleigh-Taylor instability
+         break;
+      case 8: // Radial Sod
+         problem_class = new SodRadial<dim>();
+         break;
+      case 9: // Isentropic Vortex, stationary center
+         problem_class = new IsentropicVortex<dim>();
+         break;
+      case 10: // Noh
+         problem_class = new NohProblem<dim>();
+         break;
+      case 11: // Saltzmann
+         problem_class = new SaltzmannProblem<dim>();
+         break;
+      /* VDW */
+      case 12:
+         problem_class = new VdwTest1<dim>();
+         break;
+      case 13:
+         problem_class = new VdwTest2<dim>();
+         break;
+      case 14:
+         problem_class = new VdwTest3<dim>();
+         break;
+      case 15:
+         problem_class = new VdwTest4<dim>();
+         break;
+      case 16: // Kidder shell
+         problem_class = new KidderProblem<dim>();
+         break;
+      case 17: // Kidder ball
+         problem_class = new KidderBallProblem<dim>();
+         break;
+      case 18: // ICF
+         problem_class = new ICFProblem<dim>();
+         break;
       case 21: // Sedov
       {
          MFEM_ABORT("Not implemented\n");
@@ -526,15 +510,23 @@ int main(int argc, char *argv[]) {
          //       if distorted meshes are used.
          break;
       }
+      case 40: // Smooth
+         problem_class = new SmoothWave<dim>();
+         break;
+      case 41: // Lax
+         problem_class = new LaxProblem<dim>();
+         break;
+      case 42: // Leblanc
+         problem_class = new LeblancProblem<dim>();
+         break;
+      case 43: // Riemann Problem
+         problem_class = new RiemannProblem<dim>();
+         break;
       case 100:
-      {
          problem_class = new TestBCs<dim>();
          break;
-      }
       default:
-      {
          MFEM_ABORT("Failed to initiate a problem.\n");
-      }
    }
 
    // Define the parallel finite element spaces. We use:
@@ -849,7 +841,7 @@ int main(int argc, char *argv[]) {
    // it is necessary for plotting the exact solution
    FunctionCoefficient ste_coeff(ste0_static);
    ste_coeff.SetTime(t_init);
-   if (problem == 6)
+   if (problem == 1)
    {
       double blast_energy = 0.25;
       double blast_position[] = {0.0, 0.0, 0.0};
@@ -921,7 +913,7 @@ int main(int argc, char *argv[]) {
    /* Gridfunctions used in Triple Point */
    ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
 
-   if (problem == 6 || problem == 12)
+   if (problem == 1 || problem == 3)
    {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
@@ -984,13 +976,13 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 6 || problem == 12 || problem == 15)
+      if (problem == 1 || problem == 3 || problem == 16)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
                         "Pressure", Wx, Wy, Ww, Wh);
       }
-      if (problem == 12)
+      if (problem == 3)
       {
          Wx += offx; 
          VisualizeField(vis_gamma, vishost, visport, gamma_gf,
@@ -1057,7 +1049,7 @@ int main(int argc, char *argv[]) {
             VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
                            "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
 
-            if (problem == 6 || problem == 12)
+            if (problem == 1 || problem == 3)
             {
                Wx += offx;
                VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
@@ -1080,7 +1072,7 @@ int main(int argc, char *argv[]) {
          VisualizeField(vis_ste_err, vishost, visport, ste_err,
                         "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
          
-         if (problem == 6 || problem == 12 || problem == 15)
+         if (problem == 1 || problem == 3 || problem == 16)
          {
             Wx += offx;
             VisualizeField(vis_p_err, vishost, visport, p_err,
@@ -1140,7 +1132,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 6 || problem == 12 || problem == 15) 
+   if (problem == 1 || problem == 3 || problem == 16) 
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1151,7 +1143,7 @@ int main(int argc, char *argv[]) {
       press_gf.SaveAsOne(press_ofs);
       press_ofs.close();
    }
-   if (problem == 12)
+   if (problem == 3)
    {
       std::ostringstream gamma_name;
       gamma_name << gfprint_path 
@@ -1357,7 +1349,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 6 || problem == 12 || problem == 15) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
@@ -1372,7 +1364,7 @@ int main(int argc, char *argv[]) {
                VisualizeField(vis_press, vishost, visport, press_gf,
                               "Pressure", Wx, Wy, Ww, Wh);
             }
-            if (problem == 12) // Visualize gamma
+            if (problem == 3) // Visualize gamma
             {
                vis_gamma.precision(8);
                ParGridFunction gamma_gf(&L2FESpace);
@@ -1455,7 +1447,7 @@ int main(int argc, char *argv[]) {
                   Wx += offx;
                   VisualizeField(vis_ste_ex, vishost, visport, ste_ex_gf,
                                  "Exact: Specific Total Energy", Wx, Wy, Ww, Wh);
-                  if (problem == 6 || problem == 12)
+                  if (problem == 1 || problem == 3)
                   {
                      Wx += offx;
                      VisualizeField(vis_p_ex, vishost, visport, p_ex_gf,
@@ -1476,7 +1468,7 @@ int main(int argc, char *argv[]) {
                VisualizeField(vis_ste_err, vishost, visport, ste_err,
                               "Error: Specific Total Energy", Wx, Wy, Ww, Wh);
                
-               if (problem == 6 || problem == 12 || problem == 15)
+               if (problem == 1 || problem == 3 || problem == 16)
                {
                   Wx += offx;
                   VisualizeField(vis_p_err, vishost, visport, p_err,
@@ -1822,7 +1814,7 @@ int main(int argc, char *argv[]) {
 
          // Specific volume and specific total energy
          /* In the Sedov case, we do not get convergence of the specific total energy, but the total energy */
-         if (problem == 6)
+         if (problem == 1)
          {
             ParGridFunction te_ex_gf(&L2FESpace), te_gf(&L2FESpace);
             for (int i = 0; i < ste_ex_gf.Size(); i++)

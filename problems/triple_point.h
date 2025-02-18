@@ -142,6 +142,11 @@ public:
          }
       }
    }
+   double gamma_func(const Vector &x, const double &t) override
+   {
+      if (dim == 1) { return (x(0) > 0.5) ? _gamma_2 : _gamma_1; }
+      else { return (x(0) > 1.0 && x(1) <= 1.5) ? _gamma_2 : _gamma_1; }
+   }
 
 }; // End class
 

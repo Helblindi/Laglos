@@ -85,11 +85,12 @@ public:
     *********************************************************/
    double p0(const Vector &x, const double & t) override
    {
-      double _rho = rho0(x, t);
-      double val = std::cos(2. * M_PI * x[0]) + std::cos(2. * M_PI * x[1]);
-      val *= 0.25 * _rho;
-      val += 1.;
-      return val;
+      // double _rho = rho0(x, t);
+      // double val = std::cos(2. * M_PI * x[0]) + std::cos(2. * M_PI * x[1]);
+      // val *= 0.25 * _rho;
+      // val += 1.;
+      // return val;
+      return (_gamma - 1.) * rho0(x,t) * sie0(x,t);
    }
    double rho0(const Vector &x, const double & t) override
    {
@@ -103,9 +104,18 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      double val = std::cos(3. * M_PI * x[0]) * std::cos(M_PI*x[1]) - std::cos(M_PI * x[0]) * std::cos(3. * M_PI * x[1]);
-      val *= 0.375 * M_PI;
-      return val;
+      const double denom = 2.0 / 3.0;  // (5/3 - 1) * density.
+      double val;
+      if (x.Size() == 2)
+      {
+         val = 1.0 + (cos(2*M_PI*x(0)) + cos(2*M_PI*x(1))) / 4.0;
+      }
+      else
+      {
+         val = 100.0 + ((cos(2*M_PI*x(2)) + 2) *
+                        (cos(2*M_PI*x(0)) + cos(2*M_PI*x(1))) - 2) / 16.0;
+      }
+      return val/denom;
    }
 
 }; // End class

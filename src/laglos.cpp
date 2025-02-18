@@ -629,10 +629,9 @@ int main(int argc, char *argv[]) {
 
    /* The monolithic BlockVector stores unknown fields as:
    *   - 0 -> position
-   *   - 1 -> mesh velocity
-   *   - 2 -> specific volume
-   *   - 3 -> velocity (L2V)
-   *   - 4 -> speific total energy
+   *   - 1 -> specific volume
+   *   - 2 -> velocity (L2V)
+   *   - 3 -> speific total energy
    */
    const int Vsize_l2 = L2FESpace.GetVSize();
    const int Vsize_l2v = L2VFESpace.GetVSize();

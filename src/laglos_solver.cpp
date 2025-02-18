@@ -8374,11 +8374,14 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    mv_gf_l = mv_gf_l_out;
 
    /* Properly dispose of allocated memory */
-   delete tmp_opt_ptr;
+   #ifdef MFEM_USE_HIOP
+      delete tmp_opt_ptr;
+      tmp_opt_ptr = nullptr;
+   #endif
+   
    delete omv_problem;
    optsolver = nullptr;
    omv_problem = nullptr;
-   tmp_opt_ptr = nullptr;
 }
 
 

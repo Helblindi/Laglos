@@ -277,7 +277,22 @@ void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
    SolveHydro(S, dS_dt);
 
    /* Update dx_dt */
-   SolveMeshVelocities(S, dS_dt);
+   if (this->compute_mv)
+   {
+      SolveMeshVelocities(S, dS_dt);
+   }
+   else
+   {
+      /* This assumes that before Mult has been called, this->mv_gf has been set externally */
+      if (this->mv_gf.Size() != Vsize_H1)
+      {
+         cout << "NVDofs_H1: " << NVDofs_H1 << ", mv_gf.Size(): " << mv_gf.Size() << endl;
+         MFEM_ABORT("Invalid mesh velocity size.");
+      }
+      ParGridFunction dxdt_gf;
+      dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
+      dxdt_gf = this->mv_gf;
+   }
 }
 
 

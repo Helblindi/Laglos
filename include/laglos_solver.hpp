@@ -57,6 +57,7 @@ protected:
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1Lc;
    mutable ParGridFunction x_gf;
+   mutable ParGridFunction mv_gf;
    mutable ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
    ParGridFunction v_CR_gf_fluxes;    // Iteratively updated
@@ -123,6 +124,7 @@ protected:
 
    bool use_viscosity;
    bool mm;
+   bool compute_mv = true;
    bool use_greedy_viscosity;
    bool post_process_density;
    int mv_option = 0;
@@ -206,6 +208,8 @@ public:
    void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
    void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);
+   void SetComputeMV(const bool & option) { this->compute_mv = option; }
+   void SetMV(const ParGridFunction &_mv) { this->mv_gf = _mv; }
    void SetMVLinOption(const bool & option) { this->do_mv_linearization = option; }
    void SetFVOption(const int & option);
    void SetMVIterationOption(const int &option);

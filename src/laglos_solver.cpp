@@ -104,6 +104,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
    x_gf(&H1),
+   mv_gf(&H1),
    v_CR_gf(&CR),
    v_CR_gf_corrected(&CR), 
    v_CR_gf_fluxes(&CR),
@@ -1013,7 +1014,12 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double F = n_vec.Norml2();
          n_vec /= F;
 
-         assert(1. - n_vec.Norml2() < 1e-12);
+         if (1. - n_vec.Norml2() > 1e-12)
+         {
+            cout << "n_vec: ";
+            n_vec.Print(cout);
+            MFEM_ABORT("Invalid normal vector.\n");
+         }
          c_vec = n_int;
          c_vec /= 2.;
          double c_norm = c_vec.Norml2();
@@ -1085,7 +1091,11 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
       const double k = pmesh->GetElementVolume(ci);
       mi = k / U_i[0];
 
-      assert(mi > 0); // Assumption, equation (3.6)
+      if (mi <= 0.)
+      {
+         cout <<  "Invalid mass at cell " << ci << ": " << mi << endl;
+         MFEM_ABORT("Invalid mass.\n");
+      }
 
       H1.ExchangeFaceNbrData();
 
@@ -1695,6 +1705,11 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
          num_corrected_cells += 1;
          sv_gf.Elem(cell_it) = sv_new_mc;
          rel_mass_corrected += val / sv_new_mc;
+         if (sv_new_mc <= 0.)
+         {
+            cout << "cell " << cell_it << ", sv: " << sv_new_mc << endl;
+            MFEM_ABORT("Invalid value for the specific volume\n");
+         }
       }
    }
 
@@ -1943,7 +1958,12 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
       tau_vec = n_vec;
       geom.Orthogonal(tau_vec);
       tau_vec *= -1.;
-      assert(1. - n_vec.Norml2() < 1e-12);
+      if (1. - n_vec.Norml2() > 1e-12)
+      {
+         cout << "n_vec: ";
+         n_vec.Print(cout);
+         MFEM_ABORT("Invalid normal vector.\n");
+      }
 
       if (FI.IsInterior())
       {
@@ -2507,7 +2527,12 @@ void LagrangianLOOperator<dim>::
          double F = n_vec.Norml2();
          n_vec /= F;
 
-         assert(1. - n_vec.Norml2() < 1e-12);
+         if (1. - n_vec.Norml2() > 1e-12)
+         {
+            cout << "n_vec: ";
+            n_vec.Print(cout);
+            MFEM_ABORT("Invalid normal vector.\n");
+         }
 
          // Calculate new corner locations and half  step locations
          Vector vdof1_x_new(dim), vdof2_x_new(dim), vdof1_x_half(dim), vdof2_x_half(dim);
@@ -2714,7 +2739,12 @@ void LagrangianLOOperator<dim>::
          double F = n_vec.Norml2();
          n_vec /= F;
 
-         assert(1. - n_vec.Norml2() < 1e-12);
+         if (1. - n_vec.Norml2() > 1e-12)
+         {
+            cout << "n_vec: ";
+            n_vec.Print(cout);
+            MFEM_ABORT("Invalid normal vector.\n");
+         }
 
          /*** Compute Face Flux ***/
 
@@ -5082,7 +5112,12 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
          double F = n_vec.Norml2();
          n_vec /= F;
 
-         assert(1. - n_vec.Norml2() < 1e-12);
+         if (1. - n_vec.Norml2() > 1e-12)
+         {
+            cout << "n_vec: ";
+            n_vec.Print(cout);
+            MFEM_ABORT("Invalid normal vector.\n");
+         }
 
          // Calculate new corner locations and half  step locations
          Vector vdof1_x_new(dim), vdof2_x_new(dim), vdof1_x_half(dim), vdof2_x_half(dim);

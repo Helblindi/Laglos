@@ -154,6 +154,7 @@ CONTAINS
          REAL(KIND=NUMBER)             :: c_of_gamma, expo_of_three
          IF (g .LE. 1.d0) THEN
             WRITE (*, *) "BUG: gamma less than or equal to 1"
+            WRITE (*, *) "tau: ", tau, ", e: ", e, ", p: ", p
             WRITE (*, *) "gamma = ", g
             STOP
          ELSE IF (g .LE. five_third) THEN

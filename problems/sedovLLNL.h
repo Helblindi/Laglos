@@ -112,30 +112,28 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      if (t < 1e-12)
+      if (t < 0.)
       {
-         MFEM_ABORT("sie should be initialized with a delta function in driver.\n");
+         std::cout << "SedovLLNLProblem::sie0: t < 0.0\n";
+         std::cout << "Should not be here.\n";
       }
-      else
-      {
-         double xyt[3];
-         xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
+      double xyt[3];
+      xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
 
-         Vector v(dim);
-         v0(x, t, v);
-         double p = p0(x,t);
-         double rho = rho0(x,t);
-         double e = p / ((_gamma - 1.) * rho);
-         double se = sedov_e(xyt);
-         // e and se and the same, no bug in sedov_exact
-         // if (x.Norml2() < .1)
-         // {
-         //    cout << "pressure: " << p << ", density: " << rho << ", sie: " << e << ", se: " << se << endl;
-         // }
-         
-         // return sedov_e(xyt);
-         return e;
-      }
+      Vector v(dim);
+      v0(x, t, v);
+      double p = p0(x,t);
+      double rho = rho0(x,t);
+      double e = p / ((_gamma - 1.) * rho);
+      double se = sedov_e(xyt);
+      // e and se and the same, no bug in sedov_exact
+      // if (x.Norml2() < .1)
+      // {
+      //    cout << "pressure: " << p << ", density: " << rho << ", sie: " << e << ", se: " << se << endl;
+      // }
+      
+      // return sedov_e(xyt);
+      return e;
    }
    double p0(const Vector &x, const double &t) override
    {

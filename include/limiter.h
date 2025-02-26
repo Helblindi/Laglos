@@ -70,7 +70,7 @@ private:
    ParFiniteElementSpace H1_LO, H1_HO;
    ParGridFunction LO_proj_max, LO_proj_min;
    ParDiscreteLinearOperator vert_elem_oper; 
-   HypreParMatrix *vert_elem;
+   HypreParMatrix *vert_elem, *vert_elem_trans;
 
 public:
 IDPLimiter(ParFiniteElementSpace & _pfes, ParFiniteElementSpace & H1FESpace_proj_LO,
@@ -97,6 +97,16 @@ IDPLimiter(ParFiniteElementSpace & _pfes, ParFiniteElementSpace & H1FESpace_proj
    vert_elem_oper.Assemble();
    vert_elem_oper.Finalize();
    vert_elem = vert_elem_oper.ParallelAssemble();
+   vert_elem_trans = vert_elem->Transpose();
+
+   SparseMatrix _spm, _spm_trans;
+   vert_elem->MergeDiagAndOffd(_spm);
+   vert_elem_trans->MergeDiagAndOffd(_spm_trans);
+   cout << "vert_elem: ";
+   _spm.Print(cout);
+   cout << "transpose: ";
+   _spm_trans.Print(cout);
+   // cout << "height: " << _spm.Height() << ", width: " << _spm.Width() << endl;
 }
 
 ~IDPLimiter() 
@@ -115,7 +125,7 @@ IDPLimiter(ParFiniteElementSpace & _pfes, ParFiniteElementSpace & H1FESpace_proj
  */
 void LocalConservativeLimit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
-   cout << "IDPLimiter::LocalConservativeLimit\n";
+   // cout << "IDPLimiter::LocalConservativeLimit\n";
    ComputeRhoMinMax(gf_lo);
 
    MFEM_WARNING("Possible iterations.\n");
@@ -132,6 +142,7 @@ void LocalConservativeLimit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho
  */
 void ComputeRhoMinMax(const ParGridFunction &gf_lo)
 {
+   // cout << "IDPLimiter::ComputeRhoMinMax\n";
    // Continuous projection
    GridFunctionCoefficient LO_rho_gf_coeff(&gf_lo);
 
@@ -148,6 +159,11 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
    vert_elem->Mult(LO_proj_min, rho_min);
 }
 
+void GetAdjacency(const int dof, Array<int> &adj_dofs)
+{
+   MFEM_ABORT("How to collect eligible neighbors?");
+}
+
 /**
  * @brief Limit the high-order approximation using the local maximum
  * defined by the IDP update. This algorithm is described in equations
@@ -157,25 +173,47 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
  */
 void LimitMassMax(ParGridFunction &gf_ho)
 {
-   cout << "IDPLimiter::LimitMassMax\n";
+   // cout << "IDPLimiter::LimitMassMax\n";
    if (gf_ho.Size() != NDofs)
    {
       MFEM_ABORT("Incompatible sizes of gridfunctions provided.\n");
    }
 
-   MFEM_ABORT("How to collect eligible neighbors?");
+   Array<int> adj_dofs;
 
    /* Iterate over DoFs */
    for (int dof_it = 0; dof_it < NDofs; dof_it++)
    {
+      /* Get adjacency */
+      GetAdjacency(dof_it, adj_dofs);
+
       /* Compute ai+ */
+      double aip = 0.;
+      for (int j = 0; j < adj_dofs.Size(); j++)
+      {
+         int dof_j = adj_dofs[j];
+         aip += mass_vec[dof_j]*std::max(0., rho_max[dof_j] - gf_ho[dof_j]);
+      }
 
       /* Compute bi+ */
+      double bip = max(gf_ho[dof_it] - aip / mass_vec[dof_it], rho_max[dof_it]);
 
       /* Compute li+ */
+      double lip = 0.;
+      if (aip > 0.)
+      {
+         lip = mass_vec[dof_it] * (gf_ho[dof_it] - bip) / aip;
+      }
 
       /* Set y_i */
+      gf_ho[dof_it] = bip;
+
       /* Set y_j for all neighbors */
+      for (int j = 0; j < adj_dofs.Size(); j++)
+      {
+         int dof_j = adj_dofs[j];
+         gf_ho[dof_j] = gf_ho[dof_j] + lip * std::max(0., rho_max[dof_j] - gf_ho[dof_j]);
+      }
    }
 }
 

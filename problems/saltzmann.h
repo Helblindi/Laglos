@@ -55,7 +55,6 @@ private:
    bool _known_exact_solution = true;
    bool _bcs = true;
    bool _mv_bcs_need_updating = true;
-   int size_add_bdr_dofs;
    string _indicator = "saltzmann";
 
    // CFL change
@@ -116,23 +115,17 @@ public:
       add_ess_tdofs.Append(dofs_list);
 
       /* Fill bdr vals with 0 in this case */
-      size_add_bdr_dofs = add_ess_tdofs.Size();
+      int size_add_bdr_dofs = add_ess_tdofs.Size();
       add_bdr_vals.SetSize(size_add_bdr_dofs);
 
       /* since current time is t=0, this val is 0. */
       add_bdr_vals = 0.;
-
-      assert(add_bdr_vals.Size() == size_add_bdr_dofs);
    }
 
    /* The dirichlet condition that is enforced on the left hand side changes in time */
    void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override 
    {
-      // std::cout << "saltzman::update_additional_BCs\n";
-      /* Validate we do not divide by 0 and than the array of dofs is the right size */
       assert(timestep_first > 0.);
-      assert(add_bdr_vals.Size() == size_add_bdr_dofs);
-
       /* Solve for Dirichlet velocity at left wall */
       double _xi = t / (2*timestep_first);
       double _psi = (4. - (_xi + 1.) * (_xi - 2.) * ((_xi - 2.) - (abs(_xi-2.) + (_xi-2.)) / 2.)) / 4.;

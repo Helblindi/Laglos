@@ -111,7 +111,7 @@ void Geometric<dim>::GetNodeVelocity(const Vector &dSdt, const int & node, Vecto
 {
    Vector* sptr = const_cast<Vector*>(&dSdt);
    ParGridFunction dxdt;
-   dxdt.MakeRef(&H1, *sptr, block_offsets[1]);
+   dxdt.MakeRef(&H1, *sptr, block_offsets[0]);
    assert(dxdt.Size() == dim*NDofs_H1);
 
    for (int i = 0; i < dim; i++)

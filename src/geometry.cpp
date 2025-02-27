@@ -40,7 +40,6 @@ template<int dim>
 void Geometric<dim>::UpdateNodeVelocity(Vector &dSdt, const int & node, const Vector & vel) const
 {
    ParGridFunction dxdt;
-   MFEM_ABORT("Need to remove mv_gf implementation\n");
    dxdt.MakeRef(&H1, dSdt, block_offsets[0]);
    assert(dxdt.Size() == dim*NDofs_H1);
 

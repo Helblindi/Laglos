@@ -239,7 +239,7 @@ public:
 
    // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);
-   void FillCenterVelocitiesWithL2(Vector &S);
+   void FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt);
    void FillCenterVelocitiesWithAvg(Vector &S);
 
    // Normal vector mesh motion

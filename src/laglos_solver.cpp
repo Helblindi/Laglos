@@ -1681,6 +1681,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
    //      << "========================================\n";
+   UpdateMesh(S);
    int num_corrected_cells = 0;
    ParGridFunction sv_gf;
    sv_gf.MakeRef(&L2, S, block_offsets[1]);
@@ -2786,8 +2787,7 @@ void LagrangianLOOperator<dim>::
 template<int dim>
 void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 {
-   Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   x_gf.MakeRef(&H1, S, block_offsets[0]);
 
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector cell_x(dim), node_x(dim);
@@ -2838,7 +2838,9 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 /****************************************************************************************************
 * Function: FillCenterVelocitiesWithL2
 * Parameters:
-*   S        - BlockVector representing FiniteElement information
+*   S       - BlockVector containing cell L2 velocity
+*   dSdt    - BlockVector containing derivative information,
+*             containing mesh velocities
 *
 * Purpose:
 *  This function is only needed since we are not able to implement 
@@ -2849,12 +2851,11 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 *  by taking the hydrodynamic velocity at the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt)
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
-   Vector* sptr = const_cast<Vector*>(&S);
-   ParGridFunction v_gf;
-   v_gf.MakeRef(&H1, *sptr, block_offsets[2]);
+   ParGridFunction dxdt;
+   dxdt.MakeRef(&H1, dSdt, block_offsets[0]);
 
    Vector Uc(dim+2), node_v(dim);
 
@@ -2888,7 +2889,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
       pb->velocity(Uc, node_v);
       
       // Get corresponding velocity from ParGridFunction
-      geom.UpdateNodeVelocity(S, cell_vdof, node_v);
+      geom.UpdateNodeVelocity(dSdt, cell_vdof, node_v);
    }
 }
 
@@ -2909,6 +2910,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(Vector &S)
 template<int dim>
 void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
 {
+   MFEM_ABORT("Function not implemented\n");
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
@@ -3223,9 +3225,10 @@ template<int dim>
 void LagrangianLOOperator<dim>::UpdateMesh(const Vector & S) const 
 {
    Vector* sptr = const_cast<Vector*>(&S);
-   x_gf.MakeRef(&H1, *sptr, 0);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    H1.GetMesh()->NewNodes(x_gf, false);
    L2.GetMesh()->NewNodes(x_gf, false);
+   pmesh->NewNodes(x_gf, false);
 }
 
 
@@ -6214,10 +6217,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
    /* Objects needed for function */
    mfem::Mesh::FaceInformation FI;
    Vector* sptr_old = const_cast<Vector*>(&S_old);
-   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
    sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, S, block_offsets[1]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim);
@@ -6435,10 +6437,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
    /* Objects needed for function */
    mfem::Mesh::FaceInformation FI;
    Vector* sptr_old = const_cast<Vector*>(&S_old);
-   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
    sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, S, block_offsets[1]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim);
@@ -6604,10 +6605,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
    /* Objects needed for function */
    mfem::Mesh::FaceInformation FI;
    Vector* sptr_old = const_cast<Vector*>(&S_old);
-   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
    sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, S, block_offsets[1]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim), Vnode_mv2(dim);
@@ -6772,10 +6772,9 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
    /* Objects needed for function */
    mfem::Mesh::FaceInformation FI;
    Vector* sptr_old = const_cast<Vector*>(&S_old);
-   Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf, sv_old_gf;
    sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   sv_gf.MakeRef(&L2, S, block_offsets[1]);
 
    Vector S_new = S;
    Vector predicted_node_v(dim), Vnode_mv2(dim);
@@ -6975,6 +6974,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
 template<int dim>
 void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it)
 {
+   MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    double gamma_numer = 0., gamma_c_numer = 0., gamma_f_numer = 0., denom = 0.;
 
@@ -7144,6 +7144,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
 template<int dim>
 double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
 {
+   MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
 
    ParGridFunction sv_gf, sv_old_gf, mv_gf;
@@ -7201,6 +7202,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
 template<int dim>
 void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it)
 {
+   MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
    double alphaF = 0., alphaV = 0., denom = 0.;
 
@@ -7938,6 +7940,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
 template<int dim>
 void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf)
 {
+   MFEM_ABORT("Function deprecated\n");
    assert(mv_gf.Size() == dim * NVDofs_H1);
 
    mfem::Mesh::FaceInformation FI;

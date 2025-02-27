@@ -48,6 +48,7 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &dSdt, const int & node, const Ve
       int index = node + i * NDofs_H1;
       dxdt[index] = vel[i];
    }
+   dxdt.SyncAliasMemory(dSdt);
 }
 
 
@@ -91,7 +92,6 @@ void Geometric<dim>::UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, co
       int index = node + i * NVDofs_H1;
       dxdt_l[index] = vel[i];
    }
-
 }
 
 
@@ -188,6 +188,7 @@ void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vecto
       int index = node + i * NDofs_H1;
       x_gf[index] = x[i];
    }
+   x_gf.SyncAliasMemory(S);
 }
 
 

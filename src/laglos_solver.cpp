@@ -879,28 +879,37 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
       
       /* Project back onto mv_gf */
       dxdt_gf.ProjectGridFunction(dxdt_gf_l);
-      
-      /* Choose behavior for face velocity */
-      switch (fv_option)
-      {
-      case 1:
-         MFEM_ABORT("Current face mesh velocity calculation broken\n");
-         // ComputeCorrectiveFaceVelocities(S, t, dt);
-         break;
-      
-      case 2:
-         FillFaceVelocitiesWithAvg(dxdt_gf);
-         break;
 
-      case 3:
-         FillFaceVelocitiesWithButterfly(dxdt_gf);
-         break;
-      
-      default:
-         /* Do nothing */
-         break;
-      } // End face velocity switch case
-   }
+      if (NDofs_H1 != NDofs_H1L)
+      {
+         /* Must compute mesh velocities on cell centers and faces */
+         /* Choose behavior for face velocity */
+         switch (fv_option)
+         {
+         case 1:
+            MFEM_ABORT("Current face mesh velocity calculation broken\n");
+            // ComputeCorrectiveFaceVelocities(S, t, dt);
+            break;
+         
+         case 2:
+            FillFaceVelocitiesWithAvg(dxdt_gf);
+            break;
+
+         case 3:
+            FillFaceVelocitiesWithButterfly(dxdt_gf);
+            break;
+         
+         default:
+            /* Do nothing */
+            break;
+         } // End face velocity switch case
+
+         FillCenterVelocitiesWithAvg(dxdt_gf);
+      }
+   
+   } // End dim > 1
+
+   dxdt_gf.SyncAliasMemory(dS_dt);
    chrono_mm.Stop();
 }
 
@@ -1720,6 +1729,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
    /* Append onto timeseries data */
    ts_ppd_pct_cells.Append(pct_corrected);
    ts_ppd_rel_mag.Append(rel_mass_corrected);
+   sv_gf.SyncAliasMemory(S);
 }
 
 
@@ -2908,9 +2918,8 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vect
 *  by average the values at the four corner nodes of the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(ParGridFunction &dxdt) const
 {
-   MFEM_ABORT("Function not implemented\n");
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
@@ -2948,7 +2957,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            geom.GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(dxdt, verts[j], node_v);
             Vc += node_v;
          }
          Vc /= verts.Size();
@@ -2959,14 +2968,14 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            geom.GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(dxdt, verts[j], node_v);
             Vc += node_v;
          }
 
          Vc /= verts.Size();
       }
 
-      geom.UpdateNodeVelocity(S, cell_vdof, Vc);
+      geom.UpdateNodeVelocity(dxdt, cell_vdof, Vc);
    }
 }
 

@@ -110,7 +110,22 @@ public:
       Vector v;
       velocity(U, v);
       const double E = U[dim + 1]; // specific total energy
-      return E - 0.5 * pow(v.Norml2(), 2);
+      // return E - 0.5 * pow(v.Norml2(), 2); // Gives issues, see 'quest' branch
+
+      if (E < 1.e-20)
+      {
+         return 0.;
+      }
+      else
+      {
+         double _val = E - 0.5 * pow(v.Norml2(), 2);
+         if (_val <= 0.)
+         {
+            MFEM_ABORT("Negative internal energy computed.\n");
+         }
+         return _val;
+      }
+
    }
 
    static inline void velocity(const Vector & U, Vector &vel)

@@ -5,6 +5,7 @@ list(APPEND HDRS
    riemann1D.hpp
    initial_vals.hpp
    laglos_solver.hpp
+   laglos_assembly.hpp
    lagrange_multiplier.hpp
    lambda_max_lagrange.h
    sedov_exact.hpp

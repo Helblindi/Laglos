@@ -152,8 +152,11 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 2;  // Order of mesh movement approximation space
+   int order_mv = 1;  // Order of mesh movement approximation space
    int order_u = 0;
+   int order_q = -1;
+   double cg_tol = 1e-8;
+   int cg_max_iter = 300;
    int ode_solver_type = 1;
    double t_init = 0.0;
    double t_final = 0.6;
@@ -199,6 +202,12 @@ int main(int argc, char *argv[]) {
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
                   "Number of times to refine the mesh uniformly in parallel.");
    args.AddOption(&problem, "-p", "--problem", "Test problem to run.");
+   args.AddOption(&order_q, "-oq", "--order-intrule",
+                  "Order  of the integration rule.");
+   args.AddOption(&cg_tol, "-cgt", "--cg-tol",
+                  "Relative CG tolerance (velocity linear solve).");
+   args.AddOption(&cg_max_iter, "-cgm", "--cg-max-steps",
+                  "Maximum number of CG iterations (velocity linear solve).");
    args.AddOption(&ode_solver_type, "-s", "--ode-solver",
                   "ODE solver: 1 - Forward Euler,\n\t"
                   "            2 - RK2 SSP, 3 - RK3 SSP, 4 - RK4, 6 - RK6,\n\t"
@@ -554,6 +563,24 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
 
+   // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
+   // that the boundaries are straight.
+   Array<int> ess_tdofs, ess_vdofs;
+   {
+      Array<int> ess_bdr(pmesh->bdr_attributes.Max()), dofs_marker, dofs_list;
+      for (int d = 0; d < pmesh->Dimension(); d++)
+      {
+         // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
+         // i.e., we must enforce v_x/y/z = 0 for the velocity components.
+         ess_bdr = 0; ess_bdr[d] = 1;
+         H1FESpace.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+         ess_tdofs.Append(dofs_list);
+         H1FESpace.GetEssentialVDofs(ess_bdr, dofs_marker, d);
+         FiniteElementSpace::MarkerToList(dofs_marker, dofs_list);
+         ess_vdofs.Append(dofs_list);
+      }
+   }
+
    // Define the explicit ODE solver used for time integration.
    ODESolver *ode_solver = NULL;
    switch (ode_solver_type)
@@ -632,26 +659,32 @@ int main(int argc, char *argv[]) {
    *   - 1 -> specific volume
    *   - 2 -> velocity (L2V)
    *   - 3 -> speific total energy
+   *   - 4 -> HO Velocity (optional)
+   *   - 5 -> HO specific internal energy (optional)
    */
    const int Vsize_l2 = L2FESpace.GetVSize();
    const int Vsize_l2v = L2VFESpace.GetVSize();
    const int Vsize_h1 = H1FESpace.GetVSize();
-   Array<int> offset(5);
+   Array<int> offset(6);
    offset[0] = 0;
    offset[1] = offset[0] + Vsize_h1;
    offset[2] = offset[1] + Vsize_l2;
    offset[3] = offset[2] + Vsize_l2v;
    offset[4] = offset[3] + Vsize_l2;
+   offset[5] = offset[4] + Vsize_h1;
+   offset[6] = offset[5] + Vsize_l2;
    BlockVector S(offset, Device::GetMemoryType());
 
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
-   ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction x_gf, sv_gf, v_gf, ste_gf, rho_gf(&L2FESpace), rho0_gf(&L2FESpace), vHO_gf, eHO_gf;
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
    ste_gf.MakeRef(&L2FESpace, S, offset[3]);
+   vHO_gf.MakeRef(&H1FESpace, S, offset[4]);
+   eHO_gf.MakeRef(&L2FESpace, S, offset[5]);
 
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
@@ -813,9 +846,9 @@ int main(int argc, char *argv[]) {
    // Sync the data location of x_gf with its base, S
    x_gf.SyncAliasMemory(S);
 
+   cout << "Begin static function initialization\n";
    // Change class variables into static std::functions since virtual static member functions are not an option
    // and Coefficient class requires std::function arguments
-   using namespace std::placeholders;
    std::function<double(const Vector &,const double)> sv0_static = 
       std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<void(const Vector &, const double, Vector &)> v0_static = 
@@ -826,15 +859,31 @@ int main(int argc, char *argv[]) {
       std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> p0_static = 
       std::bind(&ProblemBase<dim>::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
-
+   std::function<double(const Vector &,const double)> gamma_func_static =
+      std::bind(&ProblemBase<dim>::gamma_func, problem_class, std::placeholders::_1, std::placeholders::_2);
+   cout << "End static function initialization\n";
    // Initialize specific volume, velocity, and specific total energy
    FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(t_init);
    sv_gf.ProjectCoefficient(sv_coeff);
+   sv_gf.SyncAliasMemory(S);
+
+   // Compute Density
+   for (int i = 0; i < sv_gf.Size(); i++)
+   {
+      rho_gf[i] = 1./sv_gf[i];
+   } 
 
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
    v_gf.ProjectCoefficient(v_coeff);
+   vHO_gf.ProjectCoefficient(v_coeff);
+   for (int i = 0; i < ess_vdofs.Size(); i++)
+   {
+      vHO_gf[ess_vdofs[i]] = 0.;
+   }
+   v_gf.SyncAliasMemory(S);
+   vHO_gf.SyncAliasMemory(S);
 
    // While the ste_coeff is not used for initialization in the Sedov case,
    // it is necessary for plotting the exact solution
@@ -847,11 +896,20 @@ int main(int argc, char *argv[]) {
       DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
                                blast_position[2], blast_energy);
       ste_gf.ProjectCoefficient(e_coeff);
+      eHO_gf.ProjectCoefficient(e_coeff);
    }
    else
    {
       ste_gf.ProjectCoefficient(ste_coeff);
+      eHO_gf.ProjectCoefficient(ste_coeff);
    }
+   ste_gf.SyncAliasMemory(S);
+   eHO_gf.SyncAliasMemory(S);
+
+   ParGridFunction gamma_gf(&L2FESpace);
+   FunctionCoefficient gamma_coeff(gamma_func_static);
+   gamma_coeff.SetTime(t_init);
+   gamma_gf.ProjectCoefficient(gamma_coeff);
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
@@ -860,11 +918,15 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
+   /* project onto rho0_gf for HO */
+   rho0_gf.ProjectCoefficient(rho_coeff);
+
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
+   MFEM_WARNING("Consider setting a reference to rho_gf in hydro class\n");
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL, order_q, cg_tol, cg_max_iter, gamma_gf, rho0_gf, rho_coeff, ess_tdofs);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -905,12 +967,12 @@ int main(int argc, char *argv[]) {
    char vishost[] = "localhost";
    int  visport   = 19916;
 
-   ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
+   ParGridFunction rho_cont_gf(&H1cFESpace);
    ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
-   /* Gridfunctions used in Triple Point */
-   ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
+   /* Gridfunction used in Triple Point */
+   ParGridFunction press_gf(&L2FESpace);
 
    if (problem == 1 || problem == 3)
    {
@@ -920,19 +982,17 @@ int main(int argc, char *argv[]) {
          hydro.GetCellStateVector(S, i, U);
          double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
          press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
       }
    }
 
    // Compute the density if we need to visualize it
    if (visualization || gfprint || visit || pview)
    {
-      // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
       {
          rho_gf[i] = 1./sv_gf[i];
       } 
-      // Continuous projection
+      // Continuous projection of density
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
@@ -1247,10 +1307,14 @@ int main(int argc, char *argv[]) {
       if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
-      hydro.UpdateMeshVelocityBCs(t,dt);
+      // hydro.UpdateMeshVelocityBCs(t,dt);
       ode_solver->Step(S, t, dt);
-      hydro.EnforceL2BC(S, t, dt);
+      // hydro.EnforceL2BC(S, t, dt);
       steps++;
+
+      // sv_gf = 0.;
+      // ste_gf = 0.;
+      // v_gf = 0.;
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -1284,6 +1348,8 @@ int main(int argc, char *argv[]) {
       sv_gf.SyncAliasMemory(S);
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
+      vHO_gf.SyncAliasMemory(S);
+      eHO_gf.SyncAliasMemory(S);
 
       if (last_step || (ti % vis_steps) == 0)
       {

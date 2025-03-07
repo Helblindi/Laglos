@@ -5,6 +5,7 @@
 // #include "initial_vals.hpp"
 #include "problem_base.h"
 #include "geometry.hpp" // Mesh information
+#include "laglos_assembly.hpp"
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
 #include <iostream>
@@ -104,6 +105,22 @@ protected:
    IntegrationRule RT_ir;
    const int RT_ir_order = 2;
 
+   /* Laghos velocity objects */
+   const IntegrationRule &ir;
+   mutable QuadratureData qdata;
+   mutable bool qdata_is_current, forcemat_is_assembled;
+   const ParGridFunction &gamma_gf;
+   mutable MixedBilinearForm Force;
+   mutable ParBilinearForm Mv;
+   SparseMatrix Mv_spmat_copy;
+   mutable ParFiniteElementSpace H1c;
+   mutable Vector X, B, one, rhs, e_rhs;
+   const double cg_rel_tol;
+   const int cg_max_iter;
+   const int l2dofs_cnt;
+   DenseTensor Me, Me_inv;
+   /* end laghos velocity objects */
+
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
    Table element_face;
@@ -127,7 +144,7 @@ protected:
    bool compute_mv = true;
    bool use_greedy_viscosity;
    bool post_process_density;
-   int mv_option = 0;
+   int mv_option = 2;
    bool do_mv_linearization;
    int fv_option = 0;
    int mv_it_option = 2;
@@ -143,7 +160,8 @@ protected:
    Array<double> HiopDGradData;
 
    int ess_tdofs_cart_size;
-   Array<int> ess_bdr, dofs_list, ess_tdofs;
+   Array<int> ess_bdr, dofs_list;
+   const Array<int> &ess_tdofs;
    mutable Array<double> bdr_vals;
    Array<int> add_ess_tdofs;
    mutable Array<double> add_bdr_vals;
@@ -166,8 +184,33 @@ public:
                         Array<int> offset,
                         bool use_viscosity,
                         bool mm,
-                        double CFL);
+                        double CFL,
+                        const int oq,
+                        const double cgt,
+                        const int cgiter,
+                        ParGridFunction &gamma_gf,
+                        ParGridFunction &rho0_gf,
+                        Coefficient &rho0_coeff,
+                        const Array<int> &ess_tdofs);
    ~LagrangianLOOperator();
+
+   /* Laghos velocity objects */
+   void UpdateQuadratureData(const Vector &S) const;
+   void ResetQuadratureData() const { qdata_is_current = false; }
+   virtual void ComputeMaterialProperties(int nvalues, const double gamma[],
+                                          const double rho[], const double e[],
+                                          double p[], double cs[]) const
+   {
+      for (int v = 0; v < nvalues; v++)
+      {
+         p[v]  = (gamma[v] - 1.0) * rho[v] * e[v];
+         cs[v] = sqrt(gamma[v] * (gamma[v]-1.0) * e[v]);
+      }
+   }
+   void AssembleForceMatrix() const;
+   void SolveHOVelocity(const Vector &S, Vector &dS_dt) const; // SolveVelocity from Laghos
+   void SolveHOEnergy(const Vector &S, const Vector &v, Vector &dS_dt) const; // SolveEnergy from Laghos
+   /* end */
 
    virtual void Mult(const Vector &S, Vector &dS_dt) const;
 

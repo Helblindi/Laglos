@@ -94,7 +94,14 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
                                                 Array<int> offset,
                                                 bool use_viscosity,
                                                 bool mm, 
-                                                double CFL) :
+                                                double CFL,
+                                                const int oq,
+                                                const double cgt,
+                                                const int cgiter,
+                                                ParGridFunction &gamma_gf,
+                                                ParGridFunction &rho0_gf,
+                                                Coefficient &rho0_coeff,
+                                                const Array<int> &ess_tdofs) :
    TimeDependentOperator(size),
    H1(h1),
    H1_L(h1_l),
@@ -146,7 +153,28 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
-   CFL(CFL)
+   CFL(CFL),
+   /* Laghos objects*/
+   l2dofs_cnt(L2.GetFE(0)->GetDof()),
+   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0),
+                   (oq > 0) ? oq : 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)),
+   qdata(dim, pmesh->GetNE(), ir.GetNPoints()),
+   gamma_gf(gamma_gf),
+   Force(&L2, &H1),
+   Mv(&H1),
+   Mv_spmat_copy(),
+   one(Vsize_L2),
+   rhs(Vsize_H1),
+   e_rhs(Vsize_L2),
+   H1c(H1.GetParMesh(), H1.FEColl(), 1),
+   X(H1c.GetTrueVSize()),
+   B(H1c.GetTrueVSize()),
+   cg_rel_tol(cgt), cg_max_iter(cgiter),
+   qdata_is_current(false),
+   forcemat_is_assembled(false),
+   ess_tdofs(ess_tdofs),
+   Me(l2dofs_cnt, l2dofs_cnt, NE),
+   Me_inv(l2dofs_cnt, l2dofs_cnt, NE)
 {
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
@@ -201,30 +229,31 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Initialize arrays of tdofs
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
    // that the boundaries are straight.
-   if (ess_bdr.Size() > 0)
-   {
-      for (int d = 0; d < dim; d++)
-      {
-         // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
-         // i.e., we must enforce v_x/y/z = 0 for the velocity components.
-         ess_bdr = 0; ess_bdr[d] = 1;
-         H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-         ess_tdofs.Append(dofs_list);
-      }
-      /* Set bdr_vals for dofs that should be 0 */
-      ess_tdofs_cart_size = ess_tdofs.Size();
-      bdr_vals.SetSize(ess_tdofs_cart_size);
-      bdr_vals = 0.;
+   MFEM_WARNING("ess_tdofs is out of wack. Herein it is defined on H1L, but must be defined on H1.\n");
+   // if (ess_bdr.Size() > 0)
+   // {
+   //    for (int d = 0; d < dim; d++)
+   //    {
+   //       // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
+   //       // i.e., we must enforce v_x/y/z = 0 for the velocity components.
+   //       ess_bdr = 0; ess_bdr[d] = 1;
+   //       H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+   //       ess_tdofs.Append(dofs_list);
+   //    }
+   //    /* Set bdr_vals for dofs that should be 0 */
+   //    ess_tdofs_cart_size = ess_tdofs.Size();
+   //    bdr_vals.SetSize(ess_tdofs_cart_size);
+   //    bdr_vals = 0.;
 
-      if (ess_bdr.Size() > 4)
-      {
-         MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+   //    if (ess_bdr.Size() > 4)
+   //    {
+   //       MFEM_WARNING("May need to enforce additional BCs.\n");
+   //       pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
 
-         ess_tdofs.Append(add_ess_tdofs);
-         bdr_vals.Append(add_bdr_vals);
-      }
-   }
+   //       ess_tdofs.Append(add_ess_tdofs);
+   //       bdr_vals.Append(add_bdr_vals);
+   //    }
+   // }
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
@@ -254,6 +283,133 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
    cout << "num_edges: " << num_edges << endl;
+
+   /* Laghos HO velocity */
+   // if (p_assembly)
+   // {
+   //    qupdate = new QUpdate(dim, NE, Q1D, visc, vort, cfl,
+   //                          &timer, gamma_gf, ir, H1, L2);
+   //    ForcePA = new ForcePAOperator(qdata, H1, L2, ir);
+   //    VMassPA = new MassPAOperator(H1c, ir, rho0_coeff);
+   //    EMassPA = new MassPAOperator(L2, ir, rho0_coeff);
+   //    // Inside the above constructors for mass, there is reordering of the mesh
+   //    // nodes which is performed on the host. Since the mesh nodes are a
+   //    // subvector, so we need to sync with the rest of the base vector (which
+   //    // is assumed to be in the memory space used by the mfem::Device).
+   //    H1.GetParMesh()->GetNodes()->ReadWrite();
+   //    // Attributes 1/2/3 correspond to fixed-x/y/z boundaries, i.e.,
+   //    // we must enforce v_x/y/z = 0 for the velocity components.
+   //    const int bdr_attr_max = H1.GetMesh()->bdr_attributes.Max();
+   //    Array<int> ess_bdr(bdr_attr_max);
+   //    for (int c = 0; c < dim; c++)
+   //    {
+   //       ess_bdr = 0;
+   //       ess_bdr[c] = 1;
+   //       H1c.GetEssentialTrueDofs(ess_bdr, c_tdofs[c]);
+   //       c_tdofs[c].Read();
+   //    }
+   //    X.UseDevice(true);
+   //    B.UseDevice(true);
+   //    rhs.UseDevice(true);
+   //    e_rhs.UseDevice(true);
+   // }
+   // else
+   // {
+   // Standard local assembly and inversion for energy mass matrices.
+   // 'Me' is used in the computation of the internal energy
+   // which is used twice: once at the start and once at the end of the run.
+   MassIntegrator mi(rho0_coeff, &ir);
+   for (int e = 0; e < NE; e++)
+   {
+      DenseMatrixInverse inv(&Me(e));
+      const FiniteElement &fe = *L2.GetFE(e);
+      ElementTransformation &Tr = *L2.GetElementTransformation(e);
+      mi.AssembleElementMatrix(fe, Tr, Me(e));
+      inv.Factor();
+      inv.GetInverseMatrix(Me_inv(e));
+   }
+   // Standard assembly for the velocity mass matrix.
+   VectorMassIntegrator *vmi = new VectorMassIntegrator(rho0_coeff, &ir);
+   Mv.AddDomainIntegrator(vmi);
+   Mv.Assemble();
+   Mv_spmat_copy = Mv.SpMat();
+   // }
+
+   // Values of rho0DetJ0 and Jac0inv at all quadrature points.
+   // Initial local mesh size (assumes all mesh elements are the same).
+   int Ne, ne = NE;
+   double Volume, vol = 0.0;
+   // if (dim > 1 && p_assembly)
+   // {
+   //    Rho0DetJ0Vol(dim, NE, ir, pmesh, L2, rho0_gf, qdata, vol);
+   // }
+   // else
+   // {
+   const int NQ = ir.GetNPoints();
+   Vector rho_vals(NQ);
+   for (int e = 0; e < NE; e++)
+   {
+      rho0_gf.GetValues(e, ir, rho_vals);
+      ElementTransformation &Tr = *H1.GetElementTransformation(e);
+      for (int q = 0; q < NQ; q++)
+      {
+         const IntegrationPoint &ip = ir.IntPoint(q);
+         Tr.SetIntPoint(&ip);
+         DenseMatrixInverse Jinv(Tr.Jacobian());
+         Jinv.GetInverseMatrix(qdata.Jac0inv(e*NQ + q));
+         const double rho0DetJ0 = Tr.Weight() * rho_vals(q);
+         qdata.rho0DetJ0w(e*NQ + q) = rho0DetJ0 * ir.IntPoint(q).weight;
+      }
+   }
+   for (int e = 0; e < NE; e++) { vol += pmesh->GetElementVolume(e); }
+   // }
+   MPI_Allreduce(&vol, &Volume, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
+   MPI_Allreduce(&ne, &Ne, 1, MPI_INT, MPI_SUM, pmesh->GetComm());
+   switch (pmesh->GetElementBaseGeometry(0))
+   {
+      case Geometry::SEGMENT: qdata.h0 = Volume / Ne; break;
+      case Geometry::SQUARE: qdata.h0 = sqrt(Volume / Ne); break;
+      case Geometry::TRIANGLE: qdata.h0 = sqrt(2.0 * Volume / Ne); break;
+      case Geometry::CUBE: qdata.h0 = pow(Volume / Ne, 1./3.); break;
+      case Geometry::TETRAHEDRON: qdata.h0 = pow(6.0 * Volume / Ne, 1./3.); break;
+      default: MFEM_ABORT("Unknown zone type!");
+   }
+   qdata.h0 /= (double) H1.GetOrder(0);
+
+   // if (p_assembly)
+   // {
+   //    // Setup the preconditioner of the velocity mass operator.
+   //    // BC are handled by the VMassPA, so ess_tdofs here can be empty.
+   //    Array<int> empty_tdofs;
+   //    VMassPA_Jprec = new OperatorJacobiSmoother(VMassPA->GetBF(), empty_tdofs);
+   //    CG_VMass.SetPreconditioner(*VMassPA_Jprec);
+
+   //    CG_VMass.SetOperator(*VMassPA);
+   //    CG_VMass.SetRelTol(cg_rel_tol);
+   //    CG_VMass.SetAbsTol(0.0);
+   //    CG_VMass.SetMaxIter(cg_max_iter);
+   //    CG_VMass.SetPrintLevel(-1);
+
+   //    CG_EMass.SetOperator(*EMassPA);
+   //    CG_EMass.iterative_mode = false;
+   //    CG_EMass.SetRelTol(cg_rel_tol);
+   //    CG_EMass.SetAbsTol(0.0);
+   //    CG_EMass.SetMaxIter(cg_max_iter);
+   //    CG_EMass.SetPrintLevel(-1);
+   // }
+   // else
+   // {
+   ForceIntegrator *fi = new ForceIntegrator(qdata);
+   fi->SetIntRule(&ir);
+   Force.AddDomainIntegrator(fi);
+   // Make a dummy assembly to figure out the sparsity.
+   Force.Assemble(0);
+   Force.Finalize(0);
+   one.UseDevice(true);
+   one = 1.;
+
+   // }
+   cout << "LagrangianLOOperator Laghos HO velocity constructor [END]\n";
 }
 
 template<int dim>
@@ -271,18 +427,28 @@ void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
    // needed only because some mfem time integrators don't update the solution
    // vector at every intermediate stage (hence they don't change the mesh).
    UpdateMesh(S);
-
-   dS_dt = 0.0;
+   Vector *sptr = const_cast<Vector*>(&S);
+   // dS_dt = 0.0;
 
    /* Update sv_gf, v_gf, ste_gf */
    SolveHydro(S, dS_dt);
 
    /* Update dx_dt */
-   if (this->compute_mv)
+   switch(mv_option)
    {
-      SolveMeshVelocities(S, dS_dt);
+   case -1://HO
+   {
+      ParGridFunction vHO, dx;
+      dx.MakeRef(&H1, dS_dt, block_offsets[0]);
+      vHO.MakeRef(&H1, *sptr, block_offsets[4]);
+      dx = vHO;
+      SolveHOVelocity(S, dS_dt);
+      SolveHOEnergy(S, vHO, dS_dt);
+
+      qdata_is_current = false;
+      break;
    }
-   else
+   case 0://
    {
       /* This assumes that before Mult has been called, this->mv_gf has been set externally */
       if (this->mv_gf.Size() != Vsize_H1)
@@ -293,6 +459,14 @@ void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
       ParGridFunction dxdt_gf;
       dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
       dxdt_gf = this->mv_gf;
+      break;
+   }
+   case 1:
+   case 2:
+      SolveMeshVelocities(S, dS_dt);
+      break;
+   default:
+      MFEM_ABORT("Invalid mesh velocity option.");
    }
 }
 
@@ -869,6 +1043,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          /* Optionally, enforce boundary conditions */
          if (pb->has_boundary_conditions())
          {
+            MFEM_ABORT("ess_tdofs is currently defined on H1 in laglos but herein is implemented as if defined on H1c.\n");
             for (int i = 0; i < ess_tdofs.Size(); i++) { 
                // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
                dxdt_gf_l(ess_tdofs[i]) = bdr_vals[i]; 
@@ -966,7 +1141,6 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces+1);
 
    // Create dummy coefficients
-   using namespace std::placeholders;
    std::function<double(const Vector &,const double)> rho0_static = 
       std::bind(&ProblemBase<dim>::rho0, pb, std::placeholders::_1, std::placeholders::_2);
 
@@ -8972,6 +9146,397 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
       const int nz = zones_per_dof[i];
       if (nz) { v_geo_gf(i) /= nz; }
    }
+}
+
+
+/*
+* Laghos functions 
+*/
+// Smooth transition between 0 and 1 for x in [-eps, eps].
+MFEM_HOST_DEVICE inline double smooth_step_01(double x, double eps)
+{
+   const double y = (x + eps) / (2.0 * eps);
+   if (y < 0.0) { return 0.0; }
+   if (y > 1.0) { return 1.0; }
+   return (3.0 - 2.0 * y) * y * y;
+}
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
+{
+   cout << "========================================\n"
+        << "          UpdateQuadratureData          \n"
+        << "========================================\n";
+   if (qdata_is_current) { return; }
+
+   qdata_is_current = true;
+   forcemat_is_assembled = false;
+
+   // if (dim > 1 && p_assembly) { return qupdate->UpdateQuadratureData(S, qdata); }
+
+   // This code is only for the 1D/FA mode
+   // timer.sw_qdata.Start();
+   const int nqp = ir.GetNPoints();
+   // ParGridFunction ste, e(&L2), sv, rho_gf(&L2), v, vHO;
+   ParGridFunction e, vHO;
+   Vector* sptr = const_cast<Vector*>(&S);
+   // sv.MakeRef(&L2, *sptr, block_offsets[1]);
+   // for (int i = 0; i < Vsize_L2; i++) { rho_gf(i) = 1. / sv(i); }
+   // v.MakeRef(&L2V, *sptr, block_offsets[2]); // Using the dg vel fails bad
+   vHO.MakeRef(&H1, *sptr, block_offsets[4]); // only used in viscosity
+   e.MakeRef(&L2, *sptr, block_offsets[5]);
+   // ste.MakeRef(&L2, *sptr, block_offsets[3]);
+   // Vector _vv(dim);
+   // for (int i = 0; i < Vsize_L2; i++) { 
+   //    _vv[0] = v[i];
+   //    _vv[1] = v[i + Vsize_L2];
+   //    double E = ste[i];
+   //    e[i] = E - 0.5 * pow(_vv.Norml2(), 2); 
+   // }
+
+   Vector e_vals, rho_vals;
+   DenseMatrix Jpi(dim), sgrad_v(dim), Jinv(dim), stress(dim), stressJiT(dim);
+
+   // Batched computations are needed, because hydrodynamic codes usually
+   // involve expensive computations of material properties. Although this
+   // miniapp uses simple EOS equations, we still want to represent the batched
+   // cycle structure.
+   int nzones_batch = 3;
+   const int nbatches =  NE / nzones_batch + 1; // +1 for the remainder.
+   int nqp_batch = nqp * nzones_batch;
+   double *gamma_b = new double[nqp_batch],
+   *rho_b = new double[nqp_batch],
+   *e_b   = new double[nqp_batch],
+   *p_b   = new double[nqp_batch],
+   *cs_b  = new double[nqp_batch];
+   // Jacobians of reference->physical transformations for all quadrature points
+   // in the batch.
+   DenseTensor *Jpr_b = new DenseTensor[nzones_batch];
+   for (int b = 0; b < nbatches; b++)
+   {
+      int z_id = b * nzones_batch; // Global index over zones.
+      // The last batch might not be full.
+      if (z_id == NE) { break; }
+      else if (z_id + nzones_batch > NE)
+      {
+         nzones_batch = NE - z_id;
+         nqp_batch    = nqp * nzones_batch;
+      }
+
+      double min_detJ = std::numeric_limits<double>::infinity();
+      for (int z = 0; z < nzones_batch; z++)
+      {
+         ElementTransformation *T = H1.GetElementTransformation(z_id);
+         Jpr_b[z].SetSize(dim, dim, nqp);
+         // ste.GetValues(z_id, ir, e_vals);
+         e.GetValues(z_id, ir, e_vals);
+         // rho_gf.GetValues(z_id, ir, rho_vals);
+         for (int q = 0; q < nqp; q++)
+         {
+            const IntegrationPoint &ip = ir.IntPoint(q);
+            T->SetIntPoint(&ip);
+            Jpr_b[z](q) = T->Jacobian();
+            const double detJ = Jpr_b[z](q).Det();
+            min_detJ = fmin(min_detJ, detJ);
+            const int idx = z * nqp + q;
+            // Assuming piecewise constant gamma that moves with the mesh.
+            gamma_b[idx] = gamma_gf(z_id);
+            rho_b[idx] = qdata.rho0DetJ0w(z_id*nqp + q) / detJ / ip.weight;
+            // rho_b[idx] = fmax(0.0, rho_vals(q));
+            e_b[idx] = fmax(0.0, e_vals(q));
+         }
+         ++z_id;
+      }
+
+      // Batched computation of material properties.
+      ComputeMaterialProperties(nqp_batch, gamma_b, rho_b, e_b, p_b, cs_b);
+
+      z_id -= nzones_batch;
+      for (int z = 0; z < nzones_batch; z++)
+      {
+         ElementTransformation *T = H1.GetElementTransformation(z_id);
+         for (int q = 0; q < nqp; q++)
+         {
+            const IntegrationPoint &ip = ir.IntPoint(q);
+            T->SetIntPoint(&ip);
+            // Note that the Jacobian was already computed above. We've chosen
+            // not to store the Jacobians for all batched quadrature points.
+            const DenseMatrix &Jpr = Jpr_b[z](q);
+            CalcInverse(Jpr, Jinv);
+            const double detJ = Jpr.Det(), rho = rho_b[z*nqp + q],
+                         p = p_b[z*nqp + q], sound_speed = cs_b[z*nqp + q];
+            stress = 0.0;
+            for (int d = 0; d < dim; d++) { stress(d, d) = -p; }
+            double visc_coeff = 0.0;
+            if (use_viscosity)
+            {
+               // Compression-based length scale at the point. The first
+               // eigenvector of the symmetric velocity gradient gives the
+               // direction of maximal compression. This is used to define the
+               // relative change of the initial length scale.
+               vHO.GetVectorGradient(*T, sgrad_v);
+
+               double vorticity_coeff = 1.0;
+               // if (use_vorticity)
+               // {
+               //    const double grad_norm = sgrad_v.FNorm();
+               //    const double div_v = fabs(sgrad_v.Trace());
+               //    vorticity_coeff = (grad_norm > 0.0) ? div_v / grad_norm : 1.0;
+               // }
+
+               sgrad_v.Symmetrize();
+               double eig_val_data[3], eig_vec_data[9];
+               if (dim==1)
+               {
+                  eig_val_data[0] = sgrad_v(0, 0);
+                  eig_vec_data[0] = 1.;
+               }
+               else { sgrad_v.CalcEigenvalues(eig_val_data, eig_vec_data); }
+               Vector compr_dir(eig_vec_data, dim);
+               // Computes the initial->physical transformation Jacobian.
+               mfem::Mult(Jpr, qdata.Jac0inv(z_id*nqp + q), Jpi);
+               Vector ph_dir(dim); Jpi.Mult(compr_dir, ph_dir);
+               // Change of the initial mesh size in the compression direction.
+               const double h = qdata.h0 * ph_dir.Norml2() /
+                                compr_dir.Norml2();
+               // Measure of maximal compression.
+               const double mu = eig_val_data[0];
+               visc_coeff = 2.0 * rho * h * h * fabs(mu);
+               // The following represents a "smooth" version of the statement
+               // "if (mu < 0) visc_coeff += 0.5 rho h sound_speed".  Note that
+               // eps must be scaled appropriately if a different unit system is
+               // being used.
+               const double eps = 1e-12;
+               visc_coeff += 0.5 * rho * h * sound_speed * vorticity_coeff *
+                             (1.0 - smooth_step_01(mu - 2.0 * eps, eps));
+               stress.Add(visc_coeff, sgrad_v);
+            }
+            // Time step estimate at the point. Here the more relevant length
+            // scale is related to the actual mesh deformation; we use the min
+            // singular value of the ref->physical Jacobian. In addition, the
+            // time step estimate should be aware of the presence of shocks.
+            const double h_min =
+               Jpr.CalcSingularvalue(dim-1) / (double) H1.GetOrder(0);
+            const double inv_dt = sound_speed / h_min +
+                                  2.5 * visc_coeff / rho / h_min / h_min;
+            if (min_detJ < 0.0)
+            {
+               // This will force repetition of the step with smaller dt.
+               qdata.dt_est = 0.0;
+            }
+            else
+            {
+               if (inv_dt>0.0)
+               {
+                  qdata.dt_est = fmin(qdata.dt_est, CFL*(1.0/inv_dt));
+               }
+            }
+            // Quadrature data for partial assembly of the force operator.
+            MultABt(stress, Jinv, stressJiT);
+            stressJiT *= ir.IntPoint(q).weight * detJ;
+            for (int vd = 0 ; vd < dim; vd++)
+            {
+               for (int gd = 0; gd < dim; gd++)
+               {
+                  qdata.stressJinvT(vd)(z_id*nqp + q, gd) =
+                     stressJiT(vd, gd);
+               }
+            }
+         }
+         ++z_id;
+      }
+   }
+   delete [] gamma_b;
+   delete [] rho_b;
+   delete [] e_b;
+   delete [] p_b;
+   delete [] cs_b;
+   delete [] Jpr_b;
+   // timer.sw_qdata.Stop();
+   // timer.quad_tstep += NE;
+   cout << "end uqd\n";
+}
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::AssembleForceMatrix() const
+{
+   cout << "========================================\n"
+        << "          AssembleForceMatrix           \n"
+        << "========================================\n";
+   // if (forcemat_is_assembled || p_assembly) { return; }
+   if (forcemat_is_assembled) { return; }
+   Force = 0.0;
+   // timer.sw_force.Start();
+   Force.Assemble();
+   // timer.sw_force.Stop();
+   forcemat_is_assembled = true;
+   cout << "end afm\n";
+}
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) const
+{
+   cout << "========================================\n"
+        << "            SolveHOVelocity             \n"
+        << "========================================\n";
+   UpdateQuadratureData(S);
+   AssembleForceMatrix();
+   // The monolithic BlockVector stores the unknown fields as follows:
+   // (Position, Velocity, Specific Internal Energy).
+   ParGridFunction dv;
+   dv.MakeRef(&H1, dS_dt, block_offsets[4]);
+   dv = 0.0;
+
+   // ParGridFunction accel_src_gf;
+   // if (source_type == 2)
+   // {
+   //    accel_src_gf.SetSpace(&H1);
+   //    RTCoefficient accel_coeff(dim);
+   //    accel_src_gf.ProjectCoefficient(accel_coeff);
+   //    accel_src_gf.Read();
+   // }
+
+   // if (p_assembly)
+   // {
+   //    timer.sw_force.Start();
+   //    ForcePA->Mult(one, rhs);
+   //    timer.sw_force.Stop();
+   //    rhs.Neg();
+
+   //    // Partial assembly solve for each velocity component
+   //    const int size = H1c.GetVSize();
+   //    const Operator *Pconf = H1c.GetProlongationMatrix();
+   //    for (int c = 0; c < dim; c++)
+   //    {
+   //       dvc_gf.MakeRef(&H1c, dS_dt, H1Vsize + c*size);
+   //       rhs_c_gf.MakeRef(&H1c, rhs, c*size);
+
+   //       if (Pconf) { Pconf->MultTranspose(rhs_c_gf, B); }
+   //       else { B = rhs_c_gf; }
+
+   //       if (source_type == 2)
+   //       {
+   //          ParGridFunction accel_comp;
+   //          accel_comp.MakeRef(&H1c, accel_src_gf, c*size);
+   //          Vector AC;
+   //          accel_comp.GetTrueDofs(AC);
+   //          Vector BA(AC.Size());
+   //          VMassPA->MultFull(AC, BA);
+   //          B += BA;
+   //       }
+
+   //       H1c.GetRestrictionMatrix()->Mult(dvc_gf, X);
+   //       VMassPA->SetEssentialTrueDofs(c_tdofs[c]);
+   //       VMassPA->EliminateRHS(B);
+   //       timer.sw_cgH1.Start();
+   //       CG_VMass.Mult(B, X);
+   //       timer.sw_cgH1.Stop();
+   //       timer.H1iter += CG_VMass.GetNumIterations();
+   //       if (Pconf) { Pconf->Mult(X, dvc_gf); }
+   //       else { dvc_gf = X; }
+   //       // We need to sync the subvector 'dvc_gf' with its base vector
+   //       // because it may have been moved to a different memory space.
+   //       dvc_gf.GetMemory().SyncAlias(dS_dt.GetMemory(), dvc_gf.Size());
+   //    }
+   // }
+   // else
+   // {
+   // timer.sw_force.Start();
+   Force.Mult(one, rhs);
+   // timer.sw_force.Stop();
+   rhs.Neg();
+
+   // if (source_type == 2)
+   // {
+   //    Vector rhs_accel(rhs.Size());
+   //    Mv_spmat_copy.Mult(accel_src_gf, rhs_accel);
+   //    rhs += rhs_accel;
+   // }
+
+   HypreParMatrix A;
+   Mv.FormLinearSystem(ess_tdofs, dv, rhs, A, X, B);
+   CGSolver cg(H1.GetParMesh()->GetComm());
+   HypreSmoother prec;
+   prec.SetType(HypreSmoother::Jacobi, 1);
+   cg.SetPreconditioner(prec);
+   cg.SetOperator(A);
+   cg.SetRelTol(cg_rel_tol);
+   cg.SetAbsTol(0.0);
+   cg.SetMaxIter(cg_max_iter);
+   cg.SetPrintLevel(-1);
+   // timer.sw_cgH1.Start();
+   cg.Mult(B, X);
+   // timer.sw_cgH1.Stop();
+   // timer.H1iter += cg.GetNumIterations();
+   Mv.RecoverFEMSolution(X, rhs, dv);
+   // }
+   cout << "end shov\n";
+}
+
+
+template<int dim>
+void LagrangianLOOperator<dim>::SolveHOEnergy(const Vector &S, const Vector &v, Vector &dS_dt) const
+{
+   UpdateQuadratureData(S);
+   AssembleForceMatrix();
+
+   // The monolithic BlockVector stores the unknown fields as follows:
+   // (Position, Velocity, Specific Internal Energy).
+   ParGridFunction de;
+   de.MakeRef(&L2, dS_dt, block_offsets[5]);
+   de = 0.0;
+
+   // Solve for energy, assemble the energy source if such exists.
+   LinearForm *e_source = nullptr;
+   // if (source_type == 1) // 2D Taylor-Green.
+   // {
+   //    // Needed since the Assemble() defaults to PA.
+   //    L2.GetMesh()->DeleteGeometricFactors();
+   //    e_source = new LinearForm(&L2);
+   //    TaylorCoefficient coeff;
+   //    DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
+   //    e_source->AddDomainIntegrator(d);
+   //    e_source->Assemble();
+   // }
+
+   Array<int> l2dofs;
+   // if (p_assembly)
+   // {
+   //    timer.sw_force.Start();
+   //    ForcePA->MultTranspose(v, e_rhs);
+   //    timer.sw_force.Stop();
+   //    if (e_source) { e_rhs += *e_source; }
+   //    timer.sw_cgL2.Start();
+   //    CG_EMass.Mult(e_rhs, de);
+   //    timer.sw_cgL2.Stop();
+   //    const HYPRE_Int cg_num_iter = CG_EMass.GetNumIterations();
+   //    timer.L2iter += (cg_num_iter==0) ? 1 : cg_num_iter;
+   //    // Move the memory location of the subvector 'de' to the memory
+   //    // location of the base vector 'dS_dt'.
+   //    de.GetMemory().SyncAlias(dS_dt.GetMemory(), de.Size());
+   // }
+   // else // not p_assembly
+   // {
+   // timer.sw_force.Start();
+   Force.MultTranspose(v, e_rhs);
+   // timer.sw_force.Stop();
+   if (e_source) { e_rhs += *e_source; }
+   Vector loc_rhs(l2dofs_cnt), loc_de(l2dofs_cnt);
+   for (int e = 0; e < NE; e++)
+   {
+      L2.GetElementDofs(e, l2dofs);
+      e_rhs.GetSubVector(l2dofs, loc_rhs);
+      // timer.sw_cgL2.Start();
+      Me_inv(e).Mult(loc_rhs, loc_de);
+      // timer.sw_cgL2.Stop();
+      // timer.L2iter += 1;
+      de.SetSubVector(l2dofs, loc_de);
+   }
+   // }
+   delete e_source;
 }
 
 

@@ -94,7 +94,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) override
+   virtual double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
       // Use van der Waals
       // double rho = 1. / U[0];
@@ -111,7 +111,7 @@ public:
          assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::pressure funcalls.\n");
          _g = _gamma_2;
       }
-      return (_g - 1.) * this->internal_energy(U);
+      return (_g - 1.) * rho * sie;
    }
 
    /*********************************************************

@@ -98,19 +98,20 @@ public:
    virtual void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t=0.) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
 
    /* ProblemDescription */
-   static double internal_energy(const Vector &U)
+   static double internal_energy(const Vector &U, const double e_sheer)
    {
       const double &rho = 1./U[0];
-      const double &e = specific_internal_energy(U);
+      const double &e = specific_internal_energy(U, e_sheer);
       return rho * e;
    }
 
-   static double specific_internal_energy(const Vector &U)
+   static double specific_internal_energy(const Vector &U, const double e_sheer)
    {
+      assert(e_sheer >= 0.);
       Vector v;
       velocity(U, v);
       const double E = U[dim + 1]; // specific total energy
-      return E - 0.5 * pow(v.Norml2(), 2);
+      return E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
    }
 
    static inline void velocity(const Vector & U, Vector &vel)
@@ -125,6 +126,8 @@ public:
    inline double compute_lambda_max(const Vector & U_i,
                                     const Vector & U_j,
                                     const Vector & n_ij,
+                                    double esl, // e_sheer_left
+                                    double esr, // e_sheer_right
                                     double in_pl,
                                     double in_pr,
                                     const bool &use_greedy_viscosity,
@@ -151,12 +154,12 @@ public:
          in_taul = U_i[0];
          velocity(U_i, vi);
          in_ul = vi * n_ij; 
-         in_el = specific_internal_energy(U_i);
+         in_el = specific_internal_energy(U_i, esl);
 
          in_taur = U_j[0]; 
          velocity(U_j, vj);
          in_ur = vj * n_ij; 
-         in_er = specific_internal_energy(U_j);
+         in_er = specific_internal_energy(U_j, esr);
       }
 
       in_rhol = 1. / in_taul;
@@ -231,12 +234,27 @@ public:
       // return 0.5;
    }
 
+   /**
+    * @brief Computes the flux matrix for a given state vector U.
+    *
+    * This function calculates the flux matrix based on the input state vector U
+    * and an optional cell attribute. The flux matrix is used in the context of
+    * solving partial differential equations, particularly in fluid dynamics.
+    *
+    * @param U The state vector for which the flux is to be computed.
+    * @param cell_attr An optional integer representing cell attributes, default is 0.
+    * @return A DenseMatrix representing the flux of the state vector U.
+    *
+    * Note: This function assumes elasticity is not being used.
+    */
    inline DenseMatrix flux(const Vector &U, const int &cell_attr=0)
    {
       DenseMatrix result(dim+2, dim);
 
       Vector v; velocity(U, v);
-      const double p = pressure(U, cell_attr);
+      const double rho = 1. / U[0];
+      const double sie = specific_internal_energy(U, 0.);
+      const double p = pressure(rho, sie, cell_attr);
 
       // * is not overridden for Vector class, but *= is
       Vector v_neg = v, vp = v;
@@ -256,13 +274,10 @@ public:
       return result;
    }
 
-   inline double sound_speed(const Vector &U, const int &cell_attr=0)
+   inline double sound_speed(const double &rho, const double &press, const int &cell_attr=0)
    {
-      double _pressure = this->pressure(U, cell_attr);
-      double density = 1. / U[0];
-
-      double val = this->get_gamma(cell_attr) * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
-      val -= 2. * this->get_a() * density;
+      double val = this->get_gamma(cell_attr) * (press + this->get_a() * pow(rho,2)) / (rho * (1. - this->get_b() * rho));
+      val -= 2. * this->get_a() * rho;
       val = pow(val, 0.5);
       return val;
    }
@@ -287,7 +302,7 @@ public:
    /*********************************************
     * Functions to be overridden
     ********************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) {
+   virtual double pressure(const double &rho, const double &sie, const int &cell_attr=0) {
       MFEM_ABORT("Must override pressure in ProblemBase class.\n");
    } // virtual function, must be overridden
    virtual double rho0(const Vector &x, const double & t) {

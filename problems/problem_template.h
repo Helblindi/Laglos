@@ -86,7 +86,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
+   double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
       /*
       Must Override

@@ -84,7 +84,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
+   double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
       // TODO: Must fix to use cell specific gamma
       double _g;
@@ -94,7 +94,7 @@ public:
          assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::pressure funcalls.\n");
          _g = _gamma_2;
       }
-      return (_g - 1.) * this->internal_energy(U);
+      return (_g - 1.) * rho * sie;
       
    }
 

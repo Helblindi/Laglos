@@ -104,10 +104,9 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
+   double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
-      double density = 1. / U[0];
-      return pow(density, this->get_gamma());
+      return pow(rho, this->get_gamma());
    }
 
    /*********************************************************

@@ -76,14 +76,10 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) override
+   virtual double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
       // Use van der Waals
-      double rho = 1. / U[0];
-      double sie = this->specific_internal_energy(U);
-
       double val = (this->get_gamma() - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
-
       return val;
    }
 

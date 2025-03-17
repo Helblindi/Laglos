@@ -55,10 +55,15 @@ add_executable(TestLM EXCLUDE_FROM_ALL test_lagrange_multipliers.cpp "${MFEM_DIR
 target_link_libraries(TestLM PRIVATE "${MFEM_LIBRARIES}")
 add_test(NAME TestLM COMMAND TestLM)
 
+# Test elastic functions
+add_executable(TestElastic EXCLUDE_FROM_ALL test_elastic.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp" "${PROJECT_SOURCE_DIR}/src/geometry.cpp")
+target_link_libraries(TestElastic PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_lagrangian_greedy vdw_fortran)
+add_test(NAME TestElastic COMMAND TestElastic)
+
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
 # add_dependencies(build_tests TestRTvel TestRaviart Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran)
-add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran TestMM TestLM)
+add_dependencies(build_tests Test1D Test2D TestEulerianMWS TestLagrangianMWS TestFortran TestMM TestLM TestElastic)

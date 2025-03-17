@@ -7,6 +7,7 @@
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
+#include "elastic.hpp" //NF//MS
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -56,6 +57,7 @@ protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1Lc;
+   const ParGridFunction &rho0_gf;
    mutable ParGridFunction x_gf;
    mutable ParGridFunction mv_gf;
    mutable ParGridFunction v_CR_gf; // 5.7(b)
@@ -100,9 +102,12 @@ protected:
 
    // Mesh information
    const int NE, NBE;
-
    IntegrationRule RT_ir;
    const int RT_ir_order = 2;
+
+   // Elasticity //NF//MS
+   bool use_elasticity = false;
+   const IntegrationRule ir;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
@@ -153,6 +158,7 @@ protected:
    Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int, ts_kidder_avg_density, ts_kidder_avg_entropy;
 
 public:
+   const Elastic<dim> elastic; //NF//MS
    enum DofEntity {corner, face, cell};
 
    LagrangianLOOperator(const int size,
@@ -161,6 +167,7 @@ public:
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
+                        const ParGridFunction &rho0_gf,
                         ParLinearForm *m,
                         ProblemBase<dim> *_pb,
                         Array<int> offset,
@@ -202,6 +209,9 @@ public:
 
    /* System timing */
    mutable StopWatch chrono_mm, chrono_state, chrono_dij, chrono_mm_lin, chrono_hiop;
+
+   //NF//MS
+   void SetElasticity(const bool _use_elasticity) { this->use_elasticity = _use_elasticity; }
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);

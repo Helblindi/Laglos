@@ -89,6 +89,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
                                                 ParFiniteElementSpace &l2,
                                                 ParFiniteElementSpace &l2v,
                                                 ParFiniteElementSpace &cr,
+                                                const ParGridFunction &rho0_gf,
                                                 ParLinearForm *m,
                                                 ProblemBase<dim> *_pb,
                                                 Array<int> offset,
@@ -103,6 +104,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
+   rho0_gf(rho0_gf),
    x_gf(&H1),
    mv_gf(&H1),
    v_CR_gf(&CR),
@@ -146,7 +148,9 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
-   CFL(CFL)
+   CFL(CFL),
+   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
+   elastic(H1, L2, rho0_gf, ir) //NF//MS
 {
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
@@ -355,8 +359,24 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             MFEM_ABORT("Incorrect dimension provided.\n");
          }
       }
+      DenseMatrix F_i;
+      //NF//MS
+      if (use_elasticity)
+      {
+         const double _rho = 1./U_i[0];
+         double _es = 0.;
+         DenseMatrix _sigmaD(3);
 
-      const DenseMatrix F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
+         // _sigmaD is 3 x 3
+         elastic.ComputeS(ci, _rho, _es, _sigmaD);
+
+         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, pmesh->GetAttribute(ci));
+      }
+      else
+      {
+         F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
+      }
+
       rhs = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -381,7 +401,24 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             GetCellStateVector(S, cj, U_j); 
 
             // flux contribution
-            DenseMatrix dm = pb->flux(U_j, pmesh->GetAttribute(cj));
+            DenseMatrix dm;
+            //NF//MS
+            if (use_elasticity)
+            {
+               const double _rho = 1./U_j[0];
+               double _es = 0.;
+               DenseMatrix _sigmaD(3);
+
+               // _sigmaD is 3 x 3
+               elastic.ComputeS(cj, _rho, _es, _sigmaD);
+
+               dm = pb->ElasticFlux(_sigmaD, _es, U_j, pmesh->GetAttribute(cj));
+            }
+            else
+            {
+               dm = pb->flux(U_j, pmesh->GetAttribute(cj));
+            }
+
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -510,7 +547,11 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   DenseMatrix F_i_bdry = F_i;
                   F_i_bdry.GetRow(0, cell_v);
                   cell_v *= -1.; // Negate the velocity
-                  double _press = pb->pressure(U_i_bdry, bdr_attribute);
+                  double _rho = 1. / U_i_bdry[0];
+                  double _esi = 0.;
+                  if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
+                  double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
+                  double _press = pb->pressure(_rho, _sie, bdr_attribute);
                   for (int i = 0; i < dim; i++)
                   {
                      F_i_bdry(i+1, i) = _press;
@@ -1030,13 +1071,26 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
          pb->lm_update(b_covolume);
 
+         // Compute sheer energy, if applicable
+         double esl = 0., esr = 0.;
+         if (use_elasticity)
+         {
+            esl = elastic.e_sheer(c);
+            esr = elastic.e_sheer(cp);
+         }
+
          // Compute pressure with given EOS
-         double pl = pb->pressure(Uc,pmesh->GetAttribute(c));
-         double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+         double rhoL = 1. / Uc[0];
+         double sieL = pb->specific_internal_energy(Uc, esl);
+         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(c));
+
+         double rhoR = 1. / Ucp[0];
+         double sieR = pb->specific_internal_energy(Ucp, esr);
+         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
-         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
-         d = lambda_max * c_norm; 
+         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
+         d = lambda_max * c_norm;
          dij_avg += d;
 
          dij_sparse->Elem(c,cp) = d;
@@ -1417,7 +1471,10 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
    {
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double pressure = pb->pressure(U, pmesh->GetAttribute(cell_it));
+      double e_sheer = 0.;
+      if (use_elasticity) { e_sheer = elastic.e_sheer(cell_it); }
+      double sie = pb->specific_internal_energy(U, e_sheer);
+      double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
       avg_density += density;
@@ -3260,8 +3317,12 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
       pb->velocity(U, vel);
-      pressure = pb->pressure(U, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(U, pmesh->GetAttribute(i));
+      double rho = 1. / U[0];
+      double e_sheer = 0.;
+      if (use_elasticity) { e_sheer = elastic.e_sheer(i); }
+      double sie = pb->specific_internal_energy(U, e_sheer);
+      pressure = pb->pressure(rho, e_sheer, pmesh->GetAttribute(i));
+      ss = pb->sound_speed(rho, pressure, pmesh->GetAttribute(i));
       
       pmesh->GetElementCenter(i, center);
 

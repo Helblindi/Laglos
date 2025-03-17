@@ -107,11 +107,19 @@ public:
 
    static double specific_internal_energy(const Vector &U, const double e_sheer)
    {
-      assert(e_sheer >= 0.);
+      // Verify e_sheer > 0.
+      assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
+      
+      /* Subtract out kinetic and sheer energy */
       Vector v;
       velocity(U, v);
       const double E = U[dim + 1]; // specific total energy
-      return E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
+      double val = E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
+
+      // Verify sie > 0.
+      assert(val >=  -std::numeric_limits<double>::epsilon());
+
+      return val;
    }
 
    static inline void velocity(const Vector & U, Vector &vel)
@@ -270,6 +278,87 @@ public:
       }
 
       result.SetRow(dim+1, vp);
+
+      return result;
+   }
+
+   //NF//MS add a compute sigma routine here you have to compute the F tensor in each points and its average
+   // on the cell. then compute C then sigma, you will need the pressure in that subroutine
+   // this as to be compute 
+   /**
+    * @brief Computes the stress tensor sigma by adding the deviatoric stress tensor and the pressure term.
+    *
+    * This function calculates the stress tensor `sigma` by first extracting the dim x dim deviatoric stress tensor 
+    * from `sig_dev` and then adding the pressure term to it. The pressure is computed based on the 
+    * state vector `U` and an optional cell attribute `cell_attr`.
+    *
+    * @param[in] sig_dev The deviatoric stress tensor as a DenseMatrix.
+    * @param[in] U The state vector.
+    * @param[out] sigma The resulting stress tensor.
+    * @param[in] cell_attr An optional cell attribute used in the pressure calculation (default is 0).
+    *
+    * NOTE: @param sig_dev is not assumed to be dim x dim.
+    */
+   inline void ComputeSigma(const DenseMatrix &sig_dev, const double &pressure, DenseMatrix &sigma, const int&cell_attr=0)
+   {
+      // cout << "ProblemBase::ComputeSigma\n";
+
+      DenseMatrix I(dim);
+      I = 0.;
+      Array<int> idx(dim);
+      for (int i = 0; i < dim; i++) {
+         idx[i] = i;
+         I(i,i) = 1.;
+      }
+
+      sig_dev.GetSubMatrix(idx, idx, sigma);
+      assert(sigma.NumRows() == dim && sigma.NumCols() == dim);
+      mfem::Add(sigma, I, pressure, sigma);
+   }
+
+   /**
+    * @brief Computes the elastic flux for a given deviatoric stress tensor and displacement vector.
+    *
+    * This function calculates the elastic flux based on the provided deviatoric stress tensor (`sig_dev`),
+    * state vector (`U`), and an optional cell attribute (`cell_attr`). It first computes a flux matrix
+    * using the state vector and cell attribute, then computes the stress tensor `sigma` and sets it
+    * in the appropriate submatrix of the result. The function currently contains an assertion that always fails.
+    *
+    * @param sig_dev The deviatoric stress tensor as a DenseMatrix.
+    * @param U The state vector.
+    * @param cell_attr An optional integer representing the cell attribute (default is 0).
+    * @return A DenseMatrix representing the computed elastic flux.
+    *
+    * NOTE: @param sig_dev is not assumed to be dim x dim.
+    */
+   inline DenseMatrix ElasticFlux(const DenseMatrix &sig_dev, const double &es, const Vector &U, const int &cell_attr=0)
+   {
+      // cout << "ProblemBase::ElasticFlux\n";
+      DenseMatrix result(dim+2, dim);
+      // Indices from stress tensor in result
+      Array<int> idx(dim), idy(dim);
+      for (int i = 0; i < dim; i++) { 
+         idx[i] = 1 + i;
+         idy[i] = i;
+      }
+
+      /* Compute dim x dim stress tensor */
+      DenseMatrix sigma(dim);
+      const double rho = 1./ U[0];
+      const double sie = specific_internal_energy(U, es);
+      const double _pressure = pressure(rho, sie, cell_attr);
+      ComputeSigma(sig_dev, _pressure, sigma, cell_attr);
+
+      // * is not overridden for Vector class, but *= is
+      Vector v; velocity(U, v);
+      Vector v_neg = v, sigmav(dim);
+      v_neg *= -1.;
+      sigma.Mult(v, sigmav);
+
+      // Set entries in flux
+      result.SetRow(0,v_neg);
+      result.SetSubMatrix(idx, idy, sigma);
+      result.SetRow(dim+1, sigmav);
 
       return result;
    }

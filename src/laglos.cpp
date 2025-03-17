@@ -173,6 +173,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    bool post_process_density = false;
+   bool use_elasticity = false;
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
@@ -235,6 +236,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable checking if the mesh has twisted.");
    args.AddOption(&post_process_density, "-ppd", "--post-process-density", "-no-ppd", "--no-post-process-density",
                   "Enable or disable density post processing to guarantee conservation of mass.");
+   args.AddOption(&use_elasticity, "-ue", "--use-elasticity", "-no-ue", "--no-use-elasticity",
+                  "Enable or disable the use of elasticity."); //NF//MS
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities:"
                   "\n\t 00 - Arithmetic avg of adj cells,"
@@ -648,6 +651,7 @@ int main(int argc, char *argv[]) {
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
    ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction rho0_gf(&L2FESpace);
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
@@ -860,16 +864,20 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
+   /* Initialize rho0_gf */
+   rho0_gf.ProjectCoefficient(rho_coeff);
+
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
+   hydro.SetElasticity(use_elasticity); //NF//MS
 
    /* 
    If opting to use greedy viscosity, verify that you have not opted to use a few steps of GMV first. 
@@ -912,18 +920,6 @@ int main(int argc, char *argv[]) {
    /* Gridfunctions used in Triple Point */
    ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
 
-   if (problem == 1 || problem == 3)
-   {
-      Vector U(dim+2);
-      for (int i = 0; i < press_gf.Size(); i++)
-      {
-         hydro.GetCellStateVector(S, i, U);
-         double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
-         press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
-      }
-   }
-
    // Compute the density if we need to visualize it
    if (visualization || gfprint || visit || pview)
    {
@@ -935,6 +931,25 @@ int main(int argc, char *argv[]) {
       // Continuous projection
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+   }
+
+   if (problem == 1 || problem == 3)
+   {
+      Vector U(dim+2);
+      for (int i = 0; i < press_gf.Size(); i++)
+      {
+         hydro.GetCellStateVector(S, i, U);
+         double _rho = 1. / U[0];
+         double _esheer = 0.;
+         if (use_elasticity)
+         {
+            _esheer = hydro.elastic.e_sheer(i);
+         }
+         double _sie = problem_class->specific_internal_energy(U, _esheer);
+         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+         press_gf[i] = pressure;
+         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+      }
    }
 
    /* Initial visualization */
@@ -1354,7 +1369,14 @@ int main(int argc, char *argv[]) {
                for (int i = 0; i < press_gf.Size(); i++)
                {
                   hydro.GetCellStateVector(S, i, U);
-                  double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+                  double _rho = 1. / U[0];
+                  double _esheer = 0.;
+                  if (use_elasticity)
+                  {
+                     _esheer = hydro.elastic.e_sheer(i);
+                  }
+                  double _sie = problem_class->specific_internal_energy(U, _esheer);
+                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
                   press_gf[i] = pressure;
                }
                Wx += offx;

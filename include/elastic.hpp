@@ -29,6 +29,7 @@ private:
    // Reference to physical Jacobian for the initial mesh.
    // These are computed only at time zero and stored here.
    DenseTensor Jac0inv;
+   double mu = 100.E9;
 
 public:
    Elastic(ParFiniteElementSpace &h1_fes,
@@ -77,19 +78,16 @@ public:
    
    double e_sheer(const double &trc, const double &trc2) const
    {
-      double _mu = 1.;
-      return _mu * (trc/3. - 1.); // Neo hookean
+      return mu * (trc/3. - 1.); // Neo hookean
    }
 
    double des_dtrc(const double &trc, const double &trc2) const
    {
-      double _mu = 1.;
-      return _mu / 3.; // Neo hookean
+      return mu / 3.; // Neo hookean
    }
 
    double des_dtrc2(const double &trc, const double &trc2) const
    {
-      double _mu = 1.;
       return 0.; // Neo hookean
    }
 

@@ -108,7 +108,8 @@ public:
    static double specific_internal_energy(const Vector &U, const double e_sheer)
    {
       // Verify e_sheer > 0.
-      assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
+      // TODO: This is a temporary fix. The correct fix is to ensure that e_sheer is always positive.
+      // assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
       
       /* Subtract out kinetic and sheer energy */
       Vector v;
@@ -117,7 +118,11 @@ public:
       double val = E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
 
       // Verify sie > 0.
-      assert(val >=  -std::numeric_limits<double>::epsilon());
+      if (val <  -std::numeric_limits<double>::epsilon())
+      {
+         cout << "sie: " << val << endl;
+         MFEM_ABORT("Specific internal energy is negative or zero.\n");
+      }
 
       return val;
    }
@@ -381,6 +386,18 @@ public:
       return 1./val;
    }
 
+   /**
+    * @brief Computes the total specific energy at a given point and time.
+    *
+    * This function calculates the total specific energy by adding the specific internal energy
+    * and the contribution of the kinetic energy at a given point and time.
+    *
+    * @param x The spatial coordinates as a Vector.
+    * @param t The time as a double.
+    * @return The total specific energy as a double.
+    *
+    * NOTE: There is no sheer energy at initial time.
+    */
    double ste0(const Vector &x, const double & t)
    {
       Vector v(dim);

@@ -101,6 +101,7 @@
 *     p = 41 --> lax
 *     p = 42 --> leblanc
 *     p = 43 --> riemann
+*     p = 50 --> elastic shocktube
 *     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"
@@ -525,6 +526,9 @@ int main(int argc, char *argv[]) {
       case 43: // Riemann Problem
          problem_class = new RiemannProblem<dim>();
          break;
+      case 50: // Elastic shocktube
+         problem_class = new ElasticShocktube<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;
@@ -933,7 +937,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
-   if (problem == 1 || problem == 3)
+   if (problem == 1 || problem == 3 || problem == 50)
    {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
@@ -990,7 +994,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 1 || problem == 3 || problem == 16)
+      if (problem == 1 || problem == 3 || problem == 16 || problem == 50)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -1146,7 +1150,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 1 || problem == 3 || problem == 16) 
+   if (problem == 1 || problem == 3 || problem == 16 || problem == 50) 
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1363,7 +1367,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 1 || problem == 3 || problem == 16) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16 || problem == 50) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)

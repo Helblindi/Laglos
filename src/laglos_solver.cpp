@@ -1089,7 +1089,15 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
-         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
+         if (use_elasticity)
+         {
+            lambda_max = 1.E9;
+         }
+         else
+         {
+            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
+         }
+         
          d = lambda_max * c_norm;
          dij_avg += d;
 

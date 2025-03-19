@@ -24,4 +24,6 @@
 #include "kidder.h"
 #include "kidder_ball.h"
 #include "taylor_green.h"
+#include "elastic_shocktube.h"
+
 #endif

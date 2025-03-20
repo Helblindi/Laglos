@@ -267,6 +267,68 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
    dij_sparse = nullptr;
 }
 
+/**
+ * @brief Computes the sigma grid function (sigma_gf) based on the input vector S.
+ *
+ * This function computes the stress tensor grid function (sigma_gf) using the provided vector S.
+ * It assumes that the elasticity is being used and that the size of sigma_gf matches the
+ * number of degrees of freedom in the L2 space (NDofs_L2).
+ *
+ * @tparam dim The dimension of the problem.
+ * @param S The input vector containing the state information.
+ * @param sigma_gf The output parameter that will hold the computed sigma grid function.
+ *
+ * @note This function will need to be modified for 2D and 3D.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
+{
+   assert(this->use_elasticity);
+   assert(sigma_gf.Size() == NDofs_L2);
+
+   ParGridFunction sv_gf;
+   Vector* sptr = const_cast<Vector*>(&S);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   Vector U(dim+2);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      GetCellStateVector(S,e,U);
+      double rho = 1./sv_gf[e], es = 0.;
+      DenseMatrix sigmaD(3);
+      elastic.ComputeS(e, rho, es, sigmaD);
+      pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
+      sigma_gf[e] = sigmaD(0,0);
+   }
+}
+
+/**
+ * @brief Computes the Jacobian grid function (f_gf) based on the elasticity tensor.
+ *
+ * This function computes the Jacobian grid function (f_gf) using the elasticity tensor.
+ * It assumes that the elasticity is being used and that the size of f_gf matches the
+ * number of degrees of freedom in the L2 space (NDofs_L2).
+ *
+ * @tparam dim The dimension of the problem.
+ * @param f_gf The output parameter that will hold the computed F grid function.
+ *
+ * @note This function will need to be modified for 2D and 3D.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
+{
+   assert(this->use_elasticity);
+   assert(f_gf.Size() == NDofs_L2);
+
+   DenseMatrix F(3);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      elastic.ComputeF(e, F);
+      f_gf[e] = F(0,0);
+   }
+}
+
 /* This Mult method is not mass conservative by itself */
 template<int dim>
 void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const

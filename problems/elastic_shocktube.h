@@ -49,25 +49,29 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _a = 0., _b = 0., _gamma = 3.4;
-   bool _distort_mesh = false;
-   bool _known_exact_solution = true;
-   bool _bcs = true; // Indicator for boundary conditions
-   string _indicator = "ElasticShocktube"; // Possible: saltzmann
+   double _gamma = 4.4;
+   bool _known_exact_solution = false;
+   bool _bcs = false; // Indicator for boundary conditions
+   string _indicator = "ElasticShocktube";
 
-   double rhoL = 7000., rhoR = 7000., pL = 10.E5, pR = 1.E5, vL = 0., vR = 0.;
+   //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
+   // 5.2 elastic shock
+   double rhoL = 1000., rhoR = 1000., pL = 1.E7, pR = 1.E5, vL = 0., vR = 0.;
    double x_center = 0.5;
-   const double p_inf = 10.E10;
+   const double p_inf = 6.E8;
+
+   // 5.3 elastic shock with five waves
+   //NF//MS - Shear, how to introduce tangential velocity in a 1d test?
+   // double rhoL = 1000., rhoR = 1000., pL = 1.E8, pR = 1.E5, vL = 100., vR = -100.;
+   // double x_center = 0.5;
+   // const double p_inf = 6.E8;
 
 public:
    ElasticShocktube()
    {
-      this->set_a(_a);
-      this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
       this->set_bcs_indicator(_bcs);
-      this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
    }
    
@@ -96,17 +100,8 @@ public:
       }
       else
       {
-         double params[8];
-         params[0] = rhoL; params[3] = rhoR; // rho
-         params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
-         params[6] = this->get_gamma();      // gamma
-         params[7] = x_center;               // x_center
-         riemann1D::init(params);
-
-         double _p[2];
-         _p[0] = x[0]; _p[1] = t;
-         return riemann1D::p(_p);
+         MFEM_ABORT("No exact solution.\n");
+         return -1.;
       }
    }
 
@@ -130,41 +125,20 @@ public:
             }
          }
       }
-      else // use exact solution in riemann1D.hpp
+      else
       {
-         double params[8];
-         params[0] = rhoL; params[3] = rhoR; // rho
-         params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
-         params[6] = this->get_gamma();      // gamma
-         params[7] = x_center;               // x_center
-         riemann1D::init(params);
-
-         double p[2];
-         p[0] = x[0]; p[1] = t;
-         return riemann1D::rho(p);
+         MFEM_ABORT("No exact solution.\n");
+         return -1.;
       }
    }
    void v0(const Vector &x, const double & t, Vector &v) override
    {
+      v = 0.;
       if (t < 1e-12)
       {
-         v = vL;
+         v[0] = (x(0) < x_center) ? vL : vR;
       }
-      else
-      {
-         double params[8];
-         params[0] = rhoL; params[3] = rhoR; // rho
-         params[1] = pL; params[4] = pR;     // p
-         params[2] = params[5] = vL;         // u
-         params[6] = this->get_gamma();      // gamma
-         params[7] = x_center;               // x_center
-         riemann1D::init(params);
 
-         double p[2];
-         p[0] = x[0]; p[1] = t;
-         v[0] = riemann1D::v(p);
-      }
       return;
    }
 

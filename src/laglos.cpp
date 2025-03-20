@@ -1322,8 +1322,8 @@ int main(int argc, char *argv[]) {
 
             cout << std::fixed;
             cout << "step " << std::setw(5) << ti
-                 << ",\tt = " << std::setw(5) << std::setprecision(4) << t
-                 << ",\tdt = " << std::setw(5) << std::setprecision(6) << dt
+                 << ",\tt = " << std::setw(8) << std::setprecision(6) << t
+                 << ",\tdt = " << std::setw(8) << std::setprecision(8) << dt
                  << ",\t|e| = " << std::setprecision(10) << std::scientific
                  << sqrt_norm
                  << endl;

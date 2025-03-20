@@ -110,7 +110,6 @@ public:
       // Verify e_sheer > 0.
       // TODO: This is a temporary fix. The correct fix is to ensure that e_sheer is always positive.
       // assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
-      
       /* Subtract out kinetic and sheer energy */
       Vector v;
       velocity(U, v);
@@ -120,7 +119,7 @@ public:
       // Verify sie > 0.
       if (val <  -std::numeric_limits<double>::epsilon())
       {
-         cout << "sie: " << val << endl;
+         cout << "sie computation. E: " << E << ", ke: " << 0.5 * pow(v.Norml2(), 2) << ", esheer: " << e_sheer << ", sie: " << val << endl;
          MFEM_ABORT("Specific internal energy is negative or zero.\n");
       }
 

@@ -616,8 +616,11 @@ template<int dim>
 void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const double &dt)
 {
    int el, info;
-   Array<int> vel_dofs(2);
-   vel_dofs[0] = 1, vel_dofs[1]=2;
+   Array<int> vel_dofs(dim);
+   for (int i = 0; i < dim; i++)
+   {
+      vel_dofs[i] = i + 1;
+   }
    Vector vel(dim), Ui(dim+2);
 
    // Post processing modify computed values to enforce BCs
@@ -1091,7 +1094,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          // Finally compute lambda max
          if (use_elasticity)
          {
-            lambda_max = 1.E9;
+            lambda_max = 1.E8;
          }
          else
          {
@@ -2001,7 +2004,7 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
    mfem::Mesh::FaceInformation FI;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), Vf(dim), Vf_flux(dim); 
-   Vector n_vec(dim), tau_vec(dim);
+   Vector n_vec(dim);
    double d, c_norm, F;
 
    Array<int> row;
@@ -2021,9 +2024,6 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
       n_vec = n_int;
       F = n_vec.Norml2();
       n_vec /= F;
-      tau_vec = n_vec;
-      geom.Orthogonal(tau_vec);
-      tau_vec *= -1.;
       if (1. - n_vec.Norml2() > 1e-12)
       {
          cout << "n_vec: ";
@@ -2050,7 +2050,6 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
             // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
             double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
-            // Vf.Add(coeff, tau_vec);
 
             // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
             // {

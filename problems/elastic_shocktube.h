@@ -57,9 +57,10 @@ private:
 
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
    // 5.2 elastic shock
-   double rhoL = 1000., rhoR = 1000., pL = 1.E7, pR = 1.E5, vL = 0., vR = 0.;
+   double rhoL = 1.E3, rhoR = 1.E3, pL = 1.E6, pR = 1.E5, vL = 0., vR = 0.;
    double x_center = 0.5;
    const double p_inf = 6.E8;
+   // const double p_inf = 0.;
 
    // 5.3 elastic shock with five waves
    //NF//MS - Shear, how to introduce tangential velocity in a 1d test?

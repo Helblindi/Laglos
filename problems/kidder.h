@@ -56,7 +56,8 @@ private:
    double t_exact;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = false; // Indicator for boundary conditions
+   bool _thbcs = false; // Indicator for thermal boundary conditions
+   bool _mvbcs = false; // Indicator for mv boundary conditions
    bool _mv_bcs_need_updating = true;
    string _indicator = "Kidder"; // Possible: saltzmann
 
@@ -87,7 +88,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);

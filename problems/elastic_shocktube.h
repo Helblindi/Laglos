@@ -51,7 +51,8 @@ private:
     *********************************************************/
    double _gamma = 4.4;
    bool _known_exact_solution = false;
-   bool _bcs = false; // Indicator for boundary conditions
+   bool _thbcs = false; // Indicator for thermal boundary conditions
+   bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "ElasticShocktube";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
@@ -71,7 +72,8 @@ public:
    {
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_exact_solution(_known_exact_solution);
    }
    

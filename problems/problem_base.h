@@ -47,7 +47,8 @@ private:
    double a = 0., b = 0., gamma = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
-   bool bcs = false; // Indicator for boundary conditions
+   bool th_bcs = false; // Indicator for thermo boundary conditions to be imposed on the thermo solution
+   bool mv_bcs = false; // Indicator for mesh velocity boundary conditions to be imposed on the mesh velocity solution  
    // Indicator if mesh velocity boundary conditions need to be updated at each iteration
    // So far the only problem that needs this is Saltzman
    bool mv_bcs_need_updating = false; 
@@ -65,7 +66,8 @@ public:
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
-   void set_bcs_indicator(const bool &tvalue) { this->bcs = tvalue; }
+   void set_thbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
+   void set_mvbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
    void set_mv_bcs_need_updating_indicator(const bool &tvalue) { this->mv_bcs_need_updating = tvalue; }
    void set_distort_mesh(const bool &_distort_mesh) { distort_mesh = _distort_mesh; }
    void set_exact_solution(const bool &_known_exact_solution) { known_exact_solution = _known_exact_solution; }
@@ -79,7 +81,8 @@ public:
    double get_a() { return a; }
    double get_b() { return b; }
    string get_indicator() { return indicator; }
-   bool has_boundary_conditions() { return bcs; }
+   bool has_th_boundary_conditions() { return th_bcs; }
+   bool has_mv_boundary_conditions() { return mv_bcs; }
    bool get_mv_bcs_need_updating() { return mv_bcs_need_updating; }
    bool get_distort_mesh() { return distort_mesh; }
    bool has_exact_solution() { return known_exact_solution; }

@@ -1330,46 +1330,55 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       int bdr_attr = pmesh->GetBdrAttribute(i);
       int face = pmesh->GetBdrElementFaceIndex(i);
 
-      pmesh->GetEdgeVertices(face, verts);
-      for (int k = 0; k < verts.Size(); k++)
+      if (dim == 1)
       {
-         int index = verts[k];
-         // TODO: Get rid of all get_indicator() funcalls, replace with use of class int problem.
-         if (pb->get_indicator() == "saltzmann")
+         BdrVertexIndexingArray[face] = bdr_attr;
+      }
+      else
+      {
+         assert(dim == 2);
+
+         pmesh->GetEdgeVertices(face, verts);
+         for (int k = 0; k < verts.Size(); k++)
          {
-            // Replace the bdr attribute in the array as long as it is not
-            // the dirichlet condition (For Saltzmann Problem)
-            // This ensures the left wall vertices have the proper indicator
-            if (BdrVertexIndexingArray[index] != 5)
+            int index = verts[k];
+            // TODO: Get rid of all get_indicator() funcalls, replace with use of class int problem.
+            if (pb->get_indicator() == "saltzmann")
+            {
+               // Replace the bdr attribute in the array as long as it is not
+               // the dirichlet condition (For Saltzmann Problem)
+               // This ensures the left wall vertices have the proper indicator
+               if (BdrVertexIndexingArray[index] != 5)
+               {
+                  BdrVertexIndexingArray[index] = bdr_attr;
+               }
+            }
+            else if (pb->get_indicator() == "Sod" ||
+                     pb->get_indicator() == "TriplePoint" || 
+                     pb->get_indicator() == "riemann" ||
+                     pb->get_indicator() == "Sedov" || 
+                     pb->get_indicator() == "SodRadial" || 
+                     pb->get_indicator() == "TaylorGreen")
+            {
+               // Mark corner vertices as 5
+               // These nodes should not move at all during the simulation
+               // Identify these corner vertices as those that already have
+               // a value non negative
+               if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
+               {
+                  BdrVertexIndexingArray[index] = 5;
+               }
+               else 
+               {
+                  BdrVertexIndexingArray[index] = bdr_attr;
+               }
+            }
+            else
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
-         }
-         else if (pb->get_indicator() == "Sod" ||
-                  pb->get_indicator() == "TriplePoint" || 
-                  pb->get_indicator() == "riemann" ||
-                  pb->get_indicator() == "Sedov" || 
-                  pb->get_indicator() == "SodRadial" || 
-                  pb->get_indicator() == "TaylorGreen")
-         {
-            // Mark corner vertices as 5
-            // These nodes should not move at all during the simulation
-            // Identify these corner vertices as those that already have
-            // a value non negative
-            if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
-            {
-               BdrVertexIndexingArray[index] = 5;
-            }
-            else 
-            {
-               BdrVertexIndexingArray[index] = bdr_attr;
-            }
-         }
-         else
-         {
-            BdrVertexIndexingArray[index] = bdr_attr;
-         }
-      } // end vertex iterator
+         } // end vertex iterator
+      }
 
    } // end boundary elements
 }

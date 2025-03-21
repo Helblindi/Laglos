@@ -1158,6 +1158,11 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          if (use_elasticity)
          {
             lambda_max = 6.E3 * rhoL;
+            if (pb->get_indicator() == "ElasticImpact")
+            {
+               MFEM_WARNING("lambda_max must take into account the velocity of the material??\n");
+               lambda_max = 6.E4 * rhoL;
+            }
             // lambda_max = 5.E3;
             // lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
          }

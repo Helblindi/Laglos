@@ -102,6 +102,8 @@
 *     p = 42 --> leblanc
 *     p = 43 --> riemann
 *     p = 50 --> elastic shocktube
+*     p = 51 --> elastic impact
+*     p = 52 --> elastic sheer
 *     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"
@@ -529,6 +531,13 @@ int main(int argc, char *argv[]) {
       case 50: // Elastic shocktube
          problem_class = new ElasticShocktube<dim>();
          break;
+      case 51: // Elastic impact
+         problem_class = new ElasticImpact<dim>();
+         break;
+      case 52: // Elastic shear
+         MFEM_ABORT("Not implemented.\n");
+         problem_class = new ElasticSheer<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;
@@ -938,7 +947,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
-   if (problem == 1 || problem == 3 || problem == 50)
+   if (problem == 1 || problem == 3 || problem == 50 || problem == 51 || problem == 52)
    {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
@@ -999,7 +1008,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 1 || problem == 3 || problem == 16 || problem == 50)
+      if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -1012,7 +1021,7 @@ int main(int argc, char *argv[]) {
                         "Gamma", Wx, Wy, Ww, Wh);
       }
       //NF//MS
-      if (problem == 50)
+      if (problem == 50 || problem == 51 || problem == 52)
       {
          // Compute Sigma and F
          ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);
@@ -1181,7 +1190,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 1 || problem == 3 || problem == 16 || problem == 50) 
+   if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52) 
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1398,7 +1407,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 1 || problem == 3 || problem == 16 || problem == 50) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
@@ -1443,7 +1452,7 @@ int main(int argc, char *argv[]) {
             Wy += offy;
 
             //NF//MS
-            if (problem == 50)
+            if (problem == 50 || problem == 51 || problem == 52)
             {
                // Compute Sigma and F
                ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);

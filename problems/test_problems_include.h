@@ -25,5 +25,7 @@
 #include "kidder_ball.h"
 #include "taylor_green.h"
 #include "elastic_shocktube.h"
+#include "elastic_impact.h"
+#include "elastic_sheer.h"
 
 #endif

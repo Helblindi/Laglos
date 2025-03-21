@@ -167,7 +167,7 @@ public:
       double c_coeff = des_dtrc(c.Trace(), c2.Trace());
       double c2_coeff = 2.*des_dtrc2(c.Trace(), c2.Trace());
       mfem::Add(c_coeff, c_tf, c2_coeff, c2_tf, S);
-      S *= 2. * rho / rho0_gf(e);
+      S *= -2. * rho / rho0_gf(e);
    }
 
 };

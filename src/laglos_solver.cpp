@@ -296,9 +296,10 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
       GetCellStateVector(S,e,U);
       double rho = 1./sv_gf[e], es = 0.;
       DenseMatrix sigmaD(3);
+      DenseMatrix flux(dim+2,dim);
       elastic.ComputeS(e, rho, es, sigmaD);
-      pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-      sigma_gf[e] = sigmaD(0,0);
+      flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
+      sigma_gf[e] = flux(1,0);
    }
 }
 

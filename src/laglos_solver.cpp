@@ -807,6 +807,8 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          GetIntermediateFaceVelocity(face, _vel);
          geom.UpdateNodeVelocity(dxdt_gf, face, _vel);
       }
+      // Since we do not project here, must fill cell center velocities
+      FillCenterVelocitiesWithAvg(dS_dt);
    }
    else
    {
@@ -984,7 +986,10 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          }
       }
       
-      /* Project back onto mv_gf */
+      /* 
+      Project back onto mv_gf 
+      No need to fill center velocities as this is handled by the projection
+      */
       dxdt_gf.ProjectGridFunction(dxdt_gf_l);
       
       /* Choose behavior for face velocity */
@@ -1007,7 +1012,8 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          /* Do nothing */
          break;
       } // End face velocity switch case
-   }
+   } // end dim != 1
+   
    chrono_mm.Stop();
 }
 
@@ -2995,7 +3001,7 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 *  by taking the hydrodynamic velocity at the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
    ParGridFunction dxdt;
@@ -3052,9 +3058,8 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vect
 *  by average the values at the four corner nodes of the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S) const
 {
-   MFEM_ABORT("Function not implemented\n");
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 

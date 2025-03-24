@@ -329,8 +329,8 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    for (int e = 0; e < NE; e++)
    {
       DenseMatrixInverse inv(&Me(e));
-      const FiniteElement &fe = *L2.GetFE(e);
-      ElementTransformation &Tr = *L2.GetElementTransformation(e);
+      const FiniteElement &fe = *L2H.GetFE(e);
+      ElementTransformation &Tr = *L2H.GetElementTransformation(e);
       mi.AssembleElementMatrix(fe, Tr, Me(e));
       inv.Factor();
       inv.GetInverseMatrix(Me_inv(e));
@@ -9477,6 +9477,8 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    // else
    // {
    // timer.sw_force.Start();
+   assert(Force.NumCols() == one.Size());
+   assert(Force.NumRows() == rhs.Size());
    Force.Mult(one, rhs);
    // timer.sw_force.Stop();
    rhs.Neg();
@@ -9553,15 +9555,24 @@ void LagrangianLOOperator<dim>::SolveHOEnergy(const Vector &S, const Vector &v, 
    // else // not p_assembly
    // {
    // timer.sw_force.Start();
+   assert(Force.NumRows() == v.Size());
+   assert(Force.NumCols() == e_rhs.Size());
    Force.MultTranspose(v, e_rhs);
    // timer.sw_force.Stop();
-   if (e_source) { e_rhs += *e_source; }
+   
+   if (e_source) { 
+      assert(e_source->Size() == e_rhs.Size()); 
+      e_rhs += *e_source; 
+   }
    Vector loc_rhs(l2dofs_cnt), loc_de(l2dofs_cnt);
    for (int e = 0; e < NE; e++)
    {
       L2H.GetElementDofs(e, l2dofs);
       e_rhs.GetSubVector(l2dofs, loc_rhs);
       // timer.sw_cgL2.Start();
+      assert(Me_inv(e).NumCols() == loc_rhs.Size());
+      assert(Me_inv(e).NumRows() == loc_de.Size());
+     
       Me_inv(e).Mult(loc_rhs, loc_de);
       // timer.sw_cgL2.Stop();
       // timer.L2iter += 1;

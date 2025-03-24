@@ -12,9 +12,9 @@ const double sedov_gamma = 1.4;
 // const double sedov_E0  = 0.979264;
 
 // time at which the solution is evaluated
-double sedov_t;
+static double sedov_t;
 // position of the shock at time sedov_t
-double sedov_rs;
+static double sedov_rs;
 
 void sedov_time(double t)
 {

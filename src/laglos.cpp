@@ -653,7 +653,7 @@ int main(int argc, char *argv[]) {
    const int Vsize_l2v = L2VFESpace.GetVSize();
    const int Vsize_h1 = H1FESpace.GetVSize();
    const int Vsize_l2_h = L2FESpace_H.GetVSize();
-   Array<int> offset(6);
+   Array<int> offset(7);
    offset[0] = 0;
    offset[1] = offset[0] + Vsize_h1;
    offset[2] = offset[1] + Vsize_l2;
@@ -672,7 +672,7 @@ int main(int argc, char *argv[]) {
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
    ste_gf.MakeRef(&L2FESpace, S, offset[3]);
    vHO_gf.MakeRef(&H1FESpace, S, offset[4]);
-   eHO_gf.MakeRef(&L2FESpace, S, offset[5]);
+   eHO_gf.MakeRef(&L2FESpace_H, S, offset[5]);
 
    // Initialize x_gf using starting mesh positions
    pmesh->SetNodalGridFunction(&x_gf);
@@ -877,20 +877,29 @@ int main(int argc, char *argv[]) {
    // it is necessary for plotting the exact solution
    FunctionCoefficient ste_coeff(ste0_static);
    ste_coeff.SetTime(t_init);
+   L2_FECollection l2_fec(order_u, dim);
+   L2_FECollection l2_fec_h(order_mv-1, dim);
+   ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
+   ParFiniteElementSpace l2_fes_h(pmesh, &l2_fec_h);
+   ParGridFunction l2_e(&l2_fes), l2_e_h(&l2_fes_h);
    if (problem == 1)
    {
       double blast_energy = 0.25;
       double blast_position[] = {0.0, 0.0, 0.0};
       DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
                                blast_position[2], blast_energy);
-      ste_gf.ProjectCoefficient(e_coeff);
-      eHO_gf.ProjectCoefficient(e_coeff);
+      l2_e.ProjectCoefficient(e_coeff);
+      l2_e_h.ProjectCoefficient(e_coeff);
    }
    else
    {
-      ste_gf.ProjectCoefficient(ste_coeff);
-      eHO_gf.ProjectCoefficient(ste_coeff);
+      l2_e.ProjectCoefficient(ste_coeff);
+      l2_e_h.ProjectCoefficient(ste_coeff);
+      //ste_gf.ProjectCoefficient(ste_coeff);
+      //eHO_gf.ProjectCoefficient(ste_coeff);
    }
+   ste_gf.ProjectGridFunction(l2_e);
+   eHO_gf.ProjectGridFunction(l2_e_h);
    ste_gf.SyncAliasMemory(S);
    eHO_gf.SyncAliasMemory(S);
 

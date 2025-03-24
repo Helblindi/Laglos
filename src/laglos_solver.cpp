@@ -232,31 +232,35 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Initialize arrays of tdofs
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
    // that the boundaries are straight.
-   MFEM_WARNING("ess_tdofs is out of wack. Herein it is defined on H1L, but must be defined on H1.\n");
-   // if (ess_bdr.Size() > 0)
-   // {
-   //    for (int d = 0; d < dim; d++)
-   //    {
-   //       // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
-   //       // i.e., we must enforce v_x/y/z = 0 for the velocity components.
-   //       ess_bdr = 0; ess_bdr[d] = 1;
-   //       H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-   //       ess_tdofs.Append(dofs_list);
-   //    }
-   //    /* Set bdr_vals for dofs that should be 0 */
-   //    ess_tdofs_cart_size = ess_tdofs.Size();
-   //    bdr_vals.SetSize(ess_tdofs_cart_size);
-   //    bdr_vals = 0.;
 
-   //    if (ess_bdr.Size() > 4)
-   //    {
-   //       MFEM_WARNING("May need to enforce additional BCs.\n");
-   //       pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+   if (L2H.GetOrder(0) != H1.GetOrder(0) - 1)
+   {
+      MFEM_ABORT("ess_tdofs is set for the H1 space, but velocity is calculated on L2H.GetOrder(0) +1 ordered H1 space.\n");
+   }
+   if (ess_bdr.Size() > 0)
+   {
+      // for (int d = 0; d < dim; d++)
+      // {
+      //    // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
+      //    // i.e., we must enforce v_x/y/z = 0 for the velocity components.
+      //    ess_bdr = 0; ess_bdr[d] = 1;
+      //    H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+      //    ess_tdofs.Append(dofs_list);
+      // }
+      /* Set bdr_vals for dofs that should be 0 */
+      ess_tdofs_cart_size = ess_tdofs.Size();
+      bdr_vals.SetSize(ess_tdofs_cart_size);
+      bdr_vals = 0.;
 
-   //       ess_tdofs.Append(add_ess_tdofs);
-   //       bdr_vals.Append(add_bdr_vals);
-   //    }
-   // }
+      if (ess_bdr.Size() > 4)
+      {
+         MFEM_WARNING("May need to enforce additional BCs.\n");
+         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         MFEM_WARNING("Additional BCs should be enforced too. Must be fixed for problems with non-dirichlet conditions.\n");
+         // ess_tdofs.Append(add_ess_tdofs);
+         // bdr_vals.Append(add_bdr_vals);
+      }
+   }
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
@@ -1042,17 +1046,6 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
             // ComputeLinearizedNodeVelocities(dxdt_gf_l, dxdt_gf_l_linearized, t, dt);
             // mv_gf_l = mv_gf_l_linearized;
          }
-
-         /* Optionally, enforce boundary conditions */
-         if (pb->has_boundary_conditions())
-         {
-            MFEM_ABORT("ess_tdofs is currently defined on H1 in laglos but herein is implemented as if defined on H1c.\n");
-            for (int i = 0; i < ess_tdofs.Size(); i++) { 
-               // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
-               dxdt_gf_l(ess_tdofs[i]) = bdr_vals[i]; 
-            }
-
-         }
       }
       
       /* Project back onto mv_gf */
@@ -1083,6 +1076,16 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          } // End face velocity switch case
 
          FillCenterVelocitiesWithAvg(dxdt_gf);
+      }
+
+      /* Optionally, enforce boundary conditions */
+      if (pb->has_boundary_conditions())
+      {
+         // MFEM_ABORT("ess_tdofs is currently defined on H1 in laglos but herein is implemented as if defined on H1c.\n");
+         for (int i = 0; i < ess_tdofs.Size(); i++) { 
+            // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
+            dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
+         }
       }
    
    } // End dim > 1

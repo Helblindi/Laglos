@@ -7183,7 +7183,7 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
    x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    MFEM_ABORT("Need to remove mv_gf implementation\n");
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
+   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
 
@@ -7352,7 +7352,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
    x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    MFEM_ABORT("Need to remove mv_gf implementation\n");
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
+   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
 
@@ -7411,7 +7411,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
    Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
    x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    MFEM_ABORT("Need to remove mv_gf implementation\n");
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
+   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
    sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[1]);
    add(x_gf, dt, mv_gf, x_gf);
 
@@ -9199,7 +9199,7 @@ void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
    // for (int i = 0; i < Vsize_L2; i++) { rho_gf(i) = 1. / sv(i); }
    // v.MakeRef(&L2V, *sptr, block_offsets[2]); // Using the dg vel fails bad
    vHO.MakeRef(&H1, *sptr, block_offsets[4]); // only used in viscosity
-   e.MakeRef(&L2, *sptr, block_offsets[5]);
+   e.MakeRef(&L2H, *sptr, block_offsets[5]);
    // ste.MakeRef(&L2, *sptr, block_offsets[3]);
    // Vector _vv(dim);
    // for (int i = 0; i < Vsize_L2; i++) { 

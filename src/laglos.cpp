@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 1;  // Order of mesh movement approximation space
+   int order_mv = 2;  // Order of mesh movement approximation space
    int order_u = 0;
    int order_q = -1;
    double cg_tol = 1e-8;
@@ -161,7 +161,6 @@ int main(int argc, char *argv[]) {
    double t_init = 0.0;
    double t_final = 0.6;
    int max_tsteps = -1;
-   double dt = 0.001;
    bool visualization = false;
    int vis_steps = 5;
    bool pview = false;
@@ -183,8 +182,6 @@ int main(int argc, char *argv[]) {
    int mv_it_option = 0;
    int mv_n_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
-   bool optimize_timestep = true;
-   bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
    double dm_val = 0.; // Parameter to distort the mesh, overrides file val
@@ -273,15 +270,9 @@ int main(int argc, char *argv[]) {
                   "Set the amount of viscosity to add to the mesh motion iteration on the faces.");
    args.AddOption(&mm_cell, "-mmcc", "--mesh-motion-consistency-coefficient-on-cells",
                   "Set the coefficient for the consistency term defined on the adjacent cells.");
-   args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
-                  "--no-optimize-timestep",
-                  "Enable or disable timestep optimization using CFL.");
    args.AddOption(&CFL, "-cfl", "--CFL",
                   "CFL value to use.");
-   args.AddOption(&convergence_testing, "-ct", "--set-dt-to-h", "-no-ct", 
-                  "--no-set-dt-to-h", 
-                  "Enable or disable convergence testing timestep.");
-   args.AddOption(&dt, "-dt", "--timestep", "Timestep to use.");
+   // args.AddOption(&dt, "-dt", "--timestep", "Timestep to use.");
    args.AddOption(&suppress_output, "-so", "--suppress-output", "-no-so",
                   "--no-suppress-output",
                   "Enable or disable output during runtime.");
@@ -295,13 +286,6 @@ int main(int argc, char *argv[]) {
       return 1;
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
-
-   // Check that convergence testing and optimizing the timestep are not both set to true
-   if (optimize_timestep && convergence_testing)
-   {
-      cout << "Cannot both optimize the timestep and set the timestep for convergence testing.\n";
-      return -1;
-   }
 
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
@@ -545,6 +529,7 @@ int main(int argc, char *argv[]) {
    H1_FECollection H1FEC(order_mv, dim);
    H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   L2_FECollection L2FEC_H(order_mv-1, dim,BasisType::Positive);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -562,6 +547,8 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
+
+   ParFiniteElementSpace L2FESpace_H(pmesh, &L2FEC_H);
 
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
    // that the boundaries are straight.
@@ -665,6 +652,7 @@ int main(int argc, char *argv[]) {
    const int Vsize_l2 = L2FESpace.GetVSize();
    const int Vsize_l2v = L2VFESpace.GetVSize();
    const int Vsize_h1 = H1FESpace.GetVSize();
+   const int Vsize_l2_h = L2FESpace_H.GetVSize();
    Array<int> offset(6);
    offset[0] = 0;
    offset[1] = offset[0] + Vsize_h1;
@@ -672,7 +660,7 @@ int main(int argc, char *argv[]) {
    offset[3] = offset[2] + Vsize_l2v;
    offset[4] = offset[3] + Vsize_l2;
    offset[5] = offset[4] + Vsize_h1;
-   offset[6] = offset[5] + Vsize_l2;
+   offset[6] = offset[5] + Vsize_l2_h;
    BlockVector S(offset, Device::GetMemoryType());
 
    // Define GridFunction objects for the position, mesh velocity and specific
@@ -926,7 +914,7 @@ int main(int argc, char *argv[]) {
 
    /* Create Lagrangian Low Order Solver Object */
    MFEM_WARNING("Consider setting a reference to rho_gf in hydro class\n");
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL, order_q, cg_tol, cg_max_iter, gamma_gf, rho0_gf, rho_coeff, ess_tdofs);
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, L2FESpace_H, m, problem_class, offset, use_viscosity, mm, CFL, order_q, cg_tol, cg_max_iter, gamma_gf, rho0_gf, rho_coeff, ess_tdofs);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -1246,15 +1234,12 @@ int main(int argc, char *argv[]) {
    // time-step dt). The object oper is of type LagrangianLOOperator that
    // defines the Mult() method that used by the time integrators.
    ode_solver->Init(hydro);
-   double t = t_init;
+   hydro.ResetTimeStepEstimate();
+   double t = t_init, t_old;
+   double dt = hydro.CalculateTimestep(S);
    bool last_step = false;
    int steps = 0;
    BlockVector S_old(S);
-
-   if (convergence_testing)
-   {
-      dt = hmin; // Set timestep to smalled h val for convergence testing
-   }
 
    cout << "Entering time loop\n";
    chrono.Clear();
@@ -1292,12 +1277,6 @@ int main(int argc, char *argv[]) {
          hydro.SetCFL(CFL_new);
       }
 
-      if (optimize_timestep)
-      {
-         hydro.CalculateTimestep(S);
-         dt = hydro.GetTimestep();
-      }
-
       if (t + dt >= t_final)
       {
          dt = t_final - t;
@@ -1307,14 +1286,32 @@ int main(int argc, char *argv[]) {
       if (ti == max_tsteps) { last_step = true; }
 
       S_old = S;
+      t_old = t;
+      hydro.ResetTimeStepEstimate();
       // hydro.UpdateMeshVelocityBCs(t,dt);
       ode_solver->Step(S, t, dt);
       // hydro.EnforceL2BC(S, t, dt);
       steps++;
 
-      // sv_gf = 0.;
-      // ste_gf = 0.;
-      // v_gf = 0.;
+      // Adaptive time step control
+      const double dt_est = hydro.CalculateTimestep(S);
+      // cout << "dt_est: " << dt_est << ", dt: " << dt << endl;
+      if (dt_est < dt)
+      {
+         // Repeat (solve again) with a decreased time step - decrease of the
+         // time estimate suggests appearance of oscillations.
+         dt *= 0.85;
+         if (dt < std::numeric_limits<double>::epsilon())
+         { MFEM_ABORT("The time step crashed!"); }
+         t = t_old;
+         S = S_old;
+         hydro.ResetQuadratureData();
+         if (Mpi::Root()) { cout << "Repeating step " << ti << endl; }
+         if (steps < max_tsteps) { last_step = false; }
+         ti--; continue;
+      }
+      else if (dt_est > 1.25 * dt) { dt *= 1.02; }
+
 
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
@@ -1329,8 +1326,6 @@ int main(int argc, char *argv[]) {
       }
 
       isCollapsed = hydro.ComputeTimeSeriesData(S,t,dt);
-
-      // MFEM_WARNING("Want adaptive time step control");
 
       /* End iteration if the mesh has collapsed */
       if (check_mesh && isCollapsed)

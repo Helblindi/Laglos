@@ -89,6 +89,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
                                                 ParFiniteElementSpace &l2,
                                                 ParFiniteElementSpace &l2v,
                                                 ParFiniteElementSpace &cr,
+                                                ParFiniteElementSpace &l2h,
                                                 ParLinearForm *m,
                                                 ProblemBase<dim> *_pb,
                                                 Array<int> offset,
@@ -110,6 +111,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
+   L2H(l2h),
    x_gf(&H1),
    mv_gf(&H1),
    v_CR_gf(&CR),
@@ -133,6 +135,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    Vsize_L2(L2.GetVSize()),
    TVSize_L2(L2.TrueVSize()),
    GTVSize_L2(L2.GlobalTrueVSize()),
+   Vsize_L2H(L2H.GetVSize()),
    NDofs_L2(L2.GetNDofs()),
    Vsize_L2V(L2V.GetVSize()),
    TVSize_L2V(L2V.TrueVSize()),
@@ -155,17 +158,17 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    mm(mm),
    CFL(CFL),
    /* Laghos objects*/
-   l2dofs_cnt(L2.GetFE(0)->GetDof()),
+   l2dofs_cnt(L2H.GetFE(0)->GetDof()),
    ir(IntRules.Get(pmesh->GetElementBaseGeometry(0),
-                   (oq > 0) ? oq : 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)),
+                   (oq > 0) ? oq : 3 * H1.GetOrder(0) + L2H.GetOrder(0) - 1)),
    qdata(dim, pmesh->GetNE(), ir.GetNPoints()),
    gamma_gf(gamma_gf),
-   Force(&L2, &H1),
+   Force(&L2H, &H1),
    Mv(&H1),
    Mv_spmat_copy(),
-   one(Vsize_L2),
+   one(Vsize_L2H),
    rhs(Vsize_H1),
-   e_rhs(Vsize_L2),
+   e_rhs(Vsize_L2H),
    H1c(H1.GetParMesh(), H1.FEColl(), 1),
    X(H1c.GetTrueVSize()),
    B(H1c.GetTrueVSize()),
@@ -1249,7 +1252,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 *  a minimum of the current dt, and the computed restriction.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
+double LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 {
    // cout << "CalculateTimestep\n";
    double t_min = 1.;
@@ -1332,6 +1335,14 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
    } // End cell iterator
 
    this->timestep = t_min;
+
+   if (mv_option == -1)
+   {
+      double dt_HO = GetHOTimeStepEstimate(S);
+      this->timestep = std::min(dt_HO, this->timestep);
+   }
+
+   return this->timestep;
 }
 
 
@@ -9165,9 +9176,9 @@ MFEM_HOST_DEVICE inline double smooth_step_01(double x, double eps)
 template<int dim>
 void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
 {
-   cout << "========================================\n"
-        << "          UpdateQuadratureData          \n"
-        << "========================================\n";
+   // cout << "========================================\n"
+   //      << "          UpdateQuadratureData          \n"
+   //      << "========================================\n";
    if (qdata_is_current) { return; }
 
    qdata_is_current = true;
@@ -9355,16 +9366,34 @@ void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
    delete [] Jpr_b;
    // timer.sw_qdata.Stop();
    // timer.quad_tstep += NE;
-   cout << "end uqd\n";
+   // cout << "end uqd\n";
+}
+
+
+template<int dim>
+double LagrangianLOOperator<dim>::GetHOTimeStepEstimate(const Vector &S) const
+{
+   UpdateMesh(S);
+   UpdateQuadratureData(S);
+   double glob_dt_est;
+   const MPI_Comm comm = H1.GetParMesh()->GetComm();
+   MPI_Allreduce(&qdata.dt_est, &glob_dt_est, 1, MPI_DOUBLE, MPI_MIN, comm);
+   return glob_dt_est;
+}
+
+template<int dim>
+void LagrangianLOOperator<dim>::ResetTimeStepEstimate() const
+{
+   qdata.dt_est = std::numeric_limits<double>::infinity();
 }
 
 
 template<int dim>
 void LagrangianLOOperator<dim>::AssembleForceMatrix() const
 {
-   cout << "========================================\n"
-        << "          AssembleForceMatrix           \n"
-        << "========================================\n";
+   // cout << "========================================\n"
+   //      << "          AssembleForceMatrix           \n"
+   //      << "========================================\n";
    // if (forcemat_is_assembled || p_assembly) { return; }
    if (forcemat_is_assembled) { return; }
    Force = 0.0;
@@ -9372,16 +9401,16 @@ void LagrangianLOOperator<dim>::AssembleForceMatrix() const
    Force.Assemble();
    // timer.sw_force.Stop();
    forcemat_is_assembled = true;
-   cout << "end afm\n";
+   // cout << "end afm\n";
 }
 
 
 template<int dim>
 void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) const
 {
-   cout << "========================================\n"
-        << "            SolveHOVelocity             \n"
-        << "========================================\n";
+   // cout << "========================================\n"
+   //      << "            SolveHOVelocity             \n"
+   //      << "========================================\n";
    UpdateQuadratureData(S);
    AssembleForceMatrix();
    // The monolithic BlockVector stores the unknown fields as follows:
@@ -9473,7 +9502,7 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    // timer.H1iter += cg.GetNumIterations();
    Mv.RecoverFEMSolution(X, rhs, dv);
    // }
-   cout << "end shov\n";
+   // cout << "end shov\n";
 }
 
 
@@ -9486,7 +9515,7 @@ void LagrangianLOOperator<dim>::SolveHOEnergy(const Vector &S, const Vector &v, 
    // The monolithic BlockVector stores the unknown fields as follows:
    // (Position, Velocity, Specific Internal Energy).
    ParGridFunction de;
-   de.MakeRef(&L2, dS_dt, block_offsets[5]);
+   de.MakeRef(&L2H, dS_dt, block_offsets[5]);
    de = 0.0;
 
    // Solve for energy, assemble the energy source if such exists.
@@ -9527,7 +9556,7 @@ void LagrangianLOOperator<dim>::SolveHOEnergy(const Vector &S, const Vector &v, 
    Vector loc_rhs(l2dofs_cnt), loc_de(l2dofs_cnt);
    for (int e = 0; e < NE; e++)
    {
-      L2.GetElementDofs(e, l2dofs);
+      L2H.GetElementDofs(e, l2dofs);
       e_rhs.GetSubVector(l2dofs, loc_rhs);
       // timer.sw_cgL2.Start();
       Me_inv(e).Mult(loc_rhs, loc_de);

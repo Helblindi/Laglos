@@ -55,6 +55,7 @@ class LagrangianLOOperator : public TimeDependentOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
+   ParFiniteElementSpace &L2H;
    ParFiniteElementSpace &H1_L;
    ParFiniteElementSpace H1Lc;
    mutable ParGridFunction x_gf;
@@ -93,6 +94,8 @@ protected:
    const int TVSize_L2;
    const HYPRE_Int GTVSize_L2;
    const int NDofs_L2;
+
+   const int Vsize_L2H;
 
    const int Vsize_L2V;
    const int TVSize_L2V;
@@ -179,6 +182,7 @@ public:
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
+                        ParFiniteElementSpace &l2h,
                         ParLinearForm *m,
                         ProblemBase<dim> *_pb,
                         Array<int> offset,
@@ -210,6 +214,8 @@ public:
    void AssembleForceMatrix() const;
    void SolveHOVelocity(const Vector &S, Vector &dS_dt) const; // SolveVelocity from Laghos
    void SolveHOEnergy(const Vector &S, const Vector &v, Vector &dS_dt) const; // SolveEnergy from Laghos
+   double GetHOTimeStepEstimate(const Vector &S) const;
+   void ResetTimeStepEstimate() const;
    /* end */
 
    virtual void Mult(const Vector &S, Vector &dS_dt) const;
@@ -235,7 +241,7 @@ public:
 
    void InitializeDijMatrix();
    void BuildDijMatrix(const Vector &S);
-   void CalculateTimestep(const Vector &S);
+   double CalculateTimestep(const Vector &S);
 
    void GetCellStateVector(const Vector &S, const int cell, Vector &U) const;
    void SetCellStateVector(Vector &S_new, const int cell, const Vector &U) const;

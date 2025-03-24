@@ -317,7 +317,7 @@ public:
    virtual double p0(const Vector &x, const double & t) {
       MFEM_ABORT("Must override p0 in the ProblemBase class.\n");
    } // virtual function, must be overridden
-   virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) {
+   virtual double gamma_func(const Vector &x, const double &t) {
       return gamma;
    } // optionally overridden
    
@@ -328,3 +328,4 @@ public:
 } // ns mfem
 
 #endif // PROBLEM_BASE
+

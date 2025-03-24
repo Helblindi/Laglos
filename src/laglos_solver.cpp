@@ -167,7 +167,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    Mv(&H1),
    Mv_spmat_copy(),
    one(Vsize_L2H),
-   rhs(Vsize_H1),
+   rhsHO(Vsize_H1),
    e_rhs(Vsize_L2H),
    H1c(H1.GetParMesh(), H1.FEColl(), 1),
    X(H1c.GetTrueVSize()),
@@ -317,7 +317,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    //    }
    //    X.UseDevice(true);
    //    B.UseDevice(true);
-   //    rhs.UseDevice(true);
+   //    rhsHO.UseDevice(true);
    //    e_rhs.UseDevice(true);
    // }
    // else
@@ -9434,9 +9434,9 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    // if (p_assembly)
    // {
    //    timer.sw_force.Start();
-   //    ForcePA->Mult(one, rhs);
+   //    ForcePA->Mult(one, rhsHO);
    //    timer.sw_force.Stop();
-   //    rhs.Neg();
+   //    rhsHO.Neg();
 
    //    // Partial assembly solve for each velocity component
    //    const int size = H1c.GetVSize();
@@ -9444,7 +9444,7 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    //    for (int c = 0; c < dim; c++)
    //    {
    //       dvc_gf.MakeRef(&H1c, dS_dt, H1Vsize + c*size);
-   //       rhs_c_gf.MakeRef(&H1c, rhs, c*size);
+   //       rhs_c_gf.MakeRef(&H1c, rhsHO, c*size);
 
    //       if (Pconf) { Pconf->MultTranspose(rhs_c_gf, B); }
    //       else { B = rhs_c_gf; }
@@ -9478,20 +9478,20 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    // {
    // timer.sw_force.Start();
    assert(Force.NumCols() == one.Size());
-   assert(Force.NumRows() == rhs.Size());
-   Force.Mult(one, rhs);
+   assert(Force.NumRows() == rhsHO.Size());
+   Force.Mult(one, rhsHO);
    // timer.sw_force.Stop();
-   rhs.Neg();
+   rhsHO.Neg();
 
    // if (source_type == 2)
    // {
-   //    Vector rhs_accel(rhs.Size());
+   //    Vector rhs_accel(rhsHO.Size());
    //    Mv_spmat_copy.Mult(accel_src_gf, rhs_accel);
-   //    rhs += rhs_accel;
+   //    rhsHO += rhs_accel;
    // }
 
    HypreParMatrix A;
-   Mv.FormLinearSystem(ess_tdofs, dv, rhs, A, X, B);
+   Mv.FormLinearSystem(ess_tdofs, dv, rhsHO, A, X, B);
    CGSolver cg(H1.GetParMesh()->GetComm());
    HypreSmoother prec;
    prec.SetType(HypreSmoother::Jacobi, 1);
@@ -9505,7 +9505,7 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    cg.Mult(B, X);
    // timer.sw_cgH1.Stop();
    // timer.H1iter += cg.GetNumIterations();
-   Mv.RecoverFEMSolution(X, rhs, dv);
+   Mv.RecoverFEMSolution(X, rhsHO, dv);
    // }
    // cout << "end shov\n";
 }

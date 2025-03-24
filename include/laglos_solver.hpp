@@ -117,7 +117,7 @@ protected:
    mutable ParBilinearForm Mv;
    SparseMatrix Mv_spmat_copy;
    mutable ParFiniteElementSpace H1c;
-   mutable Vector X, B, one, rhs, e_rhs;
+   mutable Vector X, B, one, rhsHO, e_rhs;
    const double cg_rel_tol;
    const int cg_max_iter;
    const int l2dofs_cnt;

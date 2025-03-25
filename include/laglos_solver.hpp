@@ -162,12 +162,14 @@ protected:
    Array<int> HiopDGradIArr, HiopDGradJArr;
    Array<double> HiopDGradData;
 
-   int ess_tdofs_cart_size;
+   int ess_tdofs_size;
    Array<int> ess_bdr, dofs_list;
-   const Array<int> &ess_tdofs;
-   mutable Array<double> bdr_vals;
-   Array<int> add_ess_tdofs;
-   mutable Array<double> add_bdr_vals;
+   const Array<int> &ess_tdofs; // fixed x/y/z boundaries
+   mutable Array<double> bdr_vals; // fixed x/y/z boundaries (=0)
+   Array<int> add_ess_tdofs; // optional additional boundaries, set in problem
+   mutable Array<double> add_bdr_vals; // optional additional boundary values
+   Array<int> all_ess_tdofs; // all essential dofs
+   mutable Array<double> all_bdr_vals; // all essential dof values
 
    /* Time series data */
    Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;

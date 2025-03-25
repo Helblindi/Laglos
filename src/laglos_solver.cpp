@@ -239,26 +239,21 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    }
    if (ess_bdr.Size() > 0)
    {
-      // for (int d = 0; d < dim; d++)
-      // {
-      //    // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
-      //    // i.e., we must enforce v_x/y/z = 0 for the velocity components.
-      //    ess_bdr = 0; ess_bdr[d] = 1;
-      //    H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-      //    ess_tdofs.Append(dofs_list);
-      // }
       /* Set bdr_vals for dofs that should be 0 */
-      ess_tdofs_cart_size = ess_tdofs.Size();
-      bdr_vals.SetSize(ess_tdofs_cart_size);
+      ess_tdofs_size = ess_tdofs.Size();
+      bdr_vals.SetSize(ess_tdofs_size);
       bdr_vals = 0.;
+      all_ess_tdofs = ess_tdofs;
+      all_bdr_vals = bdr_vals;
 
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
-         MFEM_WARNING("Additional BCs should be enforced too. Must be fixed for problems with non-dirichlet conditions.\n");
-         // ess_tdofs.Append(add_ess_tdofs);
-         // bdr_vals.Append(add_bdr_vals);
+         pb->get_additional_BCs(H1, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         // cout << "additional bcs: " << endl;
+         // add_ess_tdofs.Print(cout);
+         all_ess_tdofs.Append(add_ess_tdofs);
+         all_bdr_vals.Append(add_bdr_vals);
       }
    }
 
@@ -416,7 +411,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    one = 1.;
 
    // }
-   cout << "LagrangianLOOperator Laghos HO velocity constructor [END]\n";
 }
 
 template<int dim>
@@ -756,8 +750,11 @@ template<int dim>
 void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const double &dt)
 {
    int el, info;
-   Array<int> vel_dofs(2);
-   vel_dofs[0] = 1, vel_dofs[1]=2;
+   Array<int> vel_dofs(dim);
+   for (int i = 0; i < dim; i++)
+   {
+      vel_dofs[i] = i + 1;
+   }
    Vector vel(dim), Ui(dim+2);
 
    // Post processing modify computed values to enforce BCs
@@ -797,7 +794,7 @@ void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const do
                if (bdr_attr == 5)
                {
                   // left
-                  double _psi = bdr_vals.Last();
+                  double _psi = all_bdr_vals.Last();
                   vel[0] = 1. * _psi;
                }
                else { MFEM_ABORT("Invalid boundary attribute provided.\n"); }
@@ -838,13 +835,13 @@ void LagrangianLOOperator<dim>::UpdateMeshVelocityBCs(const double &t, const dou
    {
       if (timestep_first == 0.)
       {
-         timestep_first = GetTimestep();
+         timestep_first = timestep;
       }
 
       /* Reset additional boundary conditions from previous iteration */
-      bdr_vals.SetSize(ess_tdofs_cart_size);
+      all_bdr_vals.SetSize(ess_tdofs_size);
       pb->update_additional_BCs(t, timestep_first, add_bdr_vals, geom, x_gf);
-      bdr_vals.Append(add_bdr_vals);
+      all_bdr_vals.Append(add_bdr_vals);
    }
 }
 
@@ -1051,6 +1048,17 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
       /* Project back onto mv_gf */
       dxdt_gf.ProjectGridFunction(dxdt_gf_l);
 
+      /* Optionally, enforce boundary conditions */
+      if (pb->has_boundary_conditions())
+      {
+         // cout << "Enforcing MV BCs\n";
+         assert(all_ess_tdofs.Size() == all_bdr_vals.Size());
+         for (int i = 0; i < all_ess_tdofs.Size(); i++) { 
+            // cout << "all_ess_tdof: " << all_ess_tdofs[i] << ", bdr val: " << all_bdr_vals[i] <<endl;
+            dxdt_gf(all_ess_tdofs[i]) = all_bdr_vals[i]; 
+         }
+      }
+
       if (NDofs_H1 != NDofs_H1L)
       {
          /* Must compute mesh velocities on cell centers and faces */
@@ -1076,16 +1084,6 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          } // End face velocity switch case
 
          FillCenterVelocitiesWithAvg(dxdt_gf);
-      }
-
-      /* Optionally, enforce boundary conditions */
-      if (pb->has_boundary_conditions())
-      {
-         // MFEM_ABORT("ess_tdofs is currently defined on H1 in laglos but herein is implemented as if defined on H1c.\n");
-         for (int i = 0; i < ess_tdofs.Size(); i++) { 
-            // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
-            dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
-         }
       }
    
    } // End dim > 1
@@ -8451,9 +8449,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    // if (pb->has_boundary_conditions())
    // {
    //    double bdr_tol = 1.E-12;
-   //    for (int i = 0; i < ess_tdofs.Size(); i++) { 
-   //       xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol; 
-   //       xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
+   //    for (int i = 0; i < all_ess_tdofs.Size(); i++) { 
+   //       xmin(all_ess_tdofs[i]) = all_bdr_vals[i] - bdr_tol; 
+   //       xmax(all_ess_tdofs[i]) = all_bdr_vals[i] + bdr_tol;
    //    }
    // }
    // cout << "xmin: ";
@@ -8496,7 +8494,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          }
 
          // Sparsity pattern for Boundary Constraint implementation which did not yield good results
-         // SetHiopBoundaryConstraintGradSparsityPattern(ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
+         // SetHiopBoundaryConstraintGradSparsityPattern(all_ess_tdofs, HiopDGradIArr, HiopDGradJArr, HiopDGradData);
 
          /* Calculate target velocity */
          switch (target_option)
@@ -8551,7 +8549,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          /* Enforce BCs on target velocity */
          if (pb->has_boundary_conditions())
          {
-            for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
+            for (int i = 0; i < all_ess_tdofs.Size(); i++) { V_target(all_ess_tdofs[i]) = all_bdr_vals[i]; }
          }
 
          /* Compute lumped mass in velocity space */
@@ -8564,8 +8562,8 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(
             geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
-            HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
-            ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
+            HiopDGradIArr, HiopDGradJArr, HiopDGradData, all_bdr_vals,
+            all_ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
             _vecWeights);
          break;
       }
@@ -8575,9 +8573,9 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          if (pb->has_boundary_conditions())
          {
             double bdr_tol = 1.E-12;
-            for (int i = 0; i < ess_tdofs.Size(); i++) {
-               xmin(ess_tdofs[i]) = bdr_vals[i] - bdr_tol;
-               xmax(ess_tdofs[i]) = bdr_vals[i] + bdr_tol;
+            for (int i = 0; i < all_ess_tdofs.Size(); i++) {
+               xmin(all_ess_tdofs[i]) = all_bdr_vals[i] - bdr_tol;
+               xmax(all_ess_tdofs[i]) = all_bdr_vals[i] + bdr_tol;
             }
          }
 
@@ -8585,7 +8583,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
          /* Instantiate problem */
-         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
+         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, all_ess_tdofs, BdrVertexIndexingArray);
          break;
       }
       default:
@@ -9491,7 +9489,7 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    // }
 
    HypreParMatrix A;
-   Mv.FormLinearSystem(ess_tdofs, dv, rhsHO, A, X, B);
+   Mv.FormLinearSystem(ess_tdofs, dv, rhsHO, A, X, B); // TODO: Does this need to be fixed??
    CGSolver cg(H1.GetParMesh()->GetComm());
    HypreSmoother prec;
    prec.SetType(HypreSmoother::Jacobi, 1);
@@ -9508,6 +9506,17 @@ void LagrangianLOOperator<dim>::SolveHOVelocity(const Vector &S, Vector &dS_dt) 
    Mv.RecoverFEMSolution(X, rhsHO, dv);
    // }
    // cout << "end shov\n";
+   /* Optionally, enforce boundary conditions */
+   if (pb->has_boundary_conditions())
+   {
+      // cout << "Enforcing MV BCs\n";
+      assert(all_ess_tdofs.Size() == all_bdr_vals.Size());
+      for (int i = 0; i < all_ess_tdofs.Size(); i++) { 
+         // cout << "all_ess_tdof: " << all_ess_tdofs[i] << ", bdr val: " << all_bdr_vals[i] <<endl;
+         dv(all_ess_tdofs[i]) = all_bdr_vals[i]; 
+      }
+   }
+   dv.SyncAliasMemory(dS_dt);
 }
 
 

@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
-   ParGridFunction x_gf, sv_gf, v_gf, ste_gf, rho_gf(&L2FESpace), rho0_gf(&L2FESpace), vHO_gf, eHO_gf;
+   ParGridFunction x_gf, sv_gf, v_gf, ste_gf, rho_gf(&L2FESpace), rho0_gf(&L2FESpace_H), vHO_gf, eHO_gf;
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
@@ -715,7 +715,7 @@ int main(int argc, char *argv[]) {
          }
          break;
       }
-      case 7: // Saltzmann
+      case 11: // Saltzmann
       {
          Array<double> coords(dim);
          for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
@@ -1297,9 +1297,9 @@ int main(int argc, char *argv[]) {
       S_old = S;
       t_old = t;
       hydro.ResetTimeStepEstimate();
-      // hydro.UpdateMeshVelocityBCs(t,dt);
+      hydro.UpdateMeshVelocityBCs(t,dt);
       ode_solver->Step(S, t, dt);
-      // hydro.EnforceL2BC(S, t, dt);
+      hydro.EnforceL2BC(S, t, dt);
       steps++;
 
       // Adaptive time step control

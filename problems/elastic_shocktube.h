@@ -49,17 +49,18 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _gamma = 4.4;
-   bool _known_exact_solution = false;
+   double _gamma = 3.4;
+   bool _known_exact_solution = true;
    bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "ElasticShocktube";
+   double _tf = 5.E-5;
 
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
    // 5.2 elastic shock
-   double rhoL = 1.E3, rhoR = 1.E3, pL = 1.E6, pR = 1.E5, vL = 0., vR = 0.;
+   double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E7, pR = 1.E5, vL = 0., vR = 0.;
    double x_center = 0.5;
-   const double p_inf = 6.E8;
+   const double p_inf = 2.15E10;
    // const double p_inf = 0.;
 
    // 5.3 elastic shock with five waves
@@ -101,10 +102,15 @@ public:
       {
          return (x(0) < x_center) ? pL : pR;
       }
+      else if (t > _tf)
+      {
+         MFEM_ABORT("Time is greater than final time.\n");
+         return -1.;
+      }
       else
       {
-         MFEM_ABORT("No exact solution.\n");
-         return -1.;
+         // No closed form solution
+         return 0.;
       }
    }
 
@@ -130,8 +136,7 @@ public:
       }
       else
       {
-         MFEM_ABORT("No exact solution.\n");
-         return -1.;
+         return 1.;
       }
    }
    void v0(const Vector &x, const double & t, Vector &v) override

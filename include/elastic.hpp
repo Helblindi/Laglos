@@ -29,7 +29,7 @@ private:
    // Reference to physical Jacobian for the initial mesh.
    // These are computed only at time zero and stored here.
    DenseTensor Jac0inv;
-   double mu = 1.E10; // Sheer modulus
+   double mu = 2.6E10; // Sheer modulus
 
 public:
    Elastic(ParFiniteElementSpace &h1_fes,

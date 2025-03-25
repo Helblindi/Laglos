@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
    // Define GridFunction objects for the position, mesh velocity and specific
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
-   ParGridFunction x_gf, sv_gf, v_gf, ste_gf, rho_gf(&L2FESpace), rho0_gf(&L2FESpace_H), vHO_gf, eHO_gf;
+   ParGridFunction x_gf, sv_gf, v_gf, ste_gf, rho_gf(&L2FESpace), rho0_gf(&L2FESpace), vHO_gf, eHO_gf;
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
@@ -923,7 +923,7 @@ int main(int argc, char *argv[]) {
 
    /* Create Lagrangian Low Order Solver Object */
    MFEM_WARNING("Consider setting a reference to rho_gf in hydro class\n");
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, L2FESpace_H, m, problem_class, offset, use_viscosity, mm, CFL, order_q, cg_tol, cg_max_iter, gamma_gf, rho0_gf, rho_coeff, ess_tdofs);
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, L2FESpace, m, problem_class, offset, use_viscosity, mm, CFL, order_q, cg_tol, cg_max_iter, gamma_gf, rho0_gf, rho_coeff, ess_tdofs);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);

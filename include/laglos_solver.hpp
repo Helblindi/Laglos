@@ -121,6 +121,7 @@ protected:
    const double cg_rel_tol;
    const int cg_max_iter;
    const int l2dofs_cnt;
+   const int NDofs_L2H;
    DenseTensor Me, Me_inv;
    /* end laghos velocity objects */
 

@@ -159,6 +159,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    CFL(CFL),
    /* Laghos objects*/
    l2dofs_cnt(L2H.GetFE(0)->GetDof()),
+   NDofs_L2H(L2H.GetNDofs()),
    ir(IntRules.Get(pmesh->GetElementBaseGeometry(0),
                    (oq > 0) ? oq : 3 * H1.GetOrder(0) + L2H.GetOrder(0) - 1)),
    qdata(dim, pmesh->GetNE(), ir.GetNPoints()),
@@ -233,10 +234,6 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
    // that the boundaries are straight.
 
-   if (L2H.GetOrder(0) != H1.GetOrder(0) - 1)
-   {
-      MFEM_ABORT("ess_tdofs is set for the H1 space, but velocity is calculated on L2H.GetOrder(0) +1 ordered H1 space.\n");
-   }
    if (ess_bdr.Size() > 0)
    {
       /* Set bdr_vals for dofs that should be 0 */
@@ -9190,22 +9187,28 @@ void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
    // This code is only for the 1D/FA mode
    // timer.sw_qdata.Start();
    const int nqp = ir.GetNPoints();
-   // ParGridFunction ste, e(&L2), sv, rho_gf(&L2), v, vHO;
-   ParGridFunction e, vHO;
    Vector* sptr = const_cast<Vector*>(&S);
-   // sv.MakeRef(&L2, *sptr, block_offsets[1]);
-   // for (int i = 0; i < Vsize_L2; i++) { rho_gf(i) = 1. / sv(i); }
-   // v.MakeRef(&L2V, *sptr, block_offsets[2]); // Using the dg vel fails bad
+   ParGridFunction vHO;
    vHO.MakeRef(&H1, *sptr, block_offsets[4]); // only used in viscosity
-   e.MakeRef(&L2H, *sptr, block_offsets[5]);
-   // ste.MakeRef(&L2, *sptr, block_offsets[3]);
-   // Vector _vv(dim);
-   // for (int i = 0; i < Vsize_L2; i++) { 
-   //    _vv[0] = v[i];
-   //    _vv[1] = v[i + Vsize_L2];
-   //    double E = ste[i];
-   //    e[i] = E - 0.5 * pow(_vv.Norml2(), 2); 
-   // }
+
+   /* Use LO density and energy */
+   ParGridFunction ste, e(&L2), sv, rho_gf(&L2), v;
+   sv.MakeRef(&L2, *sptr, block_offsets[1]);
+   for (int i = 0; i < Vsize_L2; i++) { rho_gf(i) = 1. / sv(i); }
+   v.MakeRef(&L2V, *sptr, block_offsets[2]); // Using the dg vel fails bad
+   ste.MakeRef(&L2, *sptr, block_offsets[3]);
+   Vector _vv(dim);
+   for (int i = 0; i < Vsize_L2; i++) { 
+      _vv[0] = v[i];
+      _vv[1] = v[i + Vsize_L2];
+      double E = ste[i];
+      e[i] = E - 0.5 * pow(_vv.Norml2(), 2); 
+   }
+   assert(NDofs_L2 == NDofs_L2H);
+
+   /* Use HO energy */
+   // ParGridFunction e;
+   // e.MakeRef(&L2H, *sptr, block_offsets[5]);
 
    Vector e_vals, rho_vals;
    DenseMatrix Jpi(dim), sgrad_v(dim), Jinv(dim), stress(dim), stressJiT(dim);
@@ -9241,9 +9244,8 @@ void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
       {
          ElementTransformation *T = H1.GetElementTransformation(z_id);
          Jpr_b[z].SetSize(dim, dim, nqp);
-         // ste.GetValues(z_id, ir, e_vals);
          e.GetValues(z_id, ir, e_vals);
-         // rho_gf.GetValues(z_id, ir, rho_vals);
+         rho_gf.GetValues(z_id, ir, rho_vals);
          for (int q = 0; q < nqp; q++)
          {
             const IntegrationPoint &ip = ir.IntPoint(q);
@@ -9254,8 +9256,8 @@ void LagrangianLOOperator<dim>::UpdateQuadratureData(const Vector &S) const
             const int idx = z * nqp + q;
             // Assuming piecewise constant gamma that moves with the mesh.
             gamma_b[idx] = gamma_gf(z_id);
-            rho_b[idx] = qdata.rho0DetJ0w(z_id*nqp + q) / detJ / ip.weight;
-            // rho_b[idx] = fmax(0.0, rho_vals(q));
+            rho_b[idx] = fmax(0.0, rho_vals(q)); // LO
+            // rho_b[idx] = qdata.rho0DetJ0w(z_id*nqp + q) / detJ / ip.weight; // HO
             e_b[idx] = fmax(0.0, e_vals(q));
          }
          ++z_id;

@@ -295,7 +295,7 @@ double LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e
    DenseMatrix flux(dim+2,dim);
    elastic.ComputeS(e, rho, es, sigmaD);
    flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-   return flux(1,0);
+   return -flux(1,0);
 }
 
 

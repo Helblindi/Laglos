@@ -267,6 +267,38 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
    dij_sparse = nullptr;
 }
 
+
+/**
+ * @brief Computes the sigma component for a given element.
+ *
+ * This function calculates the sigma component for a specific element in the mesh.
+ * It retrieves the state vector for the given element, computes the density and 
+ * specific internal energy, and evaluates the stress tensor and flux based on 
+ * the elasticity model.
+ *
+ * @tparam dim The dimension of the problem (1D, 2D, or 3D).
+ * @param S The input state vector containing the solution variables.
+ * @param e The index of the element for which the sigma component is computed.
+ * @return The computed sigma component for the specified element.
+ *
+ * @note This function assumes that the elasticity model is being used and that
+ *       the necessary data structures (e.g., elastic object) are properly initialized.
+ */
+template<int dim>
+double LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e) const
+{
+   Vector U(dim+2);
+
+   GetCellStateVector(S,e,U);
+   double rho = 1./U[0], es = 0.;
+   DenseMatrix sigmaD(3);
+   DenseMatrix flux(dim+2,dim);
+   elastic.ComputeS(e, rho, es, sigmaD);
+   flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
+   return flux(1,0);
+}
+
+
 /**
  * @brief Computes the sigma grid function (sigma_gf) based on the input vector S.
  *
@@ -286,20 +318,10 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2);
 
-   ParGridFunction sv_gf;
-   Vector* sptr = const_cast<Vector*>(&S);
-   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
-   Vector U(dim+2);
-
    for (int e = 0; e < NDofs_L2; e++)
    {
-      GetCellStateVector(S,e,U);
-      double rho = 1./sv_gf[e], es = 0.;
-      DenseMatrix sigmaD(3);
-      DenseMatrix flux(dim+2,dim);
-      elastic.ComputeS(e, rho, es, sigmaD);
-      flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-      sigma_gf[e] = flux(1,0);
+      double val = ComputeSigmaComp(S,e);
+      sigma_gf[e] = val;
    }
 }
 
@@ -3397,12 +3419,17 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_suffix)
 {
    Vector center(dim), U(dim+2), vel(dim);
-   double pressure=0., ss=0., x_val=0., vel_val = 0.;
+   double pressure=0., ss=0., x_val=0., vel_val = 0., sigma=0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,rho,v,ste,p,ss,cell_type\n";
+   fstream_sv << "x,rho,v,ste,p,ss,cell_type";
+   if (pb->get_indicator() == "ElasticShocktube")
+   {
+      fstream_sv << ",sigma";
+   }
+   fstream_sv << "\n";
 
    for (int i = 0; i < NDofs_L2; i++)
    {
@@ -3415,7 +3442,10 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       double sie = pb->specific_internal_energy(U, e_sheer);
       pressure = pb->pressure(rho, e_sheer, pmesh->GetAttribute(i));
       ss = pb->sound_speed(rho, pressure, pmesh->GetAttribute(i));
-      
+      if (pb->get_indicator() == "ElasticShocktube")
+      {
+         sigma = ComputeSigmaComp(S, i);
+      }
       pmesh->GetElementCenter(i, center);
 
       // We fill the x-coordinate depending on the problem.
@@ -3446,6 +3476,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       case 10: // Vdw3
       case 11: // Vdw4
       case 20:
+      case 50:
+      case 51:
+      case 52:
       default:
          x_val = center[0];
          vel_val = vel[0]; // v_x
@@ -3463,12 +3496,18 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // Print flag if interior or bdr
       if (cell_bdr_flag_gf[i] == -1.)
       {
-         fstream_sv << "int\n";
+         fstream_sv << "int";
       }
       else 
       {
-         fstream_sv << "bdr\n";
+         fstream_sv << "bdr";
       }
+
+      if (pb->get_indicator() == "ElasticShocktube")
+      {
+         fstream_sv << "," << sigma;
+      }
+      fstream_sv << "\n";
    }
 }
 

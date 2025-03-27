@@ -212,6 +212,7 @@ public:
 
    //NF//MS
    void SetElasticity(const bool _use_elasticity) { this->use_elasticity = _use_elasticity; }
+   double ComputeSigmaComp(const Vector &S, const int &e) const;
    void ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const;
    void ComputeFGF(ParGridFunction &f_gf) const;
 

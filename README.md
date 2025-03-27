@@ -62,3 +62,21 @@ $ python3 reorganize_paraview.py <input_dir> <output_dir>
 > - -16 - Error in feasiblity restoration
 >
 > A more complete list of hiopSolveStatus values is available in the file src/Interface/hiopInterface.hpp where the enum hiopSolveStatus is defined.
+
+
+# Select Elastic notes
+Since our exact solution here is given in terms of approximation data from Dr. Favrie,
+we cannot compute errors the conventional way.  To this end, I have created the file
+compute_errors to handle both the computation of the approximation errors as well 
+as convergence tables. To execute this, run the following
+```
+$ python3 ../scripts/compute_error.py results/testing/st1/state_vectors/ ../exact_sol/elastic/shocktube/all_results.txt 7 16
+```
+The third and fourth arguments correspond to matching columns of the respective files that are being compared. We list here the following pairs and their corresponding 
+representative value
+
+| parameter | arg 3 | arg 4 |
+|:----------|:-----:|:-----:|
+| $\rho$    |   1   |   13  |
+| $E$       | 3     | 15    |
+| $\sigma$  | 7     | 16    |

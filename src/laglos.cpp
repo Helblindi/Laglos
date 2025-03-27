@@ -1868,111 +1868,6 @@ int main(int argc, char *argv[]) {
          ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / ste_k_ex_gf.ComputeL2Error(zero);
          ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / ste_k_ex_gf.ComputeMaxError(zero);
       }
-      else if (problem_class->get_indicator() == "ElasticImpact" ||
-               problem_class->get_indicator() == "ElasticSheer" ||
-               problem_class->get_indicator() == "ElasticShocktube")
-      {
-         std::string solution_dir;
-         if (problem_class->get_indicator() == "ElasticImpact")
-         {
-            solution_dir = "exact_sol/elastic/double-impact/";
-         } else if (problem_class->get_indicator() == "ElasticSheer")
-         {
-            MFEM_ABORT("This case has not been implemented.\n");
-            solution_dir = "exact_sol/elastic/sheer/";
-         } else if (problem_class->get_indicator() == "ElasticShocktube")
-         {
-            solution_dir = "exact_sol/elastic/shocktube/";
-         }
-         /* Load mesh */
-         std::string mesh_file_joined = std::string(LAGLOS_DIR) + solution_dir + "sol.mesh";
-         // std::ifstream elastic_mesh_file(mesh_file_joined, std::ifstream::in);
-         const char* elastic_mesh_file = mesh_file_joined.c_str();
-
-         // std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
-         // const char* mesh_file = result.c_str();
-         // mesh = new Mesh(mesh_file, true, true);
-
-         Mesh *elastic_mesh = new Mesh(elastic_mesh_file, true, true);
-         // ParMesh *elastic_pmesh = new ParMesh(MPI_COMM_WORLD, *elastic_mesh);
-         // delete elastic_mesh;
-         // elastic_mesh_file.close();
-
-         /* Solution FESpace */
-         L2_FECollection elastic_L2FEC(0, dim, BasisType::Positive);
-         FiniteElementSpace elastic_fespace(elastic_mesh, &L2FEC);
-         FiniteElementSpace elastic_vfespace(elastic_mesh, &L2FEC, dim);
-         GridFunction elastic_rho(&elastic_fespace),
-                      elastic_sv(&elastic_fespace),
-                      elastic_vel(&elastic_vfespace),
-                      elastic_ste(&elastic_fespace),
-                      elastic_press(&elastic_fespace),
-                      elastic_sigma(&elastic_fespace);
-         MFEM_WARNING("Add computation of error of sigma too\n");
-
-         /* Load solutions */
-         // rho
-         std::string data = std::string(LAGLOS_DIR) + solution_dir + "column_13.txt"; // density
-         std::ifstream erho_infile(data, std::ifstream::in);
-         elastic_rho.Load(erho_infile, elastic_rho.Size());
-         erho_infile.close();
-         // convert to sv
-         for (int i = 0; i < elastic_sv.Size(); i++) {
-            assert(elastic_rho[i] != 0.);
-            elastic_sv[i] = 1. / elastic_rho[i];
-         }
-
-         /* Project from elastic mesh FESpace to L2FESpace and compute error */
-         GridFunction elastic_sv_proj(&L2FESpace);
-         elastic_sv_proj.ProjectGridFunction(elastic_sv);
-         GridFunctionCoefficient sv_ex_coeff(&elastic_sv_proj);
-         sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / elastic_sv.ComputeL1Error(zero);
-         sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / elastic_sv.ComputeL2Error(zero);
-         sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / elastic_sv.ComputeMaxError(zero);
-
-         // velocity
-         data = std::string(LAGLOS_DIR) + solution_dir + "column_18.txt"; // velocity
-         std::ifstream evel_infile(data, std::ifstream::in);
-         elastic_vel.Load(evel_infile, elastic_vel.Size());
-         evel_infile.close();
-         // Project from elastic mesh FESpace to L2VFESpace and compute error
-         GridFunction elastic_vel_proj(&L2VFESpace);
-         elastic_vel_proj.ProjectGridFunction(elastic_vel);
-         GridFunctionCoefficient vel_ex_coeff(&elastic_vel_proj);
-         vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / elastic_vel.ComputeL1Error(zero);
-         vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / elastic_vel.ComputeL2Error(zero);
-         vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / elastic_vel.ComputeMaxError(zero);
-
-         // specific total energy
-         data = std::string(LAGLOS_DIR) + solution_dir + "column_15.txt"; // specific total energy
-         std::ifstream este_infile(data, std::ifstream::in);
-         elastic_ste.Load(este_infile, elastic_ste.Size());
-         este_infile.close();
-         // Project from elastic mesh FESpace to L2FESpace and compute error
-         GridFunction elastic_ste_proj(&L2FESpace);
-         elastic_ste_proj.ProjectGridFunction(elastic_ste);
-         GridFunctionCoefficient ste_ex_coeff(&elastic_ste_proj);
-         ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / elastic_ste.ComputeL1Error(zero);
-         ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / elastic_ste.ComputeL2Error(zero);
-         ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / elastic_ste.ComputeMaxError(zero);
-
-         // sigma
-         // Compute Sigma and F
-         ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);
-         hydro.ComputeSigmaGF(S, sigma_gf);
-
-         data = std::string(LAGLOS_DIR) + solution_dir + "column_16.txt"; // stress tensor
-         std::ifstream esigma_infile(data, std::ifstream::in);
-         elastic_sigma.Load(esigma_infile, elastic_sigma.Size());
-         esigma_infile.close();
-         // Project from elastic mesh FESpace to L2FESpace and compute error
-         GridFunction elastic_sigma_proj(&L2FESpace);
-         elastic_sigma_proj.ProjectGridFunction(elastic_sigma);
-         GridFunctionCoefficient sigma_ex_coeff(&elastic_sigma_proj);
-         sigma_L1_error_n = ste_gf.ComputeL1Error(sigma_ex_coeff) / elastic_sigma.ComputeL1Error(zero);
-         sigma_L2_error_n = ste_gf.ComputeL2Error(sigma_ex_coeff) / elastic_sigma.ComputeL2Error(zero);
-         sigma_Max_error_n = ste_gf.ComputeMaxError(sigma_ex_coeff) / elastic_sigma.ComputeMaxError(zero);
-      }
       else
       {
          if (problem_class->get_indicator() == "Vdw1")
@@ -2096,16 +1991,8 @@ int main(int argc, char *argv[]) {
                         // total
                         << "L1_Error " << L1_error << "\n"
                         << "L2_Error " << L2_error << "\n"
-                        << "Linf_Error " << Max_error << "\n";
-      if (problem_class->get_indicator() == "ElasticImpact" ||
-          problem_class->get_indicator() == "ElasticSheer" ||
-          problem_class->get_indicator() == "ElasticShocktube")
-      {
-         convergence_file << "sigma_L1_Error " << sigma_L1_error_n << "\n"
-                          << "sigma_L2_Error " << sigma_L2_error_n << "\n"
-                          << "sigma_Linf_Error " << sigma_Max_error_n << "\n";
-      }
-      convergence_file  << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                        << "Linf_Error " << Max_error << "\n"
+                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
                         << "dt " << dt << "\n"
                         << "Endtime " << t << "\n";
                   

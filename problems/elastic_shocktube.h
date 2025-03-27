@@ -50,7 +50,7 @@ private:
     * Problem Specific constants
     *********************************************************/
    double _gamma = 3.4;
-   bool _known_exact_solution = true;
+   bool _known_exact_solution = false; // there is a file with approximation data giving an "Exact solution"
    bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "ElasticShocktube";

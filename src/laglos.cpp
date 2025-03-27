@@ -1895,7 +1895,8 @@ int main(int argc, char *argv[]) {
                       elastic_sv(&elastic_fespace),
                       elastic_vel(&elastic_vfespace),
                       elastic_ste(&elastic_fespace),
-                      elastic_press(&elastic_fespace);
+                      elastic_press(&elastic_fespace),
+                      elastic_sigma(&elastic_fespace);
          MFEM_WARNING("Add computation of error of sigma too\n");
 
          /* Load solutions */
@@ -1952,6 +1953,26 @@ int main(int argc, char *argv[]) {
          cout << "ste L1: " << ste_L1_error_n << endl;
          cout << "ste L2: " << ste_L2_error_n << endl;
          cout << "ste Max: " << ste_Max_error_n << endl;
+
+         // sigma
+         // Compute Sigma and F
+         ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);
+         hydro.ComputeSigmaGF(S, sigma_gf);
+
+         data = std::string(LAGLOS_DIR) + solution_dir + "column_16.txt"; // stress tensor
+         std::ifstream esigma_infile(data, std::ifstream::in);
+         elastic_sigma.Load(esigma_infile, elastic_sigma.Size());
+         esigma_infile.close();
+         // Project from elastic mesh FESpace to L2FESpace and compute error
+         GridFunction elastic_sigma_proj(&L2FESpace);
+         elastic_sigma_proj.ProjectGridFunction(elastic_sigma);
+         GridFunctionCoefficient sigma_ex_coeff(&elastic_sigma_proj);
+         double sigma_L1_error_n = ste_gf.ComputeL1Error(sigma_ex_coeff) / elastic_sigma.ComputeL1Error(zero);
+         double sigma_L2_error_n = ste_gf.ComputeL2Error(sigma_ex_coeff) / elastic_sigma.ComputeL2Error(zero);
+         double sigma_Max_error_n = ste_gf.ComputeMaxError(sigma_ex_coeff) / elastic_sigma.ComputeMaxError(zero);
+         cout << "sigma L1: " << sigma_L1_error_n << endl;
+         cout << "sigma L2: " << sigma_L2_error_n << endl;
+         cout << "sigma Max: " << sigma_Max_error_n << endl;
       }
       else
       {

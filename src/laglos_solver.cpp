@@ -352,6 +352,19 @@ void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
    }
 }
 
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
+{
+   assert(this->use_elasticity);
+   assert(e_sheer_gf.Size() == NDofs_L2);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      e_sheer_gf[e] = elastic.e_sheer(e);
+   }
+}
+
+
 /* This Mult method is not mass conservative by itself */
 template<int dim>
 void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const

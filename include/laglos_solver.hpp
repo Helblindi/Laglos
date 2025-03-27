@@ -215,6 +215,7 @@ public:
    double ComputeSigmaComp(const Vector &S, const int &e) const;
    void ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const;
    void ComputeFGF(ParGridFunction &f_gf) const;
+   void ComputeESheerGF(ParGridFunction &e_sheer_gf) const;
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);

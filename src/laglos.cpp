@@ -921,7 +921,7 @@ int main(int argc, char *argv[]) {
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_press, vis_gamma, vis_mc;
-   socketstream vis_sig, vis_f, vis_frho;
+   socketstream vis_sig, vis_f, vis_frho, vis_esheer;
    socketstream vis_rho_ex, vis_v_ex, vis_ste_ex, vis_p_ex;
    socketstream vis_rho_err, vis_v_err, vis_ste_err, vis_p_err;
    char vishost[] = "localhost";
@@ -994,6 +994,7 @@ int main(int argc, char *argv[]) {
       vis_sig.precision(8);
       vis_f.precision(8);
       vis_frho.precision(8);
+      vis_esheer.precision(8);
 
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
@@ -1024,9 +1025,10 @@ int main(int argc, char *argv[]) {
       if (problem == 50 || problem == 51 || problem == 52)
       {
          // Compute Sigma and F
-         ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);
+         ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
          hydro.ComputeSigmaGF(S, sigma_gf);
          hydro.ComputeFGF(f_gf);
+         hydro.ComputeESheerGF(e_sheer_gf);
 
          for (int i = 0; i < L2FESpace.GetNDofs(); i++)
          {
@@ -1045,6 +1047,9 @@ int main(int argc, char *argv[]) {
          Wx += offx;
          VisualizeField(vis_frho, vishost, visport, frho_gf,
                         "F/rho", Wx, Wy, Ww, Wh);
+         Wx += offx;
+         VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
+                        "e sheer", Wx, Wy, Ww, Wh);
       }
       
       Wx = 0;
@@ -1455,9 +1460,10 @@ int main(int argc, char *argv[]) {
             if (problem == 50 || problem == 51 || problem == 52)
             {
                // Compute Sigma and F
-               ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace);
+               ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
                hydro.ComputeSigmaGF(S, sigma_gf);
                hydro.ComputeFGF(f_gf);
+               hydro.ComputeESheerGF(e_sheer_gf);
 
                for (int i = 0; i < L2FESpace.GetNDofs(); i++)
                {
@@ -1476,6 +1482,9 @@ int main(int argc, char *argv[]) {
                Wx += offx;
                VisualizeField(vis_frho, vishost, visport, frho_gf,
                               "F/rho", Wx, Wy, Ww, Wh);
+               Wx += offx;
+               VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
+                              "e sheer", Wx, Wy, Ww, Wh);
             }
 
             if (problem_class->has_exact_solution())

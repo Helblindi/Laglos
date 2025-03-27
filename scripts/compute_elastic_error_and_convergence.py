@@ -2,8 +2,8 @@ import os
 import glob
 import numpy as np
 import argparse
-import re  # Import regex for extracting numbers
-from tabulate import tabulate  # Import tabulate for LaTeX table generation
+import re
+from tabulate import tabulate
 
 def extract_refinement_level(filename):
     """ Extracts refinement level from a filename like 'sv_06.csv' and computes step size """
@@ -15,17 +15,7 @@ def extract_refinement_level(filename):
         raise ValueError(f"Could not extract refinement level from {filename}")
 
 def read_data(filename, column=0, has_header=False):
-    """ 
-    Reads a CSV or space-delimited TXT file and returns numerical values from the specified column.
-    
-    Parameters:
-    - filename (str): Path to the file.
-    - column (int): The column index to extract data from (0-based index).
-    - has_header (bool): Whether the file has a header row to skip (True for approximation file).
-    
-    Returns:
-    - np.array: Extracted numerical values.
-    """
+    """ Reads a CSV or space-delimited TXT file and returns numerical values from the specified column. """
     delimiter = ',' if filename.endswith('.csv') else None  # None lets NumPy auto-detect spaces/tabs
     
     try:
@@ -58,10 +48,14 @@ def compute_L1_error(approx_file, exact_file, approx_col=0, exact_col=0):
     return L1_error
 
 def compute_convergence_order(errors, step_sizes):
-    """ Computes the convergence order from L1 errors and step sizes. """
+    """ Computes the convergence order using the formula: log(Ei / Ei-1) / log(hi / hi-1) """
     orders = []
     for i in range(1, len(errors)):
-        order = np.log(errors[i] / errors[i-1]) / np.log(step_sizes[i] / step_sizes[i-1])
+        E_i = errors[i]
+        E_i_1 = errors[i-1]
+        h_i = step_sizes[i]
+        h_i_1 = step_sizes[i-1]
+        order = np.log(E_i / E_i_1) / np.log(h_i / h_i_1)
         orders.append(order)
     return orders
 
@@ -78,8 +72,11 @@ def process_refinement_files(directory, exact_file, approx_col=0, exact_col=0):
         step_sizes.append(step_size)
     
     convergence_orders = compute_convergence_order(errors, step_sizes)
+
+    print('errors: ', errors)
+    print('convergence orders: ', convergence_orders)
     
-    return zip(approx_files, errors, step_sizes, convergence_orders)
+    return errors, step_sizes, convergence_orders
 
 def main():
     """ Main function to parse arguments and generate LaTeX table. """
@@ -91,17 +88,25 @@ def main():
     args = parser.parse_args()
     
     # Process the files and compute the results
-    results = process_refinement_files(args.directory, args.exact_file, approx_col=args.approx_col, exact_col=args.exact_col)
+    errors, step_sizes, convergence_orders = process_refinement_files(args.directory, args.exact_file, approx_col=args.approx_col, exact_col=args.exact_col)
 
     # Prepare data for tabulate
     table_data = []
-    for file_name, error, step_size, order in results:
-        step_size_str = f"{step_size:<10.3f}"
+    
+    for i, error in enumerate(errors):
+
         error_str = f"{error:<2.3e}"
-        order_str = f"{order:.3f}" if order != float('inf') else "N/A"
+
+        # For the first row, do not compute convergence order, display '{---}'
+        if i == 0:
+            order_str = "---"
+        else:
+            order = convergence_orders[i-1]
+            order_str = f"{order:<0.2e}"
         
-        # Add row to table_data
-        table_data.append([f"{1. / step_size:<10.3f}", error_str, order_str])
+        # Add row to table data
+        num_dofs = int(1 / step_sizes[i])
+        table_data.append([num_dofs, error_str, order_str])
     
     # Print LaTeX formatted table using tabulate
     headers = ['Num dofs', 'L1 Error', 'Convergence Order']

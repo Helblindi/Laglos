@@ -1199,11 +1199,10 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          if (use_elasticity)
          {
             lambda_max = 6.E3 * rhoL;
-            if (pb->get_indicator() == "ElasticImpact")
-            {
-               MFEM_WARNING("lambda_max must take into account the velocity of the material??\n");
-               lambda_max = 6.E4 * rhoL;
-            }
+            // if (pb->get_indicator() == "ElasticImpact")
+            // {
+            //    lambda_max = 6.E4 * rhoL;
+            // }
             // lambda_max = 5.E3;
             // lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
          }
@@ -3438,7 +3437,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
    fstream_sv << "x,rho,v,ste,p,ss,cell_type";
-   if (pb->get_indicator() == "ElasticShocktube")
+   if (pb->get_indicator() == "ElasticShocktube" || 
+       pb->get_indicator() == "ElasticImpact" ||
+       pb->get_indicator() == "ElasticSheer")
    {
       fstream_sv << ",sigma";
    }
@@ -3455,7 +3456,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       double sie = pb->specific_internal_energy(U, e_sheer);
       pressure = pb->pressure(rho, e_sheer, pmesh->GetAttribute(i));
       ss = pb->sound_speed(rho, pressure, pmesh->GetAttribute(i));
-      if (pb->get_indicator() == "ElasticShocktube")
+      if (pb->get_indicator() == "ElasticShocktube" || 
+          pb->get_indicator() == "ElasticImpact" ||
+          pb->get_indicator() == "ElasticSheer")
       {
          sigma = ComputeSigmaComp(S, i);
       }
@@ -3516,7 +3519,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          fstream_sv << "bdr";
       }
 
-      if (pb->get_indicator() == "ElasticShocktube")
+      if (pb->get_indicator() == "ElasticShocktube" || 
+          pb->get_indicator() == "ElasticImpact" ||
+          pb->get_indicator() == "ElasticSheer")
       {
          fstream_sv << "," << sigma;
       }

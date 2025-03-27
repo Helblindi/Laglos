@@ -49,7 +49,7 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _gamma = 4.4;
+   double _gamma = 3.4;
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = false; // Indicator for mv boundary conditions
@@ -57,16 +57,9 @@ private:
 
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
    // 5.2 elastic shock
-   double rhoL = 1.E3, rhoR = 1.E3, pL = 1.E5, pR = 1.E5, vL = 10., vR = -10.;
+   double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E5, pR = 1.E5, vL = 10., vR = -10.;
    double x_center = 0.5;
-   const double p_inf = 6.E8;
-   // const double p_inf = 0.;
-
-   // 5.3 elastic shock with five waves
-   //NF//MS - Shear, how to introduce tangential velocity in a 1d test?
-   // double rhoL = 1000., rhoR = 1000., pL = 1.E8, pR = 1.E5, vL = 100., vR = -100.;
-   // double x_center = 0.5;
-   // const double p_inf = 6.E8;
+   const double p_inf = 2.15E10;
 
 public:
    ElasticImpact()

@@ -22,3 +22,8 @@ for the necessary columns is the following:
          python3 convert_center_to_edgy.py column_0.txt column_0_new.txt
    (3) Generate mfem mesh from endpoint data
          python3 generate_mfem_mesh.py column_0_new.txt sol.mesh
+
+UPDATE (03/27/2025):
+  This functionality is no longer needed since errors and convergence 
+  rates are computed using a python script.  
+  See commit: 1de3a59eed1206b746bb1045a7f75a4485ed5e5e

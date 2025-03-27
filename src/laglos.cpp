@@ -1704,7 +1704,7 @@ int main(int argc, char *argv[]) {
                       << setfill('0')
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
-                      << ".out";
+                      << ".csv";
 
    ostringstream ts_filename_suffix;
    ts_filename_suffix << "tsData_"
@@ -1830,6 +1830,8 @@ int main(int argc, char *argv[]) {
    double sv_L1_error_n = 0., rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
           sv_L2_error_n = 0., rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,
           sv_Max_error_n = 0., rho_Max_error_n = 0., vel_Max_error_n = 0., ste_Max_error_n = 0.;
+   /* Compute error in sigma for elastic cases */
+   double sigma_L1_error_n = 0., sigma_L2_error_n = 0., sigma_Max_error_n = 0.;
 
    if (problem_class->has_exact_solution())
    {
@@ -1927,9 +1929,6 @@ int main(int argc, char *argv[]) {
          sv_L1_error_n = sv_gf.ComputeL1Error(sv_ex_coeff) / elastic_sv.ComputeL1Error(zero);
          sv_L2_error_n = sv_gf.ComputeL2Error(sv_ex_coeff) / elastic_sv.ComputeL2Error(zero);
          sv_Max_error_n = sv_gf.ComputeMaxError(sv_ex_coeff) / elastic_sv.ComputeMaxError(zero);
-         cout << "sv L1: " << sv_L1_error_n << endl;
-         cout << "sv L2: " << sv_L2_error_n << endl;
-         cout << "sv Max: " << sv_Max_error_n << endl;
 
          // velocity
          data = std::string(LAGLOS_DIR) + solution_dir + "column_18.txt"; // velocity
@@ -1943,9 +1942,6 @@ int main(int argc, char *argv[]) {
          vel_L1_error_n = v_gf.ComputeL1Error(vel_ex_coeff) / elastic_vel.ComputeL1Error(zero);
          vel_L2_error_n = v_gf.ComputeL2Error(vel_ex_coeff) / elastic_vel.ComputeL2Error(zero);
          vel_Max_error_n = v_gf.ComputeMaxError(vel_ex_coeff) / elastic_vel.ComputeMaxError(zero);
-         cout << "vel L1: " << vel_L1_error_n << endl;
-         cout << "vel L2: " << vel_L2_error_n << endl;
-         cout << "vel Max: " << vel_Max_error_n << endl;
 
          // specific total energy
          data = std::string(LAGLOS_DIR) + solution_dir + "column_15.txt"; // specific total energy
@@ -1959,9 +1955,6 @@ int main(int argc, char *argv[]) {
          ste_L1_error_n = ste_gf.ComputeL1Error(ste_ex_coeff) / elastic_ste.ComputeL1Error(zero);
          ste_L2_error_n = ste_gf.ComputeL2Error(ste_ex_coeff) / elastic_ste.ComputeL2Error(zero);
          ste_Max_error_n = ste_gf.ComputeMaxError(ste_ex_coeff) / elastic_ste.ComputeMaxError(zero);
-         cout << "ste L1: " << ste_L1_error_n << endl;
-         cout << "ste L2: " << ste_L2_error_n << endl;
-         cout << "ste Max: " << ste_Max_error_n << endl;
 
          // sigma
          // Compute Sigma and F
@@ -1976,12 +1969,9 @@ int main(int argc, char *argv[]) {
          GridFunction elastic_sigma_proj(&L2FESpace);
          elastic_sigma_proj.ProjectGridFunction(elastic_sigma);
          GridFunctionCoefficient sigma_ex_coeff(&elastic_sigma_proj);
-         double sigma_L1_error_n = ste_gf.ComputeL1Error(sigma_ex_coeff) / elastic_sigma.ComputeL1Error(zero);
-         double sigma_L2_error_n = ste_gf.ComputeL2Error(sigma_ex_coeff) / elastic_sigma.ComputeL2Error(zero);
-         double sigma_Max_error_n = ste_gf.ComputeMaxError(sigma_ex_coeff) / elastic_sigma.ComputeMaxError(zero);
-         cout << "sigma L1: " << sigma_L1_error_n << endl;
-         cout << "sigma L2: " << sigma_L2_error_n << endl;
-         cout << "sigma Max: " << sigma_Max_error_n << endl;
+         sigma_L1_error_n = ste_gf.ComputeL1Error(sigma_ex_coeff) / elastic_sigma.ComputeL1Error(zero);
+         sigma_L2_error_n = ste_gf.ComputeL2Error(sigma_ex_coeff) / elastic_sigma.ComputeL2Error(zero);
+         sigma_Max_error_n = ste_gf.ComputeMaxError(sigma_ex_coeff) / elastic_sigma.ComputeMaxError(zero);
       }
       else
       {
@@ -2106,8 +2096,16 @@ int main(int argc, char *argv[]) {
                         // total
                         << "L1_Error " << L1_error << "\n"
                         << "L2_Error " << L2_error << "\n"
-                        << "Linf_Error " << Max_error << "\n"
-                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                        << "Linf_Error " << Max_error << "\n";
+      if (problem_class->get_indicator() == "ElasticImpact" ||
+          problem_class->get_indicator() == "ElasticSheer" ||
+          problem_class->get_indicator() == "ElasticShocktube")
+      {
+         convergence_file << "sigma_L1_Error " << sigma_L1_error_n << "\n"
+                          << "sigma_L2_Error " << sigma_L2_error_n << "\n"
+                          << "sigma_Linf_Error " << sigma_Max_error_n << "\n";
+      }
+      convergence_file  << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
                         << "dt " << dt << "\n"
                         << "Endtime " << t << "\n";
                   

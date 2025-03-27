@@ -71,19 +71,20 @@ public:
    {
       DenseMatrix c(3), c2(3);
       Compute_c(e, c);
+      const double rho0 = rho0_gf(e);
 
       mfem::Mult(c, c, c2);
-      return e_sheer(c.Trace(), c2.Trace());
+      return e_sheer(c.Trace(), c2.Trace(), rho0);
    }
    
-   double e_sheer(const double &trc, const double &trc2) const
+   double e_sheer(const double &trc, const double &trc2, const double &rho0) const
    {
-      return mu * (trc/3. - 1.); // Neo hookean
+      return mu / 2 * (trc - 3.) / rho0; // Neo hookean
    }
 
    double des_dtrc(const double &trc, const double &trc2) const
    {
-      return mu / 3.; // Neo hookean
+      return mu / 2.; // Neo hookean
    }
 
    double des_dtrc2(const double &trc, const double &trc2) const
@@ -156,7 +157,8 @@ public:
 
       /* Compute sheer energy, and save in class member */
       mfem::Mult(c, c, c2);
-      es = e_sheer(c.Trace(), c2.Trace());
+      const double rho0 = rho0_gf(e);
+      es = e_sheer(c.Trace(), c2.Trace(), rho0);
       
       /* Compute deviatoric part of stess tensor */
       DenseMatrix c_tf(3), c2_tf(3); // 'trace-free objects'

@@ -1,0 +1,24 @@
+Because of the nature of the files I received and my need to 
+read them in to mesh objects and GridFunction objects in 
+MFEM, I utilized ChatGPT to generate some scripts to handle
+the processing of the received data. The process to break 
+down the space delimited file of values into separate files 
+for the necessary columns is the following:
+
+   (1) Parse the desired columns
+         python3 col_parser.py all_results.txt 0 16
+         cols:
+            0  - x_gf
+            13 - rho mixture
+            14 - pressure mixture
+            15 - total energy mixture
+            16 - stress 00
+            18 - vx
+            19 - vy
+
+   (2) Convert the cell center values to cell boundary values,
+       as that is what the mesh file must contain. This shift 
+       is hard coded to 0.005.
+         python3 convert_center_to_edgy.py column_0.txt column_0_new.txt
+   (3) Generate mfem mesh from endpoint data
+         python3 generate_mfem_mesh.py column_0_new.txt sol.mesh

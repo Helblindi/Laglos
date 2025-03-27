@@ -67,7 +67,7 @@ public:
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
    void set_thbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
-   void set_mvbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
+   void set_mvbcs_indicator(const bool &tvalue) { this->mv_bcs = tvalue; }
    void set_mv_bcs_need_updating_indicator(const bool &tvalue) { this->mv_bcs_need_updating = tvalue; }
    void set_distort_mesh(const bool &_distort_mesh) { distort_mesh = _distort_mesh; }
    void set_exact_solution(const bool &_known_exact_solution) { known_exact_solution = _known_exact_solution; }

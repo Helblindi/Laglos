@@ -32,23 +32,18 @@ def interpolate_exact_solution(approx_x, exact_file, exact_col=0):
     exact_y = read_data(exact_file, exact_col, has_header=False)  # Read exact solution values
     
     interpolated_exact = np.interp(approx_x, exact_x, exact_y)  # Interpolate exact solution
-    print('interpolated_exact_sol: ', interpolated_exact)
     return interpolated_exact
 
 def compute_L1_error(approx_file, exact_file, approx_cols, exact_cols):
     """ Computes the composite L1 error between approximation and exact solution across multiple variables. """
     approx_x = read_data(approx_file, 0, has_header=True)  # Read x-values from approx file
     approx = [read_data(approx_file, col, has_header=True) for col in approx_cols]  # Approximation data (y-values)
-    print('approx cols: ', approx_cols)
-   #  print('approx: ', approx)
     
     exact = [interpolate_exact_solution(approx_x, exact_file, col) for col in exact_cols]  # Exact solution for all columns
     
     # Compute the composite L1 error (sum of relative errors across all variables)
     _errors = (np.sum(np.abs(a - e)) / np.sum(np.abs(e)) for a, e in zip(approx, exact))
     composite_error = sum(np.sum(np.abs(a - e)) / np.sum(np.abs(e)) for a, e in zip(approx, exact))
-    print('errors: ', _errors)
-    print('composite error: ', composite_error)
     return composite_error
 
 def compute_convergence_order(errors, step_sizes):
@@ -77,9 +72,6 @@ def process_refinement_files(directory, exact_file, approx_cols, exact_cols):
     
     convergence_orders = compute_convergence_order(errors, step_sizes)
 
-   #  print('errors: ', errors)
-   #  print('convergence orders: ', convergence_orders)
-    
     return errors, step_sizes, convergence_orders
 
 def main():
@@ -99,22 +91,22 @@ def main():
     
     for i, error in enumerate(errors):
 
-        error_str = f"{error:<2.3e}"
+        error_str = f"{error:<1.3e}"
 
         # For the first row, do not compute convergence order, display '{---}'
         if i == 0:
             order_str = "---"
         else:
             order = convergence_orders[i-1]
-            order_str = f"{order:<0.2e}"
+            order_str = f"{order:<0.2f}"
         
         # Add row to table data
         num_dofs = int(1 / step_sizes[i])
-        table_data.append([num_dofs, error_str, order_str])
+        table_data.append([num_dofs, error, order_str])
     
     # Print LaTeX formatted table using tabulate
     headers = ['Num dofs', 'Composite L1 Error', 'Convergence Order']
-    latex_table = tabulate(table_data, headers=headers, tablefmt="latex", floatfmt=".3e")
+    latex_table = tabulate(table_data, headers=headers, tablefmt="latex", floatfmt=(".0f", "1.3e"))
     
     print(latex_table)
 

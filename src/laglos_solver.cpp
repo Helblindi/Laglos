@@ -285,18 +285,26 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
  *       the necessary data structures (e.g., elastic object) are properly initialized.
  */
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, Vector &sigma_e) const
+void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, DenseMatrix &sigma_e) const
 {
+   assert(use_elasticity);
+   Array<int> idx(dim), idy(dim);
+   DenseMatrix sigmaD(3);
+   DenseMatrix flux(dim+2,dim);
    Vector U(dim+2);
    sigma_e.SetSize(dim);
 
+   /* Fill sigma_e arrays */
+   for (int i = 0; i < dim; i++)
+   {
+      idx[i] = i+1;
+      idy[i] = i;
+   }
    GetCellStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
-   DenseMatrix sigmaD(3);
-   DenseMatrix flux(dim+2,dim);
    elastic.ComputeS(e, rho, es, sigmaD);
    flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-   for (int i = 0; i < dim; i++) { sigma_e[i] = -flux(i+1,i); }
+   flux.GetSubMatrix(idx, idy, sigma_e);
 }
 
 
@@ -318,12 +326,13 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
 {
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2 * dim);
-   Vector sigma_e(dim);
+   DenseMatrix sigma_e(dim);
 
    for (int e = 0; e < NDofs_L2; e++)
    {
       ComputeSigmaComp(S,e,sigma_e);
-      for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e[i]; }
+      // Want sigma_1,1 and sigma_1,2
+      for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e(0,i); }
    }
 }
 
@@ -1201,18 +1210,15 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          if (use_elasticity)
          {
             lambda_max = 6.E3 * rhoL;
-            // if (pb->get_indicator() == "ElasticImpact")
+            // if (pb->get_indicator() == "ElasticShear")
             // {
-            //    lambda_max = 6.E4 * rhoL;
+            //    lambda_max *= 10.;
             // }
-            // lambda_max = 5.E3;
-            // lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
          }
          else
          {
             lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
          }
-         // cout << "lambda_max: " << lambda_max << endl;
          
          d = lambda_max * c_norm;
          dij_avg += d;
@@ -3432,20 +3438,27 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
-   Vector center(dim), U(dim+2), vel(dim), sigma(dim);
-   double pressure=0., ss=0., x_val=0., vel_val = 0.;
+   Vector center(dim), U(dim+2), vel(dim);
+   DenseMatrix sigma(dim);
+   double pressure=0., ss=0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,rho,v,ste,p,ss,cell_type";
+   fstream_sv << "x,";
+   if (dim > 1) { fstream_sv << "y,"; }
+   if (dim > 2) { fstream_sv << "z,"; }
+   fstream_sv << "rho,vx,";
+   if (dim > 1) { fstream_sv << "vy,"; }
+   if (dim > 2) { fstream_sv << "vz,"; }
+   fstream_sv << "ste,p,ss,cell_type";
    if (pb->get_indicator() == "ElasticShocktube" || 
        pb->get_indicator() == "ElasticImpact" ||
        pb->get_indicator() == "ElasticShear")
    {
-      fstream_sv << ",sigmax";
-      if (dim > 1) { fstream_sv << ",sigmay"; }
-      if (dim > 2) { fstream_sv << ",sigmaz";}
+      fstream_sv << ",sigma11";
+      if (dim > 1) { fstream_sv << ",sigma12"; }
+      if (dim > 2) { fstream_sv << ",sigma13";}
    }
    fstream_sv << "\n";
 
@@ -3468,55 +3481,22 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       }
       pmesh->GetElementCenter(i, center);
 
-      // We fill the x-coordinate depending on the problem.
-      // This really depends on what kind of visualization is needed
-      switch (problem)
-      {
-      // Any radial plot, we take the L2 norm of the cell center
-      case 4:  // Noh
-      case 6:  // Sedov
-      case 13: // Sod Radial
-         x_val = center.Norml2();
-         vel_val = vel.Norml2(); // magnitude in radial case
-         break;
-      
-      case 7: // Saltzman
-         x_val = center[0];
-         vel_val = vel[1]; // v_y
-         break;
-
-      // For stacked Sod problem, we only need the x-coord
-      case 0:  // Smooth
-      case 1:  // Sod
-      case 2:  // Lax
-      case 3:  // Leblanc
-      case 5:
-      case 8:  // Vdw1
-      case 9:  // Vdw2
-      case 10: // Vdw3
-      case 11: // Vdw4
-      case 20:
-      case 50:
-      case 51:
-      case 52:
-      default:
-         x_val = center[0];
-         vel_val = vel[0]; // v_x
-         break;
-      }
-
       // Output to file
-      fstream_sv << x_val << ","    // x
-                 << 1./U[0] << ","  // rho
-                 << vel_val << ","  // vel, either v_x, v_y, or ||v||
-                 << U[dim+1] << "," // ste
-                 << pressure << "," // pressure
-                 << ss << ",";      // sound speed
+      for (int i = 0; i < dim; i++) {
+         fstream_sv << center[i] << ",";                  // x,y,z
+      }
+      fstream_sv << 1./U[0] << ",";                       // rho
+      for (int i = 0; i < dim; i++) {
+         fstream_sv << vel[i] << ",";                     // v
+      }
+      fstream_sv << U[dim+1] << ","                       // ste
+                 << pressure << ","                       // pressure
+                 << ss << ",";                            // sound speed
 
       // Print flag if interior or bdr
       if (cell_bdr_flag_gf[i] == -1.)
       {
-         fstream_sv << "int";
+         fstream_sv << "int";                             // cell_type
       }
       else 
       {
@@ -3525,9 +3505,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
 
       if (pb->get_indicator() == "ElasticShocktube" || 
           pb->get_indicator() == "ElasticImpact" ||
-          pb->get_indicator() == "ElasticShear")
+          pb->get_indicator() == "ElasticShear")          // sigma
       {
-         for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma[i]; }
+         for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
       }
       fstream_sv << "\n";
    }

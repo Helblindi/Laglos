@@ -43,7 +43,7 @@ namespace hydroLO
 {
 
 template<int dim>
-class ElasticSheer: public ProblemBase<dim>
+class ElasticShear: public ProblemBase<dim>
 {
 private:
    /*********************************************************
@@ -53,7 +53,7 @@ private:
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = false; // Indicator for mv boundary conditions
-   string _indicator = "ElasticSheer";
+   string _indicator = "ElasticShear";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
    // 5.2 elastic shock
@@ -69,7 +69,7 @@ private:
    // const double p_inf = 6.E8;
 
 public:
-   ElasticSheer()
+   ElasticShear()
    {
       MFEM_ABORT("Sheer not yet implemented\n");
       this->set_gamma(_gamma);

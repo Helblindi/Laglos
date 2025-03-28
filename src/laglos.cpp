@@ -535,8 +535,7 @@ int main(int argc, char *argv[]) {
          problem_class = new ElasticImpact<dim>();
          break;
       case 52: // Elastic shear
-         MFEM_ABORT("Not implemented.\n");
-         problem_class = new ElasticSheer<dim>();
+         problem_class = new ElasticShear<dim>();
          break;
       case 100:
          problem_class = new TestBCs<dim>();

@@ -3439,7 +3439,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    fstream_sv << "x,rho,v,ste,p,ss,cell_type";
    if (pb->get_indicator() == "ElasticShocktube" || 
        pb->get_indicator() == "ElasticImpact" ||
-       pb->get_indicator() == "ElasticSheer")
+       pb->get_indicator() == "ElasticShear")
    {
       fstream_sv << ",sigma";
    }
@@ -3458,7 +3458,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       ss = pb->sound_speed(rho, pressure, pmesh->GetAttribute(i));
       if (pb->get_indicator() == "ElasticShocktube" || 
           pb->get_indicator() == "ElasticImpact" ||
-          pb->get_indicator() == "ElasticSheer")
+          pb->get_indicator() == "ElasticShear")
       {
          sigma = ComputeSigmaComp(S, i);
       }
@@ -3521,7 +3521,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
 
       if (pb->get_indicator() == "ElasticShocktube" || 
           pb->get_indicator() == "ElasticImpact" ||
-          pb->get_indicator() == "ElasticSheer")
+          pb->get_indicator() == "ElasticShear")
       {
          fstream_sv << "," << sigma;
       }

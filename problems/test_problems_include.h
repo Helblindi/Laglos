@@ -26,6 +26,6 @@
 #include "taylor_green.h"
 #include "elastic_shocktube.h"
 #include "elastic_impact.h"
-#include "elastic_sheer.h"
+#include "elastic_shear.h"
 
 #endif

@@ -285,9 +285,10 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
  *       the necessary data structures (e.g., elastic object) are properly initialized.
  */
 template<int dim>
-double LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e) const
+void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, Vector &sigma_e) const
 {
    Vector U(dim+2);
+   sigma_e.SetSize(dim);
 
    GetCellStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
@@ -295,7 +296,7 @@ double LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e
    DenseMatrix flux(dim+2,dim);
    elastic.ComputeS(e, rho, es, sigmaD);
    flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-   return -flux(1,0);
+   for (int i = 0; i < dim; i++) { sigma_e[i] = -flux(i+1,i); }
 }
 
 
@@ -316,12 +317,13 @@ template<int dim>
 void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
 {
    assert(this->use_elasticity);
-   assert(sigma_gf.Size() == NDofs_L2);
+   assert(sigma_gf.Size() == NDofs_L2 * dim);
+   Vector sigma_e(dim);
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      double val = ComputeSigmaComp(S,e);
-      sigma_gf[e] = val;
+      ComputeSigmaComp(S,e,sigma_e);
+      for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e[i]; }
    }
 }
 
@@ -3430,8 +3432,8 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
-   Vector center(dim), U(dim+2), vel(dim);
-   double pressure=0., ss=0., x_val=0., vel_val = 0., sigma=0.;
+   Vector center(dim), U(dim+2), vel(dim), sigma(dim);
+   double pressure=0., ss=0., x_val=0., vel_val = 0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
@@ -3441,7 +3443,9 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
        pb->get_indicator() == "ElasticImpact" ||
        pb->get_indicator() == "ElasticShear")
    {
-      fstream_sv << ",sigma";
+      fstream_sv << ",sigmax";
+      if (dim > 1) { fstream_sv << ",sigmay"; }
+      if (dim > 2) { fstream_sv << ",sigmaz";}
    }
    fstream_sv << "\n";
 
@@ -3460,7 +3464,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
           pb->get_indicator() == "ElasticImpact" ||
           pb->get_indicator() == "ElasticShear")
       {
-         sigma = ComputeSigmaComp(S, i);
+         ComputeSigmaComp(S, i, sigma);
       }
       pmesh->GetElementCenter(i, center);
 
@@ -3523,7 +3527,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
           pb->get_indicator() == "ElasticImpact" ||
           pb->get_indicator() == "ElasticShear")
       {
-         fstream_sv << "," << sigma;
+         for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma[i]; }
       }
       fstream_sv << "\n";
    }

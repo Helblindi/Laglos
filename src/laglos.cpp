@@ -1024,7 +1024,7 @@ int main(int argc, char *argv[]) {
       if (problem == 50 || problem == 51 || problem == 52)
       {
          // Compute Sigma and F
-         ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
+         ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
          hydro.ComputeSigmaGF(S, sigma_gf);
          hydro.ComputeFGF(f_gf);
          hydro.ComputeESheerGF(e_sheer_gf);
@@ -1459,7 +1459,7 @@ int main(int argc, char *argv[]) {
             if (problem == 50 || problem == 51 || problem == 52)
             {
                // Compute Sigma and F
-               ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
+               ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
                hydro.ComputeSigmaGF(S, sigma_gf);
                hydro.ComputeFGF(f_gf);
                hydro.ComputeESheerGF(e_sheer_gf);
@@ -1829,8 +1829,6 @@ int main(int argc, char *argv[]) {
    double sv_L1_error_n = 0., rho_L1_error_n = 0., vel_L1_error_n = 0., ste_L1_error_n = 0.,
           sv_L2_error_n = 0., rho_L2_error_n = 0., vel_L2_error_n = 0., ste_L2_error_n = 0.,
           sv_Max_error_n = 0., rho_Max_error_n = 0., vel_Max_error_n = 0., ste_Max_error_n = 0.;
-   /* Compute error in sigma for elastic cases */
-   double sigma_L1_error_n = 0., sigma_L2_error_n = 0., sigma_Max_error_n = 0.;
 
    if (problem_class->has_exact_solution())
    {

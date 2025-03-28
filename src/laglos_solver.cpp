@@ -1211,9 +1211,9 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          {
             lambda_max = 6.E3 * rhoL;
             // if (pb->get_indicator() == "ElasticShear")
-            // {
-            //    lambda_max *= 10.;
-            // }
+            {
+               lambda_max *= 10.;
+            }
          }
          else
          {

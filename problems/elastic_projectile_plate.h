@@ -53,7 +53,7 @@ private:
    const int cell_attr_g = 1, cell_attr_s = 50;
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
-   bool _mvbcs = true; // Indicator for mv boundary conditions
+   bool _mvbcs = false; // Indicator for mv boundary conditions
    string _indicator = "ElasticProjectilePlate";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
@@ -72,7 +72,7 @@ private:
       double _x = x[0];
       double _y = x[1];
       /* projectile location */
-      if (_x >= 0.1 && _x <= .2 && _y >= 0.45 && _y <= 0.55) { return true; }
+      if (_x >= 0.2 && _x <= .3 && _y >= 0.45 && _y <= 0.55) { return true; }
       else { return false; }
    }
    bool is_plate_region(const Vector &x)
@@ -80,7 +80,7 @@ private:
       double _x = x[0];
       double _y = x[1];
       /* plate location */
-      if (_x >= 0.2 && _x <= .3 && _y >= 0.25 && _y <= 0.75) { return true; }
+      if (_x >= 0.3 && _x <= .4 && _y >= 0.25 && _y <= 0.75) { return true; }
       return false;
    }
 
@@ -122,12 +122,15 @@ public:
       ess_bdr = 0;
       ess_bdr[4] = 1;
 
-      /* Boundary conditions: This test enforces dirichlet at left boundary - marker 5 */
-      for (int d = 0; d < dim; d++)
-      {
-         fes.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-         add_ess_tdofs.Append(dofs_list);
-      }
+      /* 
+      Boundary conditions: This test enforces dirichlet at left boundary on
+      the x-coord only. [marker 5] 
+      The remaining boundary is treated with do-nothing bcs. 
+      */
+      int d = 0;
+      fes.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+      add_ess_tdofs.Append(dofs_list);
+
       /* remove possible duplicates */
       add_ess_tdofs.Unique();
 

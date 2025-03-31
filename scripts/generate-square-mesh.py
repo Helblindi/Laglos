@@ -4,10 +4,10 @@ import numpy as np
 def main():
    nx_gridpoints = 21
    ny_gridpoints = 21
-   xL = -10.
-   xR = 10.
-   yL = -10.
-   yR = 10.
+   xL = -5.
+   xR = 5.
+   yL = -5.
+   yR = 5.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"

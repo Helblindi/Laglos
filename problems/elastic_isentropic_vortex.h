@@ -67,7 +67,7 @@ private:
    /* helper function to determine the region based on x,y coords */
    bool is_solid_region(const Vector &x)
    {
-      if (abs(x[0]) <= 5. && abs(x[1]) <= 5.) { return true; }
+      if (abs(x[0]) <= 2.5 && abs(x[1]) <= 2.5) { return true; }
       return false;
    }
 

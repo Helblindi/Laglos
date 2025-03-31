@@ -63,6 +63,27 @@ $ python3 reorganize_paraview.py <input_dir> <output_dir>
 >
 > A more complete list of hiopSolveStatus values is available in the file src/Interface/hiopInterface.hpp where the enum hiopSolveStatus is defined.
 
+# Handling boundary conditions
+## Boundary attributes
+The user has the option in the problem file to impose boundary conditions on
+the thermodynamics and/or on the mesh velocity.
+Both of these types of boundary conditions have corresponding flags ```_thbcs```
+and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
+
+Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
+that can be used are
+
+1. Used to enforce $v_x = 0$.
+2. Used to enforce $v_y = 0$.
+3. Used to enforce $v_z = 0$.
+4. Used to enforce $v_r = 0$, or in other words 0 radial movement.
+5. Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+
+If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
+the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs
+must be overridden. See for example Dirichlet conditions enforced on the left wall 
+of the Saltzman problem.
+
 
 # Select Elastic notes
 Since our exact solution here is given in terms of approximation data from Dr. Favrie,

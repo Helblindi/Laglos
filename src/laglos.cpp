@@ -950,7 +950,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
-   if (problem == 1 || problem == 3 || problem == 50 || problem == 51 || problem == 52)
+   if (problem == 1 || problem == 3 || use_elasticity)
    {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
@@ -1012,7 +1012,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52)
+      if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -1025,7 +1025,7 @@ int main(int argc, char *argv[]) {
                         "Gamma", Wx, Wy, Ww, Wh);
       }
       //NF//MS
-      if (problem == 50 || problem == 51 || problem == 52)
+      if (use_elasticity)
       {
          // Compute Sigma and F
          ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
@@ -1198,7 +1198,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52) 
+   if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1415,7 +1415,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 1 || problem == 3 || problem == 16 || problem == 50 || problem == 51 || problem == 52) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16 || use_elasticity) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
@@ -1460,7 +1460,7 @@ int main(int argc, char *argv[]) {
             Wy += offy;
 
             //NF//MS
-            if (problem == 50 || problem == 51 || problem == 52)
+            if (use_elasticity)
             {
                // Compute Sigma and F
                ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);

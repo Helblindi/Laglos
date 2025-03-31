@@ -2,12 +2,12 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 11
-   ny_gridpoints = 6
-   xL = -3.
-   xR = 3.
-   yL = 0.
-   yR = 3.
+   nx_gridpoints = 21
+   ny_gridpoints = 21
+   xL = -10.
+   xR = 10.
+   yL = -10.
+   yR = 10.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
@@ -37,13 +37,22 @@ def main():
    f.write("elements\n")
    # Num elements goes here
    f.write(str((nx_gridpoints-1)*(ny_gridpoints-1)) + "\n")
-   # List of vertices for each element
-   el = 1
+   # elements
+   #  50 - solid in center square [-5,5]x[-5,5]
+   #  1 - gas in exterior region
+   el_it = 0
+   el_attr = 1
    for i in range(0, nx_gridpoints - 1):
       for j in range(0, ny_gridpoints - 1):
+         if (i >= (nx_gridpoints - 1) / 4 and i < 3 * (nx_gridpoints - 1) / 4 
+             and j >= (ny_gridpoints - 1) / 4 and j < 3 * (ny_gridpoints - 1) / 4):
+            el_attr = 50
+         else:
+            el_attr = 1
          left = j + i*ny_gridpoints
-         f.write("%d 3 %d %d %d %d\n" % (el, left, left+ny_gridpoints, left+ny_gridpoints+1, left+1))
-         el += 1
+         print("el: ", el_it, ", attr: ", el_attr)
+         el_it += 1
+         f.write("%d 3 %d %d %d %d\n" % (el_attr, left, left+ny_gridpoints, left+ny_gridpoints+1, left+1))
    f.write("\n")
 
    # BOUNDARY

@@ -288,11 +288,18 @@ template<int dim>
 void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, DenseMatrix &sigma_e) const
 {
    assert(use_elasticity);
+   sigma_e.SetSize(dim);
+   sigma_e = 0.;
+
+   if (pmesh->GetAttribute(e) == 50)
+   {
+      return;
+   }
+
    Array<int> idx(dim), idy(dim);
    DenseMatrix sigmaD(3);
    DenseMatrix flux(dim+2,dim);
    Vector U(dim+2);
-   sigma_e.SetSize(dim);
 
    /* Fill sigma_e arrays */
    for (int i = 0; i < dim; i++)
@@ -326,13 +333,17 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
 {
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2 * dim);
+   sigma_gf = 0.;
    DenseMatrix sigma_e(dim);
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      ComputeSigmaComp(S,e,sigma_e);
-      // Want sigma_1,1 and sigma_1,2
-      for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e(0,i); }
+      if (pmesh->GetAttribute(e) == 50)
+      {
+         ComputeSigmaComp(S,e,sigma_e);
+         // Want sigma_1,1 and sigma_1,2
+         for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e(0,i); }
+      }
    }
 }
 
@@ -470,7 +481,8 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
       }
       DenseMatrix F_i;
       //NF//MS
-      if (use_elasticity)
+      int ci_attr = pmesh->GetAttribute(ci);
+      if (use_elasticity && ci_attr == 50)
       {
          const double _rho = 1./U_i[0];
          double _es = 0.;
@@ -479,11 +491,11 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
          // _sigmaD is 3 x 3
          elastic.ComputeS(ci, _rho, _es, _sigmaD);
 
-         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, pmesh->GetAttribute(ci));
+         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, ci_attr);
       }
       else
       {
-         F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
+         F_i = pb->flux(U_i, ci_attr);
       }
 
       rhs = 0.;
@@ -512,7 +524,8 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             // flux contribution
             DenseMatrix dm;
             //NF//MS
-            if (use_elasticity)
+            int cj_attr = pmesh->GetAttribute(cj);
+            if (use_elasticity && cj_attr == 50)
             {
                const double _rho = 1./U_j[0];
                double _es = 0.;
@@ -521,11 +534,11 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                // _sigmaD is 3 x 3
                elastic.ComputeS(cj, _rho, _es, _sigmaD);
 
-               dm = pb->ElasticFlux(_sigmaD, _es, U_j, pmesh->GetAttribute(cj));
+               dm = pb->ElasticFlux(_sigmaD, _es, U_j, cj_attr);
             }
             else
             {
-               dm = pb->flux(U_j, pmesh->GetAttribute(cj));
+               dm = pb->flux(U_j, cj_attr);
             }
 
             dm += F_i; 
@@ -3452,9 +3465,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    if (dim > 1) { fstream_sv << "vy,"; }
    if (dim > 2) { fstream_sv << "vz,"; }
    fstream_sv << "ste,p,ss,cell_type";
-   if (pb->get_indicator() == "ElasticShocktube" || 
-       pb->get_indicator() == "ElasticImpact" ||
-       pb->get_indicator() == "ElasticShear")
+   if (use_elasticity)
    {
       fstream_sv << ",sigma11";
       if (dim > 1) { fstream_sv << ",sigma12"; }
@@ -3471,11 +3482,10 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       double e_sheer = 0.;
       if (use_elasticity) { e_sheer = elastic.e_sheer(i); }
       double sie = pb->specific_internal_energy(U, e_sheer);
-      pressure = pb->pressure(rho, e_sheer, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(rho, pressure, pmesh->GetAttribute(i));
-      if (pb->get_indicator() == "ElasticShocktube" || 
-          pb->get_indicator() == "ElasticImpact" ||
-          pb->get_indicator() == "ElasticShear")
+      double attr = pmesh->GetAttribute(i);
+      pressure = pb->pressure(rho, e_sheer, attr);
+      ss = pb->sound_speed(rho, pressure, attr);
+      if (use_elasticity)
       {
          ComputeSigmaComp(S, i, sigma);
       }
@@ -3503,9 +3513,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          fstream_sv << "bdr";
       }
 
-      if (pb->get_indicator() == "ElasticShocktube" || 
-          pb->get_indicator() == "ElasticImpact" ||
-          pb->get_indicator() == "ElasticShear")          // sigma
+      if (use_elasticity)                                 // sigma
       {
          for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
       }

@@ -376,9 +376,7 @@ int main(int argc, char *argv[]) {
    Mesh *mesh;
    if (strncmp(mesh_file_location, "default", 7) != 0)
    {
-      std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
-      const char* mesh_file = result.c_str();
-      mesh = new Mesh(mesh_file, true, true);
+      mesh = new Mesh(mesh_file_location, true, true);
    }
    else // Default mesh
    {
@@ -536,6 +534,12 @@ int main(int argc, char *argv[]) {
          break;
       case 52: // Elastic shear
          problem_class = new ElasticShear<dim>();
+         break;
+      case 53: // Elastic isentropic vortex
+         problem_class = new ElasticIsentropicVortex<dim>();
+         break;
+      case 54: // Elastic projectile plate
+         problem_class = new ElasticProjectilePlate<dim>();
          break;
       case 100:
          problem_class = new TestBCs<dim>();

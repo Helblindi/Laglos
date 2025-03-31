@@ -264,6 +264,10 @@ public:
     */
    inline DenseMatrix flux(const Vector &U, const int &cell_attr=0)
    {
+      if (cell_attr == 50)
+      {
+         MFEM_ABORT("Cell attr 50 is reserved for elastic.\n");
+      }
       DenseMatrix result(dim+2, dim);
 
       Vector v; velocity(U, v);
@@ -340,6 +344,11 @@ public:
     */
    inline DenseMatrix ElasticFlux(const DenseMatrix &sig_dev, const double &es, const Vector &U, const int &cell_attr=0)
    {
+      if (cell_attr != 50)
+      {
+         MFEM_WARNING("Elastic cell must have attribute 50.\n");
+         return flux(U, cell_attr);
+      }
       // cout << "ProblemBase::ElasticFlux\n";
       DenseMatrix result(dim+2, dim);
       // Indices from stress tensor in result

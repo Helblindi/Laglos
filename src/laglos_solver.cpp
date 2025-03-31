@@ -291,7 +291,7 @@ void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, 
    sigma_e.SetSize(dim);
    sigma_e = 0.;
 
-   if (pmesh->GetAttribute(e) == 50)
+   if (pmesh->GetAttribute(e) != 50)
    {
       return;
    }
@@ -1222,7 +1222,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          // Finally compute lambda max
          if (use_elasticity)
          {
-            lambda_max = 6.E3 * rhoL;
+            lambda_max = 6.E3 * std::max(rhoL,rhoR);
             // if (pb->get_indicator() == "ElasticShear")
             {
                lambda_max *= 10.;

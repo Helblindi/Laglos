@@ -30,6 +30,10 @@ private:
    // These are computed only at time zero and stored here.
    DenseTensor Jac0inv;
    double mu = 2.6E10; // Sheer modulus
+   /* Different shear moduli for projectile plate */
+   // double mu = 9.2E10;
+   // double mu = 1.E9;
+   // double mu = 0.;
 
 public:
    Elastic(ParFiniteElementSpace &h1_fes,

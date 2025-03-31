@@ -58,9 +58,9 @@ private:
 
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
    // 5.2 elastic projectile plate section 7.1
-   double rho_g = 1., rho_s = 8.9E3;
+   double rho_g = 1., rho_s = 8.9E3; // kg/m^3
    double v_proj = 800.; // m/s
-   const double p_inf = 3.42E10;
+   const double p_inf = 3.42E10; // Pa
 
    /* helper function to determine the region based on x,y coords */
    bool is_solid_region(const Vector &x)
@@ -156,8 +156,14 @@ public:
    {
       if (t < 1e-12)
       {
-         MFEM_WARNING("Need to initialize pressure properly.\n");
-         return 1.E-10;
+         if (is_solid_region(x)) {
+            const double _gam = _gamma_s;
+            return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0) - p_inf * _gam;
+         } else
+         {
+            const double _gam = _gamma_g;
+            return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0);
+         }
       }
       else
       {
@@ -190,13 +196,14 @@ public:
    double sie0(const Vector &x, const double & t) override
    {
       cout << "sie0\n";
-      if (is_solid_region(x)) {
-         const double _gam = _gamma_s;
-         return (p0(x,t) + p_inf * _gam) / this->rho0(x, t) / (_gam - 1.0);
-      } else
+      if (is_solid_region(x))
       {
-         const double _gam = _gamma_g;
-         return p0(x,t) / this->rho0(x, t) / (_gam - 1.0);
+         return 0.;
+      }
+      else
+      {
+         // Value corresponds to 1 atm = 101.325 kPa
+         return 2.5331125E5; // J / kg
       }
    }
 

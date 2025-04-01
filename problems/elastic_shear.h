@@ -58,7 +58,7 @@ private:
    //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
    // 5.2 elastic shock
    double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E5, pR = 1.E5, vL = 0., vR = 0.;
-   double tvL = 500., tvR = -500.;
+   double tvL = 100., tvR = -100.;
    double x_center = 0.5;
    const double p_inf = 2.15E10;
 

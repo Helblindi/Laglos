@@ -893,7 +893,11 @@ int main(int argc, char *argv[]) {
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
-   hydro.SetElasticity(use_elasticity); //NF//MS
+   if (use_elasticity) //NF//MS
+   {
+      hydro.SetElasticity(use_elasticity);
+      hydro.SetShearModulus(problem_class->get_shear_modulus());
+   }
 
    /* 
    If opting to use greedy viscosity, verify that you have not opted to use a few steps of GMV first. 

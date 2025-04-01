@@ -51,6 +51,7 @@ private:
    const int cell_attr_g = 1, cell_attr_s = 50;
    const double solid_multiplier = 1.E3;
    const double p_inf_s = 2.15E10;
+   const double mu = 2.6E10;
    /* options */
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
@@ -206,6 +207,10 @@ ElasticIsentropicVortex()
       }
    }
 
+   double get_shear_modulus() override
+   {
+      return mu;
+   }
 }; // End class
 
 } // ns hydroLO

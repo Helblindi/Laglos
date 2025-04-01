@@ -61,13 +61,7 @@ private:
    double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E7, pR = 1.E5, vL = 0., vR = 0.;
    double x_center = 0.5;
    const double p_inf = 2.15E10;
-   // const double p_inf = 0.;
-
-   // 5.3 elastic shock with five waves
-   //NF//MS - Shear, how to introduce tangential velocity in a 1d test?
-   // double rhoL = 1000., rhoR = 1000., pL = 1.E8, pR = 1.E5, vL = 100., vR = -100.;
-   // double x_center = 0.5;
-   // const double p_inf = 6.E8;
+   const double mu = 2.6E10;
 
 public:
    ElasticShocktube()
@@ -155,6 +149,10 @@ public:
       return (p0(x,t) + p_inf * this->get_gamma()) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
+   double get_shear_modulus() override
+   {
+      return mu;
+   }
 }; // End class
 
 } // ns hydroLO

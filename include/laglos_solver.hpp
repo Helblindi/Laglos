@@ -158,7 +158,7 @@ protected:
    Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int, ts_kidder_avg_density, ts_kidder_avg_entropy;
 
 public:
-   const Elastic<dim> elastic; //NF//MS
+   Elastic<dim> elastic; //NF//MS
    enum DofEntity {corner, face, cell};
 
    LagrangianLOOperator(const int size,
@@ -216,6 +216,7 @@ public:
    void ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const;
    void ComputeFGF(ParGridFunction &f_gf) const;
    void ComputeESheerGF(ParGridFunction &e_sheer_gf) const;
+   void SetShearModulus(const double &_mu) { elastic.set_shear_modulus(_mu); }
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);

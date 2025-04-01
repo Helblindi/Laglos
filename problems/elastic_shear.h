@@ -55,12 +55,11 @@ private:
    bool _mvbcs = false; // Indicator for mv boundary conditions
    string _indicator = "ElasticShear";
 
-   //https://www.sciencedirect.com/science/article/pii/S0021999107005220?via%3Dihub#sec3
-   // 5.2 elastic shock
    double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E5, pR = 1.E5, vL = 0., vR = 0.;
    double tvL = 100., tvR = -100.;
    double x_center = 0.5;
    const double p_inf = 2.15E10;
+   const double mu = 2.6E10;
 
 public:
    ElasticShear()
@@ -161,6 +160,10 @@ public:
       return (p0(x,t) + p_inf * this->get_gamma()) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 
+   double get_shear_modulus() override
+   {
+      return mu;
+   }
 }; // End class
 
 } // ns hydroLO

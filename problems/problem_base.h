@@ -437,6 +437,9 @@ public:
    virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) {
       return gamma;
    } // optionally overridden
+   virtual double get_shear_modulus() {
+      MFEM_ABORT("Must override ProblemBase::get_shear_modulus if '-ue' is used.\n");
+   }
    
 }; // End ProblemBase
 

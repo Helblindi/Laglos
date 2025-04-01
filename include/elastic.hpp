@@ -29,11 +29,7 @@ private:
    // Reference to physical Jacobian for the initial mesh.
    // These are computed only at time zero and stored here.
    DenseTensor Jac0inv;
-   double mu = 2.6E10; // Sheer modulus
-   /* Different shear moduli for projectile plate */
-   // double mu = 9.2E10;
-   // double mu = 1.E9;
-   // double mu = 0.;
+   double mu = -1.; // Shear modulus
 
 public:
    Elastic(ParFiniteElementSpace &h1_fes,
@@ -71,6 +67,8 @@ public:
       }
    }
 
+   void set_shear_modulus(const double &_mu) { this->mu = _mu; }
+
    double e_sheer(const int &e) const
    {
       DenseMatrix c(3), c2(3);
@@ -83,6 +81,10 @@ public:
    
    double e_sheer(const double &trc, const double &trc2, const double &rho0) const
    {
+      if (mu == -1.)
+      {
+         MFEM_ABORT("Must set shear modulus.\n");
+      }
       return mu / 2 * (trc - 3.) / rho0; // Neo hookean
    }
 

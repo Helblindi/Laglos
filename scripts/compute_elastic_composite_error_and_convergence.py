@@ -79,8 +79,8 @@ def main():
     parser = argparse.ArgumentParser(description="Compute composite L1 error and convergence order for approximations.")
     parser.add_argument("directory", help="Directory containing the approximation files")
     parser.add_argument("exact_file", help="File containing the exact solution")
-    parser.add_argument("--approx_cols", type=int, nargs='+', default=[0, 1, 2], help="Column indices for approximation data (density, velocity, energy)")
-    parser.add_argument("--exact_cols", type=int, nargs='+', default=[1, 2, 3], help="Column indices for exact solution data (density, velocity, energy)")
+    parser.add_argument("--approx_cols", type=int, nargs='+', default=[2, 3, 5], help="Column indices for approximation data (density, velocity, energy)")
+    parser.add_argument("--exact_cols", type=int, nargs='+', default=[13, 18, 15], help="Column indices for exact solution data (density, velocity, energy)")
     args = parser.parse_args()
     
     # Process the files and compute the results

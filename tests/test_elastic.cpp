@@ -82,7 +82,7 @@ int tester()
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
    delete mesh;
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase<dim> * problem_class = new ElasticShocktube<dim>();
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
@@ -172,6 +172,7 @@ int tester()
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    hydro.SetElasticity(true);
+   hydro.SetShearModulus(problem_class->get_shear_modulus());
 
    /* If the mesh hasn't moved, F should be the identity matrix */
    DenseMatrix F(dim), I(3), res(3);

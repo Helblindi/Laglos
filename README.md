@@ -126,9 +126,9 @@ To see this implemented, see the execution of the multi-material isentropic vort
 ```
 ### Elastic shear
 ```
-./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
-./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
-./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
 ```
 ### Elastic Isentropic Vortex
 ```

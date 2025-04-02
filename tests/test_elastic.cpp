@@ -177,7 +177,7 @@ int tester()
    /* If the mesh hasn't moved, F should be the identity matrix */
    DenseMatrix F(dim), I(3), res(3);
    I = 0.; for (int i = 0; i < 3; i++) { I(i,i) = 1.; }
-   hydro.elastic.ComputeF(0, F);
+   hydro.elastic.ComputeAvgF(0, F);
    if (F.NumCols() != 3 && F.NumRows() != 3)
    {
       cout << "Improper dimensions of F.\n";
@@ -209,7 +209,7 @@ int tester()
    x_gf.SyncAliasMemory(S);
    pmesh->NewNodes(x_gf, false);
 
-   hydro.elastic.ComputeF(0, F);
+   hydro.elastic.ComputeAvgF(0, F);
    res = F;
    res -= I;
    if (res.FNorm() > tol)

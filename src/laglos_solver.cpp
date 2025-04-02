@@ -369,7 +369,7 @@ void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      elastic.ComputeF(e, F);
+      elastic.ComputeAvgF(e, F);
       f_gf[e] = F(0,0);
    }
 }

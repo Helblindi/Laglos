@@ -17,10 +17,17 @@ namespace mfem
 namespace hydroLO
 {
 
+enum class ShearEnergyMethod {
+   AVERAGE_F,
+   AVERAGE_C,
+   AVERAGE_ENERGY
+};
+
 template<int dim>
 class Elastic
 {
 private:
+   ShearEnergyMethod shear_method;
    ParFiniteElementSpace &H1, &L2;
    const ParGridFunction &rho0_gf;
    const IntegrationRule &ir;
@@ -35,7 +42,8 @@ public:
    Elastic(ParFiniteElementSpace &h1_fes,
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
-           const IntegrationRule &ir) : 
+           const IntegrationRule &ir,
+           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),
@@ -43,7 +51,8 @@ public:
       NE(H1.GetParMesh()->GetNE()),
       NDofs_L2(L2.GetNDofs()), 
       nqp(ir.GetNPoints()),
-      Jac0inv(dim, dim, NE * nqp)
+      Jac0inv(dim, dim, NE * nqp),
+      shear_method(method)
    {
       cout << "=== Elastic constructor ===\n";
 
@@ -69,14 +78,26 @@ public:
 
    void set_shear_modulus(const double &_mu) { this->mu = _mu; }
 
+   void setShearEnergyMethod(ShearEnergyMethod method) { shear_method = method; }
+
    double e_sheer(const int &e) const
    {
-      DenseMatrix c(3), c2(3);
-      Compute_c(e, c);
-      const double rho0 = rho0_gf(e);
+      switch (shear_method) {
+         case ShearEnergyMethod::AVERAGE_F:
+         {
+            DenseMatrix c(3), c2(3);
+            Compute_cFromAvgF(e, c);
+            const double rho0 = rho0_gf(e);
 
-      mfem::Mult(c, c, c2);
-      return e_sheer(c.Trace(), c2.Trace(), rho0);
+            mfem::Mult(c, c, c2);
+            return e_sheer(c.Trace(), c2.Trace(), rho0);
+         }
+         case ShearEnergyMethod::AVERAGE_C:
+         case ShearEnergyMethod::AVERAGE_ENERGY:
+            MFEM_ABORT("Not implemented");
+         default:
+            MFEM_ABORT("Unknown shear energy method");
+      }
    }
    
    double e_sheer(const double &trc, const double &trc2, const double &rho0) const
@@ -98,7 +119,7 @@ public:
       return 0.; // Neo hookean
    }
 
-   void ComputeF(const int e, DenseMatrix &F) const
+   void ComputeAvgF(const int e, DenseMatrix &F) const
    {
       DenseMatrix F_dim(dim); F_dim = 0.;
       ElementTransformation *T = H1.GetElementTransformation(e);
@@ -113,6 +134,7 @@ public:
          DenseMatrix Ji(dim);
          mfem::Mult(Jr, Jac0inv(e*nqp + q), Ji);
          F_dim.Add(ip.weight, Ji);
+         // TODO: Try this averaging on F F^T instead of F.
       }
       /* If dim != 3, will need to augment F with 1s on the diagonal */
       if (dim == 3)
@@ -138,11 +160,11 @@ public:
       }
    }
 
-   void Compute_c(const int &e, DenseMatrix &c) const
+   void Compute_cFromAvgF(const int &e, DenseMatrix &c) const
    {
       DenseMatrix F(3), FT(3), C(3);
       c.SetSize(3);
-      ComputeF(e,F);
+      ComputeAvgF(e,F);
       FT.Transpose(F);
       mfem::Mult(FT, F, C);
       c = C;
@@ -159,7 +181,7 @@ public:
       S = 0.;
 
       /* Compute c */
-      Compute_c(e, c);
+      Compute_cFromAvgF(e, c);
 
       /* Compute sheer energy, and save in class member */
       mfem::Mult(c, c, c2);

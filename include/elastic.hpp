@@ -144,16 +144,23 @@ public:
          MFEM_ABORT("Must set shear modulus.\n");
       }
       return mu / 2 * (trc - 3.) / rho0; // Neo hookean
+      /* alternate eos from paper */
+      // double j2 = pow(trc2 - pow(trc,2),2) - 2. * trc;
+      // return mu * (j2 - 3.) / 8. / rho0;
    }
 
    double des_dtrc(const double &trc, const double &trc2, const double &rho0) const
    {
       return mu / 2. / rho0; // Neo hookean
+      /* alternate eos from paper */
+      // return mu * ( -4. * trc2 * trc + 4. * pow(trc,3) - 2. ) / 8. / rho0;
    }
 
    double des_dtrc2(const double &trc, const double &trc2, const double &rho0) const
    {
       return 0.; // Neo hookean
+      /* alternate eos from paper */
+      // return mu * (2. * trc2 - 2. * pow(trc,2)) / 8. / rho0;
    }
 
    void ComputeAvgF(const int e, DenseMatrix &F) const
@@ -287,6 +294,7 @@ public:
       double c2_coeff = 2.*des_dtrc2(c.Trace(), c2.Trace(), rho0);
       mfem::Add(c_coeff, c_tf, c2_coeff, c2_tf, S);
       S *= 2. * rho;
+
    }
 
 };

@@ -3482,7 +3482,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       if (use_elasticity) { e_sheer = elastic.e_sheer(i); }
       double sie = pb->specific_internal_energy(U, e_sheer);
       double attr = pmesh->GetAttribute(i);
-      pressure = pb->pressure(rho, e_sheer, attr);
+      pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
       if (use_elasticity)
       {

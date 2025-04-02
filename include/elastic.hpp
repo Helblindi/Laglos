@@ -43,7 +43,7 @@ public:
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
-           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
+           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),
@@ -82,17 +82,21 @@ public:
 
    double e_sheer(const int &e) const
    {
+      DenseMatrix c(3), c2(3);
+      const double rho0 = rho0_gf(e);
       switch (shear_method) {
          case ShearEnergyMethod::AVERAGE_F:
          {
-            DenseMatrix c(3), c2(3);
             Compute_cFromAvgF(e, c);
-            const double rho0 = rho0_gf(e);
-
             mfem::Mult(c, c, c2);
             return e_sheer(c.Trace(), c2.Trace(), rho0);
          }
          case ShearEnergyMethod::AVERAGE_C:
+         {
+            Compute_cAvg(e,c);
+            mfem::Mult(c, c, c2);
+            return e_sheer(c.Trace(), c2.Trace(), rho0);
+         }
          case ShearEnergyMethod::AVERAGE_ENERGY:
             MFEM_ABORT("Not implemented");
          default:
@@ -171,7 +175,61 @@ public:
       c *= std::pow(C.Det(), -1./3.);
    }
 
-   void ComputeS(const int &e, const double &rho, double &es, DenseMatrix &S) const
+   void Compute_cAvg(const int &e, DenseMatrix &c) const
+   {
+      // cout << "!!!!!!!!!!!!!!!!!Elastic::Compute_cAvg!!!!!!!!!!!!!!!!!\n";
+      DenseMatrix F_dim(dim);
+      DenseMatrix F(3), FT(3), FTF(3);
+      DenseMatrix C(3), cqp(3);
+      ElementTransformation *T = H1.GetElementTransformation(e);
+
+      c.SetSize(3);
+      c = 0.;
+      for (int q = 0; q < nqp; q++)
+      {
+         F_dim = 0.;
+         F = 0.; FT = 0.; FTF = 0.; C = 0.;
+         const IntegrationPoint &ip = ir.IntPoint(q);
+         T->SetIntPoint(&ip);
+         DenseMatrix Jr = T->Jacobian();
+         /* Instead of a mapping from the reference element,
+            we need a mapping from the initial configuration
+            of the given element */
+         DenseMatrix Ji(dim);
+         mfem::Mult(Jr, Jac0inv(e*nqp + q), F_dim);
+         if (dim == 3)
+         {
+            F = F_dim;
+         }
+         else { /* If dim != 3, will need to augment F with 1s on the diagonal */
+            /* Set submatrix to F_dim */
+            Array<int> idx(dim);
+            for (int i = 0; i < dim; i++)
+            {
+               idx[i] = i;
+            }
+            F.SetSubMatrix(idx, idx, F_dim);
+
+            /* Fill remaining entries with a 1 */
+            for (int i = dim; i < 3; i++)
+            {
+               F(i,i) = 1.;
+            }
+         }
+
+         /* Compute FTF at quadrature point, and normalize */
+         FT.Transpose(F);
+         mfem::Mult(FT, F, cqp);
+         cqp *= std::pow(cqp.Det(), -1./3.);
+
+         /* Add in contribution from quadrature point */
+         c.Add(ip.weight, cqp);
+      }
+      // cout << "c: ";
+      // c.Print(cout);
+   }
+
+   void ComputeS(const int &e, const double &rho, DenseMatrix &S) const
    {
       /* Objects needed in function */
       DenseMatrix c(3), c2(3), I(3);
@@ -186,7 +244,6 @@ public:
       /* Compute sheer energy, and save in class member */
       mfem::Mult(c, c, c2);
       const double rho0 = rho0_gf(e);
-      es = e_sheer(c.Trace(), c2.Trace(), rho0);
       
       /* Compute deviatoric part of stess tensor */
       DenseMatrix c_tf(3), c2_tf(3); // 'trace-free objects'

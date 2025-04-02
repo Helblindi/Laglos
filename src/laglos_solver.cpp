@@ -309,7 +309,8 @@ void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, 
    }
    GetCellStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
-   elastic.ComputeS(e, rho, es, sigmaD);
+   elastic.ComputeS(e, rho, sigmaD);
+   es = elastic.e_sheer(e);
    flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
    flux.GetSubMatrix(idx, idy, sigma_e);
 }
@@ -489,7 +490,8 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
          DenseMatrix _sigmaD(3);
 
          // _sigmaD is 3 x 3
-         elastic.ComputeS(ci, _rho, _es, _sigmaD);
+         elastic.ComputeS(ci, _rho, _sigmaD);
+         _es = elastic.e_sheer(ci);
 
          F_i = pb->ElasticFlux(_sigmaD, _es, U_i, ci_attr);
       }
@@ -532,7 +534,8 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                DenseMatrix _sigmaD(3);
 
                // _sigmaD is 3 x 3
-               elastic.ComputeS(cj, _rho, _es, _sigmaD);
+               elastic.ComputeS(cj, _rho, _sigmaD);
+               _es = elastic.e_sheer(cj);
 
                dm = pb->ElasticFlux(_sigmaD, _es, U_j, cj_attr);
             }

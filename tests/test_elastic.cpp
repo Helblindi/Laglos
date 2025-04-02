@@ -194,7 +194,8 @@ int tester()
    /* If F is the identity, then es = 0 */
    DenseMatrix sigma(3);
    double e_sheer = -1.;
-   hydro.elastic.ComputeS(0, rho0_gf[0], e_sheer, sigma);
+   hydro.elastic.ComputeS(0, rho0_gf[0], sigma);
+   e_sheer = hydro.elastic.e_sheer(0);
    if (e_sheer > tol)
    {
       cout << "Sheer energy is not zero.\n";

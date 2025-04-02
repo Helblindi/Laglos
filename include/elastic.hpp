@@ -116,23 +116,23 @@ public:
       double es_c = e_sheer(c.Trace(), c2.Trace(), rho0);
       cc = c;
 
-      if (abs(es_F - es_c) > 1.E-12)
-      {
-         cout << "F and c energies not equal!\n";
-         cout << "esF: " << es_F << ", esc: " << es_c << endl;
-         DenseMatrix test = cF;
-         test -= cc;
-         if (test.FNorm() >= 1E-12)
-         {
-            cout << "cF: ";
-            cF.Print(cout);
-            cout << "cc: ";
-            cc.Print(cout);
-            cout << "test: ";
-            test.Print(cout);
-            assert(false);
-         }
-      }
+      // if (abs(es_F - es_c) > 1.E-12)
+      // {
+      //    cout << "F and c energies not equal!\n";
+      //    cout << "esF: " << es_F << ", esc: " << es_c << endl;
+      //    DenseMatrix test = cF;
+      //    test -= cc;
+      //    if (test.FNorm() >= 1E-12)
+      //    {
+      //       cout << "cF: ";
+      //       cF.Print(cout);
+      //       cout << "cc: ";
+      //       cc.Print(cout);
+      //       cout << "test: ";
+      //       test.Print(cout);
+      //       assert(false);
+      //    }
+      // }
       
       return es_c;
    }
@@ -270,7 +270,8 @@ public:
       S = 0.;
 
       /* Compute c */
-      Compute_cFromAvgF(e, c);
+      // Compute_cFromAvgF(e, c);
+      Compute_cAvg(e, c);
 
       /* Compute sheer energy, and save in class member */
       mfem::Mult(c, c, c2);

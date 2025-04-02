@@ -324,7 +324,7 @@ public:
 
       sig_dev.GetSubMatrix(idx, idx, sigma);
       assert(sigma.NumRows() == dim && sigma.NumCols() == dim);
-      mfem::Add(sigma, I, pressure, sigma);
+      mfem::Add(sigma, I, -1. * pressure, sigma);
    }
 
    /**
@@ -369,6 +369,7 @@ public:
       Vector v; velocity(U, v);
       Vector v_neg = v, sigmav(dim);
       v_neg *= -1.;
+      sigma *= -1.;
       sigma.Mult(v, sigmav);
 
       // Set entries in flux

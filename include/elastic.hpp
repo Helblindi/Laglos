@@ -83,25 +83,58 @@ public:
    double e_sheer(const int &e) const
    {
       DenseMatrix c(3), c2(3);
+      DenseMatrix cF(3), cc(3);
       const double rho0 = rho0_gf(e);
-      switch (shear_method) {
-         case ShearEnergyMethod::AVERAGE_F:
+      // switch (shear_method) {
+      //    case ShearEnergyMethod::AVERAGE_F:
+      //    {
+      //       Compute_cFromAvgF(e, c);
+      //       mfem::Mult(c, c, c2);
+      //       return e_sheer(c.Trace(), c2.Trace(), rho0);
+      //    }
+      //    case ShearEnergyMethod::AVERAGE_C:
+      //    {
+      //       Compute_cAvg(e,c);
+      //       mfem::Mult(c, c, c2);
+      //       return e_sheer(c.Trace(), c2.Trace(), rho0);
+      //    }
+      //    case ShearEnergyMethod::AVERAGE_ENERGY:
+      //       MFEM_ABORT("Not implemented");
+      //    default:
+      //       MFEM_ABORT("Unknown shear energy method");
+      // }
+
+      // Avg F
+      Compute_cFromAvgF(e, c);
+      mfem::Mult(c, c, c2);
+      cF = c;
+      double es_F = e_sheer(c.Trace(), c2.Trace(), rho0);
+
+      // Avg c
+      Compute_cAvg(e,c);
+      mfem::Mult(c, c, c2);
+      double es_c = e_sheer(c.Trace(), c2.Trace(), rho0);
+      cc = c;
+
+      if (abs(es_F - es_c) > 1.E-12)
+      {
+         cout << "F and c energies not equal!\n";
+         cout << "esF: " << es_F << ", esc: " << es_c << endl;
+         DenseMatrix test = cF;
+         test -= cc;
+         if (test.FNorm() >= 1E-12)
          {
-            Compute_cFromAvgF(e, c);
-            mfem::Mult(c, c, c2);
-            return e_sheer(c.Trace(), c2.Trace(), rho0);
+            cout << "cF: ";
+            cF.Print(cout);
+            cout << "cc: ";
+            cc.Print(cout);
+            cout << "test: ";
+            test.Print(cout);
+            assert(false);
          }
-         case ShearEnergyMethod::AVERAGE_C:
-         {
-            Compute_cAvg(e,c);
-            mfem::Mult(c, c, c2);
-            return e_sheer(c.Trace(), c2.Trace(), rho0);
-         }
-         case ShearEnergyMethod::AVERAGE_ENERGY:
-            MFEM_ABORT("Not implemented");
-         default:
-            MFEM_ABORT("Unknown shear energy method");
       }
+      
+      return es_c;
    }
    
    double e_sheer(const double &trc, const double &trc2, const double &rho0) const
@@ -225,8 +258,6 @@ public:
          /* Add in contribution from quadrature point */
          c.Add(ip.weight, cqp);
       }
-      // cout << "c: ";
-      // c.Print(cout);
    }
 
    void ComputeS(const int &e, const double &rho, DenseMatrix &S) const

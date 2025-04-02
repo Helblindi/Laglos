@@ -113,3 +113,47 @@ To see this implemented, see the execution of the multi-material isentropic vort
 ```
 ./Laglos -m data/elastic/square-vortex-mz.mesh -p 53 -tf 10 -cfl 0.5 -ue 
 ```
+
+## Examples
+
+### Elastic shocktube
+```
+./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue -rs 8
+```
+### Elastic impact
+```
+./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue -rs 8
+```
+### Elastic shear
+```
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
+./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
+./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -rs 0
+```
+### Elastic Isentropic Vortex
+```
+./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue -rs 1
+```
+### Elastic Projectile Plate
+The final time depends on the shear modulus used, which is modified in the problem file.
+The final times reported in the referenced paper corresponding to their shear moduli are as follows
+#### $\mu = 9.2\times 10^{10}$ Pa
+1. $t = 3.6\times 10^{-5}$
+2. $t = 1.06\times 10^{-4}$
+3. $t = 3.2\times 10^{-4}$
+4. $t = 6.09\times 10^{-4}$
+
+#### $\mu = 1\times 10^{9}$ Pa
+1. $t = 3.5\times 10^{-5}$
+2. $t = 1.4\times 10^{-4}$
+3. $t = 4.2\times 10^{-4}$
+4. $t = 7.1\times 10^{-4}$
+
+#### $\mu = 0$ Pa
+1. $t = 7.5\times 10^{-5}$
+2. $t = 1.87\times 10^{-4}$
+3. $t = 6\times 10^{-4}$
+4. $t = 1.03\times 10^{-4}$
+```
+./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf .000103 -cfl 0.5 -ue -rs 1
+```

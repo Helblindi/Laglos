@@ -146,12 +146,12 @@ public:
       return mu / 2 * (trc - 3.) / rho0; // Neo hookean
    }
 
-   double des_dtrc(const double &trc, const double &trc2) const
+   double des_dtrc(const double &trc, const double &trc2, const double &rho0) const
    {
-      return mu / 2.; // Neo hookean
+      return mu / 2. / rho0; // Neo hookean
    }
 
-   double des_dtrc2(const double &trc, const double &trc2) const
+   double des_dtrc2(const double &trc, const double &trc2, const double &rho0) const
    {
       return 0.; // Neo hookean
    }
@@ -283,10 +283,10 @@ public:
       mfem::Add(c, I, -1./3. * c.Trace(), c_tf);
       mfem::Add(c2, I, -1./3. * c2.Trace(), c2_tf);
 
-      double c_coeff = des_dtrc(c.Trace(), c2.Trace());
-      double c2_coeff = 2.*des_dtrc2(c.Trace(), c2.Trace());
+      double c_coeff = des_dtrc(c.Trace(), c2.Trace(), rho0);
+      double c2_coeff = 2.*des_dtrc2(c.Trace(), c2.Trace(), rho0);
       mfem::Add(c_coeff, c_tf, c2_coeff, c2_tf, S);
-      S *= -2. * rho / rho0_gf(e);
+      S *= 2. * rho;
    }
 
 };

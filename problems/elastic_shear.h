@@ -56,7 +56,7 @@ private:
    string _indicator = "ElasticShear";
 
    double rhoL = 2.7E3, rhoR = 2.7E3, pL = 1.E5, pR = 1.E5, vL = 0., vR = 0.;
-   double tvL = 100., tvR = -100.;
+   double tvL = -100., tvR = 100.;
    double x_center = 0.5;
    const double p_inf = 2.15E10;
    const double mu = 2.6E10;

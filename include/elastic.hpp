@@ -43,7 +43,7 @@ public:
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
-           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
+           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),
@@ -85,56 +85,24 @@ public:
       DenseMatrix c(3), c2(3);
       DenseMatrix cF(3), cc(3);
       const double rho0 = rho0_gf(e);
-      // switch (shear_method) {
-      //    case ShearEnergyMethod::AVERAGE_F:
-      //    {
-      //       Compute_cFromAvgF(e, c);
-      //       mfem::Mult(c, c, c2);
-      //       return e_sheer(c.Trace(), c2.Trace(), rho0);
-      //    }
-      //    case ShearEnergyMethod::AVERAGE_C:
-      //    {
-      //       Compute_cAvg(e,c);
-      //       mfem::Mult(c, c, c2);
-      //       return e_sheer(c.Trace(), c2.Trace(), rho0);
-      //    }
-      //    case ShearEnergyMethod::AVERAGE_ENERGY:
-      //       MFEM_ABORT("Not implemented");
-      //    default:
-      //       MFEM_ABORT("Unknown shear energy method");
-      // }
-
-      // Avg F
-      Compute_cFromAvgF(e, c);
-      mfem::Mult(c, c, c2);
-      cF = c;
-      double es_F = e_sheer(c.Trace(), c2.Trace(), rho0);
-
-      // Avg c
-      Compute_cAvg(e,c);
-      mfem::Mult(c, c, c2);
-      double es_c = e_sheer(c.Trace(), c2.Trace(), rho0);
-      cc = c;
-
-      // if (abs(es_F - es_c) > 1.E-12)
-      // {
-      //    cout << "F and c energies not equal!\n";
-      //    cout << "esF: " << es_F << ", esc: " << es_c << endl;
-      //    DenseMatrix test = cF;
-      //    test -= cc;
-      //    if (test.FNorm() >= 1E-12)
-      //    {
-      //       cout << "cF: ";
-      //       cF.Print(cout);
-      //       cout << "cc: ";
-      //       cc.Print(cout);
-      //       cout << "test: ";
-      //       test.Print(cout);
-      //       assert(false);
-      //    }
-      // }
-      
-      return es_c;
+      switch (shear_method) {
+         case ShearEnergyMethod::AVERAGE_F:
+         {
+            Compute_cFromAvgF(e, c);
+            mfem::Mult(c, c, c2);
+            return e_sheer(c.Trace(), c2.Trace(), rho0);
+         }
+         case ShearEnergyMethod::AVERAGE_C:
+         {
+            Compute_cAvg(e,c);
+            mfem::Mult(c, c, c2);
+            return e_sheer(c.Trace(), c2.Trace(), rho0);
+         }
+         case ShearEnergyMethod::AVERAGE_ENERGY:
+            MFEM_ABORT("Not implemented");
+         default:
+            MFEM_ABORT("Unknown shear energy method");
+      }
    }
    
    double e_sheer(const double &trc, const double &trc2, const double &rho0) const
@@ -277,8 +245,22 @@ public:
       S = 0.;
 
       /* Compute c */
-      // Compute_cFromAvgF(e, c);
-      Compute_cAvg(e, c);
+      switch (shear_method) {
+         case ShearEnergyMethod::AVERAGE_F:
+         {
+            Compute_cFromAvgF(e, c);
+            break;
+         }
+         case ShearEnergyMethod::AVERAGE_C:
+         {
+            Compute_cAvg(e,c);
+            break;
+         }
+         case ShearEnergyMethod::AVERAGE_ENERGY:
+            MFEM_ABORT("Not implemented");
+         default:
+            MFEM_ABORT("Unknown shear energy method");
+      }
 
       /* Compute sheer energy, and save in class member */
       mfem::Mult(c, c, c2);
@@ -294,7 +276,6 @@ public:
       double c2_coeff = 2.*des_dtrc2(c.Trace(), c2.Trace(), rho0);
       mfem::Add(c_coeff, c_tf, c2_coeff, c2_tf, S);
       S *= 2. * rho;
-
    }
 
 };

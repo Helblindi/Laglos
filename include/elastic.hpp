@@ -89,20 +89,20 @@ public:
          case ShearEnergyMethod::AVERAGE_F:
          {
             Compute_cFromAvgF(e, c);
-            mfem::Mult(c, c, c2);
-            return e_sheer(c.Trace(), c2.Trace(), rho0);
+            break;
          }
          case ShearEnergyMethod::AVERAGE_C:
          {
             Compute_cAvg(e,c);
-            mfem::Mult(c, c, c2);
-            return e_sheer(c.Trace(), c2.Trace(), rho0);
+            break;
          }
          case ShearEnergyMethod::AVERAGE_ENERGY:
             MFEM_ABORT("Not implemented");
          default:
             MFEM_ABORT("Unknown shear energy method");
       }
+      mfem::Mult(c, c, c2);
+      return e_sheer(c.Trace(), c2.Trace(), rho0);
    }
    
    double e_sheer(const double &trc, const double &trc2, const double &rho0) const

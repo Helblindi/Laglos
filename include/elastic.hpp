@@ -111,24 +111,32 @@ public:
       {
          MFEM_ABORT("Must set shear modulus.\n");
       }
-      return mu / 2 * (trc - 3.) / rho0; // Neo hookean
+      /* Neo hookean */
+      return mu / 2 * (trc - 3.) / rho0; 
       /* alternate eos from paper */
       // double j2 = pow(trc2 - pow(trc,2),2) - 2. * trc;
       // return mu * (j2 - 3.) / 8. / rho0;
+      /* favrie 2014 */
+      // return mu * (trc2 - 3.) / 8 / rho0;
    }
 
    double des_dtrc(const double &trc, const double &trc2, const double &rho0) const
    {
-      return mu / 2. / rho0; // Neo hookean
+      /* Neo hookean */
+      return mu / 2. / rho0;
       /* alternate eos from paper */
       // return mu * ( -4. * trc2 * trc + 4. * pow(trc,3) - 2. ) / 8. / rho0;
+      /* favrie 2014 */
+      // return 0.;
    }
 
    double des_dtrc2(const double &trc, const double &trc2, const double &rho0) const
    {
-      return 0.; // Neo hookean
+      /* Neo hookean */
+      return 0.;
       /* alternate eos from paper */
       // return mu * (2. * trc2 - 2. * pow(trc,2)) / 8. / rho0;
+      // return mu / 8. / rho0;
    }
 
    void ComputeAvgF(const int e, DenseMatrix &F) const

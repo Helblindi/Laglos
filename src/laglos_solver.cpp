@@ -223,7 +223,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         if (pb->has_mv_boundary_conditions())
+         {
+            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         }
 
          ess_tdofs.Append(add_ess_tdofs);
          bdr_vals.Append(add_bdr_vals);

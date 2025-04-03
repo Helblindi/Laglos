@@ -541,6 +541,9 @@ int main(int argc, char *argv[]) {
       case 54: // Elastic projectile plate
          problem_class = new ElasticProjectilePlate<dim>();
          break;
+      case 55: // Elastic shear rotate in y direction
+         problem_class = new ElasticShearY<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;

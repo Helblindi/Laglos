@@ -134,6 +134,10 @@ To see this implemented, see the execution of the multi-material isentropic vort
 ```
 ./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
 ```
+### Elastic impact + shear
+```
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+```
 ### Elastic Isentropic Vortex
 ```
 ./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue -rs 1

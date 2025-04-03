@@ -544,6 +544,9 @@ int main(int argc, char *argv[]) {
       case 55: // Elastic shear rotate in y direction
          problem_class = new ElasticShearY<dim>();
          break;
+      case 56: // Elastic impact + shear
+         problem_class = new ElasticImpactShear<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;

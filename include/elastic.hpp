@@ -43,7 +43,7 @@ public:
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
-           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
+           ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),

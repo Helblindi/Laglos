@@ -316,6 +316,7 @@ void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, 
    es = elastic.e_sheer(e);
    flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
    flux.GetSubMatrix(idx, idy, sigma_e);
+   sigma_e *= -1.;
 }
 
 

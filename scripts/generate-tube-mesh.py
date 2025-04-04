@@ -2,13 +2,13 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 3201
+   nx_gridpoints = 102401
    ny_gridpoints = 2
 
    x_arr = np.linspace(0.,1,nx_gridpoints)
    y_arr = np.linspace(0.,1. / (nx_gridpoints - 1),ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/tube-3200x1y.mesh"
+   filename = home_dir + "data/tube-102400x1y.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file

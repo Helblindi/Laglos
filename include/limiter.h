@@ -184,6 +184,57 @@ void LocalConservativeLimit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho
    
 }
 
+void GlobalConservativeLimit(ParGridFunction &gf_ho)
+{
+   cout << "===== Limiter::GlobalConservativeLimit =====\n";
+   assert(gf_ho.Size() == NDofs);
+
+   /* Compute total mass */
+   double M = 0.;
+   for (int i = 0; i < NDofs; i++)
+   {
+      M += mass_vec[i] * gf_ho[i]; 
+   }
+   cout << "M: " << M << endl;
+
+   /* Compute y */
+   Vector y(NDofs);
+   for (int i = 0; i < NDofs; i++)
+   {
+      y[i] = std::min( std::max( gf_ho[i], rho_min[i]), rho_max[i] );
+   }
+
+   /* Compute alpha+ and alpha-*/
+   double _sum_my = 0., _denom_max = 0., _denom_min = 0.;
+   for (int i = 0; i < NDofs; i++)
+   {
+      double _m = mass_vec[i];
+      _sum_my += _m * y[i];
+      _denom_max += _m * (rho_max[i] - y[i]);
+      _denom_min += _m * (rho_min[i] - y[i]);
+   }
+   const double _num = M - _sum_my;
+   const double alpha_p = std::max(0., _num / _denom_max);
+   const double alpha_n = std::max(0., _num / _denom_min);
+
+   /* Finally, set z */
+   Vector z(NDofs);
+   for (int i = 0; i < NDofs; i++)
+   {
+      z[i] = y[i] + alpha_p * (rho_max[i] - y[i]) + alpha_n * (rho_min[i] - y[i]);
+   }
+
+   gf_ho = z;
+}
+
+void LimitGlobal(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
+{
+   cout << "===== Limiter::LimitGlobal =====\n";
+   LocalConservativeLimit(gf_lo, gf_ho);
+
+   GlobalConservativeLimit(gf_ho);
+}
+
 /**
  * @brief Given the low order IDP solution, compute the local min and max values
  * for the high order solution. this computes u_i^min and u_i^max defined in 

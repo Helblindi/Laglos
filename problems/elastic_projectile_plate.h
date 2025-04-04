@@ -62,9 +62,10 @@ private:
    double v_proj = 800.; // m/s
    const double p_inf = 3.42E10; // Pa
    /* Different shear moduli for projectile plate */
-   // const double mu = 9.2E10;
-   // double mu = 1.E9;
-   double mu = 0.;
+   const double mu = 9.2E10;
+   // const double mu = 9.2E8 // should bounce back, run long time
+   // const double mu = 1.E9;
+   // const double mu = 0.;
 
    /* helper function to determine the region based on x,y coords */
    bool is_solid_region(const Vector &x)
@@ -161,12 +162,13 @@ public:
       if (t < 1e-12)
       {
          if (is_solid_region(x)) {
-            const double _gam = _gamma_s;
-            return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0) - p_inf * _gam;
+            // const double _gam = _gamma_s;
+            // return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0) - p_inf * _gam;
+            return 0.;
+
          } else
          {
-            const double _gam = _gamma_g;
-            return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0);
+            return 101325.; // 1 atm = 101.325 kPa
          }
       }
       else
@@ -202,12 +204,17 @@ public:
       cout << "sie0\n";
       if (is_solid_region(x))
       {
-         return 0.;
+         // return 0.;
+         // double _gam = this->get_gamma();
+         return (p0(x,t) + p_inf * this->get_gamma(50)) / this->rho0(x, t) / (this->get_gamma(50) - 1.0);
+         // return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0) - p_inf * _gam;
       }
       else
       {
          // Value corresponds to 1 atm = 101.325 kPa
-         return 2.5331125E5; // J / kg
+         // return 2.5331125E5; // J / kg
+         const double _gam = _gamma_g;
+         return p0(x,t) * (_gam - 1.) / rho0(x,t);
       }
    }
 

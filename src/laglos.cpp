@@ -947,6 +947,9 @@ int main(int argc, char *argv[]) {
    /* Gridfunctions used in Triple Point */
    ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
 
+   /* Elasticity gridfunctions */
+   ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
+
    // Compute the density if we need to visualize it
    if (visualization || gfprint || visit || pview)
    {
@@ -1038,7 +1041,6 @@ int main(int argc, char *argv[]) {
       if (use_elasticity)
       {
          // Compute Sigma and F
-         ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
          hydro.ComputeSigmaGF(S, sigma_gf);
          hydro.ComputeFGF(f_gf);
          hydro.ComputeESheerGF(e_sheer_gf);
@@ -1240,6 +1242,8 @@ int main(int argc, char *argv[]) {
    visit_dc.RegisterField("Mass Loss", &mc_gf);
    visit_dc.RegisterField("Pressure", &press_gf);
    visit_dc.RegisterField("Gamma", &gamma_gf);
+   visit_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+   visit_dc.RegisterField("e sheer", &e_sheer_gf);
    visit_dc.SetCycle(0);
    visit_dc.SetTime(0.0);
    visit_dc.Save();
@@ -1255,6 +1259,8 @@ int main(int argc, char *argv[]) {
    paraview_dc.RegisterField("Mass Loss", &mc_gf);
    paraview_dc.RegisterField("Pressure", &press_gf);
    paraview_dc.RegisterField("Gamma", &gamma_gf);
+   paraview_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+   paraview_dc.RegisterField("e sheer", &e_sheer_gf);
    paraview_dc.SetCycle(0);
    paraview_dc.SetTime(0.0); 
    paraview_dc.Save();
@@ -1473,7 +1479,6 @@ int main(int argc, char *argv[]) {
             if (use_elasticity)
             {
                // Compute Sigma and F
-               ParGridFunction sigma_gf(&L2VFESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
                hydro.ComputeSigmaGF(S, sigma_gf);
                hydro.ComputeFGF(f_gf);
                hydro.ComputeESheerGF(e_sheer_gf);

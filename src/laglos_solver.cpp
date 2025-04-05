@@ -336,7 +336,7 @@ template<int dim>
 void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
 {
    assert(this->use_elasticity);
-   assert(sigma_gf.Size() == NDofs_L2 * dim);
+   assert(sigma_gf.Size() == NDofs_L2);
    sigma_gf = 0.;
    DenseMatrix sigmaD_e(3);
 
@@ -345,8 +345,7 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
       if (pmesh->GetAttribute(e) == 50)
       {
          ComputeSigmaDComp(S,e,sigmaD_e);
-         // Want sigma_1,1 and sigma_1,2
-         for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigmaD_e(0,i); }
+         sigma_gf[e] = sigmaD_e.FNorm();
       }
    }
 }

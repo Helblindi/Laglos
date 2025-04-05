@@ -62,10 +62,11 @@ private:
    double v_proj = 800.; // m/s
    const double p_inf = 3.42E10; // Pa
    /* Different shear moduli for projectile plate */
-   const double mu = 9.2E10;
-   // const double mu = 9.2E8 // should bounce back, run long time
-   // const double mu = 1.E9;
-   // const double mu = 0.;
+   const double mu = 9.2E10; // .002
+   // const double mu = 9.2E9; // .002 for bounceback
+   // const double mu = 9.2E8; // 0.002 re-stiffens 
+   // const double mu = 0.; // bound to crash
+
 
    /* helper function to determine the region based on x,y coords */
    bool is_solid_region(const Vector &x)

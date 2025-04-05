@@ -288,11 +288,11 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
  *       the necessary data structures (e.g., elastic object) are properly initialized.
  */
 template<int dim>
-void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, DenseMatrix &sigma_e) const
+void LagrangianLOOperator<dim>::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
 {
    assert(use_elasticity);
-   sigma_e.SetSize(dim);
-   sigma_e = 0.;
+   sigmaD_e.SetSize(3);
+   sigmaD_e = 0.;
 
    if (pmesh->GetAttribute(e) != 50)
    {
@@ -300,7 +300,6 @@ void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, 
    }
 
    Array<int> idx(dim), idy(dim);
-   DenseMatrix sigmaD(3);
    DenseMatrix flux(dim+2,dim);
    Vector U(dim+2);
 
@@ -312,11 +311,11 @@ void LagrangianLOOperator<dim>::ComputeSigmaComp(const Vector &S, const int &e, 
    }
    GetCellStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
-   elastic.ComputeS(e, rho, sigmaD);
-   es = elastic.e_sheer(e);
-   flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-   flux.GetSubMatrix(idx, idy, sigma_e);
-   sigma_e *= -1.;
+   elastic.ComputeS(e, rho, sigmaD_e);
+   // es = elastic.e_sheer(e);
+   // flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
+   // flux.GetSubMatrix(idx, idy, sigma_e);
+   // sigma_e *= -1.;
 }
 
 
@@ -339,15 +338,15 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2 * dim);
    sigma_gf = 0.;
-   DenseMatrix sigma_e(dim);
+   DenseMatrix sigmaD_e(3);
 
    for (int e = 0; e < NDofs_L2; e++)
    {
       if (pmesh->GetAttribute(e) == 50)
       {
-         ComputeSigmaComp(S,e,sigma_e);
+         ComputeSigmaDComp(S,e,sigmaD_e);
          // Want sigma_1,1 and sigma_1,2
-         for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigma_e(0,i); }
+         for (int i = 0; i < dim; i++) { sigma_gf[e + i*NDofs_L2] = sigmaD_e(0,i); }
       }
    }
 }
@@ -3458,7 +3457,6 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_suffix)
 {
    Vector center(dim), U(dim+2), vel(dim);
-   DenseMatrix sigma(dim);
    double pressure=0., ss=0.;
 
    // Form filenames and ofstream objects
@@ -3473,9 +3471,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    fstream_sv << "ste,p,ss,cell_type";
    if (use_elasticity)
    {
-      fstream_sv << ",sigma11";
-      if (dim > 1) { fstream_sv << ",sigma12"; }
-      if (dim > 2) { fstream_sv << ",sigma13";}
+      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33";
    }
    fstream_sv << "\n";
 
@@ -3491,10 +3487,6 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       double attr = pmesh->GetAttribute(i);
       pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
-      if (use_elasticity)
-      {
-         ComputeSigmaComp(S, i, sigma);
-      }
       pmesh->GetElementCenter(i, center);
 
       // Output to file
@@ -3518,10 +3510,15 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       {
          fstream_sv << "bdr";
       }
-
-      if (use_elasticity)                                 // sigma
+ 
+      if (use_elasticity)
       {
-         for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
+         DenseMatrix sigmaD(3);
+         ComputeSigmaDComp(S, i, sigmaD); // sigma
+         // for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
+         fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2);
+         fstream_sv << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2);
+         fstream_sv << "," << sigmaD(2,0) << "," << sigmaD(2,1) << "," << sigmaD(2,2);
       }
       fstream_sv << "\n";
    }

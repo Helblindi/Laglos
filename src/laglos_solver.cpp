@@ -581,7 +581,6 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             int bdr_attr = BdrElementIndexingArray[fids[j]];
             // cout << "boundary attribute for face " << fids[j] << ": " << bdr_attr << endl;
             cell_bdr_arr.Append(bdr_attr);
-
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
             U_i_bdry = U_i;
@@ -698,6 +697,27 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   break;
                }
                }
+            }
+            else if (use_elasticity && ci_attr == 50)
+            {
+               /* Negate sigma */
+               DenseMatrix F_i_bdry = F_i;
+
+               for (int i = 0; i < dim; i++)
+               {
+                  for (int j = 0; j < dim; j++)
+                  {
+                     F_i_bdry(i+1, j) *= -1.;
+                  }
+               }
+
+               Vector sigmap;
+               F_i_bdry.GetRow(dim+1, sigmap);
+               sigmap *= -1.;
+               F_i_bdry.SetRow(dim+1, sigmap);
+
+               F_i_bdry.Mult(c, y_temp_bdry);
+               y_temp += y_temp_bdry;
             }
             else
             {

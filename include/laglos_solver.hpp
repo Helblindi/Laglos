@@ -3,7 +3,7 @@
 
 #include "mfem.hpp"
 // #include "initial_vals.hpp"
-#include "problem_base.h"
+#include "test_problems_include.h"
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove

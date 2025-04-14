@@ -326,6 +326,20 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 
    Vector sum_validation(dim);
 
+    /* Add in e_source for taylor green */
+    LinearForm *e_source = nullptr;
+    if (pb->get_indicator() == "TaylorGreen")
+    {
+        // Needed since the Assemble() defaults to PA.
+       L2.GetMesh()->DeleteGeometricFactors();
+       e_source = new LinearForm(&L2);
+       TaylorCoefficient coeff;
+       IntegrationRule ir = IntRules.Get(L2.GetFE(0)->GetGeomType(), 2);
+       DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
+       e_source->AddDomainIntegrator(d);
+       e_source->Assemble();
+    }
+
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
       is_boundary_cell = false;
@@ -541,6 +555,13 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
          } // End boundary face        
 
       } // End Face iterator
+
+      /* Add in e_source for taylor green */
+      if (pb->get_indicator() == "TaylorGreen")
+      {
+         // cout << "LF size: " << e_source->Size() << endl;
+         rhs[dim+1] += e_source->Elem(ci);
+      }
 
       /* 
       Compute current mass, rather than assume mass is conserved

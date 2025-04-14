@@ -42,6 +42,18 @@ namespace mfem
 namespace hydroLO
 {
 
+class TaylorCoefficient : public Coefficient
+{
+public:
+   virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip)
+   {
+      Vector x(2);
+      T.Transform(ip, x);
+      return 3.0 / 8.0 * M_PI * ( cos(3.0*M_PI*x(0)) * cos(M_PI*x(1)) -
+                                    cos(M_PI*x(0))     * cos(3.0*M_PI*x(1)) );
+   }
+};
+
 template<int dim>
 class TaylorGreenProblem: public ProblemBase<dim>
 {

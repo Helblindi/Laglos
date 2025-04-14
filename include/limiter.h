@@ -186,7 +186,7 @@ void LocalConservativeLimit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho
 
 void GlobalConservativeLimit(ParGridFunction &gf_ho)
 {
-   cout << "===== Limiter::GlobalConservativeLimit =====\n";
+   // cout << "===== Limiter::GlobalConservativeLimit =====\n";
    assert(gf_ho.Size() == NDofs);
 
    /* Compute total mass */
@@ -195,7 +195,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    {
       M += mass_vec[i] * gf_ho[i]; 
    }
-   cout << "M: " << M << endl;
+   // cout << "M: " << M << endl;
 
    /* Compute y */
    Vector y(NDofs);
@@ -229,7 +229,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
 
 void LimitGlobal(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
-   cout << "===== Limiter::LimitGlobal =====\n";
+   // cout << "===== Limiter::LimitGlobal =====\n";
    LocalConservativeLimit(gf_lo, gf_ho);
 
    GlobalConservativeLimit(gf_ho);

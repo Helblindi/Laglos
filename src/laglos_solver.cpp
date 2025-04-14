@@ -1734,6 +1734,29 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
 
 
 /****************************************************************************************************
+* Function: ComputeDensity
+* Parameters:
+*  S      - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  rho_gf - ParGridFunction that will be set to the inverse of the specific volume
+*
+* Purpose:
+*  Simply invert the specific volume
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction sv_gf;
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   rho_gf.SetSize(NDofs_L2);
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      rho_gf[i] = 1. / sv_gf.Elem(i);
+   }
+}
+
+
+/****************************************************************************************************
 * Function: GetCellStateVector
 * Parameters:
 *  S    - BlockVector that stores mesh information, mesh velocity, and state variables.

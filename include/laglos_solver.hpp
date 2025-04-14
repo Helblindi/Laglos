@@ -324,6 +324,7 @@ public:
 
    // Enforce Mass Conservation
    void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
+   void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

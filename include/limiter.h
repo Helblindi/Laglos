@@ -66,6 +66,7 @@ private:
    const HypreParVector &mass_vec;
    const int NDofs;
    mutable ParGridFunction rho_min, rho_max;
+   double glob_rho_max = -1., glob_rho_min = -1.;
 
    ParFiniteElementSpace H1_LO, H1_HO;
    ParGridFunction LO_proj_max, LO_proj_min;
@@ -188,6 +189,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
 {
    // cout << "===== Limiter::GlobalConservativeLimit =====\n";
    assert(gf_ho.Size() == NDofs);
+   assert(glob_rho_min >= 0. && glob_rho_max >= glob_rho_min);
 
    /* Compute total mass */
    double M = 0.;
@@ -201,7 +203,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    Vector y(NDofs);
    for (int i = 0; i < NDofs; i++)
    {
-      y[i] = std::min( std::max( gf_ho[i], rho_min[i]), rho_max[i] );
+      y[i] = std::min( std::max( gf_ho[i], glob_rho_min), glob_rho_max );
    }
 
    /* Compute alpha+ and alpha-*/
@@ -210,8 +212,8 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    {
       double _m = mass_vec[i];
       _sum_my += _m * y[i];
-      _denom_max += _m * (rho_max[i] - y[i]);
-      _denom_min += _m * (rho_min[i] - y[i]);
+      _denom_max += _m * (glob_rho_max - y[i]);
+      _denom_min += _m * (glob_rho_min - y[i]);
    }
    const double _num = M - _sum_my;
    const double alpha_p = std::max(0., _num / _denom_max);
@@ -221,7 +223,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    Vector z(NDofs);
    for (int i = 0; i < NDofs; i++)
    {
-      z[i] = y[i] + alpha_p * (rho_max[i] - y[i]) + alpha_n * (rho_min[i] - y[i]);
+      z[i] = y[i] + alpha_p * (glob_rho_max - y[i]) + alpha_n * (glob_rho_min - y[i]);
    }
 
    gf_ho = z;
@@ -259,6 +261,10 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
    */
    vert_elem->Mult(LO_proj_max, rho_max);
    vert_elem->Mult(LO_proj_min, rho_min);
+
+   /* Global bounds necessary for global conservative limiting, see Remark 2.4 */
+   glob_rho_max = rho_max.Max();
+   glob_rho_min = rho_min.Min();
 }
 
 

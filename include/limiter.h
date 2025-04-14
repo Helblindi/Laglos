@@ -219,6 +219,10 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    const double alpha_p = std::max(0., _num / _denom_max);
    const double alpha_n = std::max(0., _num / _denom_min);
 
+   MFEM_ASSERT(alpha_p >= 0. && alpha_p <= 1. && 
+               alpha_n >= 0. && alpha_n <= 1.,
+               "alpha_p and alpha_n should be between 0 and 1.\n");
+
    /* Finally, set z */
    Vector z(NDofs);
    for (int i = 0; i < NDofs; i++)
@@ -227,6 +231,9 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    }
 
    gf_ho = z;
+
+   MFEM_ASSERT(gf_ho.Max() <= glob_rho_max && gf_ho.Min() >= glob_rho_min,
+               "Global limiting failed.\n");
 }
 
 void LimitGlobal(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
@@ -447,7 +454,7 @@ void LimitMassMin(ParGridFunction &gf_ho, double &pct_limited)
       for (int j = 0; j < adj_dofs.Size(); j++)
       {
          int dof_j = adj_dofs[j];
-         gf_ho[dof_j] = gf_ho[dof_j] + lim * std::max(0., gf_ho[dof_j] - rho_max[dof_j]);
+         gf_ho[dof_j] = gf_ho[dof_j] + lim * std::max(0., gf_ho[dof_j] - rho_min[dof_j]);
       }
    }
    pct_limited =  double(num_limited) / NDofs;

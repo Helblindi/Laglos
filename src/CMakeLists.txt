@@ -1,6 +1,7 @@
 list(APPEND SRCS 
    laglos.cpp
    laglos_solver.cpp
+   sedov_exact.cpp
    # lagrange_multiplier.cpp
    geometry.cpp)
 

@@ -16,6 +16,7 @@
 #define LIMITER
 
 #include "mfem.hpp"
+#include "mfem/fem/pgridfunc.hpp"
 
 using namespace mfem;
 using namespace std;
@@ -70,8 +71,8 @@ private:
    const ParFiniteElementSpace &pfes;
    Vector *mass_vec;
    const int NDofs;
-   Vector mass_lumped;
-   Vector vol_vec;
+   ParGridFunction mass_lumped;
+   ParGridFunction vol_vec;
    mutable ParGridFunction rho_min, rho_max;
    mutable ParGridFunction rho_min_relaxed, rho_max_relaxed;
    double glob_rho_max = -1., glob_rho_min = -1.;
@@ -96,8 +97,8 @@ IDPLimiter(ParFiniteElementSpace & _pfes, ParFiniteElementSpace & H1FESpace_proj
    pfes(_pfes),
    mass_vec(&_mass_vec),
    NDofs(mass_vec->Size()),
-   mass_lumped(NDofs),
-   vol_vec(NDofs),
+   mass_lumped(&_pfes),
+   vol_vec(&_pfes),
    rho_min(&_pfes),
    rho_max(&_pfes),
    rho_min_relaxed(&_pfes),
@@ -591,10 +592,10 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    {
       M += mass_lumped[i] * gf_ho[i]; 
    }
-   // cout << "M: " << M << endl;
+   cout << "M: " << M << endl;
 
    /* Compute y */
-   Vector y(NDofs);
+   Vector y(NDofs); y = 0.;
    for (int i = 0; i < NDofs; i++)
    {
       GetRhoMaxMin(i, rho_max_i, rho_min_i);
@@ -689,7 +690,7 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== Limiter::LimitGlobal =====\n";
    ComputeRhoMinMax(gf_lo);
-   ComputeVolume(gf_ho);
+   // ComputeVolume(gf_ho);
    ComputeMasses(gf_ho);
 
    bool satisfies_estimate = CheckEstimate(mass_lumped, gf_ho);

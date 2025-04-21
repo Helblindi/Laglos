@@ -87,7 +87,7 @@ private:
    const int dim;
    const int max_it = 2;
    bool use_glob = false;
-   const int relaxation_option = 0; // 0: no relaxation, 1: relaxation type 1, 2: relaxation type 2
+   const int relaxation_option = 1; // 0: no relaxation, 1: relaxation type 1, 2: relaxation type 2
    bool suppress_warnings = false;
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL
 
@@ -128,6 +128,11 @@ IDPLimiter(ParFiniteElementSpace & _pfes, ParFiniteElementSpace & H1FESpace_proj
 
    vert_elem->MergeDiagAndOffd(_spm);
    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
+
+   cout << "IDPLimiter configuration options:\n";
+   cout << "  - max_it: " << max_it << endl;
+   cout << "  - relaxation_option: " << relaxation_option << endl;
+   cout << "  - suppress_warnings: " << suppress_warnings << endl;
 }
 
 ~IDPLimiter() 
@@ -516,8 +521,8 @@ void LocalConservativeLimitGS(ParGridFunction &gf_ho)
       num_it++;
       if (num_it == max_it) { max_it_reached = true;}
 
-      cout << "ratio of min able to be limited: " << double(num_min_lim)/num_min << ", num min: " << num_min << endl;
-      cout << "ratio of max able to be limited: " << double(num_max_lim)/num_max << ", num max: " << num_max << endl;
+      // cout << "ratio of min able to be limited: " << double(num_min_lim)/num_min << ", num min: " << num_min << endl;
+      // cout << "ratio of max able to be limited: " << double(num_max_lim)/num_max << ", num max: " << num_max << endl;
 
       /* Check conservation */
       // cout << "checking local mass conservation\n";
@@ -686,12 +691,42 @@ void ComputeLumpedMasses(const ParGridFunction &gf_ho)
    mass_lumped = _lf;
 }
 
+void ComputeCellMassesAndVolumes(const ParGridFunction &gf_ho)
+{
+   // cout << "IDPLimiter::ComputeCellMasses\n";
+   // MFEM_ABORT("Need to compute volume based on quadrature");
+   const int NE = pfes.GetNE();
+   Vector cell_mass(NE);
+   Vector cell_vol(NE);
+   for (int i = 0; i < NE; i++)
+   {
+      cell_mass[i] = 0.;
+      cell_vol[i] = 0.;
+      Array<int> dofs;
+      pfes.GetElementDofs(i, dofs);
+      for (int j = 0; j < dofs.Size(); j++)
+      {
+         int dof_j = dofs[j];
+         cell_mass[i] += mass_lumped[dof_j] * gf_ho[dof_j];
+         cell_vol[i] += mass_lumped[dof_j];
+      }
+   }
+   cout << "cell masses: ";
+   cell_mass.Print(cout);
+   cout << "sum idp cell masses: " << cell_mass.Sum() << endl;
+   cout << "cell volumes: ";
+   cell_vol.Print(cout);
+   cout << "sum idp cell volumes: " << cell_vol.Sum() << endl;
+}
+
 void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
-   // cout << "===== Limiter::LimitGlobal =====\n";
+   // cout << "===== Limiter::Limit =====\n";
    ComputeRhoMinMax(gf_lo);
    // ComputeVolume(gf_ho);
    ComputeLumpedMasses(gf_ho);
+   // cout << "---Initial cell masses---\n";
+   // ComputeCellMassesAndVolumes(gf_ho);
 
    bool satisfies_estimate = CheckEstimate(mass_lumped, gf_ho);
    if (!satisfies_estimate)
@@ -703,16 +738,21 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
    {
       case JACOBI:
          LocalConservativeLimitJacobi(gf_ho);
-         GlobalConservativeLimit(gf_ho);
+         // GlobalConservativeLimit(gf_ho);
          break;
       case GAUSS_SEIDEL:
          LocalConservativeLimitGS(gf_ho);
-         GlobalConservativeLimit(gf_ho);
+         // GlobalConservativeLimit(gf_ho);
          break;
       default:
          MFEM_ABORT("Unknown iteration method.\n");
          break;
    }
+
+   // cout << "---Final cell masses---\n";
+   // ComputeCellMassesAndVolumes(gf_ho);
+
+   // cout << "===== END Limiter::Limit =====\n";
 }
 
 void RelaxBoundsMin(const ParGridFunction &rho_min_in, ParGridFunction &rho_min_out)

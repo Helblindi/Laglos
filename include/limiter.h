@@ -676,7 +676,7 @@ void ComputeVolume(const ParGridFunction &gf_ho)
    }
 }
 
-void ComputeMasses(const ParGridFunction &gf_ho)
+void ComputeLumpedMasses(const ParGridFunction &gf_ho)
 {
    LinearForm _lf(gf_ho.ParFESpace());
    ConstantCoefficient one(1.0);
@@ -691,7 +691,7 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
    // cout << "===== Limiter::LimitGlobal =====\n";
    ComputeRhoMinMax(gf_lo);
    // ComputeVolume(gf_ho);
-   ComputeMasses(gf_ho);
+   ComputeLumpedMasses(gf_ho);
 
    bool satisfies_estimate = CheckEstimate(mass_lumped, gf_ho);
    if (!satisfies_estimate)

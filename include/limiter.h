@@ -683,6 +683,17 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    gf_ho = z;
 }
 
+bool less_than_or_equal(double a, double b) {
+   // double eps = std::numeric_limits<double>::epsilon();
+   double eps = 1.E-12;
+   return a < b || std::abs(a - b) < eps * std::max({1.0, std::abs(a), std::abs(b)});
+}
+
+bool greater_than_or_equal(double a, double b) {
+   double eps = std::numeric_limits<double>::epsilon();
+   return a > b || std::abs(a - b) < eps * std::max({1.0, std::abs(a), std::abs(b)});
+}
+
 bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
 {
    // cout << "IDPLimiter::CheckEstimate\n";
@@ -694,13 +705,15 @@ bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
       M_max += mi * x_max[i];
       M_min += mi * x_min[i];
    }
-   if (M >= M_min && M <= M_max)
+   if (less_than_or_equal(M_min, M) && less_than_or_equal(M, M_max))
    {
       return true;
    }
    else
    {
-      cout << setprecision(15) << "M_min: " << M_min << ", M: " << M << ", M_max: " << M_max << endl;
+      if (less_than_or_equal(M, M_min)) { cout << "M < M_min\n"; }
+      if (less_than_or_equal(M_max, M)) { cout << "M > M_max\n"; }
+      cout << std::fixed << std::setprecision(20) << "M_min: " << M_min << ", M: " << M << ", M_max: " << M_max << endl;
       return false;
    }
 }

@@ -17,7 +17,12 @@ namespace mfem
 namespace hydroLO
 {
 
-enum class ShearEnergyMethod {
+enum ShearEOS {
+   NEO_HOOKEAN,
+   MOONEY_RIVLIN
+};
+
+enum ShearEnergyMethod {
    AVERAGE_F,
    AVERAGE_C,
    AVERAGE_ENERGY
@@ -28,6 +33,7 @@ class Elastic
 {
 private:
    ShearEnergyMethod shear_method;
+   ShearEOS shear_eos;
    ParFiniteElementSpace &H1, &L2;
    const ParGridFunction &rho0_gf;
    const IntegrationRule &ir;
@@ -43,6 +49,7 @@ public:
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
+           ShearEOS _shear_eos = ShearEOS::NEO_HOOKEAN,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
       H1(h1_fes), 
       L2(l2_fes),
@@ -52,6 +59,7 @@ public:
       NDofs_L2(L2.GetNDofs()), 
       nqp(ir.GetNPoints()),
       Jac0inv(dim, dim, NE * nqp),
+      shear_eos(_shear_eos),
       shear_method(method)
    {
       cout << "=== Elastic constructor ===\n";
@@ -111,32 +119,72 @@ public:
       {
          MFEM_ABORT("Must set shear modulus.\n");
       }
-      /* Neo hookean */
-      return mu / 2 * (trc - 3.) / rho0; 
+
+      switch (shear_eos)
+      {
+      case NEO_HOOKEAN:
+         return mu / 2 * (trc - 3.) / rho0;
+      case MOONEY_RIVLIN:
+         return mu / 32. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc);
+      default:
+         MFEM_ABORT("Invalid value for shear_eos.");
+      }
+       
       /* alternate eos from paper */
       // double j2 = pow(trc2 - pow(trc,2),2) - 2. * trc;
       // return mu * (j2 - 3.) / 8. / rho0;
       /* favrie 2014 */
       // return mu * (trc2 - 3.) / 8 / rho0;
+
+      return -1.;
    }
 
    double des_dtrc(const double &trc, const double &trc2, const double &rho0) const
    {
-      /* Neo hookean */
-      return mu / 2. / rho0;
+      if (mu == -1.)
+      {
+         MFEM_ABORT("Must set shear modulus.\n");
+      }
+
+      switch (shear_eos)
+      {
+      case NEO_HOOKEAN:
+         return mu / 2. / rho0;
+      case MOONEY_RIVLIN:
+         return mu / 8. / rho0 * (pow(trc,3) - trc*trc2 - 2.);
+      default:
+         MFEM_ABORT("Invalid value for shear_eos.");
+      }
+
       /* alternate eos from paper */
       // return mu * ( -4. * trc2 * trc + 4. * pow(trc,3) - 2. ) / 8. / rho0;
       /* favrie 2014 */
-      // return 0.;
+
+      return -1.;
    }
 
    double des_dtrc2(const double &trc, const double &trc2, const double &rho0) const
    {
-      /* Neo hookean */
-      return 0.;
+      if (mu == -1.)
+      {
+         MFEM_ABORT("Must set shear modulus.\n");
+      }
+
+      switch (shear_eos)
+      {
+      case NEO_HOOKEAN:
+         return 0.;
+      case MOONEY_RIVLIN:
+         return mu / 16. / rho0 * (-pow(trc,2) + trc2);
+      default:
+         MFEM_ABORT("Invalid value for shear_eos.");
+      }
+
       /* alternate eos from paper */
       // return mu * (2. * trc2 - 2. * pow(trc,2)) / 8. / rho0;
       // return mu / 8. / rho0;
+
+      return -1.;
    }
 
    void ComputeAvgF(const int e, DenseMatrix &F) const

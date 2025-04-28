@@ -87,7 +87,7 @@ private:
    const int dim;
    const int max_it = 2;
    bool use_glob = false;
-   const int relaxation_option = 1; // 0: no relaxation, 1: relaxation type 1, 2: relaxation type 2
+   const int relaxation_option = 0; // 0: no relaxation, 1: relaxation type 1, 2: relaxation type 2
    bool suppress_warnings = false;
    bool suppress_output = true;
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL
@@ -620,7 +620,12 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
 {
    // cout << "===== Limiter::GlobalConservativeLimit =====\n";
    assert(gf_ho.Size() == NDofs);
-   assert(glob_x_min >= 0. && glob_x_max >= glob_x_min);
+   
+   if (!less_than_or_equal(0, glob_x_min) || !less_than_or_equal(glob_x_min, glob_x_max))
+   {
+      cout << "glob x min: " << glob_x_min << ", glob_x_max: " << glob_x_max << endl;
+      MFEM_ABORT("x_min < 0 or x_max < x_min.");
+   }
 
    /* Compute total mass */
    double M = 0.;
@@ -676,8 +681,14 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
       MFEM_WARNING("Global limiter not locally conservative.\n");
    }
 
-   MFEM_VERIFY(gf_ho.Max() <= glob_x_max && gf_ho.Min() >= glob_x_min,
-               "Global limiting failed.\n");
+   MFEM_VERIFY(less_than_or_equal(gf_ho.Max(), glob_x_max) && less_than_or_equal(glob_x_min, gf_ho.Min()), "Global limiting failed.\n");
+
+   MFEM_WARNING("Global limiter is not locally mass conservative.");
+   // bool is_locally_conservative = CheckLocalMassConservation(gf_ho, z);
+   // if (!is_locally_conservative)
+   // {
+   //    MFEM_ABORT("Global limiter is not locally conservative.");
+   // }
    /* end checks */
 
    gf_ho = z;

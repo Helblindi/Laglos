@@ -49,7 +49,7 @@ public:
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
-           ShearEOS _shear_eos = ShearEOS::NEO_HOOKEAN,
+           ShearEOS _shear_eos = ShearEOS::MOONEY_RIVLIN,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
       H1(h1_fes), 
       L2(l2_fes),
@@ -125,7 +125,8 @@ public:
       case NEO_HOOKEAN:
          return mu / 2 * (trc - 3.) / rho0;
       case MOONEY_RIVLIN:
-         return mu / 32. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc);
+         return mu / 64. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
+         // return 0.;
       default:
          MFEM_ABORT("Invalid value for shear_eos.");
       }

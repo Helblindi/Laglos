@@ -3490,7 +3490,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    fstream_sv << "ste,p,ss,cell_type";
    if (use_elasticity)
    {
-      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33";
+      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,es";
    }
    fstream_sv << "\n";
 
@@ -3538,6 +3538,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2);
          fstream_sv << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2);
          fstream_sv << "," << sigmaD(2,0) << "," << sigmaD(2,1) << "," << sigmaD(2,2);
+         fstream_sv << "," << e_sheer;
       }
       fstream_sv << "\n";
    }

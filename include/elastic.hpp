@@ -125,7 +125,7 @@ public:
       case NEO_HOOKEAN:
          return mu / 2. * (trc - 3.) / rho0;
       case MOONEY_RIVLIN:
-         return mu / 128. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
+         return mu / 32. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
          // return 0.;
       default:
          MFEM_ABORT("Invalid value for shear_eos.");
@@ -235,7 +235,7 @@ public:
       c.SetSize(3);
       ComputeAvgF(e,F);
       FT.Transpose(F);
-      mfem::Mult(FT, F, C);
+      mfem::Mult(F, FT, C);
       c = C;
       c *= std::pow(C.Det(), -1./3.);
    }
@@ -284,7 +284,7 @@ public:
 
          /* Compute FTF at quadrature point, and normalize */
          FT.Transpose(F);
-         mfem::Mult(FT, F, cqp);
+         mfem::Mult(F, FT, cqp);
          cqp *= std::pow(cqp.Det(), -1./3.);
 
          /* Add in contribution from quadrature point */

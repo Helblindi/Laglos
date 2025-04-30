@@ -1247,10 +1247,12 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          // Finally compute lambda max
          if (use_elasticity)
          {
-            lambda_max = 6.E3 * std::max(rhoL,rhoR);
+            // lambda_max = 6.E3 * std::max(rhoL,rhoR);
             // lambda computation does not handle negative pressure
-            // lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity, pb->get_b());
-            // lambda_max = sqrt(lambda_max * lambda_max + (4. / 3.) * 9.2E10);
+            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl+3.4*2.15E10, pr+3.4*2.15E10, this->use_greedy_viscosity, pb->get_b());
+            // TODO: lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl+gamma*pinf, pr+gamma*pinf, this->use_greedy_viscosity, pb->get_b());
+            lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * 2.6E10);
+            // TODO: lambda_max = sqrt(pow(lambda_max, 2) + rho * 4./3. * mu);
          }
          else
          {

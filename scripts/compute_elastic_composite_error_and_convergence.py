@@ -112,3 +112,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Example usage:
+# $ python3 ../scripts/compute_elastic_composite_error_and_convergence.py ./results/from_whistler/elastic/MooneyRivlin/shear/state_vectors/ ../exact_sol/elastic/MooneyRivlin/shear/shear-tan-vel.csv --approx_cols 4 --exact_cols 1

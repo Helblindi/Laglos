@@ -123,9 +123,9 @@ public:
       switch (shear_eos)
       {
       case NEO_HOOKEAN:
-         return mu / 2 * (trc - 3.) / rho0;
+         return mu / 2. * (trc - 3.) / rho0;
       case MOONEY_RIVLIN:
-         return mu / 64. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
+         return mu / 128. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
          // return 0.;
       default:
          MFEM_ABORT("Invalid value for shear_eos.");

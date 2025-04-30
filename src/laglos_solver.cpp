@@ -3487,7 +3487,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    fstream_sv << "rho,vx,";
    if (dim > 1) { fstream_sv << "vy,"; }
    if (dim > 2) { fstream_sv << "vz,"; }
-   fstream_sv << "ste,p,ss,cell_type";
+   fstream_sv << "ste,sie,p,ss,cell_type";
    if (use_elasticity)
    {
       fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,es";
@@ -3517,6 +3517,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          fstream_sv << vel[i] << ",";                     // v
       }
       fstream_sv << U[dim+1] << ","                       // ste
+                 << sie << ","                            // sie
                  << pressure << ","                       // pressure
                  << ss << ",";                            // sound speed
 

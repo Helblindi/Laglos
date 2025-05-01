@@ -5,6 +5,15 @@ import argparse
 import re
 from tabulate import tabulate
 
+def file_has_header(filepath):
+    with open(filepath, 'r') as f:
+        first_line = f.readline().strip().split(',')
+        try:
+            [float(item) for item in first_line]
+            return False  # All values numeric → no header
+        except ValueError:
+            return True   # Non-numeric value found → header present
+
 def extract_refinement_level(filename):
     """ Extracts refinement level from a filename like 'sv_06.csv' and computes step size """
     match = re.search(r'(\d+)', filename)  # Find the first number in the filename
@@ -28,8 +37,9 @@ def read_data(filename, column=0, has_header=False):
 
 def interpolate_exact_solution(approx_x, exact_file, exact_col=0):
     """ Interpolates the exact solution onto the x-values of the approximation data. """
-    exact_x = read_data(exact_file, 0, has_header=False)  # Read x-values from exact solution file
-    exact_y = read_data(exact_file, exact_col, has_header=False)  # Read exact solution values
+    _has_header = file_has_header(exact_file)
+    exact_x = read_data(exact_file, 0, has_header=_has_header)  # Read x-values from exact solution file
+    exact_y = read_data(exact_file, exact_col, has_header=_has_header)  # Read exact solution values
     
     interpolated_exact = np.interp(approx_x, exact_x, exact_y)  # Interpolate exact solution
     return interpolated_exact

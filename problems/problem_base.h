@@ -15,7 +15,8 @@ extern "C" {
       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *want_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume);
+      double *lambda_maxr_out, double *pstar, int *k, 
+      double *b_covolume, double *p_inf);
 }
 
 // Fortran subroutine from Lagrangian code (GREEDY)
@@ -148,7 +149,6 @@ public:
                                     double in_pl,
                                     double in_pr,
                                     const bool &use_greedy_viscosity,
-                                    double b_covolume=-1.,
                                     const string flag="NA")
    {
       // cout << "compute_lambda_max\n";
@@ -182,8 +182,7 @@ public:
       in_rhol = 1. / in_taul;
       in_rhor = 1. / in_taur;
 
-      double in_tol = 1.e-16,
-             _b=0.;
+      double in_tol = 1.e-16;
       double lambda_maxl_out = 0.,
              lambda_maxr_out = 0.,
              pstar = 0.,
@@ -191,23 +190,15 @@ public:
       int k = 0; // Tells you how many iterations were needed for convergence
       bool want_iter = false;
 
-      // Handle b_covolume parameter
-      if (b_covolume == -1.)
-      {
-         // if b_covolume is not specified, or is -1., use the problem specific value.
-         _b = this->get_b();
-      }
-      else
-      {
-         // if b_covolume is specified, use this value
-         _b = b_covolume;
-      }
+      double _b = this->get_b();
+      double _p_inf = this->get_pinf();
 
       double lambda_max = 1.;
       if (use_greedy_viscosity)
       {
          want_iter = true; // No iter
          // cout << "inul: " << in_ul << ", inur: " << in_ur << endl;
+         MFEM_ABORT("Need to incorporate b_covolume and p_inf");
          __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(
             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
             &want_iter,&lambda_max, &pstar,&k);
@@ -216,12 +207,7 @@ public:
       {
          __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-            &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);
-
-         // bool no_iter = false; 
-         // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
-         //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
+            &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b, &_p_inf);
 
          lambda_max = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
       }

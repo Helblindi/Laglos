@@ -64,6 +64,7 @@ public:
    ElasticImpact()
    {
       this->set_gamma(_gamma);
+      this->set_pinf(p_inf);
       this->set_indicator(_indicator);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);

@@ -102,6 +102,7 @@ public:
          MFEM_ABORT("Dimension must be 2 for the elastic shear problem.\n");
       }
       this->set_indicator(_indicator);
+      this->set_pinf(p_inf);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
       this->set_exact_solution(_known_exact_solution);

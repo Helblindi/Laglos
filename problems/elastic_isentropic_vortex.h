@@ -76,6 +76,7 @@ public:
 ElasticIsentropicVortex()
    {
       this->set_indicator(_indicator);
+      this->set_pinf(p_inf);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);

@@ -52,8 +52,22 @@ def compute_L1_error(approx_file, exact_file, approx_cols, exact_cols):
     exact = [interpolate_exact_solution(approx_x, exact_file, col) for col in exact_cols]  # Exact solution for all columns
     
     # Compute the composite L1 error (sum of relative errors across all variables)
-    _errors = (np.sum(np.abs(a - e)) / np.sum(np.abs(e)) for a, e in zip(approx, exact))
     composite_error = sum(np.sum(np.abs(a - e)) / np.sum(np.abs(e)) for a, e in zip(approx, exact))
+    return composite_error
+
+def compute_L2_error(approx_file, exact_file, approx_cols, exact_cols):
+    """ Computes the composite L2 error between approximation and exact solution across multiple variables. """
+    approx_x = read_data(approx_file, 0, has_header=True)  # Read x-values from approx file
+    approx = [read_data(approx_file, col, has_header=True) for col in approx_cols]  # Approximation data (y-values)
+    
+    exact = [interpolate_exact_solution(approx_x, exact_file, col) for col in exact_cols]  # Exact solution for all columns
+
+    # Compute the composite L2 error (sum of relative squared errors across all variables)
+    composite_error = sum(
+        np.sqrt(np.sum((a - e) ** 2)) / np.sqrt(np.sum(e ** 2))
+        for a, e in zip(approx, exact)
+    )
+    
     return composite_error
 
 def compute_convergence_order(errors, step_sizes):

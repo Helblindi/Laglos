@@ -2541,7 +2541,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -7229,7 +7229,7 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -7390,7 +7390,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -7451,7 +7451,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;

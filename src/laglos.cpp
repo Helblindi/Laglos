@@ -547,6 +547,12 @@ int main(int argc, char *argv[]) {
       case 56: // Elastic impact + shear
          problem_class = new ElasticImpactShear<dim>();
          break;
+      case 57: // Elastic 2D, Favrie 2014 section 5.4
+         MFEM_ABORT("Not implemented yet");
+         break;
+      case 58: // Elastic noh
+         problem_class = new ElasticNoh<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;
@@ -1898,7 +1904,7 @@ int main(int argc, char *argv[]) {
          sv_ex_gf.ProjectCoefficient(sv_coeff);
 
          // In the case of the Noh Problem, project 0 on the boundary of approx and exact
-         if (problem_class->get_indicator() == "Noh")
+         if ((problem_class->get_indicator() == "ElasticNoh" || problem_class->get_indicator() == "Noh"))
          {
             cout << "[Noh] Projecting zero on the boundary cells.\n";
             ParGridFunction cell_bdr_flag_gf;

@@ -62,7 +62,43 @@ public:
       shear_eos(_shear_eos),
       shear_method(method)
    {
-      cout << "=== Elastic constructor ===\n";
+      /*************** CONFIGURATION OUTPUT ***************/
+      cout << "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+      << "@         Elastic Class Configuration      @\n"
+      << "@------------------------------------------@\n"
+      << "@ shear_eos         : " << std::setw(20) << std::left;
+      switch (shear_eos)
+      {
+         case NEO_HOOKEAN:
+            cout << "NEO_HOOKEAN";
+            break;
+         case MOONEY_RIVLIN:
+            cout << "MOONEY_RIVLIN";
+            break;
+         default:
+            MFEM_ABORT("Invalid value for shear_eos.");
+      }
+      cout << " @\n";
+      
+      cout << "@ ShearEnergyMethod : " << std::setw(20) << std::left;
+      switch (shear_method)
+      {
+         case ShearEnergyMethod::AVERAGE_F:
+            cout << "AVERAGE_F";
+            break;
+         case ShearEnergyMethod::AVERAGE_C:
+            cout << "AVERAGE_C";
+            break;
+         default:
+            MFEM_ABORT("Unknown shear energy method");
+      }
+      cout << " @\n";
+      
+      cout << "@ nqp               : " << std::setw(20) << std::left << nqp      << " @\n"
+            << "@ NDofs_L2          : " << std::setw(20) << std::left << NDofs_L2 << " @\n"
+            << "@ NE                : " << std::setw(20) << std::left << NE       << " @\n"
+            << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n";
+      /***************** END CONFIGURATION *****************/
 
       if (NDofs_L2 != NE)
       {

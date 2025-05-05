@@ -3480,13 +3480,8 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,";
-   if (dim > 1) { fstream_sv << "y,"; }
-   if (dim > 2) { fstream_sv << "z,"; }
-   fstream_sv << "rho,vx,";
-   if (dim > 1) { fstream_sv << "vy,"; }
-   if (dim > 2) { fstream_sv << "vz,"; }
-   fstream_sv << "ste,sie,p,ss,cell_type";
+   // Header
+   fstream_sv << "x,y,z,rho,vx,vy,vz,ste,sie,p,ss,cell_type";
    if (use_elasticity)
    {
       fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,s11,s22,s33,es";
@@ -3507,18 +3502,26 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       ss = pb->sound_speed(rho, pressure, attr);
       pmesh->GetElementCenter(i, center);
 
+      // Get relevant quantities
+      double _x = center[0], _y = 0., _z = 0;
+      double _vx = vel[0], _vy = 0., _vz = 0.;
+      if (dim > 1) {
+         _y = center[1];
+         _vy = vel[1];
+         if (dim > 2) {
+            _z = center[2];
+            _vz = vel[2];
+         }
+      }
+      
       // Output to file
-      for (int i = 0; i < dim; i++) {
-         fstream_sv << center[i] << ",";                  // x,y,z
-      }
-      fstream_sv << 1./U[0] << ",";                       // rho
-      for (int i = 0; i < dim; i++) {
-         fstream_sv << vel[i] << ",";                     // v
-      }
-      fstream_sv << U[dim+1] << ","                       // ste
-                 << sie << ","                            // sie
-                 << pressure << ","                       // pressure
-                 << ss << ",";                            // sound speed
+      fstream_sv << _x << "," << _y << "," << _z << ","    // x,y,z,
+                 << 1./U[0] << ","                         // rho
+                 << _vx << "," << _vy << "," << _vz << "," // vx,vy,vz
+                 << U[dim+1] << ","                        // ste
+                 << sie << ","                             // sie
+                 << pressure << ","                        // pressure
+                 << ss << ",";                             // sound speed
 
       // Print flag if interior or bdr
       if (cell_bdr_flag_gf[i] == -1.)

@@ -548,7 +548,7 @@ int main(int argc, char *argv[]) {
          problem_class = new ElasticImpactShear<dim>();
          break;
       case 57: // Elastic 2D, Favrie 2014 section 5.4
-         MFEM_ABORT("Not implemented yet");
+         problem_class = new ElasticTwist<dim>();
          break;
       case 58: // Elastic noh
          problem_class = new ElasticNoh<dim>();

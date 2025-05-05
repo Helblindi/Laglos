@@ -171,3 +171,8 @@ The final times reported in the referenced paper corresponding to their shear mo
 ./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 6
 ./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 1
 ```
+
+### Elastic twist
+```
+./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 6
+```

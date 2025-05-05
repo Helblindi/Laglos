@@ -3489,7 +3489,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
    fstream_sv << "ste,sie,p,ss,cell_type";
    if (use_elasticity)
    {
-      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,es";
+      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,s11,s22,s33,es";
    }
    fstream_sv << "\n";
 
@@ -3535,10 +3535,13 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
          DenseMatrix sigmaD(3);
          ComputeSigmaDComp(S, i, sigmaD); // sigma
          // for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
-         fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2);
-         fstream_sv << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2);
-         fstream_sv << "," << sigmaD(2,0) << "," << sigmaD(2,1) << "," << sigmaD(2,2);
-         fstream_sv << "," << e_sheer;
+         fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2)
+                    << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2)
+                    << "," << sigmaD(2,0) << "," << sigmaD(2,1) << "," << sigmaD(2,2)
+                    << "," << sigmaD(0,0) - pressure
+                    << "," << sigmaD(1,1) - pressure
+                    << "," << sigmaD(2,2) - pressure
+                    << "," << e_sheer;
       }
       fstream_sv << "\n";
    }

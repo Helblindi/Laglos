@@ -908,7 +908,12 @@ int main(int argc, char *argv[]) {
    if (use_elasticity) //NF//MS
    {
       hydro.SetElasticity(use_elasticity);
-      hydro.SetShearModulus(problem_class->get_shear_modulus());
+      const double _mu = problem_class->get_shear_modulus();
+      if (_mu < 1.e-12)
+      {
+         MFEM_WARNING("Elasticity has been chosen, but the shear modulus is 0, meaning this is the fluid case.");
+      }
+      hydro.SetShearModulus(_mu);
    }
 
    /* 
@@ -1480,6 +1485,8 @@ int main(int argc, char *argv[]) {
             
             Wx = 0;
             Wy += offy;
+
+            // MFEM_ABORT("Need to implement get_gamma with a cell_attr variable.");
 
             //NF//MS
             if (use_elasticity)

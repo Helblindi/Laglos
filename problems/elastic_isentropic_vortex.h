@@ -51,7 +51,7 @@ private:
    const int cell_attr_g = 1, cell_attr_s = 50;
    const double solid_multiplier = 1.E3;
    const double p_inf_s = 2.15E10;
-   const double mu = 2.6E10;
+   const double _mu = 2.6E10;
    /* options */
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
@@ -77,6 +77,7 @@ ElasticIsentropicVortex()
    {
       this->set_indicator(_indicator);
       this->set_pinf(p_inf);
+      this->set_shear_modulus(_mu);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
@@ -206,11 +207,6 @@ ElasticIsentropicVortex()
          const double _gam = _gamma_g;
          return p0(x,t) / this->rho0(x, t) / (_gam - 1.0);
       }
-   }
-
-   double get_shear_modulus() override
-   {
-      return mu;
    }
 }; // End class
 

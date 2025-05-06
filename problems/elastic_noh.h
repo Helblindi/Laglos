@@ -59,9 +59,9 @@ private:
    const double _rho = 2.7E3;
    const double _p = 1.E5;
    const double _v = 1.E5;
-   const double p_inf = 2.15E10;
-   // const double p_inf = 0.;
-   const double mu = 2.6E10;
+   const double _p_inf = 2.15E10;
+   // const double _p_inf = 0.;
+   const double _mu = 2.6E10;
 
 public:
    ElasticNoh()
@@ -69,6 +69,8 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_gamma(_gamma);
+      this->set_pinf(_p_inf);
+      this->set_shear_modulus(_mu);
       this->set_indicator(_indicator);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
@@ -87,7 +89,7 @@ public:
     *********************************************************/
    double pressure(const double &rho, const double &sie, const int &cell_attr=0) override
    {
-      return (this->get_gamma() - 1.) * rho * sie - this->get_gamma() * p_inf;
+      return (this->get_gamma() - 1.) * rho * sie - this->get_gamma() * _p_inf;
    }
 
    /*********************************************************
@@ -137,12 +139,7 @@ public:
    }
    double sie0(const Vector &x, const double & t) override
    {
-      return (p0(x,t) + p_inf * this->get_gamma()) / this->rho0(x, t) / (this->get_gamma() - 1.0);
-   }
-
-   double get_shear_modulus() override
-   {
-      return mu;
+      return (p0(x,t) + _p_inf * this->get_gamma()) / this->rho0(x, t) / (this->get_gamma() - 1.0);
    }
 }; // End class
 

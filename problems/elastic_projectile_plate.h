@@ -62,10 +62,10 @@ private:
    double v_proj = 800.; // m/s
    const double p_inf = 3.42E10; // Pa
    /* Different shear moduli for projectile plate */
-   const double mu = 9.2E10; // .002
-   // const double mu = 9.2E9; // .002 for bounceback
-   // const double mu = 9.2E8; // 0.002 re-stiffens 
-   // const double mu = 0.; // bound to crash
+   const double _mu = 9.2E10; // .002
+   // const double _mu = 9.2E9; // .002 for bounceback
+   // const double _mu = 9.2E8; // 0.002 re-stiffens 
+   // const double _mu = 0.; // bound to crash
 
 
    /* helper function to determine the region based on x,y coords */
@@ -103,6 +103,7 @@ public:
       }
       this->set_indicator(_indicator);
       this->set_pinf(p_inf);
+      this->set_shear_modulus(_mu);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
       this->set_exact_solution(_known_exact_solution);
@@ -218,11 +219,6 @@ public:
          const double _gam = _gamma_g;
          return p0(x,t) * (_gam - 1.) / rho0(x,t);
       }
-   }
-
-   double get_shear_modulus() override
-   {
-      return mu;
    }
 }; // End class
 

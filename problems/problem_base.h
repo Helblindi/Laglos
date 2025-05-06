@@ -45,7 +45,8 @@ template<int dim>
 class ProblemBase
 {
 private:
-   double a = 0., b = 0., gamma = 0., p_inf = 0.;
+   double a = 0., b = 0., gamma = 0.;
+   double p_inf = 0., mu = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool th_bcs = false; // Indicator for thermo boundary conditions to be imposed on the thermo solution
@@ -67,6 +68,7 @@ public:
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
    void set_pinf(const double &_p_inf) { p_inf = _p_inf; }
+   void set_shear_modulus(const double &_mu) { mu = _mu; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
    void set_thbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
    void set_mvbcs_indicator(const bool &tvalue) { this->mv_bcs = tvalue; }
@@ -97,6 +99,7 @@ public:
    /* Optionally overridden */
    virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
    virtual double get_pinf(const int &cell_attr = 0) { return p_inf; }
+   virtual double get_shear_modulus(const int &cell_attr = 0) { return mu; }
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
    virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
@@ -426,9 +429,6 @@ public:
    virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) {
       return gamma;
    } // optionally overridden
-   virtual double get_shear_modulus() {
-      MFEM_ABORT("Must override ProblemBase::get_shear_modulus if '-ue' is used.\n");
-   }
    
 }; // End ProblemBase
 

@@ -3,6 +3,7 @@
 
 #include "mfem.hpp"
 #include "geometry.hpp"
+#include "eos.h"
 #include <cmath>
 #include <string>
 
@@ -44,7 +45,6 @@ template<int dim>
 class ProblemBase
 {
 private:
-   double a = 0., b = 0., gamma = 0.;
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool bcs = false; // Indicator for boundary conditions
@@ -58,6 +58,10 @@ private:
    double cfl_first = 0.5;
    double cfl_second = 0.5;
    double cfl_time_change = 0.;
+
+protected:
+   std::unique_ptr<EquationOfState> eos = NULL;  // Pointer to the EOS object
+   double a = 0., b = 0., gamma = 0.;
 
 public:
    // Setters
@@ -76,21 +80,21 @@ public:
    void set_cfl_time_change(const double &_cfl_time_change) { cfl_time_change = _cfl_time_change; }
 
    // Getters
-   double get_a() { return a; }
-   double get_b() { return b; }
-   string get_indicator() { return indicator; }
-   bool has_boundary_conditions() { return bcs; }
-   bool get_mv_bcs_need_updating() { return mv_bcs_need_updating; }
-   bool get_distort_mesh() { return distort_mesh; }
-   bool has_exact_solution() { return known_exact_solution; }
+   double get_a() const { return a; }
+   double get_b() const { return b; }
+   string get_indicator() const { return indicator; }
+   bool has_boundary_conditions() const { return bcs; }
+   bool get_mv_bcs_need_updating() const { return mv_bcs_need_updating; }
+   bool get_distort_mesh() const { return distort_mesh; }
+   bool has_exact_solution() const { return known_exact_solution; }
    // CFL change
-   bool get_cfl_change() { return change_cfl; }
-   double get_cfl_first() { return cfl_first; }
-   double get_cfl_second() { return cfl_second; }
-   double get_cfl_time_change() { return cfl_time_change; }
+   bool get_cfl_change() const { return change_cfl; }
+   double get_cfl_first() const { return cfl_first; }
+   double get_cfl_second() const { return cfl_second; }
+   double get_cfl_time_change() const { return cfl_time_change; }
 
    /* Optionally overridden */
-   virtual double get_gamma(const int &cell_attr = 0) { return gamma; }
+   virtual double get_gamma(const int &cell_attr = 0) const { return gamma; }
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
    virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
@@ -144,7 +148,7 @@ public:
                                     double in_pr,
                                     const bool &use_greedy_viscosity,
                                     double b_covolume=-1.,
-                                    const string flag="NA")
+                                    const string flag="NA") const
    {
       // cout << "compute_lambda_max\n";
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
@@ -246,12 +250,14 @@ public:
       // return 0.5;
    }
 
-   inline DenseMatrix flux(const Vector &U, const int &cell_attr=0)
+   inline DenseMatrix flux(const Vector &U, const int &cell_attr=0) const
    {
       DenseMatrix result(dim+2, dim);
 
       Vector v; velocity(U, v);
-      const double p = pressure(U, cell_attr);
+      const double rho = 1. / U[0];
+      const double sie = specific_internal_energy(U);
+      const double p = pressure(rho, sie, cell_attr);
 
       // * is not overridden for Vector class, but *= is
       Vector v_neg = v, vp = v;
@@ -271,13 +277,10 @@ public:
       return result;
    }
 
-   inline double sound_speed(const Vector &U, const int &cell_attr=0)
+   inline double sound_speed(const double &rho, const double &press, const int &cell_attr=0) const
    {
-      double _pressure = this->pressure(U, cell_attr);
-      double density = 1. / U[0];
-
-      double val = this->get_gamma(cell_attr) * (_pressure + this->get_a() * pow(density,2)) / (density * (1. - this->get_b() * density));
-      val -= 2. * this->get_a() * density;
+      double val = this->get_gamma(cell_attr) * (press + this->get_a() * pow(rho,2)) / (rho * (1. - this->get_b() * rho));
+      val -= 2. * this->get_a() * rho;
       val = pow(val, 0.5);
       return val;
    }
@@ -285,39 +288,46 @@ public:
    /*********************************************
     * Functions describing the initial state
     ********************************************/
-   double sv0(const Vector &x, const double & t)
+   double sv0(const Vector &x, const double & t) const
    {
       double val = this->rho0(x,t);
       assert(val != 0.);
       return 1./val;
    }
 
-   double ste0(const Vector &x, const double & t)
+   double ste0(const Vector &x, const double & t) const
    {
       Vector v(dim);
       this->v0(x,t,v);
       return this->sie0(x, t) + 0.5 * pow(v.Norml2(), 2);
    }
 
+   /* To compute pressure, utilize our equation of state */
+   double pressure(const double &rho, const double &sie, const double &gamma) const {
+      assert(eos != NULL);
+      return this->eos->pressure(rho, sie, gamma);
+   }
+
+   double pressure(const double &rho, const double &sie, const int &cell_attr=0) const {
+      return pressure(rho, sie, this->get_gamma(cell_attr));
+   }
+
    /*********************************************
     * Functions to be overridden
     ********************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) {
-      MFEM_ABORT("Must override pressure in ProblemBase class.\n");
-   } // virtual function, must be overridden
-   virtual double rho0(const Vector &x, const double & t) {
+   virtual double rho0(const Vector &x, const double & t) const {
       MFEM_ABORT("Must override rho0 in ProblemBase class.\n");
    } // virtual function, must be overridden
-   virtual void v0(const Vector &x, const double & t, Vector &v) {
+   virtual void v0(const Vector &x, const double & t, Vector &v) const {
       MFEM_ABORT("Must override v0 in ProblemBase class.\n");
    } // virtual function, must be overridden
-   virtual double sie0(const Vector &x, const double & t) {
+   virtual double sie0(const Vector &x, const double & t) const {
       MFEM_ABORT("Must override sie0 in ProblemBase class.\n");
    } // virtual function, must be overridden
-   virtual double p0(const Vector &x, const double & t) {
+   virtual double p0(const Vector &x, const double & t) const {
       MFEM_ABORT("Must override p0 in the ProblemBase class.\n");
    } // virtual function, must be overridden
-   virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) {
+   virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) const {
       return gamma;
    } // optionally overridden
    

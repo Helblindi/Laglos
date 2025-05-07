@@ -918,7 +918,9 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < press_gf.Size(); i++)
       {
          hydro.GetCellStateVector(S, i, U);
-         double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+         double _rho = 1. / U[0];
+         double _sie = problem_class->specific_internal_energy(U);
+         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
          press_gf[i] = pressure;
          gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
       }
@@ -1354,7 +1356,9 @@ int main(int argc, char *argv[]) {
                for (int i = 0; i < press_gf.Size(); i++)
                {
                   hydro.GetCellStateVector(S, i, U);
-                  double pressure = problem_class->pressure(U, pmesh->GetAttribute(i));
+                  double _rho = 1. / U[0];
+                  double _sie = problem_class->specific_internal_energy(U);
+                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
                   press_gf[i] = pressure;
                }
                Wx += offx;

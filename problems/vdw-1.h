@@ -29,6 +29,7 @@
 *********************************************************/
 
 
+#include "eos.h"
 #include "mfem.hpp"
 #include "problem_base.h"
 #include <cmath>
@@ -84,6 +85,9 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new VanDerWaalsEOS(this->a, this->b));
    }
 
    /* Override getters */
@@ -99,22 +103,9 @@ public:
    }
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-       // Use van der Waals
-      double rho = 1. / U[0];
-      double sie = this->specific_internal_energy(U);
-
-      double val = (this->get_gamma() - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
-      return val;
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double &t) override
+   double p0(const Vector &x, const double &t) const override
    {
       if (t < 1.e-16) {
          if (x[0] <= initial_shock)
@@ -128,12 +119,12 @@ public:
       }
       else {
          double rho = rho0(x,t);
-         double val = (this->get_gamma() - 1.) * (rho * sie0(x,t) + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
-         return val;
+         double sie = sie0(x,t);
+         return this->eos->pressure(rho, sie, this->get_gamma());
       }
    }
 
-   virtual double rho0(const Vector &x, const double & t) override
+   virtual double rho0(const Vector &x, const double & t) const override
    {
       if (t < 1.e-16) {
          if (x[0] <= initial_shock)
@@ -152,7 +143,7 @@ public:
          return rho_d[index];
       }
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   virtual void v0(const Vector &x, const double & t, Vector &v) const override
    {
       if (t < 1.e-16) {
          if (x[0] <= initial_shock)
@@ -173,7 +164,7 @@ public:
          v[0] = v_d[index];
       }
    }
-   virtual double sie0(const Vector &x, const double & t) override
+   virtual double sie0(const Vector &x, const double & t) const override
    {
       if (t < 1.e-16) {
          if (x[0] <= initial_shock)
@@ -226,7 +217,7 @@ public:
       // cout << "Done computing vdw arrays\n";
    }
 
-   void getIndex(const double val, int & index)
+   void getIndex(const double val, int & index) const
    {
       for (int j = 0; j < vec_size; j++)
       {

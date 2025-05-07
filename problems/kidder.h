@@ -91,20 +91,15 @@ public:
       this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Optionally overridden, or removed */
-   double get_gamma(const int &cell_attr = 0) override { return _gamma; }
+   double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
-
-   /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
 
    /*********************************************************
     * Initial State functions
@@ -114,7 +109,7 @@ public:
     * is the initial particle location, rather than the 
     * particle location at time t.
     *********************************************************/
-   double p0(const Vector &x, const double & t) override
+   double p0(const Vector &x, const double & t) const override
    {
       /* Get initial pressure */
       double _p0 = pow(rho0(x,0), this->get_gamma());
@@ -130,7 +125,7 @@ public:
       }
       return 0.;
    }
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       double r = x.Norml2();
       /* Get initial density */
@@ -147,7 +142,7 @@ public:
          return _rho0 * pow(_h, 2. / (1. - this->get_gamma()));
       }
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       if (t < 1e-12)
       {
@@ -162,19 +157,21 @@ public:
       }
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
-      return p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      double _p = p0(x,t);
+      double _rho = rho0(x,t);
+      return this->eos->energy(_p, _rho, this->get_gamma());
    }
 
    /*********************************************************
     * Problem specific functions
     *********************************************************/
-   double h(const double t)
+   double h(const double t) const
    {
       return sqrt(1. - pow(t/tau, 2));
    }
-   double dhdt(const double t)
+   double dhdt(const double t) const
    {
       return t / pow(tau, 2) / h(t);     
    }

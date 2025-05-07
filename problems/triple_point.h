@@ -67,10 +67,13 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Override getters */
-   double get_gamma(const int &cell_attr) override {
+   double get_gamma(const int &cell_attr) const override {
       assert((cell_attr == 1 || cell_attr == 2) && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
       return (cell_attr == 1) ? _gamma_1 : _gamma_2;
    }
@@ -82,44 +85,27 @@ public:
    }
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      // TODO: Must fix to use cell specific gamma
-      double _g;
-      if (cell_attr == 1) { 
-         _g = _gamma_1;
-      } else {
-         assert(cell_attr != 0 && "Must pass in a cell_attr to any ProblemBase::pressure funcalls.\n");
-         _g = _gamma_2;
-      }
-      return (_g - 1.) * this->internal_energy(U);
-      
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double &t) override
+   double p0(const Vector &x, const double &t) const override
    {
       // TODO: Pressure function requires a cell_attr value, but the base function does not share this requirement
       return 0.;
    }
 
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       return (dim == 2) ? (x(0) > 1.0 && x(1) > 1.5) ? 0.125 : 1.0
          /* dim = 3 */  : x(0) > 1.0 && ((x(1) < 1.5 && x(2) < 1.5) ||
                                          (x(1) > 1.5 && x(2) > 1.5)) ? 0.125 : 1.0;
       // return (dim == 2) ? (x(0) > 1.0 && x(1) < 1.5) ? 1. : .125; // same pressure
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       v = 0.;
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       if (x[0] <= 1)
       {
@@ -142,7 +128,7 @@ public:
          }
       }
    }
-   double gamma_func(const Vector &x, const double &t) override
+   double gamma_func(const Vector &x, const double &t) const override
    {
       if (dim == 1) { return (x(0) > 0.5) ? _gamma_2 : _gamma_1; }
       else { return (x(0) > 1.0 && x(1) <= 1.5) ? _gamma_2 : _gamma_1; }

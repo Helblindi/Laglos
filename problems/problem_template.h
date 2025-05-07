@@ -43,7 +43,7 @@ namespace hydroLO
 {
 
 template<int dim>
-class ProblemTemplate: public ProblemBase<dim>
+class ProblemTemplate : public ProblemBase<dim>
 {
 private:
    /*********************************************************
@@ -76,49 +76,41 @@ public:
       this->set_cfl_first(_cfl_first);
       this->set_cfl_second(_cfl_second);
       this->set_cfl_time_change(_cfl_time_change);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS()); // Options are IdealGasEOS, VanDerWaalsEOS, NobleAbelStiffenedGasEOS, and PolytropicEOS
    }
 
    /* Optionally overridden, or removed */
-   double get_gamma(const int &cell_attr = 0) override { return _gamma; }
+   double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      /*
-      Must Override
-      */
-      return 0.;
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double & t) override
+   double p0(const Vector &x, const double & t) const override
    {
       /*
       Must Override
       */
       return 0.;
    }
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       /*
       Must Override
       */
       return 0.;
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       /*
       Must Override
       */
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       /*
       Must Override

@@ -94,6 +94,9 @@ public:
       this->set_cfl_first(_cfl_first);
       this->set_cfl_second(_cfl_second);
       this->set_cfl_time_change(_cfl_time_change);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Override specific update functions */
@@ -133,17 +136,9 @@ public:
    }
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double &t) override
+   double p0(const Vector &x, const double &t) const override
    {
       if (t == 0) { return pow((this->get_gamma() - 1), 2) * 10e-4; } // TODO: Change pressure
       else {
@@ -173,7 +168,7 @@ public:
       }
    }
 
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       assert(dim < 3); //
       if (t == 0) { return 1.; }
@@ -205,7 +200,7 @@ public:
       }
       return 0.;
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       if (t == 0) { v = 0.; }
       else 
@@ -239,13 +234,13 @@ public:
       }
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       if (t == 0) { return pow(10, -5); }
       else {
          double _p = p0(x,t);
          double _rho = rho0(x,t);
-         return _p / (_rho * (this->get_gamma() - 1.));
+         return this->eos->energy(_p, _rho, this->get_gamma());
       }
    }
 

@@ -524,7 +524,9 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   DenseMatrix F_i_bdry = F_i;
                   F_i_bdry.GetRow(0, cell_v);
                   cell_v *= -1.; // Negate the velocity
-                  double _press = pb->pressure(U_i_bdry, bdr_attribute);
+                  double _rho = 1. / U_i_bdry[0];
+                  double _sie = pb->specific_internal_energy(U_i_bdry);
+                  double _press = pb->pressure(_rho, _sie, bdr_attribute);
                   for (int i = 0; i < dim; i++)
                   {
                      F_i_bdry(i+1, i) = _press;
@@ -1061,8 +1063,13 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          pb->lm_update(b_covolume);
 
          // Compute pressure with given EOS
-         double pl = pb->pressure(Uc,pmesh->GetAttribute(c));
-         double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+         double rhoL = 1. / Uc[0];
+         double sieL = pb->specific_internal_energy(Uc);
+         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(c));
+
+         double rhoR = 1. / Ucp[0];
+         double sieR = pb->specific_internal_energy(Ucp);
+         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
@@ -1447,7 +1454,8 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
    {
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double pressure = pb->pressure(U, pmesh->GetAttribute(cell_it));
+      double sie = pb->specific_internal_energy(U);
+      double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
       avg_density += density;
@@ -2034,45 +2042,9 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
          Vf *= 0.5;
          if (use_viscosity)
          {
-            // double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-            // double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
-            // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
             double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
-            // Vf.Add(coeff, tau_vec);
-
-            // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
-            // {
-            //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
-            //    cout << "pressure differential: " << pc << endl;
-            //    cout << "coeff: " << coeff << endl;
-            // }
          }
-         
-         // Switch orientation of Vf based on orientation of faces in mfem
-         // Vf_flux = Vf;
-         // Vf_flux *= F;
-         // int ind = -1;
-         // int ori = 0;
-
-         // Array<int> element_face_row, element_face_oris;
-         // pmesh->GetElementEdges(c, element_face_row, element_face_oris);
-         // for (int i = 0; i < 4; i++) // 3DTODO
-         // {
-         //    if (element_face_row[i] == face)
-         //    {
-         //       ind = i;
-         //       ori = element_face_oris[i];
-         //    }
-         // }
-         // if ((ind == 0 && ori == 1)  || 
-         //       (ind == 1 && ori == -1) ||
-         //       (ind == 2 && ori == -1) ||
-         //       (ind == 3 && ori == 1))
-         // {
-         //    cout << "flipping orientation of Vf for face: " << face << endl;
-         //    Vf_flux *= -1.;
-         // }
       }
 
       else 
@@ -3313,8 +3285,11 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
       pb->velocity(U, vel);
-      pressure = pb->pressure(U, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(U, pmesh->GetAttribute(i));
+      double rho = 1. / U[0];
+      double sie = pb->specific_internal_energy(U);
+      double attr = pmesh->GetAttribute(i);
+      pressure = pb->pressure(rho, sie, attr);
+      ss = pb->sound_speed(rho, pressure, attr);
       
       pmesh->GetElementCenter(i, center);
 
@@ -3638,9 +3613,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
                Ri += y;
 
                /* Get viscosity contribution */
-               // pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-               // pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
-               // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                coeff = 0.5 * d * (Ucp[0] - Uc[0]) / c_norm; // This is how 5.7b is defined.
                if (BdrVertexIndexingArray[node] == -1)
                {

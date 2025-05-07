@@ -29,6 +29,7 @@
 *********************************************************/
 
 
+#include "eos.h"
 #include "mfem.hpp"
 #include "problem_base.h"
 #include <cmath>
@@ -73,25 +74,15 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
-   }
 
-   /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   virtual double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      // Use van der Waals
-      double rho = 1. / U[0];
-      double sie = this->specific_internal_energy(U);
-
-      double val = (this->get_gamma() - 1.) * (rho * sie + this->get_a() * pow(rho, 2)) / (1. - this->get_b() * rho) - this->get_a() * pow(rho,2);
-      return val;
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new VanDerWaalsEOS(this->a, this->b));
    }
 
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   virtual double rho0(const Vector &x, const double & t) override
+   virtual double rho0(const Vector &x, const double & t) const override
    {
       if (t < 1.e-16) {
          if (x[0] <= initial_shock)
@@ -108,7 +99,7 @@ public:
          return 0.5; // TODO: Exact representation of sie0
       }
    }
-   virtual void v0(const Vector &x, const double & t, Vector &v) override
+   virtual void v0(const Vector &x, const double & t, Vector &v) const override
    {
       v = 0.;
       if (t < 1.e-16) {
@@ -123,31 +114,37 @@ public:
          }
       }
    }
-   virtual double sie0(const Vector &x, const double & t) override 
+   virtual double sie0(const Vector &x, const double & t) const override 
    {
       if (t < 1.e-16) {
          double rho = rho0(x,t);
-         double pressure = p0(x);
-
-         return ((pressure + this->get_a() * pow(rho,2)) * (1. - this->get_b()*rho)  / (rho * (this->get_gamma() - 1.))) - this->get_a() * rho;
+         double pressure = p0(x,t);
+         return this->eos->energy(pressure, rho, this->get_gamma());
       }
       else {
-         MFEM_ABORT("Exact solution for vdw3 not programmed.\n");
+         MFEM_ABORT("Exact solution for vdw2 not programmed.\n");
          return -1.;
       }
    }
 
    // Initial values are in terms of pressure
-   double p0(const Vector &x)
+   virtual double p0(const Vector &x, const double & t) const override
    {
-      if (x[0] <= initial_shock)
+      if (t < 1.E-12)
       {
-         return pL;
+         if (x[0] <= initial_shock)
+         {
+            return pL;
+         }
+         else 
+         {
+            assert(x[0] <= 1.);
+            return pR;
+         }
       }
-      else 
-      {
-         assert(x[0] <= 1.);
-         return pR;
+      else {
+         MFEM_ABORT("Exact solution for vdw2 not programmed.\n");
+         return -1.;
       }
    }
 

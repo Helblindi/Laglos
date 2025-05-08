@@ -239,8 +239,8 @@ public:
 
    // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);
-   void FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt);
-   void FillCenterVelocitiesWithAvg(ParGridFunction &dxdt) const;
+   void FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const;
+   void FillCenterVelocitiesWithAvg(Vector &dxdt) const;
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;

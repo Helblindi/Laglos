@@ -326,6 +326,20 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
 
    Vector sum_validation(dim);
 
+    /* Add in e_source for taylor green */
+    LinearForm *e_source = nullptr;
+    if (pb->get_indicator() == "TaylorGreen")
+    {
+        // Needed since the Assemble() defaults to PA.
+       L2.GetMesh()->DeleteGeometricFactors();
+       e_source = new LinearForm(&L2);
+       TaylorCoefficient coeff;
+       IntegrationRule ir = IntRules.Get(L2.GetFE(0)->GetGeomType(), 2);
+       DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
+       e_source->AddDomainIntegrator(d);
+       e_source->Assemble();
+    }
+
    for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
    {
       is_boundary_cell = false;
@@ -510,7 +524,9 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   DenseMatrix F_i_bdry = F_i;
                   F_i_bdry.GetRow(0, cell_v);
                   cell_v *= -1.; // Negate the velocity
-                  double _press = pb->pressure(U_i_bdry, bdr_attribute);
+                  double _rho = 1. / U_i_bdry[0];
+                  double _sie = pb->specific_internal_energy(U_i_bdry);
+                  double _press = pb->pressure(_rho, _sie, bdr_attribute);
                   for (int i = 0; i < dim; i++)
                   {
                      F_i_bdry(i+1, i) = _press;
@@ -541,6 +557,13 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
          } // End boundary face        
 
       } // End Face iterator
+
+      /* Add in e_source for taylor green */
+      if (pb->get_indicator() == "TaylorGreen")
+      {
+         // cout << "LF size: " << e_source->Size() << endl;
+         rhs[dim+1] += e_source->Elem(ci);
+      }
 
       /* 
       Compute current mass, rather than assume mass is conserved
@@ -700,6 +723,8 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          GetIntermediateFaceVelocity(face, _vel);
          geom.UpdateNodeVelocity(dxdt_gf, face, _vel);
       }
+      // Since we do not project here, must fill cell center velocities
+      FillCenterVelocitiesWithAvg(dS_dt);
    }
    else
    {
@@ -879,28 +904,37 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
       
       /* Project back onto mv_gf */
       dxdt_gf.ProjectGridFunction(dxdt_gf_l);
-      
-      /* Choose behavior for face velocity */
-      switch (fv_option)
-      {
-      case 1:
-         MFEM_ABORT("Current face mesh velocity calculation broken\n");
-         // ComputeCorrectiveFaceVelocities(S, t, dt);
-         break;
-      
-      case 2:
-         FillFaceVelocitiesWithAvg(dxdt_gf);
-         break;
 
-      case 3:
-         FillFaceVelocitiesWithButterfly(dxdt_gf);
-         break;
-      
-      default:
-         /* Do nothing */
-         break;
-      } // End face velocity switch case
-   }
+      if (NDofs_H1 != NDofs_H1L)
+      {
+         /* Must compute mesh velocities on cell centers and faces */
+         /* Choose behavior for face velocity */
+         switch (fv_option)
+         {
+         case 1:
+            MFEM_ABORT("Current face mesh velocity calculation broken\n");
+            // ComputeCorrectiveFaceVelocities(S, t, dt);
+            break;
+         
+         case 2:
+            FillFaceVelocitiesWithAvg(dxdt_gf);
+            break;
+
+         case 3:
+            FillFaceVelocitiesWithButterfly(dxdt_gf);
+            break;
+         
+         default:
+            /* Do nothing */
+            break;
+         } // End face velocity switch case
+
+         FillCenterVelocitiesWithAvg(dxdt_gf);
+      }
+   
+   } // End dim > 1
+
+   dxdt_gf.SyncAliasMemory(dS_dt);
    chrono_mm.Stop();
 }
 
@@ -1031,8 +1065,13 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          pb->lm_update(b_covolume);
 
          // Compute pressure with given EOS
-         double pl = pb->pressure(Uc,pmesh->GetAttribute(c));
-         double pr = pb->pressure(Ucp,pmesh->GetAttribute(cp));
+         double rhoL = 1. / Uc[0];
+         double sieL = pb->specific_internal_energy(Uc);
+         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(c));
+
+         double rhoR = 1. / Ucp[0];
+         double sieR = pb->specific_internal_energy(Ucp);
+         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
          lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
@@ -1417,7 +1456,8 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
    {
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double pressure = pb->pressure(U, pmesh->GetAttribute(cell_it));
+      double sie = pb->specific_internal_energy(U);
+      double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
       avg_density += density;
@@ -1720,6 +1760,30 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
    /* Append onto timeseries data */
    ts_ppd_pct_cells.Append(pct_corrected);
    ts_ppd_rel_mag.Append(rel_mass_corrected);
+   sv_gf.SyncAliasMemory(S);
+}
+
+
+/****************************************************************************************************
+* Function: ComputeDensity
+* Parameters:
+*  S      - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  rho_gf - ParGridFunction that will be set to the inverse of the specific volume
+*
+* Purpose:
+*  Simply invert the specific volume
+****************************************************************************************************/
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const
+{
+   Vector* sptr = const_cast<Vector*>(&S);
+   ParGridFunction sv_gf;
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   rho_gf.SetSize(NDofs_L2);
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      rho_gf[i] = 1. / sv_gf.Elem(i);
+   }
 }
 
 
@@ -1936,7 +2000,7 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
    mfem::Mesh::FaceInformation FI;
    int c, cp;
    Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), Vf(dim), Vf_flux(dim); 
-   Vector n_vec(dim), tau_vec(dim);
+   Vector n_vec(dim);
    double d, c_norm, F;
 
    Array<int> row;
@@ -1956,9 +2020,6 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
       n_vec = n_int;
       F = n_vec.Norml2();
       n_vec /= F;
-      tau_vec = n_vec;
-      geom.Orthogonal(tau_vec);
-      tau_vec *= -1.;
       if (1. - n_vec.Norml2() > 1e-12)
       {
          cout << "n_vec: ";
@@ -1980,45 +2041,9 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
          Vf *= 0.5;
          if (use_viscosity)
          {
-            // double pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-            // double pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
-            // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
             double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
-            // Vf.Add(coeff, tau_vec);
-
-            // if (pmesh->GetAttribute(cp) != pmesh->GetAttribute(c))
-            // {
-            //    cout << "cells " << c << " and " << cp << " have different attributes.\n";
-            //    cout << "pressure differential: " << pc << endl;
-            //    cout << "coeff: " << coeff << endl;
-            // }
          }
-         
-         // Switch orientation of Vf based on orientation of faces in mfem
-         // Vf_flux = Vf;
-         // Vf_flux *= F;
-         // int ind = -1;
-         // int ori = 0;
-
-         // Array<int> element_face_row, element_face_oris;
-         // pmesh->GetElementEdges(c, element_face_row, element_face_oris);
-         // for (int i = 0; i < 4; i++) // 3DTODO
-         // {
-         //    if (element_face_row[i] == face)
-         //    {
-         //       ind = i;
-         //       ori = element_face_oris[i];
-         //    }
-         // }
-         // if ((ind == 0 && ori == 1)  || 
-         //       (ind == 1 && ori == -1) ||
-         //       (ind == 2 && ori == -1) ||
-         //       (ind == 3 && ori == 1))
-         // {
-         //    cout << "flipping orientation of Vf for face: " << face << endl;
-         //    Vf_flux *= -1.;
-         // }
       }
 
       else 
@@ -2851,7 +2876,7 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 *  by taking the hydrodynamic velocity at the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
    ParGridFunction dxdt;
@@ -2908,9 +2933,8 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vect
 *  by average the values at the four corner nodes of the cell.
 ****************************************************************************************************/
 template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
+void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &dxdt) const
 {
-   MFEM_ABORT("Function not implemented\n");
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
@@ -2948,7 +2972,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            geom.GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(dxdt, verts[j], node_v);
             Vc += node_v;
          }
          Vc /= verts.Size();
@@ -2959,14 +2983,14 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &S)
          pmesh->GetElementVertices(ci, verts);
          for (int j = 0; j < verts.Size(); j++)
          {
-            geom.GetNodeVelocity(S, verts[j], node_v);
+            geom.GetNodeVelocity(dxdt, verts[j], node_v);
             Vc += node_v;
          }
 
          Vc /= verts.Size();
       }
 
-      geom.UpdateNodeVelocity(S, cell_vdof, Vc);
+      geom.UpdateNodeVelocity(dxdt, cell_vdof, Vc);
    }
 }
 
@@ -3260,8 +3284,11 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       // compute pressure and sound speed on the fly
       GetCellStateVector(S, i, U);
       pb->velocity(U, vel);
-      pressure = pb->pressure(U, pmesh->GetAttribute(i));
-      ss = pb->sound_speed(U, pmesh->GetAttribute(i));
+      double rho = 1. / U[0];
+      double sie = pb->specific_internal_energy(U);
+      double attr = pmesh->GetAttribute(i);
+      pressure = pb->pressure(rho, sie, attr);
+      ss = pb->sound_speed(rho, pressure, attr);
       
       pmesh->GetElementCenter(i, center);
 
@@ -3585,9 +3612,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
                Ri += y;
 
                /* Get viscosity contribution */
-               // pcp = pb->pressure(Ucp,pmesh->GetAttribute(cp));
-               // pc = pcp - pb->pressure(Uc,pmesh->GetAttribute(c));
-               // double coeff = d * pc * (Ucp[0] - Uc[0]) / F; // This fixes the upward movement in tp
                coeff = 0.5 * d * (Ucp[0] - Uc[0]) / c_norm; // This is how 5.7b is defined.
                if (BdrVertexIndexingArray[node] == -1)
                {

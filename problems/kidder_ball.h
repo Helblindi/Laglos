@@ -51,10 +51,13 @@ public:
       this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Optionally overridden, or removed */
-   double get_gamma(const int &cell_attr = 0) override { return _gamma; }
+   double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
@@ -94,21 +97,15 @@ public:
    }
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double & t) override
+   double p0(const Vector &x, const double & t) const override
    {
-      return (this->get_gamma() - 1.) * this->rho0(x,t) * this->sie0(x,t);
+      double _rho = rho0(x,t);
+      double _sie = sie0(x,t);
+      return this->eos->pressure(_rho, _sie, this->get_gamma());
    }
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       double _r = x.Norml2();
       double val = -1. * pow(_r,2) / (1. + pow(t-1.,2));
@@ -116,7 +113,7 @@ public:
       val *= 2. * pow(1 + pow(t-1.,2), -1.5);
       return val;
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       double _r = x.Norml2();
       double val = (t-1.) / (1. + pow(t-1.,2));
@@ -125,7 +122,7 @@ public:
       
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       double val = 0.75 / (1. + pow(t-1,2));
       return val;

@@ -68,6 +68,9 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
    
    /* Override specific update functions */
@@ -79,18 +82,7 @@ public:
    /*********************************************************
     * Problem Description functions
     *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      // Initial
-      // _pL = 1.0;
-      // _pR= 0.1;
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
-
-   /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double p0(const Vector &x, const double & t) override
+   double p0(const Vector &x, const double & t) const override
    {
       if (t < 1e-12)
       {
@@ -115,7 +107,7 @@ public:
    /*********************************************************
     * Initial State functions
     *********************************************************/
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       if (t < 1e-12)
       {
@@ -147,7 +139,7 @@ public:
          return riemann1D::rho(p);
       }
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       if (t < 1e-12)
       {
@@ -170,10 +162,11 @@ public:
       return;
    }
 
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
-      return (x(0) < x_center) ? p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0) // Sod
-                        : p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      double _rho = rho0(x,t);
+      double _p = p0(x,t);
+      return this->eos->energy(_p, _rho, this->get_gamma());
    }
 
 }; // End class

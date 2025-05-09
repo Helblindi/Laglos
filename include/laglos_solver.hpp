@@ -3,7 +3,7 @@
 
 #include "mfem.hpp"
 // #include "initial_vals.hpp"
-#include "problem_base.h"
+#include "test_problems_include.h"
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
@@ -239,8 +239,8 @@ public:
 
    // Fill mv_gf for cell centers
    void SetCellCenterAsCenter(Vector &S);
-   void FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt);
-   void FillCenterVelocitiesWithAvg(Vector &S);
+   void FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const;
+   void FillCenterVelocitiesWithAvg(Vector &dxdt) const;
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
@@ -324,6 +324,7 @@ public:
 
    // Enforce Mass Conservation
    void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
+   void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);

@@ -9,6 +9,7 @@ list(APPEND HDRS
    lambda_max_lagrange.h
    sedov_exact.hpp
    limiter.h
+   eos.h
    # "${PROJECT_SOURCE_DIR}/../mfem/build/mfem.hpp"
    )
 

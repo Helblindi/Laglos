@@ -80,25 +80,20 @@ public:
       this->set_cfl_first(_cfl_first);
       this->set_cfl_second(_cfl_second);
       this->set_cfl_time_change(_cfl_time_change);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Optionally overridden, or removed */
-   double get_gamma(const int &cell_attr = 0) override { return _gamma; }
+   double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double &t) override
+   double p0(const Vector &x, const double &t) const override
    {
       double norm_x = x.Norml2();
       if (t < 1e-12)
@@ -110,7 +105,7 @@ public:
          MFEM_ABORT("No exact solution for ICF like implosion problem.\n");
       }
    }
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       double norm_x = x.Norml2();
       if (t < 1e-12)
@@ -122,7 +117,7 @@ public:
          MFEM_ABORT("No exact solution for ICF like implosion problem.\n");
       }
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       double norm_x = x.Norml2();
       if (t < 1e-12)
@@ -143,9 +138,11 @@ public:
       }
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
-      return p0(x,t) / this->rho0(x, t) / (this->get_gamma() - 1.0);
+      double pressure = p0(x,t);
+      double density = rho0(x,t);
+      return this->eos->energy(pressure, density, this->get_gamma());
    }
 
 }; // End class

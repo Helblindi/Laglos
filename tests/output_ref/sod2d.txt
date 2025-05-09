@@ -1,0 +1,195 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh data/ref-square.mesh
+   --output-flag default
+   --refine-serial 4
+   --refine-parallel 0
+   --problem 2
+   --ode-solver 1
+   --t-init 0
+   --t-final 0.225
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-visit
+   --no-print
+   --no-mass-correct
+   --use-viscosity
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --no-post-process-density
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 2
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --optimize-timestep
+   --CFL 0.5
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 2, spacedim: 2
+Zones min/max: 256 256
+global_vSize: 256
+N dofs: 1089
+Num Scalar Vertex DoFs: 289
+Num Scalar edge-interior DoFs: 544
+Num Scalar face-interior DoFs: 0
+Num faces: 544
+dim: 2
+Number of kinematic (position, mesh velocity) dofs: 2178
+Corresponding NDofs: 1089
+Corresponding VDim: 2
+Corresponding Vsize: 2178
+Number of specific internal energy dofs: 256
+Corresponding NDofs: 256
+Corresponding VDim: 1
+Corresponding Vsize: 256
+Number of velocity dofs: 512
+Corresponding NDofs: 256
+Corresponding VDim: 2
+Corresponding Vsize: 512
+num interior faces: 480
+num boundary faces: 64
+num total faces: 544
+num boundary elements: 64
+num elements: 256
+Geometric::Non-default constructor
+NDofs_H1: 1089
+Instantiating hydro op
+block offsets: 0 2178 2434 2946
+3202
+Constructing BdrElementIndexingArray:
+Vsize_H1: 2178
+Vsize_H1L: 578
+TVSize_H1: 2178
+GTVSize_H1: 2178
+NDofs_H1: 1089
+NVDofs_H1: 289
+NDofs_H1L: 289
+NDofs_L2: 256
+NDofs_L2V: 256
+Vsize_L2V: 512
+num_elements: 256
+num_faces: 544
+num_vertices: 289
+num_edges: 544
+Entering time loop
+step     5,	t = 0.0133,	dt = 0.002826,	|e| = 3.6497044111e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.1498325440e-15
+Interior Mass Error: 1.0915934319e-15
+--------------------------------------
+step    10,	t = 0.0277,	dt = 0.002901,	|e| = 3.6720767768e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.2459169499e-15
+Interior Mass Error: 1.2052591225e-15
+--------------------------------------
+step    15,	t = 0.0424,	dt = 0.002967,	|e| = 3.6965422782e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.2894777838e-15
+Interior Mass Error: 1.2714697020e-15
+--------------------------------------
+step    20,	t = 0.0574,	dt = 0.003029,	|e| = 3.7235223117e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.6798869394e-15
+Interior Mass Error: 1.7144260312e-15
+--------------------------------------
+step    25,	t = 0.0727,	dt = 0.003085,	|e| = 3.7529766474e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.6872113274e-15
+Interior Mass Error: 1.7187058025e-15
+--------------------------------------
+step    30,	t = 0.0883,	dt = 0.003135,	|e| = 3.7847559843e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.6734299132e-15
+Interior Mass Error: 1.7122861456e-15
+--------------------------------------
+step    35,	t = 0.1041,	dt = 0.003182,	|e| = 3.8186394993e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.8356265582e-15
+Interior Mass Error: 1.8940505501e-15
+--------------------------------------
+step    40,	t = 0.1202,	dt = 0.003224,	|e| = 3.8543972180e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 1.8987512180e-15
+Interior Mass Error: 1.9676877915e-15
+--------------------------------------
+step    45,	t = 0.1364,	dt = 0.003262,	|e| = 3.8918045826e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.1844023504e-15
+Interior Mass Error: 2.3079296096e-15
+--------------------------------------
+step    50,	t = 0.1528,	dt = 0.003296,	|e| = 3.9306538301e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.0524669927e-15
+Interior Mass Error: 2.1210043044e-15
+--------------------------------------
+step    55,	t = 0.1694,	dt = 0.003327,	|e| = 3.9707664746e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.6448750597e-15
+Interior Mass Error: 2.7647322577e-15
+--------------------------------------
+step    60,	t = 0.1861,	dt = 0.003354,	|e| = 4.0120149760e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.8983374343e-15
+Interior Mass Error: 3.0955334038e-15
+--------------------------------------
+step    65,	t = 0.2030,	dt = 0.003379,	|e| = 4.0543590937e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.9644496734e-15
+Interior Mass Error: 3.1884296161e-15
+--------------------------------------
+step    70,	t = 0.2199,	dt = 0.003400,	|e| = 4.0978996041e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.8254790483e-15
+Interior Mass Error: 2.9799795788e-15
+--------------------------------------
+step    72,	t = 0.2250,	dt = 0.001682,	|e| = 4.1111767407e+01
+Percentage of cells where mass conservation was broken: 0.0000000000e+00
+Initial mass sum: 5.6250000000e-01, Current mass sum: 5.6250000000e-01
+Mass Error: 2.7958923756e-15
+Interior Mass Error: 2.9378112440e-15
+--------------------------------------
+Program took 4.2482591667e-01s.
+This amounts to 2.2732551191e-05 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+                                total time | t / (dof*ts) 
+  Total time:                    4.248e-01 | 2.273e-05
+  Dij calculation:               8.202e-02 | 4.389e-06
+  Mesh Motion calculation:       1.595e-01 | 8.536e-06
+    Hiop calculation (if used):  0.000e+00 | 0.000e+00
+  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
+  State Update calculation:      1.497e-01 | 8.013e-06
+===========================================================

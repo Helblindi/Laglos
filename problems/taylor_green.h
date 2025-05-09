@@ -42,6 +42,18 @@ namespace mfem
 namespace hydroLO
 {
 
+class TaylorCoefficient : public Coefficient
+{
+public:
+   virtual double Eval(ElementTransformation &T, const IntegrationPoint &ip)
+   {
+      Vector x(2);
+      T.Transform(ip, x);
+      return 3.0 / 8.0 * M_PI * ( cos(3.0*M_PI*x(0)) * cos(M_PI*x(1)) -
+                                    cos(M_PI*x(0))     * cos(3.0*M_PI*x(1)) );
+   }
+};
+
 template<int dim>
 class TaylorGreenProblem: public ProblemBase<dim>
 {
@@ -65,44 +77,36 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Optionally overridden, or removed */
-   double get_gamma(const int &cell_attr = 0) override { return _gamma; }
+   double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      return (this->get_gamma() - 1.) * this->internal_energy(U);
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double p0(const Vector &x, const double & t) override
+   double p0(const Vector &x, const double & t) const override
    {
-      // double _rho = rho0(x, t);
-      // double val = std::cos(2. * M_PI * x[0]) + std::cos(2. * M_PI * x[1]);
-      // val *= 0.25 * _rho;
-      // val += 1.;
-      // return val;
-      return (_gamma - 1.) * rho0(x,t) * sie0(x,t);
+      double _rho = rho0(x,t);
+      double _sie = sie0(x,t);
+      return this->eos->pressure(_rho, _sie, this->get_gamma());
    }
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       return 1.;
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       v[0] = std::sin(M_PI * x[0]) * std::cos(M_PI * x[1]);
       v[1] = -1. * std::cos(M_PI * x[0]) * std::sin(M_PI * x[1]);
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       const double denom = 2.0 / 3.0;  // (5/3 - 1) * density.
       double val;

@@ -70,6 +70,9 @@ public:
       this->set_bcs_indicator(_bcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
+
+      // Set Equation of state
+      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
    /* Override specific update functions */
@@ -79,18 +82,9 @@ public:
    }
 
    /*********************************************************
-    * Problem Description functions
-    *********************************************************/
-   double pressure(const Vector &U, const int &cell_attr=0) override
-   {
-      double val = (this->get_gamma() - 1.) * this->internal_energy(U);
-      return val;
-   }
-
-   /*********************************************************
     * Initial State functions
     *********************************************************/
-   double rho0(const Vector &x, const double & t) override
+   double rho0(const Vector &x, const double & t) const override
    {
       double xyt[3];
       xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;
@@ -98,7 +92,7 @@ public:
       double rho = sedov_rho(xyt);
       return rho;
    }
-   void v0(const Vector &x, const double & t, Vector &v) override
+   void v0(const Vector &x, const double & t, Vector &v) const override
    {
       v = 0.;
 
@@ -110,7 +104,7 @@ public:
 
       return;
    }
-   double sie0(const Vector &x, const double & t) override
+   double sie0(const Vector &x, const double & t) const override
    {
       if (t < 0.)
       {
@@ -135,7 +129,7 @@ public:
       // return sedov_e(xyt);
       return e;
    }
-   double p0(const Vector &x, const double &t) override
+   double p0(const Vector &x, const double &t) const override
    {
       double xyt[3];
       xyt[0] = x[0], xyt[1] = x[1], xyt[2] = t;

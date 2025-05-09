@@ -12,11 +12,11 @@ const double sedov_gamma = 1.4;
 // const double sedov_E0  = 0.979264;
 
 // time at which the solution is evaluated
-double sedov_t;
+extern double sedov_t;
 // position of the shock at time sedov_t
-double sedov_rs;
+extern double sedov_rs;
 
-void sedov_time(double t)
+inline void sedov_time(double t)
 {
    sedov_t  = t;
    sedov_rs = 1.0040216061302775389 * sqrt(sedov_t);
@@ -24,7 +24,7 @@ void sedov_time(double t)
 
 // implementation of the secant method;
 // solves  f(x) = fx
-int invert_func_secant(double (*f)(double),
+inline int invert_func_secant(double (*f)(double),
                        double a,
                        double b,
                        double fx,
@@ -69,12 +69,12 @@ int invert_func_secant(double (*f)(double),
    return 0;
 }
 
-double sedov_r2k(double eps)
+inline double sedov_r2k(double eps)
 {
    return (0.9319246811611120694 * eps * pow(1. - eps * eps / 36., -7. / 2.));
 }
 
-double sedov_epsr(double r)
+inline double sedov_epsr(double r)
 {
    int no_conv;
    double eps;
@@ -88,12 +88,12 @@ double sedov_epsr(double r)
    return eps;
 }
 
-double sedov_rhoeps(double eps)
+inline double sedov_rhoeps(double eps)
 {
    return (1.8273064355862722579 * pow(eps, 5. / 7.) * pow(0.4 + 1.44 / (2.4 - eps), 10. / 3.));
 }
 
-double sedov_rho(double r)
+inline double sedov_rho(double r)
 {
    if (r > sedov_rs)
    {
@@ -103,12 +103,12 @@ double sedov_rho(double r)
    return sedov_rhoeps(sedov_epsr(r));
 }
 
-double sedov_peps(double eps)
+inline double sedov_peps(double eps)
 {
    return (0.065782785110333115709 * (6. + eps) * pow(0.2 + 0.72 / (2.4 - eps), 7. / 3.) / sedov_t);
 }
 
-double sedov_p(double r)
+inline double sedov_p(double r)
 {
    if (r > sedov_rs)
    {
@@ -118,12 +118,12 @@ double sedov_p(double r)
    return sedov_peps(sedov_epsr(r));
 }
 
-double sedov_rh2k(double eps)
+inline double sedov_rh2k(double eps)
 {
    return (15.472111057950348815 * eps / (6. + eps) * pow(0.2 + 0.72 / (2.4 - eps), 7. / 3.));
 }
 
-double sedov_epsrh(double rh)
+inline double sedov_epsrh(double rh)
 {
    int no_conv;
    double eps;
@@ -137,7 +137,7 @@ double sedov_epsrh(double rh)
    return eps;
 }
 
-double sedov_rrh(double rh)
+inline double sedov_rrh(double rh)
 {
    if (rh > sedov_rs)
    {
@@ -147,9 +147,9 @@ double sedov_rrh(double rh)
    return sqrt(sedov_t) * pow(sedov_r2k(sedov_epsrh(rh)), 1. / 7.);
 }
 
-double sedov_eeps(double eps) { return sedov_peps(eps) / ((sedov_gamma - 1.) * sedov_rhoeps(eps)); }
+inline double sedov_eeps(double eps) { return sedov_peps(eps) / ((sedov_gamma - 1.) * sedov_rhoeps(eps)); }
 
-double sedov_e(double r)
+inline double sedov_e(double r)
 {
    if (r > sedov_rs)
    {
@@ -159,12 +159,12 @@ double sedov_e(double r)
    return sedov_eeps(sedov_epsr(r));
 }
 
-double sedov_veps(double eps)
+inline double sedov_veps(double eps)
 {
    return (0.35356380510848455185 * pow(eps, 1. / 7.) / sqrt(sedov_t * (6. - eps) / (6. + eps)));
 }
 
-double sedov_v(double r)
+inline double sedov_v(double r)
 {
    if (r > sedov_rs)
    {
@@ -174,25 +174,25 @@ double sedov_v(double r)
    return sedov_veps(sedov_epsr(r));
 }
 
-double sedov_rho(const double *xyt)
+inline double sedov_rho(const double *xyt)
 {
    sedov_time(xyt[2]);
    return sedov_rho(sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]));
 }
 
-double sedov_e(const double *xyt)
+inline double sedov_e(const double *xyt)
 {
    sedov_time(xyt[2]);
    return sedov_e(sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]));
 }
 
-double sedov_p(const double *xyt)
+inline double sedov_p(const double *xyt)
 {
    sedov_time(xyt[2]);
    return sedov_p(sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]));
 }
 
-double sedov_phi_x(const double *xyt)
+inline double sedov_phi_x(const double *xyt)
 {
    sedov_time(xyt[2]);
    double rh = sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]);
@@ -203,7 +203,7 @@ double sedov_phi_x(const double *xyt)
    return 0.0;
 }
 
-double sedov_phi_y(const double *xyt)
+inline double sedov_phi_y(const double *xyt)
 {
    sedov_time(xyt[2]);
    double rh = sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]);
@@ -214,7 +214,7 @@ double sedov_phi_y(const double *xyt)
    return 0.0;
 }
 
-double sedov_vx(const double *xyt)
+inline double sedov_vx(const double *xyt)
 {
    sedov_time(xyt[2]);
    double r = sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]);
@@ -225,7 +225,7 @@ double sedov_vx(const double *xyt)
    return 0.0;
 }
 
-double sedov_vy(const double *xyt)
+inline double sedov_vy(const double *xyt)
 {
    sedov_time(xyt[2]);
    double r = sqrt(xyt[0] * xyt[0] + xyt[1] * xyt[1]);

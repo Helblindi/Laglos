@@ -31,7 +31,8 @@ private:
    double _a = 0., _b = 0., _gamma = 7/5.;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = false;
+   bool _thbcs = false;
+   bool _mvbcs = true;
    string _indicator = "SmoothWave";
 
 public:
@@ -41,7 +42,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
 

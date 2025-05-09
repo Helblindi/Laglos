@@ -10,6 +10,7 @@ list(APPEND HDRS
    sedov_exact.hpp
    limiter.h
    eos.h
+   elastic.hpp
    # "${PROJECT_SOURCE_DIR}/../mfem/build/mfem.hpp"
    )
 

@@ -16,7 +16,8 @@ extern "C" {
       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *want_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k, double *b_covolume);
+      double *lambda_maxr_out, double *pstar, int *k, 
+      double *b_covolume, double *p_inf);
 }
 
 // Fortran subroutine from Lagrangian code (GREEDY)
@@ -47,7 +48,8 @@ class ProblemBase
 private:
    bool distort_mesh = false;
    bool known_exact_solution = false;
-   bool bcs = false; // Indicator for boundary conditions
+   bool th_bcs = false; // Indicator for thermo boundary conditions to be imposed on the thermo solution
+   bool mv_bcs = false; // Indicator for mesh velocity boundary conditions to be imposed on the mesh velocity solution  
    // Indicator if mesh velocity boundary conditions need to be updated at each iteration
    // So far the only problem that needs this is Saltzman
    bool mv_bcs_need_updating = false; 
@@ -60,16 +62,20 @@ private:
    double cfl_time_change = 0.;
 
 protected:
-   std::unique_ptr<EquationOfState> eos = NULL;  // Pointer to the EOS object
    double a = 0., b = 0., gamma = 0.;
+   double q = 0., p_inf = 0., mu = 0.;
+   std::unique_ptr<EquationOfState> eos = NULL;  // Pointer to the EOS object
 
 public:
    // Setters
    void set_a(const double &_a) { a = _a; }
    void set_b(const double &_b) { b = _b; }
    void set_gamma(const double &_gamma) { gamma = _gamma; }
+   void set_pinf(const double &_p_inf) { p_inf = _p_inf; }
+   void set_shear_modulus(const double &_mu) { mu = _mu; }
    void set_indicator(const string &_ind) { this->indicator = _ind; }
-   void set_bcs_indicator(const bool &tvalue) { this->bcs = tvalue; }
+   void set_thbcs_indicator(const bool &tvalue) { this->th_bcs = tvalue; }
+   void set_mvbcs_indicator(const bool &tvalue) { this->mv_bcs = tvalue; }
    void set_mv_bcs_need_updating_indicator(const bool &tvalue) { this->mv_bcs_need_updating = tvalue; }
    void set_distort_mesh(const bool &_distort_mesh) { distort_mesh = _distort_mesh; }
    void set_exact_solution(const bool &_known_exact_solution) { known_exact_solution = _known_exact_solution; }
@@ -83,7 +89,8 @@ public:
    double get_a() const { return a; }
    double get_b() const { return b; }
    string get_indicator() const { return indicator; }
-   bool has_boundary_conditions() const { return bcs; }
+   bool has_th_boundary_conditions() const { return th_bcs; }
+   bool has_mv_boundary_conditions() const { return mv_bcs; }
    bool get_mv_bcs_need_updating() const { return mv_bcs_need_updating; }
    bool get_distort_mesh() const { return distort_mesh; }
    bool has_exact_solution() const { return known_exact_solution; }
@@ -95,6 +102,8 @@ public:
 
    /* Optionally overridden */
    virtual double get_gamma(const int &cell_attr = 0) const { return gamma; }
+   virtual double get_pinf(const int &cell_attr = 0) const { return p_inf; }
+   virtual double get_shear_modulus(const int &cell_attr = 0) const { return mu; }
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
    virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
@@ -102,34 +111,32 @@ public:
    virtual void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t=0.) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
 
    /* ProblemDescription */
-   static double internal_energy(const Vector &U)
+   static double internal_energy(const Vector &U, const double e_sheer)
    {
       const double &rho = 1./U[0];
-      const double &e = specific_internal_energy(U);
+      const double &e = specific_internal_energy(U, e_sheer);
       return rho * e;
    }
 
-   static double specific_internal_energy(const Vector &U)
+   static double specific_internal_energy(const Vector &U, const double e_sheer)
    {
+      // Verify e_sheer > 0.
+      // TODO: This is a temporary fix. The correct fix is to ensure that e_sheer is always positive.
+      // assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
+      /* Subtract out kinetic and sheer energy */
       Vector v;
       velocity(U, v);
       const double E = U[dim + 1]; // specific total energy
-      // return E - 0.5 * pow(v.Norml2(), 2); // Gives issues, see 'quest' branch
+      double val = E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
 
-      if (E < 1.e-20)
+      // Verify sie > 0.
+      if (val <  -std::numeric_limits<double>::epsilon())
       {
-         return 0.;
-      }
-      else
-      {
-         double _val = E - 0.5 * pow(v.Norml2(), 2);
-         if (_val <= 0.)
-         {
-            MFEM_ABORT("Negative internal energy computed.\n");
-         }
-         return _val;
+         cout << "sie computation. E: " << E << ", ke: " << 0.5 * pow(v.Norml2(), 2) << ", esheer: " << e_sheer << ", sie: " << val << endl;
+         MFEM_ABORT("Specific internal energy is negative or zero.\n");
       }
 
+      return val;
    }
 
    static inline void velocity(const Vector & U, Vector &vel)
@@ -144,11 +151,12 @@ public:
    inline double compute_lambda_max(const Vector & U_i,
                                     const Vector & U_j,
                                     const Vector & n_ij,
+                                    double esl, // e_sheer_left
+                                    double esr, // e_sheer_right
                                     double in_pl,
                                     double in_pr,
                                     const bool &use_greedy_viscosity,
-                                    double b_covolume=-1.,
-                                    const string flag="NA") const
+                                    const string flag="NA")
    {
       // cout << "compute_lambda_max\n";
       double in_taul, in_ul, in_el, in_taur, in_ur, in_er, in_rhol, in_rhor;
@@ -170,19 +178,18 @@ public:
          in_taul = U_i[0];
          velocity(U_i, vi);
          in_ul = vi * n_ij; 
-         in_el = specific_internal_energy(U_i);
+         in_el = specific_internal_energy(U_i, esl);
 
          in_taur = U_j[0]; 
          velocity(U_j, vj);
          in_ur = vj * n_ij; 
-         in_er = specific_internal_energy(U_j);
+         in_er = specific_internal_energy(U_j, esr);
       }
 
       in_rhol = 1. / in_taul;
       in_rhor = 1. / in_taur;
 
-      double in_tol = 1.e-16,
-             _b=0.;
+      double in_tol = 1.e-16;
       double lambda_maxl_out = 0.,
              lambda_maxr_out = 0.,
              pstar = 0.,
@@ -190,23 +197,15 @@ public:
       int k = 0; // Tells you how many iterations were needed for convergence
       bool want_iter = false;
 
-      // Handle b_covolume parameter
-      if (b_covolume == -1.)
-      {
-         // if b_covolume is not specified, or is -1., use the problem specific value.
-         _b = this->get_b();
-      }
-      else
-      {
-         // if b_covolume is specified, use this value
-         _b = b_covolume;
-      }
+      double _b = this->get_b();
+      double _p_inf = this->get_pinf();
 
       double lambda_max = 1.;
       if (use_greedy_viscosity)
       {
          want_iter = true; // No iter
          // cout << "inul: " << in_ul << ", inur: " << in_ur << endl;
+         MFEM_ABORT("Need to incorporate b_covolume and p_inf");
          __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(
             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
             &want_iter,&lambda_max, &pstar,&k);
@@ -215,12 +214,7 @@ public:
       {
          __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-            &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b);
-
-         // bool no_iter = false; 
-         // __arbitrary_eos_lambda_module_MOD_lambda_arbitrary_eos(
-         //    &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
-         //    &no_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &b_covolume);
+            &want_iter,&lambda_maxl_out,&lambda_maxr_out,&pstar,&k, &_b, &_p_inf);
 
          lambda_max = std::max(std::abs(lambda_maxl_out), std::abs(lambda_maxr_out));
       }
@@ -250,13 +244,30 @@ public:
       // return 0.5;
    }
 
-   inline DenseMatrix flux(const Vector &U, const int &cell_attr=0) const
+   /**
+    * @brief Computes the flux matrix for a given state vector U.
+    *
+    * This function calculates the flux matrix based on the input state vector U
+    * and an optional cell attribute. The flux matrix is used in the context of
+    * solving partial differential equations, particularly in fluid dynamics.
+    *
+    * @param U The state vector for which the flux is to be computed.
+    * @param cell_attr An optional integer representing cell attributes, default is 0.
+    * @return A DenseMatrix representing the flux of the state vector U.
+    *
+    * Note: This function assumes elasticity is not being used.
+    */
+   inline DenseMatrix flux(const Vector &U, const int &cell_attr=0)
    {
+      if (cell_attr == 50)
+      {
+         MFEM_ABORT("Cell attr 50 is reserved for elastic.\n");
+      }
       DenseMatrix result(dim+2, dim);
 
       Vector v; velocity(U, v);
       const double rho = 1. / U[0];
-      const double sie = specific_internal_energy(U);
+      const double sie = specific_internal_energy(U, 0.);
       const double p = pressure(rho, sie, cell_attr);
 
       // * is not overridden for Vector class, but *= is
@@ -277,7 +288,94 @@ public:
       return result;
    }
 
-   inline double sound_speed(const double &rho, const double &press, const int &cell_attr=0) const
+   //NF//MS add a compute sigma routine here you have to compute the F tensor in each points and its average
+   // on the cell. then compute C then sigma, you will need the pressure in that subroutine
+   // this as to be compute 
+   /**
+    * @brief Computes the stress tensor sigma by adding the deviatoric stress tensor and the pressure term.
+    *
+    * This function calculates the stress tensor `sigma` by first extracting the dim x dim deviatoric stress tensor 
+    * from `sig_dev` and then adding the pressure term to it. The pressure is computed based on the 
+    * state vector `U` and an optional cell attribute `cell_attr`.
+    *
+    * @param[in] sig_dev The deviatoric stress tensor as a DenseMatrix.
+    * @param[in] U The state vector.
+    * @param[out] sigma The resulting stress tensor.
+    * @param[in] cell_attr An optional cell attribute used in the pressure calculation (default is 0).
+    *
+    * NOTE: @param sig_dev is not assumed to be dim x dim.
+    */
+   inline void ComputeSigma(const DenseMatrix &sig_dev, const double &pressure, DenseMatrix &sigma, const int&cell_attr=0)
+   {
+      // cout << "ProblemBase::ComputeSigma\n";
+
+      DenseMatrix I(dim);
+      I = 0.;
+      Array<int> idx(dim);
+      for (int i = 0; i < dim; i++) {
+         idx[i] = i;
+         I(i,i) = 1.;
+      }
+
+      sig_dev.GetSubMatrix(idx, idx, sigma);
+      assert(sigma.NumRows() == dim && sigma.NumCols() == dim);
+      mfem::Add(sigma, I, -1. * pressure, sigma);
+   }
+
+   /**
+    * @brief Computes the elastic flux for a given deviatoric stress tensor and displacement vector.
+    *
+    * This function calculates the elastic flux based on the provided deviatoric stress tensor (`sig_dev`),
+    * state vector (`U`), and an optional cell attribute (`cell_attr`). It first computes a flux matrix
+    * using the state vector and cell attribute, then computes the stress tensor `sigma` and sets it
+    * in the appropriate submatrix of the result. The function currently contains an assertion that always fails.
+    *
+    * @param sig_dev The deviatoric stress tensor as a DenseMatrix.
+    * @param U The state vector.
+    * @param cell_attr An optional integer representing the cell attribute (default is 0).
+    * @return A DenseMatrix representing the computed elastic flux.
+    *
+    * NOTE: @param sig_dev is not assumed to be dim x dim.
+    */
+   inline DenseMatrix ElasticFlux(const DenseMatrix &sig_dev, const double &es, const Vector &U, const int &cell_attr=0)
+   {
+      if (cell_attr != 50)
+      {
+         MFEM_WARNING("Elastic cell must have attribute 50.\n");
+         return flux(U, cell_attr);
+      }
+      // cout << "ProblemBase::ElasticFlux\n";
+      DenseMatrix result(dim+2, dim);
+      // Indices from stress tensor in result
+      Array<int> idx(dim), idy(dim);
+      for (int i = 0; i < dim; i++) { 
+         idx[i] = 1 + i;
+         idy[i] = i;
+      }
+
+      /* Compute dim x dim stress tensor */
+      DenseMatrix sigma(dim);
+      const double rho = 1./ U[0];
+      const double sie = specific_internal_energy(U, es);
+      const double _pressure = pressure(rho, sie, cell_attr);
+      ComputeSigma(sig_dev, _pressure, sigma, cell_attr);
+
+      // * is not overridden for Vector class, but *= is
+      Vector v; velocity(U, v);
+      Vector v_neg = v, sigmav(dim);
+      v_neg *= -1.;
+      sigma *= -1.;
+      sigma.Mult(v, sigmav);
+
+      // Set entries in flux
+      result.SetRow(0,v_neg);
+      result.SetSubMatrix(idx, idy, sigma);
+      result.SetRow(dim+1, sigmav);
+
+      return result;
+   }
+
+   inline double sound_speed(const double &rho, const double &press, const int &cell_attr=0)
    {
       double val = this->get_gamma(cell_attr) * (press + this->get_a() * pow(rho,2)) / (rho * (1. - this->get_b() * rho));
       val -= 2. * this->get_a() * rho;
@@ -295,7 +393,19 @@ public:
       return 1./val;
    }
 
-   double ste0(const Vector &x, const double & t) const
+   /**
+    * @brief Computes the total specific energy at a given point and time.
+    *
+    * This function calculates the total specific energy by adding the specific internal energy
+    * and the contribution of the kinetic energy at a given point and time.
+    *
+    * @param x The spatial coordinates as a Vector.
+    * @param t The time as a double.
+    * @return The total specific energy as a double.
+    *
+    * NOTE: There is no sheer energy at initial time.
+    */
+   double ste0(const Vector &x, const double & t)
    {
       Vector v(dim);
       this->v0(x,t,v);

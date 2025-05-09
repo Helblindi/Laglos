@@ -2,13 +2,13 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 28
-   ny_gridpoints = 5
+   nx_gridpoints = 102401
+   ny_gridpoints = 2
 
-   x_arr = np.linspace(-1.7,1.,nx_gridpoints)
-   y_arr = np.linspace(0.,.4,ny_gridpoints)
+   x_arr = np.linspace(0.,1,nx_gridpoints)
+   y_arr = np.linspace(0.,1. / (nx_gridpoints - 1),ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/shocktube-test.mesh"
+   filename = home_dir + "data/tube-102400x1y.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -39,7 +39,7 @@ def main():
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
       for j in range(i, i + ny_gridpoints - 1):
          print("i: ", i)
-         f.write("%d 3 %d %d %d %d\n" % (el, j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
+         f.write("50 3 %d %d %d %d\n" % (j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
          el += 1
    f.write("\n")
 

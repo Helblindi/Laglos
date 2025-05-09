@@ -34,7 +34,8 @@ private:
    double _a = 0., _b = 0., _gamma = 5./3.;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = true; // Indicator for boundary conditions
+   bool _thbcs = true; // Indicator for thermal boundary conditions
+   bool _mvbcs = true; // Indicator for mv boundary conditions
    bool _mv_bcs_need_updating = true;
    int size_add_bdr_dofs;
    Array<int> bdr_dofs_list;
@@ -47,7 +48,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_mv_bcs_need_updating_indicator(_mv_bcs_need_updating);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);

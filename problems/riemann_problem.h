@@ -52,7 +52,8 @@ private:
    double _a = 0., _b = 0;
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
-   bool _bcs = true; // Indicator for boundary conditions
+   bool _thbcs = false; // Indicator for thermal boundary conditions
+   bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "riemann"; // Possible: saltzmann
 
    /* Top states of TP */
@@ -81,7 +82,8 @@ public:
       this->set_a(_a);
       this->set_b(_b);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
 

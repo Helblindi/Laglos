@@ -65,10 +65,10 @@ public:
 
 class NobleAbelStiffenedGasEOS : public EquationOfState {
 private:
-   double q, b, p_inf;
+   double b, q, p_inf;
 public:
-   NobleAbelStiffenedGasEOS(const double &_q,const double &_b, const double &_p_inf)
-      : q(_q), b(_b), p_inf(_p_inf) {}
+   NobleAbelStiffenedGasEOS(const double &_b, const double &_q, const double &_p_inf)
+      : b(_b), q(_q),  p_inf(_p_inf) {}
 
    double pressure(double rho, double e, double gamma) const override {
       if (rho <= 0.0) {

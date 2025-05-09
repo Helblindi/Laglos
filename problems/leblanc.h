@@ -53,7 +53,8 @@ private:
    double _gamma = 5./3.;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = false;
+   bool _thbcs = false;
+   bool _mvbcs = true;
    string _indicator = "";
 
    double rhoL = 1., rhoR = 0.001, pL = (2./3.)/10., pR = (2./3.)/10.e10, vL = 0., vR = 0.;
@@ -66,7 +67,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
 

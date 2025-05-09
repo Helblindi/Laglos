@@ -22,10 +22,6 @@ include_directories(${TEST_SRC_DIR}/src
 # target_link_libraries(Test2D PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian)
 # add_test(NAME Test2D COMMAND Test2D)
 
-add_executable(TestFortran EXCLUDE_FROM_ALL test_fortran.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
-target_link_libraries(TestFortran PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
-add_test(NAME TestFortran COMMAND TestFortran)
-
 # add_executable(TestMM EXCLUDE_FROM_ALL test_mm.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp")
 # target_link_libraries(TestMM PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
 # add_test(NAME TestMM COMMAND TestMM)
@@ -94,12 +90,17 @@ add_test(NAME CompareSod2D
 )
 
 
+# Test elastic functions
+add_executable(TestElastic EXCLUDE_FROM_ALL test_elastic.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp" "${PROJECT_SOURCE_DIR}/src/geometry.cpp")
+target_link_libraries(TestElastic PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_lagrangian_greedy vdw_fortran)
+add_test(NAME TestElastic COMMAND TestElastic)
+
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestFortran TestEOS)
+add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestElastic)
 
 # Custom target to clean tmp testing directory
 add_custom_target(clean_tests

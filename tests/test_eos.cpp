@@ -37,11 +37,11 @@ void test_noble_abel() {
     double rho = 1.5;
     double e = 3.0;
     double gamma = 1.4;
-    double q = 0.5;
     double b = 0.1;
+    double q = 0.5;
     double p_inf = 1.0;
 
-    NobleAbelStiffenedGasEOS eos(q, b, p_inf);
+    NobleAbelStiffenedGasEOS eos(b, q, p_inf);
     double p = eos.pressure(rho, e, gamma);
     double e_back = eos.energy(p, rho, gamma);
     assert(approximatelyEqual(e, e_back, 1e-8));

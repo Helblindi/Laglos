@@ -101,6 +101,9 @@
 *     p = 41 --> lax
 *     p = 42 --> leblanc
 *     p = 43 --> riemann
+*     p = 50 --> elastic shocktube
+*     p = 51 --> elastic impact
+*     p = 52 --> elastic sheer
 *     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"
@@ -173,6 +176,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    bool post_process_density = false;
+   bool use_elasticity = false;
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
@@ -235,6 +239,8 @@ int main(int argc, char *argv[]) {
                   "Enable or disable checking if the mesh has twisted.");
    args.AddOption(&post_process_density, "-ppd", "--post-process-density", "-no-ppd", "--no-post-process-density",
                   "Enable or disable density post processing to guarantee conservation of mass.");
+   args.AddOption(&use_elasticity, "-ue", "--use-elasticity", "-no-ue", "--no-use-elasticity",
+                  "Enable or disable the use of elasticity."); //NF//MS
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities:"
                   "\n\t 00 - Arithmetic avg of adj cells,"
@@ -370,9 +376,7 @@ int main(int argc, char *argv[]) {
    Mesh *mesh;
    if (strncmp(mesh_file_location, "default", 7) != 0)
    {
-      std::string result = std::string(LAGLOS_DIR) + std::string(mesh_file_location);
-      const char* mesh_file = result.c_str();
-      mesh = new Mesh(mesh_file, true, true);
+      mesh = new Mesh(mesh_file_location, true, true);
    }
    else // Default mesh
    {
@@ -522,6 +526,33 @@ int main(int argc, char *argv[]) {
       case 43: // Riemann Problem
          problem_class = new RiemannProblem<dim>();
          break;
+      case 50: // Elastic shocktube
+         problem_class = new ElasticShocktube<dim>();
+         break;
+      case 51: // Elastic impact
+         problem_class = new ElasticImpact<dim>();
+         break;
+      case 52: // Elastic shear
+         problem_class = new ElasticShear<dim>();
+         break;
+      case 53: // Elastic isentropic vortex
+         problem_class = new ElasticIsentropicVortex<dim>();
+         break;
+      case 54: // Elastic projectile plate
+         problem_class = new ElasticProjectilePlate<dim>();
+         break;
+      case 55: // Elastic shear rotate in y direction
+         problem_class = new ElasticShearY<dim>();
+         break;
+      case 56: // Elastic impact + shear
+         problem_class = new ElasticImpactShear<dim>();
+         break;
+      case 57: // Elastic 2D, Favrie 2014 section 5.4
+         problem_class = new ElasticTwist<dim>();
+         break;
+      case 58: // Elastic noh
+         problem_class = new ElasticNoh<dim>();
+         break;
       case 100:
          problem_class = new TestBCs<dim>();
          break;
@@ -648,6 +679,7 @@ int main(int argc, char *argv[]) {
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
    ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction rho0_gf(&L2FESpace);
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
@@ -860,16 +892,29 @@ int main(int argc, char *argv[]) {
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
    m->Assemble();
 
+   /* Initialize rho0_gf */
+   rho0_gf.ProjectCoefficient(rho_coeff);
+
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
+   if (use_elasticity) //NF//MS
+   {
+      hydro.SetElasticity(use_elasticity);
+      const double _mu = problem_class->get_shear_modulus();
+      if (_mu < 1.e-12)
+      {
+         MFEM_WARNING("Elasticity has been chosen, but the shear modulus is 0, meaning this is the fluid case.");
+      }
+      hydro.SetShearModulus(_mu);
+   }
 
    /* 
    If opting to use greedy viscosity, verify that you have not opted to use a few steps of GMV first. 
@@ -900,6 +945,7 @@ int main(int argc, char *argv[]) {
 
    /* Set up visualiztion object */
    socketstream vis_rho, vis_v, vis_ste, vis_press, vis_gamma, vis_mc;
+   socketstream vis_sig, vis_f, vis_frho, vis_esheer;
    socketstream vis_rho_ex, vis_v_ex, vis_ste_ex, vis_p_ex;
    socketstream vis_rho_err, vis_v_err, vis_ste_err, vis_p_err;
    char vishost[] = "localhost";
@@ -912,19 +958,8 @@ int main(int argc, char *argv[]) {
    /* Gridfunctions used in Triple Point */
    ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
 
-   if (problem == 1 || problem == 3)
-   {
-      Vector U(dim+2);
-      for (int i = 0; i < press_gf.Size(); i++)
-      {
-         hydro.GetCellStateVector(S, i, U);
-         double _rho = 1. / U[0];
-         double _sie = problem_class->specific_internal_energy(U);
-         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
-         press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
-      }
-   }
+   /* Elasticity gridfunctions */
+   ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
 
    // Compute the density if we need to visualize it
    if (visualization || gfprint || visit || pview)
@@ -937,6 +972,25 @@ int main(int argc, char *argv[]) {
       // Continuous projection
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+   }
+
+   if (problem == 1 || problem == 3 || use_elasticity)
+   {
+      Vector U(dim+2);
+      for (int i = 0; i < press_gf.Size(); i++)
+      {
+         hydro.GetCellStateVector(S, i, U);
+         double _rho = 1. / U[0];
+         double _esheer = 0.;
+         if (use_elasticity)
+         {
+            _esheer = hydro.elastic.e_sheer(i);
+         }
+         double _sie = problem_class->specific_internal_energy(U, _esheer);
+         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+         press_gf[i] = pressure;
+         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+      }
    }
 
    /* Initial visualization */
@@ -964,6 +1018,11 @@ int main(int argc, char *argv[]) {
       vis_gamma.precision(8);
       vis_mc.precision(8);
 
+      vis_sig.precision(8);
+      vis_f.precision(8);
+      vis_frho.precision(8);
+      vis_esheer.precision(8);
+
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
       int offx = Ww+10, offy = Wh+45;; // window offsets
@@ -977,7 +1036,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 1 || problem == 3 || problem == 16)
+      if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -988,6 +1047,35 @@ int main(int argc, char *argv[]) {
          Wx += offx; 
          VisualizeField(vis_gamma, vishost, visport, gamma_gf,
                         "Gamma", Wx, Wy, Ww, Wh);
+      }
+      //NF//MS
+      if (use_elasticity)
+      {
+         // Compute Sigma and F
+         hydro.ComputeSigmaGF(S, sigma_gf);
+         hydro.ComputeFGF(f_gf);
+         hydro.ComputeESheerGF(e_sheer_gf);
+
+         for (int i = 0; i < L2FESpace.GetNDofs(); i++)
+         {
+            frho_gf[i] = f_gf[i] / rho_gf[i];
+         }
+
+         // Visualize
+         Wx = 0;
+         Wy += offy;
+
+         VisualizeField(vis_sig, vishost, visport, sigma_gf,
+                        "Sigma", Wx, Wy, Ww, Wh);
+         Wx += offx;
+         VisualizeField(vis_f, vishost, visport, f_gf,
+                        "F", Wx, Wy, Ww, Wh);
+         Wx += offx;
+         VisualizeField(vis_frho, vishost, visport, frho_gf,
+                        "F/rho", Wx, Wy, Ww, Wh);
+         Wx += offx;
+         VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
+                        "e sheer", Wx, Wy, Ww, Wh);
       }
       
       Wx = 0;
@@ -1133,7 +1221,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 1 || problem == 3 || problem == 16) 
+   if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1165,6 +1253,8 @@ int main(int argc, char *argv[]) {
    visit_dc.RegisterField("Mass Loss", &mc_gf);
    visit_dc.RegisterField("Pressure", &press_gf);
    visit_dc.RegisterField("Gamma", &gamma_gf);
+   visit_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+   visit_dc.RegisterField("e sheer", &e_sheer_gf);
    visit_dc.SetCycle(0);
    visit_dc.SetTime(0.0);
    visit_dc.Save();
@@ -1180,6 +1270,8 @@ int main(int argc, char *argv[]) {
    paraview_dc.RegisterField("Mass Loss", &mc_gf);
    paraview_dc.RegisterField("Pressure", &press_gf);
    paraview_dc.RegisterField("Gamma", &gamma_gf);
+   paraview_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+   paraview_dc.RegisterField("e sheer", &e_sheer_gf);
    paraview_dc.SetCycle(0);
    paraview_dc.SetTime(0.0); 
    paraview_dc.Save();
@@ -1305,8 +1397,8 @@ int main(int argc, char *argv[]) {
 
             cout << std::fixed;
             cout << "step " << std::setw(5) << ti
-                 << ",\tt = " << std::setw(5) << std::setprecision(4) << t
-                 << ",\tdt = " << std::setw(5) << std::setprecision(6) << dt
+                 << ",\tt = " << std::setw(8) << std::setprecision(6) << t
+                 << ",\tdt = " << std::setw(8) << std::setprecision(8) << dt
                  << ",\t|e| = " << std::setprecision(10) << std::scientific
                  << sqrt_norm
                  << endl;
@@ -1350,14 +1442,19 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 1 || problem == 3 || problem == 16) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16 || use_elasticity) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
                {
                   hydro.GetCellStateVector(S, i, U);
                   double _rho = 1. / U[0];
-                  double _sie = problem_class->specific_internal_energy(U);
+                  double _esheer = 0.;
+                  if (use_elasticity)
+                  {
+                     _esheer = hydro.elastic.e_sheer(i);
+                  }
+                  double _sie = problem_class->specific_internal_energy(U, _esheer);
                   double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
                   press_gf[i] = pressure;
                }
@@ -1388,6 +1485,38 @@ int main(int argc, char *argv[]) {
             
             Wx = 0;
             Wy += offy;
+
+            // MFEM_ABORT("Need to implement get_gamma with a cell_attr variable.");
+
+            //NF//MS
+            if (use_elasticity)
+            {
+               // Compute Sigma and F
+               hydro.ComputeSigmaGF(S, sigma_gf);
+               hydro.ComputeFGF(f_gf);
+               hydro.ComputeESheerGF(e_sheer_gf);
+
+               for (int i = 0; i < L2FESpace.GetNDofs(); i++)
+               {
+                  frho_gf[i] = f_gf[i] * rho_gf[i];
+               }
+
+               // Visualize
+               Wx = 0;
+               Wy += offy;
+
+               VisualizeField(vis_sig, vishost, visport, sigma_gf,
+                              "Sigma", Wx, Wy, Ww, Wh);
+               Wx += offx;
+               VisualizeField(vis_f, vishost, visport, f_gf,
+                              "F", Wx, Wy, Ww, Wh);
+               Wx += offx;
+               VisualizeField(vis_frho, vishost, visport, frho_gf,
+                              "F/rho", Wx, Wy, Ww, Wh);
+               Wx += offx;
+               VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
+                              "e sheer", Wx, Wy, Ww, Wh);
+            }
 
             if (problem_class->has_exact_solution())
             {
@@ -1606,7 +1735,7 @@ int main(int argc, char *argv[]) {
                       << setfill('0')
                       << setw(2)
                       << to_string(rp_levels + rs_levels)
-                      << ".out";
+                      << ".csv";
 
    ostringstream ts_filename_suffix;
    ts_filename_suffix << "tsData_"
@@ -1684,6 +1813,7 @@ int main(int argc, char *argv[]) {
 
    if (problem_class->has_exact_solution())
    {
+      MFEM_WARNING("Use exact solution from error calculation.\n");
       // Save exact to file as well
       BlockVector S_exact(offset, Device::GetMemoryType());
       ParGridFunction x_gf_exact, sv_ex_gf, vel_ex_gf, ste_ex_gf;
@@ -1781,7 +1911,7 @@ int main(int argc, char *argv[]) {
          sv_ex_gf.ProjectCoefficient(sv_coeff);
 
          // In the case of the Noh Problem, project 0 on the boundary of approx and exact
-         if (problem_class->get_indicator() == "Noh")
+         if ((problem_class->get_indicator() == "ElasticNoh" || problem_class->get_indicator() == "Noh"))
          {
             cout << "[Noh] Projecting zero on the boundary cells.\n";
             ParGridFunction cell_bdr_flag_gf;

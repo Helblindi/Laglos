@@ -201,3 +201,117 @@ TODO: Add section of optional build if optimization is to be utilized.
 ~/Workspace/Laghos/build> cmake -DLaglos_DIR=../../Laglos -S .. 
 ~/Workspace/Laghos/build> make -j 8
 ```
+
+# Handling boundary conditions
+## Boundary attributes
+The user has the option in the problem file to impose boundary conditions on
+the thermodynamics and/or on the mesh velocity.
+Both of these types of boundary conditions have corresponding flags ```_thbcs```
+and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
+
+Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
+that can be used are
+
+1. Used to enforce $v_x = 0$.
+2. Used to enforce $v_y = 0$.
+3. Used to enforce $v_z = 0$.
+4. Used to enforce $v_r = 0$, or in other words 0 radial movement.
+5. Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+
+If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
+the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs
+must be overridden. See for example Dirichlet conditions enforced on the left wall 
+of the Saltzman problem.
+
+
+# Select Elastic notes
+Since our exact solution here is given in terms of approximation data from Dr. Favrie,
+we cannot compute errors the conventional way.  To this end, I have created the file
+compute_errors to handle both the computation of the approximation errors as well 
+as convergence tables. To execute this, run the following
+```
+$ python3 ../scripts/compute_error.py results/testing/st1/state_vectors/ ../exact_sol/elastic/shocktube/all_results.txt 7 16
+```
+The third and fourth arguments correspond to matching columns of the respective files that are being compared. We list here the following pairs and their corresponding 
+representative value
+
+| parameter | arg 3 | arg 4 |
+|:----------|:-----:|:-----:|
+| $\rho$    |   1   |   13  |
+| $E$       | 3     | 15    |
+| $\sigma$  | 7     | 16    |
+
+## Meshes
+Laglos has the capability to handle multimaterial test problems, and this is implemented through the 
+cell attribute values defined in the mesh. For each element that should be treated as a solid,
+the cell attribute in the mesh should be set to 50. When the use-elasticity ['-ue'] is used in 
+a Laglos execution, the elastic flux and elastic sheer with be computed only if the cell
+attribute value is set to 50. Otherwise, a non-elastic flux will be used.
+
+To see this implemented, see the execution of the multi-material isentropic vortex problem
+```
+./Laglos -m data/elastic/square-vortex-mz.mesh -p 53 -tf 10 -cfl 0.5 -ue 
+```
+
+## Examples
+
+### Elastic shocktube
+```
+./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue -rs 8
+```
+### Elastic impact
+```
+./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue -rs 8
+```
+### Elastic shear
+```
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+```
+### Elastic shear y direction (rotated x)
+```
+./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+```
+### Elastic impact + shear
+```
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+```
+### Elastic Isentropic Vortex
+```
+./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue -rs 1
+```
+### Elastic Projectile Plate
+The final time depends on the shear modulus used, which is modified in the problem file.
+The final times reported in the referenced paper corresponding to their shear moduli are as follows
+#### $\mu = 9.2\times 10^{10}$ Pa
+1. $t = 3.6\times 10^{-5}$
+2. $t = 1.06\times 10^{-4}$
+3. $t = 3.2\times 10^{-4}$
+4. $t = 6.09\times 10^{-4}$
+
+#### $\mu = 1\times 10^{9}$ Pa
+1. $t = 3.5\times 10^{-5}$
+2. $t = 1.4\times 10^{-4}$
+3. $t = 4.2\times 10^{-4}$
+4. $t = 7.1\times 10^{-4}$
+
+#### $\mu = 0$ Pa
+1. $t = 7.5\times 10^{-5}$
+2. $t = 1.87\times 10^{-4}$
+3. $t = 6\times 10^{-4}$
+4. $t = 1.03\times 10^{-4}$
+```
+./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf .000103 -cfl 0.5 -ue -ppd -rs 1
+```
+
+### Elastic Noh
+```
+./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 6
+./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 1
+```
+
+### Elastic twist
+```
+./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 6
+```

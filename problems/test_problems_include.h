@@ -24,4 +24,14 @@
 #include "kidder.h"
 #include "kidder_ball.h"
 #include "taylor_green.h"
+#include "elastic_shocktube.h"
+#include "elastic_impact.h"
+#include "elastic_shear.h"
+#include "elastic_shear_y.h"
+#include "elastic_impact_shear.h"
+#include "elastic_isentropic_vortex.h"
+#include "elastic_projectile_plate.h"
+#include "elastic_twist.h"
+#include "elastic_noh.h"
+
 #endif

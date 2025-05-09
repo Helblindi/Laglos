@@ -52,7 +52,8 @@ private:
    double _gamma = 7./5.;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _bcs = true;
+   bool _thbcs = true;
+   bool _mvbcs = true;
    string _indicator = "IsentropicVortex"; // Possible: saltzmann
 
    // Free steam conditions
@@ -68,7 +69,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
 

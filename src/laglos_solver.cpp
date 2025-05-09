@@ -89,6 +89,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
                                                 ParFiniteElementSpace &l2,
                                                 ParFiniteElementSpace &l2v,
                                                 ParFiniteElementSpace &cr,
+                                                const ParGridFunction &rho0_gf,
                                                 ParLinearForm *m,
                                                 ProblemBase<dim> *_pb,
                                                 Array<int> offset,
@@ -103,6 +104,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    L2V(l2v),
    CR(cr),
    CRc(CR.GetParMesh(), CR.FEColl(), 1),
+   rho0_gf(rho0_gf),
    x_gf(&H1),
    mv_gf(&H1),
    v_CR_gf(&CR),
@@ -146,7 +148,9 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    // Options
    use_viscosity(use_viscosity),
    mm(mm),
-   CFL(CFL)
+   CFL(CFL),
+   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
+   elastic(H1, L2, rho0_gf, ir) //NF//MS
 {
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
@@ -219,7 +223,10 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
       if (ess_bdr.Size() > 4)
       {
          MFEM_WARNING("May need to enforce additional BCs.\n");
-         pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         if (pb->has_mv_boundary_conditions())
+         {
+            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+         }
 
          ess_tdofs.Append(add_ess_tdofs);
          bdr_vals.Append(add_bdr_vals);
@@ -262,6 +269,126 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
    delete dij_sparse;
    dij_sparse = nullptr;
 }
+
+
+/**
+ * @brief Computes the sigma component for a given element.
+ *
+ * This function calculates the sigma component for a specific element in the mesh.
+ * It retrieves the state vector for the given element, computes the density and 
+ * specific internal energy, and evaluates the stress tensor and flux based on 
+ * the elasticity model.
+ *
+ * @tparam dim The dimension of the problem (1D, 2D, or 3D).
+ * @param S The input state vector containing the solution variables.
+ * @param e The index of the element for which the sigma component is computed.
+ * @return The computed sigma component for the specified element.
+ *
+ * @note This function assumes that the elasticity model is being used and that
+ *       the necessary data structures (e.g., elastic object) are properly initialized.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
+{
+   assert(use_elasticity);
+   sigmaD_e.SetSize(3);
+   sigmaD_e = 0.;
+
+   if (pmesh->GetAttribute(e) != 50)
+   {
+      return;
+   }
+
+   Array<int> idx(dim), idy(dim);
+   DenseMatrix flux(dim+2,dim);
+   Vector U(dim+2);
+
+   /* Fill sigma_e arrays */
+   for (int i = 0; i < dim; i++)
+   {
+      idx[i] = i+1;
+      idy[i] = i;
+   }
+   GetCellStateVector(S,e,U);
+   double rho = 1./U[0], es = 0.;
+   elastic.ComputeS(e, rho, sigmaD_e);
+   // es = elastic.e_sheer(e);
+   // flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
+   // flux.GetSubMatrix(idx, idy, sigma_e);
+   // sigma_e *= -1.;
+}
+
+
+/**
+ * @brief Computes the sigma grid function (sigma_gf) based on the input vector S.
+ *
+ * This function computes the stress tensor grid function (sigma_gf) using the provided vector S.
+ * It assumes that the elasticity is being used and that the size of sigma_gf matches the
+ * number of degrees of freedom in the L2 space (NDofs_L2).
+ *
+ * @tparam dim The dimension of the problem.
+ * @param S The input vector containing the state information.
+ * @param sigma_gf The output parameter that will hold the computed sigma grid function.
+ *
+ * @note This function will need to be modified for 2D and 3D.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
+{
+   assert(this->use_elasticity);
+   assert(sigma_gf.Size() == NDofs_L2);
+   sigma_gf = 0.;
+   DenseMatrix sigmaD_e(3);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      if (pmesh->GetAttribute(e) == 50)
+      {
+         ComputeSigmaDComp(S,e,sigmaD_e);
+         sigma_gf[e] = sigmaD_e.FNorm();
+      }
+   }
+}
+
+/**
+ * @brief Computes the Jacobian grid function (f_gf) based on the elasticity tensor.
+ *
+ * This function computes the Jacobian grid function (f_gf) using the elasticity tensor.
+ * It assumes that the elasticity is being used and that the size of f_gf matches the
+ * number of degrees of freedom in the L2 space (NDofs_L2).
+ *
+ * @tparam dim The dimension of the problem.
+ * @param f_gf The output parameter that will hold the computed F grid function.
+ *
+ * @note This function will need to be modified for 2D and 3D.
+ */
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
+{
+   assert(this->use_elasticity);
+   assert(f_gf.Size() == NDofs_L2);
+
+   DenseMatrix F(3);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      elastic.ComputeAvgF(e, F);
+      f_gf[e] = F(0,0);
+   }
+}
+
+template<int dim>
+void LagrangianLOOperator<dim>::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
+{
+   assert(this->use_elasticity);
+   assert(e_sheer_gf.Size() == NDofs_L2);
+
+   for (int e = 0; e < NDofs_L2; e++)
+   {
+      e_sheer_gf[e] = elastic.e_sheer(e);
+   }
+}
+
 
 /* This Mult method is not mass conservative by itself */
 template<int dim>
@@ -369,8 +496,26 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             MFEM_ABORT("Incorrect dimension provided.\n");
          }
       }
+      DenseMatrix F_i;
+      //NF//MS
+      int ci_attr = pmesh->GetAttribute(ci);
+      if (use_elasticity && ci_attr == 50)
+      {
+         const double _rho = 1./U_i[0];
+         double _es = 0.;
+         DenseMatrix _sigmaD(3);
 
-      const DenseMatrix F_i = pb->flux(U_i, pmesh->GetAttribute(ci));
+         // _sigmaD is 3 x 3
+         elastic.ComputeS(ci, _rho, _sigmaD);
+         _es = elastic.e_sheer(ci);
+
+         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, ci_attr);
+      }
+      else
+      {
+         F_i = pb->flux(U_i, ci_attr);
+      }
+
       rhs = 0.;
 
       for (int j=0; j < fids.Size(); j++) // Face iterator
@@ -395,7 +540,26 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             GetCellStateVector(S, cj, U_j); 
 
             // flux contribution
-            DenseMatrix dm = pb->flux(U_j, pmesh->GetAttribute(cj));
+            DenseMatrix dm;
+            //NF//MS
+            int cj_attr = pmesh->GetAttribute(cj);
+            if (use_elasticity && cj_attr == 50)
+            {
+               const double _rho = 1./U_j[0];
+               double _es = 0.;
+               DenseMatrix _sigmaD(3);
+
+               // _sigmaD is 3 x 3
+               elastic.ComputeS(cj, _rho, _sigmaD);
+               _es = elastic.e_sheer(cj);
+
+               dm = pb->ElasticFlux(_sigmaD, _es, U_j, cj_attr);
+            }
+            else
+            {
+               dm = pb->flux(U_j, cj_attr);
+            }
+
             dm += F_i; 
             Vector y(dim+2);
             dm.Mult(c, y);
@@ -431,7 +595,6 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
             int bdr_attr = BdrElementIndexingArray[fids[j]];
             // cout << "boundary attribute for face " << fids[j] << ": " << bdr_attr << endl;
             cell_bdr_arr.Append(bdr_attr);
-
             Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
             F_i.Mult(c, y_temp);
             U_i_bdry = U_i;
@@ -525,7 +688,9 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                   F_i_bdry.GetRow(0, cell_v);
                   cell_v *= -1.; // Negate the velocity
                   double _rho = 1. / U_i_bdry[0];
-                  double _sie = pb->specific_internal_energy(U_i_bdry);
+                  double _esi = 0.;
+                  if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
+                  double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
                   double _press = pb->pressure(_rho, _sie, bdr_attribute);
                   for (int i = 0; i < dim; i++)
                   {
@@ -547,6 +712,27 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
                }
                }
             }
+            // else if (use_elasticity && ci_attr == 50)
+            // {
+            //    /* Negate sigma */
+            //    DenseMatrix F_i_bdry = F_i;
+
+            //    for (int i = 0; i < dim; i++)
+            //    {
+            //       for (int j = 0; j < dim; j++)
+            //       {
+            //          F_i_bdry(i+1, j) *= -1.;
+            //       }
+            //    }
+
+            //    Vector sigmap;
+            //    F_i_bdry.GetRow(dim+1, sigmap);
+            //    sigmap *= -1.;
+            //    F_i_bdry.SetRow(dim+1, sigmap);
+
+            //    F_i_bdry.Mult(c, y_temp_bdry);
+            //    y_temp += y_temp_bdry;
+            // }
             else
             {
                y_temp *= 2.;
@@ -598,12 +784,15 @@ template<int dim>
 void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const double &dt)
 {
    int el, info;
-   Array<int> vel_dofs(2);
-   vel_dofs[0] = 1, vel_dofs[1]=2;
+   Array<int> vel_dofs(dim);
+   for (int i = 0; i < dim; i++)
+   {
+      vel_dofs[i] = i + 1;
+   }
    Vector vel(dim), Ui(dim+2);
 
    // Post processing modify computed values to enforce BCs
-   if (pb->has_boundary_conditions())
+   if (pb->has_th_boundary_conditions())
    {
       for (int bdr_ci = 0; bdr_ci < NBE; bdr_ci++)
       {
@@ -656,7 +845,7 @@ void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const do
          Ui.SetSubVector(vel_dofs, vel);
          SetCellStateVector(S, el, Ui);
       }
-   } // End pb->has_boundary_conditions()
+   } // End pb->has_th_boundary_conditions()
 }
 
 
@@ -892,7 +1081,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          }
 
          /* Optionally, enforce boundary conditions */
-         if (pb->has_boundary_conditions())
+         if (pb->has_mv_boundary_conditions())
          {
             for (int i = 0; i < ess_tdofs.Size(); i++) { 
                // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
@@ -902,7 +1091,10 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
          }
       }
       
-      /* Project back onto mv_gf */
+      /* 
+      Project back onto mv_gf 
+      No need to fill center velocities as this is handled by the projection
+      */
       dxdt_gf.ProjectGridFunction(dxdt_gf_l);
 
       if (NDofs_H1 != NDofs_H1L)
@@ -1064,18 +1256,36 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
          double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
          pb->lm_update(b_covolume);
 
+         // Compute sheer energy, if applicable
+         double esl = 0., esr = 0.;
+         if (use_elasticity)
+         {
+            esl = elastic.e_sheer(c);
+            esr = elastic.e_sheer(cp);
+         }
+
          // Compute pressure with given EOS
          double rhoL = 1. / Uc[0];
-         double sieL = pb->specific_internal_energy(Uc);
+         double sieL = pb->specific_internal_energy(Uc, esl);
          double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(c));
 
          double rhoR = 1. / Ucp[0];
-         double sieR = pb->specific_internal_energy(Ucp);
+         double sieR = pb->specific_internal_energy(Ucp, esr);
          double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
 
          // Finally compute lambda max
-         lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, pl, pr, this->use_greedy_viscosity, pb->get_b());
-         d = lambda_max * c_norm; 
+         if (use_elasticity)
+         {
+            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+            lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * pb->get_shear_modulus());
+            // TODO: lambda_max = sqrt(pow(lambda_max, 2) + rho * 4./3. * mu);
+         }
+         else
+         {
+            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+         }
+         
+         d = lambda_max * c_norm;
          dij_avg += d;
 
          dij_sparse->Elem(c,cp) = d;
@@ -1304,46 +1514,55 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
       int bdr_attr = pmesh->GetBdrAttribute(i);
       int face = pmesh->GetBdrElementFaceIndex(i);
 
-      pmesh->GetEdgeVertices(face, verts);
-      for (int k = 0; k < verts.Size(); k++)
+      if (dim == 1)
       {
-         int index = verts[k];
-         // TODO: Get rid of all get_indicator() funcalls, replace with use of class int problem.
-         if (pb->get_indicator() == "saltzmann")
+         BdrVertexIndexingArray[face] = bdr_attr;
+      }
+      else
+      {
+         assert(dim == 2);
+
+         pmesh->GetEdgeVertices(face, verts);
+         for (int k = 0; k < verts.Size(); k++)
          {
-            // Replace the bdr attribute in the array as long as it is not
-            // the dirichlet condition (For Saltzmann Problem)
-            // This ensures the left wall vertices have the proper indicator
-            if (BdrVertexIndexingArray[index] != 5)
+            int index = verts[k];
+            // TODO: Get rid of all get_indicator() funcalls, replace with use of class int problem.
+            if (pb->get_indicator() == "saltzmann")
+            {
+               // Replace the bdr attribute in the array as long as it is not
+               // the dirichlet condition (For Saltzmann Problem)
+               // This ensures the left wall vertices have the proper indicator
+               if (BdrVertexIndexingArray[index] != 5)
+               {
+                  BdrVertexIndexingArray[index] = bdr_attr;
+               }
+            }
+            else if (pb->get_indicator() == "Sod" ||
+                     pb->get_indicator() == "TriplePoint" || 
+                     pb->get_indicator() == "riemann" ||
+                     pb->get_indicator() == "Sedov" || 
+                     pb->get_indicator() == "SodRadial" || 
+                     pb->get_indicator() == "TaylorGreen")
+            {
+               // Mark corner vertices as 5
+               // These nodes should not move at all during the simulation
+               // Identify these corner vertices as those that already have
+               // a value non negative
+               if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
+               {
+                  BdrVertexIndexingArray[index] = 5;
+               }
+               else 
+               {
+                  BdrVertexIndexingArray[index] = bdr_attr;
+               }
+            }
+            else
             {
                BdrVertexIndexingArray[index] = bdr_attr;
             }
-         }
-         else if (pb->get_indicator() == "Sod" ||
-                  pb->get_indicator() == "TriplePoint" || 
-                  pb->get_indicator() == "riemann" ||
-                  pb->get_indicator() == "Sedov" || 
-                  pb->get_indicator() == "SodRadial" || 
-                  pb->get_indicator() == "TaylorGreen")
-         {
-            // Mark corner vertices as 5
-            // These nodes should not move at all during the simulation
-            // Identify these corner vertices as those that already have
-            // a value non negative
-            if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
-            {
-               BdrVertexIndexingArray[index] = 5;
-            }
-            else 
-            {
-               BdrVertexIndexingArray[index] = bdr_attr;
-            }
-         }
-         else
-         {
-            BdrVertexIndexingArray[index] = bdr_attr;
-         }
-      } // end vertex iterator
+         } // end vertex iterator
+      }
 
    } // end boundary elements
 }
@@ -1456,7 +1675,9 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
    {
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double sie = pb->specific_internal_energy(U);
+      double e_sheer = 0.;
+      if (use_elasticity) { e_sheer = elastic.e_sheer(cell_it); }
+      double sie = pb->specific_internal_energy(U, e_sheer);
       double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
@@ -2338,7 +2559,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -3272,12 +3493,18 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_suffix)
 {
    Vector center(dim), U(dim+2), vel(dim);
-   double pressure=0., ss=0., x_val=0., vel_val = 0.;
+   double pressure=0., ss=0.;
 
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
-   fstream_sv << "x,rho,v,ste,p,ss,cell_type\n";
+   // Header
+   fstream_sv << "x,y,z,rho,vx,vy,vz,ste,sie,p,ss,cell_type";
+   if (use_elasticity)
+   {
+      fstream_sv << ",sd11,sd12,sd13,sd21,sd22,sd23,sd31,sd32,sd33,s11,s22,s33,es";
+   }
+   fstream_sv << "\n";
 
    for (int i = 0; i < NDofs_L2; i++)
    {
@@ -3285,64 +3512,59 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
       GetCellStateVector(S, i, U);
       pb->velocity(U, vel);
       double rho = 1. / U[0];
-      double sie = pb->specific_internal_energy(U);
+      double e_sheer = 0.;
+      if (use_elasticity) { e_sheer = elastic.e_sheer(i); }
+      double sie = pb->specific_internal_energy(U, e_sheer);
       double attr = pmesh->GetAttribute(i);
       pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
-      
       pmesh->GetElementCenter(i, center);
 
-      // We fill the x-coordinate depending on the problem.
-      // This really depends on what kind of visualization is needed
-      switch (problem)
-      {
-      // Any radial plot, we take the L2 norm of the cell center
-      case 4:  // Noh
-      case 6:  // Sedov
-      case 13: // Sod Radial
-         x_val = center.Norml2();
-         vel_val = vel.Norml2(); // magnitude in radial case
-         break;
-      
-      case 7: // Saltzman
-         x_val = center[0];
-         vel_val = vel[1]; // v_y
-         break;
-
-      // For stacked Sod problem, we only need the x-coord
-      case 0:  // Smooth
-      case 1:  // Sod
-      case 2:  // Lax
-      case 3:  // Leblanc
-      case 5:
-      case 8:  // Vdw1
-      case 9:  // Vdw2
-      case 10: // Vdw3
-      case 11: // Vdw4
-      case 20:
-      default:
-         x_val = center[0];
-         vel_val = vel[0]; // v_x
-         break;
+      // Get relevant quantities
+      double _x = center[0], _y = 0., _z = 0;
+      double _vx = vel[0], _vy = 0., _vz = 0.;
+      if (dim > 1) {
+         _y = center[1];
+         _vy = vel[1];
+         if (dim > 2) {
+            _z = center[2];
+            _vz = vel[2];
+         }
       }
-
+      
       // Output to file
-      fstream_sv << x_val << ","    // x
-                 << 1./U[0] << ","  // rho
-                 << vel_val << ","  // vel, either v_x, v_y, or ||v||
-                 << U[dim+1] << "," // ste
-                 << pressure << "," // pressure
-                 << ss << ",";      // sound speed
+      fstream_sv << _x << "," << _y << "," << _z << ","    // x,y,z,
+                 << 1./U[0] << ","                         // rho
+                 << _vx << "," << _vy << "," << _vz << "," // vx,vy,vz
+                 << U[dim+1] << ","                        // ste
+                 << sie << ","                             // sie
+                 << pressure << ","                        // pressure
+                 << ss << ",";                             // sound speed
 
       // Print flag if interior or bdr
       if (cell_bdr_flag_gf[i] == -1.)
       {
-         fstream_sv << "int\n";
+         fstream_sv << "int";                             // cell_type
       }
       else 
       {
-         fstream_sv << "bdr\n";
+         fstream_sv << "bdr";
       }
+ 
+      if (use_elasticity)
+      {
+         DenseMatrix sigmaD(3);
+         ComputeSigmaDComp(S, i, sigmaD); // sigma
+         // for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
+         fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2)
+                    << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2)
+                    << "," << sigmaD(2,0) << "," << sigmaD(2,1) << "," << sigmaD(2,2)
+                    << "," << sigmaD(0,0) - pressure
+                    << "," << sigmaD(1,1) - pressure
+                    << "," << sigmaD(2,2) - pressure
+                    << "," << e_sheer;
+      }
+      fstream_sv << "\n";
    }
 }
 
@@ -7028,7 +7250,7 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -7189,7 +7411,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -7250,7 +7472,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
    // Sum over all cells
    for (int ci = 0; ci < NDofs_L2; ci++)
    {
-      if (pb->get_indicator() == "Noh" && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
          // Skip boundary cells
          continue;
@@ -8275,7 +8497,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
    xmax = 1.E12;
 
    /* Adjust the above for boundary conditions */
-   // if (pb->has_boundary_conditions())
+   // if (pb->has_mv_boundary_conditions())
    // {
    //    double bdr_tol = 1.E-12;
    //    for (int i = 0; i < ess_tdofs.Size(); i++) { 
@@ -8376,7 +8598,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          }
 
          /* Enforce BCs on target velocity */
-         if (pb->has_boundary_conditions())
+         if (pb->has_mv_boundary_conditions())
          {
             for (int i = 0; i < ess_tdofs.Size(); i++) { V_target(ess_tdofs[i]) = bdr_vals[i]; }
          }
@@ -8399,7 +8621,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
       case 2: // Viscous objective function
       {
          /* Need to modify the solution bound restrictions to accomodate boundary conditions */
-         if (pb->has_boundary_conditions())
+         if (pb->has_mv_boundary_conditions())
          {
             double bdr_tol = 1.E-12;
             for (int i = 0; i < ess_tdofs.Size(); i++) {

@@ -13,7 +13,7 @@ if [[ ! -x "$EXECUTABLE" ]]; then
 fi
 
 # test parameters
-mesh_file="data/ref-square.mesh"
+mesh_file="${SOURCE_DIR}/data/ref-square.mesh"
 problem=2
 final_time=.225
 cfl=0.5

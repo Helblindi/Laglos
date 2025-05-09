@@ -52,7 +52,8 @@ private:
    double _a = 0., _b = 0., _gamma = 1.4;
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
-   bool _bcs = false; // Indicator for boundary conditions
+   bool _thbcs = false; // Indicator for thermal boundary conditions
+   bool _mvbcs = false; // Indicator for mv boundary conditions
    string _indicator = ""; // Possible: saltzmann
 
    // CFL change, can remove if not needed
@@ -68,7 +69,8 @@ public:
       this->set_b(_b);
       this->set_gamma(_gamma);
       this->set_indicator(_indicator);
-      this->set_bcs_indicator(_bcs);
+      this->set_thbcs_indicator(_thbcs);
+      this->set_mvbcs_indicator(_mvbcs);
       this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
       // CFL change

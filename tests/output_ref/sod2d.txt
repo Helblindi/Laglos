@@ -74,6 +74,7 @@ num boundary elements: 210
 num elements: 500
 Geometric::Non-default constructor
 NDofs_H1: 2211
+dim: 2
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @         Elastic Class Configuration      @
@@ -530,14 +531,14 @@ Initial mass sum: 5.6250000000e-02, Current mass sum: 5.6250000000e-02
 Mass Error: 3.0389705027e-14
 Interior Mass Error: 3.1013877677e-14
 --------------------------------------
-Program took 4.0665727917e+00s.
-This amounts to 2.2974987524e-05 s per timestep per gridpoint.
+Program took 4.0690880833e+00s.
+This amounts to 2.2989198211e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 4.067e+00                    | 2.297e-05
-  Dij calculation: 7.600e-01               | 4.294e-06
-  Mesh Motion calculation: 1.506e+00       | 8.509e-06
+                                 Total time: 4.069e+00                    | 2.299e-05
+  Dij calculation: 7.626e-01               | 4.308e-06
+  Mesh Motion calculation: 1.506e+00       | 8.510e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 1.472e+00      | 8.315e-06
+  State Update calculation: 1.469e+00      | 8.298e-06
 ===========================================================

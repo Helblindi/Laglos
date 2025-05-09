@@ -1121,7 +1121,6 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
             break;
          } // End face velocity switch case
 
-         FillCenterVelocitiesWithAvg(dxdt_gf);
       }
    
    } // End dim > 1

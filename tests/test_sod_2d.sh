@@ -13,13 +13,13 @@ if [[ ! -x "$EXECUTABLE" ]]; then
 fi
 
 # test parameters
-mesh_file="${SOURCE_DIR}/data/ref-square.mesh"
+mesh_file="${SOURCE_DIR}/data/shocktube.mesh"
 problem=2
 final_time=.225
 cfl=0.5
 mv_option=2
 fv_option=2
-refinements_serial=4
+refinements_serial=0
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "

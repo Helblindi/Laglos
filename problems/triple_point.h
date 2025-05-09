@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class TriplePoint: public ProblemBase<dim>
+class TriplePoint: public ProblemBase
 {
 private:
    /*********************************************************
@@ -60,7 +59,7 @@ private:
    bool _change_cfl = false;
 
 public:
-   TriplePoint()
+   TriplePoint(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ElasticImpactShear: public ProblemBase<dim>
+class ElasticImpactShear: public ProblemBase
 {
 private:
    /*********************************************************
@@ -62,7 +61,7 @@ private:
    const double _mu = 2.6E10;
 
 public:
-   ElasticImpactShear()
+   ElasticImpactShear(const int &_dim) : ProblemBase(_dim)
    {
       if (dim != 2)
       {

@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class NohProblem: public ProblemBase<dim>
+class NohProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -57,7 +56,7 @@ private:
    string _indicator = "Noh"; // Possible: saltzmann
 
 public:
-   NohProblem()
+   NohProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

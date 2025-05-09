@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ElasticTwist: public ProblemBase<dim>
+class ElasticTwist: public ProblemBase
 {
 private:
    /*********************************************************
@@ -66,7 +65,7 @@ private:
    const double R2 = R*R;
 
 public:
-   ElasticTwist()
+   ElasticTwist(const int &_dim) : ProblemBase(_dim)
    {
       if (dim != 2)
       {

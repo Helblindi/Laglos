@@ -54,8 +54,7 @@ public:
    }
 };
 
-template<int dim>
-class TaylorGreenProblem: public ProblemBase<dim>
+class TaylorGreenProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -69,7 +68,7 @@ private:
    string _indicator = "TaylorGreen"; // Possible: saltzmann
 
 public:
-   TaylorGreenProblem()
+   TaylorGreenProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

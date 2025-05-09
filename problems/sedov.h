@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class SedovProblem: public ProblemBase<dim>
+class SedovProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -63,7 +62,7 @@ private:
    double sedov_energy_initial = 0.25;
 
 public:
-   SedovProblem()
+   SedovProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

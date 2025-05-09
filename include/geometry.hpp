@@ -11,11 +11,11 @@ namespace mfem
 namespace hydroLO
 {
 
-template <int dim>
 class Geometric
 {
 
 private:
+   const int dim;
    Array<int> block_offsets;
    ParFiniteElementSpace &H1, &L2;
    ParMesh *pmesh;
@@ -25,7 +25,7 @@ private:
    Table vertex_edge, *edge_vertex;
 
 public:
-   Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFiniteElementSpace &l2);
+   Geometric(const int &_dim, Array<int> offsets, ParFiniteElementSpace &h1, ParFiniteElementSpace &l2);
    ~Geometric() {}
 
    inline Array<int> GetBlockOffsets() const { return block_offsets; }

@@ -24,8 +24,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class KidderBallProblem: public ProblemBase<dim>
+class KidderBallProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -42,7 +41,7 @@ private:
    string _indicator = "KidderBall"; // Possible: saltzmann
 
 public:
-   KidderBallProblem()
+   KidderBallProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);
@@ -63,7 +62,7 @@ public:
    void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
-   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override 
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override 
    {
       std::cout << "KidderBall::get_additional_BCs\n";
 
@@ -81,7 +80,7 @@ public:
    }
 
    /* The dirichlet condition that is enforced on the left hand side changes in time */
-   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override 
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric *geom=NULL, const ParGridFunction *x_gf=NULL) override 
    {
       /* Validate we do not divide by 0 and than the array of dofs is the right size */
       assert(add_bdr_vals.Size() == size_add_bdr_dofs);
@@ -91,7 +90,7 @@ public:
       for (int bdr_v_it = 0; bdr_v_it < size_add_bdr_dofs / dim; bdr_v_it++)
       {
          int dof = bdr_dofs_list[bdr_v_it];
-         geom.GetNodePosition(x_gf, dof, x);
+         geom->GetNodePosition(*x_gf, dof, x);
          this->v0(x, t, v);
          add_bdr_vals[bdr_v_it] = v[0];
          add_bdr_vals[bdr_v_it + size_add_bdr_dofs / dim] = v[1];

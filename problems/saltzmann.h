@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class SaltzmannProblem: public ProblemBase<dim>
+class SaltzmannProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -80,7 +79,7 @@ private:
    double x0 = 0.0000000001; // Initial shock position
 
 public:
-   SaltzmannProblem()
+   SaltzmannProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);
@@ -107,7 +106,7 @@ public:
       this->set_b(b_covolume);
    }
 
-   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override 
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override 
    {
       std::cout << "saltzman::get_additional_BCs\n";
 
@@ -128,7 +127,7 @@ public:
    }
 
    /* The dirichlet condition that is enforced on the left hand side changes in time */
-   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override 
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric *geom=NULL, const ParGridFunction *x_gf=NULL) override 
    {
       assert(timestep_first > 0.);
       /* Solve for Dirichlet velocity at left wall */

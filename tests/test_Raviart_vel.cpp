@@ -182,9 +182,9 @@ int test_Ci_geo()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix Cgeo(dim), Cgeo_0(dim), C_error(dim);
@@ -313,9 +313,9 @@ void plot_velocities()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), true_vel(dim);
    double t = 0.;

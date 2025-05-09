@@ -185,8 +185,7 @@ inline void SetHiopHessianSparsityPattern(const ParMesh *pmesh, const ParFiniteE
 *
 *  Upper triangular, CSR.
 ****************************************************************************************************/
-template<int dim>
-inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Geometric<dim> &geom, const ParFiniteElementSpace &H1, const int &num_vertices, Array<int> &I, Array<int> &J)
+inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Geometric &geom, const ParFiniteElementSpace &H1, const int &num_vertices, Array<int> &I, Array<int> &J)
 {
    // std::cout << "SetHiopHessianSparsityPatternViscous\n";
    Array<int> adj_verts, adj_adj_verts, cols_for_node, cols_upper_diag;
@@ -310,8 +309,7 @@ inline void SetHiopHessianSparsityPatternViscous(const ParMesh *pmesh, const Geo
 *         |
 *         2
 ****************************************************************************************************/
-template<int dim>
-inline void CalcViscousVelocity(const Geometric<dim> &geom, const Array<int> &BdrVertexIndexingArray, const Vector &V, const int &ix, const Array<int> &adj_verts, Vector &vel)
+inline void CalcViscousVelocity(const int &dim, const Geometric &geom, const Array<int> &BdrVertexIndexingArray, const Vector &V, const int &ix, const Array<int> &adj_verts, Vector &vel)
 {
    Vector Vj(dim);
    int adj_verts_size = adj_verts.Size();
@@ -351,24 +349,25 @@ inline void CalcViscousVelocity(const Geometric<dim> &geom, const Array<int> &Bd
  * Class to represent the local mass conservation
  * constraints on our Lagrange Multiplier problem
  */
-template <int dim>
 class LocalMassConservationOperator : public Operator
 {
 private:
+   const int dim;
    const ParGridFunction &X;
    const int num_cells, input_size;
    const int nnzSparse = 8;
-   const Geometric<dim> &geom;
+   const Geometric &geom;
    double dt; 
    Array<int> GradCIArr, GradCJArr;
    Array<double> GradDataArr;
    mutable SparseMatrix grad;
 
 public:
-   LocalMassConservationOperator(const Geometric<dim> &_geom, const ParGridFunction &_X, 
+   LocalMassConservationOperator(const int &_dim, const Geometric &_geom, const ParGridFunction &_X, 
                                  const int &_num_cells, const int &_input_size, const double &_dt,
                                  const Array<int> GradCI, const Array<int> GradCJ)
       : Operator(_num_cells, _input_size),
+        dim(_dim),
         num_cells(_num_cells),
         input_size(_input_size),
         X(_X),  
@@ -522,7 +521,6 @@ public:
    }
 };
 
-template<int dim>
 class zeroSparseMatrix : public Operator
 {
 private:
@@ -567,7 +565,6 @@ public:
 };
 
 
-template<int dim>
 class BoundaryConditionsOperator : public Operator
 {
 private:
@@ -627,11 +624,11 @@ public:
  * 
  * Note that both velocity vectors are of size dim * NVDofsH1
  */
-template <int dim>
 class TargetOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
-   const Geometric<dim> &geom;
+   const int dim;
+   const Geometric &geom;
    const int n_bdr_dofs, num_cells, num_vertices;
    const int nnz_sparse_jaceq, nnz_sparse_jacineq, nnz_sparse_Hess_Lagr;
    const Vector &V_target;
@@ -643,8 +640,8 @@ private:
    //    2) Average mass at a given vertex
    const Vector vecWeights;
    // const Vector &d_lo, d_hi;
-   const LocalMassConservationOperator<dim> LMCoper;
-   // const BoundaryConditionsOperator<dim> BCoper;
+   const LocalMassConservationOperator LMCoper;
+   // const BoundaryConditionsOperator BCoper;
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
    Array<int> ess_tdofs;
@@ -661,7 +658,7 @@ private:
 
 public:
    TargetOptimizedMeshVelocityProblem(
-      const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
+      const int &_dim, const Geometric &_geom, const Vector &_V_target, const Vector &_massvec, 
       const ParGridFunction &_X, const int _num_cells,
       const double &dt, const Vector &_xmin, const Vector &_xmax,
       Array<int> _HessI, Array<int> _HessJ,
@@ -671,13 +668,14 @@ public:
       Array<int> _ess_tdofs, Array<int> _BdrVertexIndexingArray,
       const double &mv_target_visc_coeff,
       const Vector &_vecWeights)
-      : geom(_geom),
+      : dim(_dim),
+        geom(_geom),
         X(_X),
         dt(dt),
         num_cells(_num_cells),
         num_vertices(_geom.GetNVDofs_H1()),
         xmin(_xmin), xmax(_xmax),
-        OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
+        OptimizationProblem(_geom.GetNVDofs_H1(), NULL, NULL),
         V_target(_V_target), 
         massvec(_massvec), 
         bdr_vals(_bdr_vals, _bdr_vals.Size()),
@@ -686,7 +684,7 @@ public:
         n_bdr_dofs(_ess_tdofs.Size()),
       //   d_lo(bdr_vals), d_hi(bdr_vals),
       //   BCoper(n_bdr_dofs, input_size, _ess_tdofs, _GradDI, _GradDJ, _GradDData),
-        LMCoper(_geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
+        LMCoper(dim, _geom, _X, _num_cells, input_size, dt, _GradCI, _GradCJ),
         HessIArr(_HessI), HessJArr(_HessJ), HessData(_HessJ.Size()),
         ess_tdofs(_ess_tdofs),
         BdrVertexIndexingArray(_BdrVertexIndexingArray),
@@ -778,7 +776,7 @@ public:
             /* Compute Vi_hat */
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
-            CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
+            CalcViscousVelocity(dim, geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
 
             subtract(Vi, Vi_hat, Vi_diff);
             assert(Vi_diff.Size() == dim);
@@ -839,7 +837,7 @@ public:
             geom.VertexGetAdjacentVertices(ix, adj_verts);
             int adj_verts_size = adj_verts.Size();
 
-            CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
+            CalcViscousVelocity(dim, geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
 
             /* Add interior portion to d/dvix, d/dviy */
             add(2, Vi, -2., Vi_hat, temp_vec); // 32Vi - 8Vi_hat
@@ -1017,16 +1015,16 @@ public:
  * 
  * Note that both velocity vectors are of size dim * NVDofsH1
  */
-template <int dim>
 class ViscousOptimizedMeshVelocityProblem : public OptimizationProblem
 {
 private:
-   const Geometric<dim> &geom;
+   const int dim;
+   const Geometric &geom;
    const int num_cells, num_faces, num_vertices;
    const int nnz_sparse_jaceq, nnz_sparse_Hess_Lagr;
    Vector massvec, d_lo, d_hi;
-   const LocalMassConservationOperator<dim> LMCoper;
-   // const zeroSparseMatrix<dim> zSMoper;
+   const LocalMassConservationOperator LMCoper;
+   // const zeroSparseMatrix zSMoper;
    Array<int> HessIArr, HessJArr;
    Array<double> HessData;
    Array<int> ess_tdofs;
@@ -1035,18 +1033,19 @@ private:
    DenseMatrix block;
 
 public:
-   ViscousOptimizedMeshVelocityProblem(const Geometric<dim> &_geom, const Vector &_massvec,
+   ViscousOptimizedMeshVelocityProblem(const int &_dim, const Geometric &_geom, const Vector &_massvec,
                                        const ParGridFunction &_X, const int _num_cells,
                                        const double &dt, const Vector &xmin, const Vector &xmax,
                                        const Array<int> &_HessI, const Array<int> &_HessJ,
                                        const Array<int> &GradCI, const Array<int> &GradCJ,
                                        const Array<int> _ess_tdofs, const Array<int> _BdrVertexIndexingArray)
-      : geom(_geom),
+      : dim(_dim),
+        geom(_geom),
         num_cells(_num_cells),
         num_faces(geom.GetNumFaces()),
-        OptimizationProblem(dim*_geom.GetNVDofs_H1(), NULL, NULL),
+        OptimizationProblem(_geom.GetNVDofs_H1(), NULL, NULL),
         massvec(_massvec), d_lo(1), d_hi(1),
-        LMCoper(_geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
+        LMCoper(dim, _geom, _X, _num_cells, input_size, dt, GradCI, GradCJ),
         nnz_sparse_jaceq(GradCJ.Size()),
         nnz_sparse_Hess_Lagr(_HessJ.Size()),
         num_vertices(_geom.GetNVDofs_H1()),
@@ -1101,7 +1100,7 @@ public:
          /* Compute Vi_hat */
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-         CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
+         CalcViscousVelocity(dim, geom, BdrVertexIndexingArray, V, ix, adj_verts, Vi_hat);
          
          subtract(Vi, Vi_hat, temp_vec);
          val += std::pow(temp_vec.Norml2(),2);
@@ -1130,7 +1129,7 @@ public:
          /* Compute Vi_hat */
          geom.VertexGetAdjacentVertices(ix, adj_verts);
          int adj_verts_size = adj_verts.Size();
-         CalcViscousVelocity(geom, BdrVertexIndexingArray, V, ix, adj_verts, temp_vec);
+         CalcViscousVelocity(dim, geom, BdrVertexIndexingArray, V, ix, adj_verts, temp_vec);
 
          /* Add interior portion to d/dvix, d/dviy */
          iy = ix + num_vertices;

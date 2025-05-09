@@ -150,9 +150,9 @@ int TestWeightedCellAverageVelocityAtNode()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    Vector vbar(dim), pos(dim);

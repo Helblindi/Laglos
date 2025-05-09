@@ -41,8 +41,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class LeblancProblem: public ProblemBase<dim>
+class LeblancProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -61,7 +60,7 @@ private:
    double x_center = 0.5;
 
 public:
-   LeblancProblem()
+   LeblancProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

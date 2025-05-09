@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class TestBCs: public ProblemBase<dim>
+class TestBCs: public ProblemBase
 {
 private:
    /*********************************************************
@@ -65,7 +64,7 @@ private:
    bool _change_cfl = false;
 
 public:
-   TestBCs()
+   TestBCs(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

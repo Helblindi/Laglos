@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
    // Print the banner.
    if (Mpi::Root()) { display_banner(cout); }
 
-   const int dim = CompileTimeVals::dim;
+   int dim = 2;
    const string results_dir = CompileTimeVals::results_dir;
 
    // Parse command line options
@@ -395,12 +395,8 @@ int main(int argc, char *argv[]) {
                                                true));
       }
    }
-   if (dim != mesh->Dimension())
-   {
-      cout << "Mesh dimension does not match compile time vals dimension\n"
-           << "Aborting program.\n";
-      return -1;
-   }
+
+   dim = mesh->Dimension();
    cout << "Meshing done\n";
 
    // mesh->SetCurvature(2);
@@ -444,20 +440,20 @@ int main(int argc, char *argv[]) {
    { cout << "Zones min/max: " << ne_min << " " << ne_max << endl; }
 
    // Set up problem
-   ProblemBase<dim> * problem_class = NULL;
+   ProblemBase * problem_class = NULL;
    switch (problem)
    {
       case 0: // Taylor-Green
-         problem_class = new TaylorGreenProblem<dim>();
+         problem_class = new TaylorGreenProblem(dim);
          break;
       case 1: // Sedov
-         problem_class = new SedovLLNLProblem<dim>();
+         problem_class = new SedovLLNLProblem(dim);
          break;
       case 2: // Sod
-         problem_class = new SodProblem<dim>();
+         problem_class = new SodProblem(dim);
          break;
       case 3: // Triple Point
-         problem_class = new TriplePoint<dim>();
+         problem_class = new TriplePoint(dim);
          break;
       case 4: // gresh vortex
          break;
@@ -468,38 +464,38 @@ int main(int argc, char *argv[]) {
       case 7: // 2D Rayleigh-Taylor instability
          break;
       case 8: // Radial Sod
-         problem_class = new SodRadial<dim>();
+         problem_class = new SodRadial(dim);
          break;
       case 9: // Isentropic Vortex, stationary center
-         problem_class = new IsentropicVortex<dim>();
+         problem_class = new IsentropicVortex(dim);
          break;
       case 10: // Noh
-         problem_class = new NohProblem<dim>();
+         problem_class = new NohProblem(dim);
          break;
       case 11: // Saltzmann
-         problem_class = new SaltzmannProblem<dim>();
+         problem_class = new SaltzmannProblem(dim);
          break;
       /* VDW */
       case 12:
-         problem_class = new VdwTest1<dim>();
+         problem_class = new VdwTest1(dim);
          break;
       case 13:
-         problem_class = new VdwTest2<dim>();
+         problem_class = new VdwTest2(dim);
          break;
       case 14:
-         problem_class = new VdwTest3<dim>();
+         problem_class = new VdwTest3(dim);
          break;
       case 15:
-         problem_class = new VdwTest4<dim>();
+         problem_class = new VdwTest4(dim);
          break;
       case 16: // Kidder shell
-         problem_class = new KidderProblem<dim>();
+         problem_class = new KidderProblem(dim);
          break;
       case 17: // Kidder ball
-         problem_class = new KidderBallProblem<dim>();
+         problem_class = new KidderBallProblem(dim);
          break;
       case 18: // ICF
-         problem_class = new ICFProblem<dim>();
+         problem_class = new ICFProblem(dim);
          break;
       case 21: // Sedov
       {
@@ -508,53 +504,53 @@ int main(int argc, char *argv[]) {
          Vector params(2);
          params[0] = hmax, params[1] = pmesh->GetElementVolume(0);
 
-         problem_class = new SedovProblem<dim>();
+         problem_class = new SedovProblem(dim);
          problem_class->update(params, t_init);
          // TODO: Will need to modify initialization of internal energy
          //       if distorted meshes are used.
          break;
       }
       case 40: // Smooth
-         problem_class = new SmoothWave<dim>();
+         problem_class = new SmoothWave(dim);
          break;
       case 41: // Lax
-         problem_class = new LaxProblem<dim>();
+         problem_class = new LaxProblem(dim);
          break;
       case 42: // Leblanc
-         problem_class = new LeblancProblem<dim>();
+         problem_class = new LeblancProblem(dim);
          break;
       case 43: // Riemann Problem
-         problem_class = new RiemannProblem<dim>();
+         problem_class = new RiemannProblem(dim);
          break;
       case 50: // Elastic shocktube
-         problem_class = new ElasticShocktube<dim>();
+         problem_class = new ElasticShocktube(dim);
          break;
       case 51: // Elastic impact
-         problem_class = new ElasticImpact<dim>();
+         problem_class = new ElasticImpact(dim);
          break;
       case 52: // Elastic shear
-         problem_class = new ElasticShear<dim>();
+         problem_class = new ElasticShear(dim);
          break;
       case 53: // Elastic isentropic vortex
-         problem_class = new ElasticIsentropicVortex<dim>();
+         problem_class = new ElasticIsentropicVortex(dim);
          break;
       case 54: // Elastic projectile plate
-         problem_class = new ElasticProjectilePlate<dim>();
+         problem_class = new ElasticProjectilePlate(dim);
          break;
       case 55: // Elastic shear rotate in y direction
-         problem_class = new ElasticShearY<dim>();
+         problem_class = new ElasticShearY(dim);
          break;
       case 56: // Elastic impact + shear
-         problem_class = new ElasticImpactShear<dim>();
+         problem_class = new ElasticImpactShear(dim);
          break;
       case 57: // Elastic 2D, Favrie 2014 section 5.4
-         problem_class = new ElasticTwist<dim>();
+         problem_class = new ElasticTwist(dim);
          break;
       case 58: // Elastic noh
-         problem_class = new ElasticNoh<dim>();
+         problem_class = new ElasticNoh(dim);
          break;
       case 100:
-         problem_class = new TestBCs<dim>();
+         problem_class = new TestBCs(dim);
          break;
       default:
          MFEM_ABORT("Failed to initiate a problem.\n");
@@ -849,15 +845,15 @@ int main(int argc, char *argv[]) {
    // and Coefficient class requires std::function arguments
    using namespace std::placeholders;
    std::function<double(const Vector &,const double)> sv0_static = 
-      std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<void(const Vector &, const double, Vector &)> v0_static = 
-      std::bind(&ProblemBase<dim>::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      std::bind(&ProblemBase::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
    std::function<double(const Vector &,const double)> ste0_static = 
-      std::bind(&ProblemBase<dim>::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> p0_static = 
-      std::bind(&ProblemBase<dim>::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
 
    // Initialize specific volume, velocity, and specific total energy
    FunctionCoefficient sv_coeff(sv0_static);
@@ -899,7 +895,7 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);

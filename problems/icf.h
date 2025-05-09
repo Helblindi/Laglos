@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ICFProblem: public ProblemBase<dim>
+class ICFProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -67,7 +66,7 @@ private:
    double _rho2 = 1., _p2 = 0.1, _r2 = 1.2;
 
 public:
-   ICFProblem()
+   ICFProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

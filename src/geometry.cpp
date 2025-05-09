@@ -10,8 +10,8 @@ namespace hydroLO
 /**
 * Constructor 
 */
-template<int dim>
-Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFiniteElementSpace &l2) :
+Geometric::Geometric(const int &_dim, Array<int> offsets, ParFiniteElementSpace &h1, ParFiniteElementSpace &l2) :
+   dim(_dim),
    H1(h1),
    L2(l2),
    pmesh(h1.GetParMesh()),
@@ -25,6 +25,7 @@ Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFini
    NVDofs_H1 = h1.GetNVDofs();
    Transpose(*edge_vertex, vertex_edge);
    cout << "NDofs_H1: " << NDofs_H1 << endl;
+   cout << "dim: " << dim << endl;
 }
 
 /****************************************************************************************************
@@ -36,8 +37,7 @@ Geometric<dim>::Geometric(Array<int> offsets, ParFiniteElementSpace &h1, ParFini
 * Purpose:
 *   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::UpdateNodeVelocity(Vector &dSdt, const int & node, const Vector & vel) const
+void Geometric::UpdateNodeVelocity(Vector &dSdt, const int & node, const Vector & vel) const
 {
    ParGridFunction dxdt;
    dxdt.MakeRef(&H1, dSdt, block_offsets[0]);
@@ -61,8 +61,7 @@ void Geometric<dim>::UpdateNodeVelocity(Vector &dSdt, const int & node, const Ve
 * Purpose:
 *   This function is used to update the mv_gf ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &dxdt, const int &node, const Vector &vel) const
+void Geometric::UpdateNodeVelocity(ParGridFunction &dxdt, const int &node, const Vector &vel) const
 {
    assert(dxdt.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
@@ -83,8 +82,7 @@ void Geometric<dim>::UpdateNodeVelocity(ParGridFunction &dxdt, const int &node, 
 * Purpose:
 *   This function is used to update the dxdt ParGridFunction which is used to move the mesh.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, const Vector &vel) const
+void Geometric::UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, const Vector &vel) const
 {
    assert(dxdt_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
@@ -105,8 +103,7 @@ void Geometric<dim>::UpdateNodeVelocityVecL(Vector &dxdt_l, const int & node, co
 * Purpose:
 *  This function returns the velocity at the given global node.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetNodeVelocity(const Vector &dSdt, const int & node, Vector & vel) const
+void Geometric::GetNodeVelocity(const Vector &dSdt, const int & node, Vector & vel) const
 {
    Vector* sptr = const_cast<Vector*>(&dSdt);
    ParGridFunction dxdt;
@@ -131,8 +128,7 @@ void Geometric<dim>::GetNodeVelocity(const Vector &dSdt, const int & node, Vecto
 * Purpose:
 *  This function returns the velocity at the given global node.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetNodeVelocity(const ParGridFunction &dxdt, const int & node, Vector & vel) const
+void Geometric::GetNodeVelocity(const ParGridFunction &dxdt, const int & node, Vector & vel) const
 {
    assert(dxdt.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
@@ -154,8 +150,7 @@ void Geometric<dim>::GetNodeVelocity(const ParGridFunction &dxdt, const int & no
 *  This function returns the velocity at the given global node.
 * Note: L indicates grid function is the low order form.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetNodeVelocityVecL(const Vector &dxdt_l, const int & node, Vector & vel) const
+void Geometric::GetNodeVelocityVecL(const Vector &dxdt_l, const int & node, Vector & vel) const
 {
    assert(dxdt_l.Size() == dim*NVDofs_H1);
    for (int i = 0; i < dim; i++)
@@ -176,8 +171,7 @@ void Geometric<dim>::GetNodeVelocityVecL(const Vector &dxdt_l, const int & node,
 * Purpose:
 *  This function updates the cartesian location corresponding to a global node.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vector &x) const
+void Geometric::UpdateNodePosition(Vector &S, const int & node, const Vector &x) const
 {
    ParGridFunction x_gf;
    x_gf.MakeRef(&H1, S, block_offsets[0]);
@@ -202,8 +196,7 @@ void Geometric<dim>::UpdateNodePosition(Vector &S, const int & node, const Vecto
 * Purpose:
 *  This function returns the cartesian location corresponding to a global node.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Vector & x) const
+void Geometric::GetNodePositionFromBV(const Vector &S, const int & node, Vector & x) const
 {
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf;
@@ -224,8 +217,7 @@ void Geometric<dim>::GetNodePositionFromBV(const Vector &S, const int & node, Ve
 * Purpose:
 *  This function returns the cartesian location corresponding to a global node.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector &x) const
+void Geometric::GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector &x) const
 {
    assert(x_gf.Size() == dim*NDofs_H1);
    for (int i = 0; i < dim; i++)
@@ -245,8 +237,7 @@ void Geometric<dim>::GetNodePosition(const ParGridFunction &x_gf, const int & no
 * Purpose:
 *    This function returns the H1 DOFS on a given face.
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::GetFaceDofs(const int &face, Array<int> &face_dofs) const
+void Geometric::GetFaceDofs(const int &face, Array<int> &face_dofs) const
 {
    H1.GetFaceDofs(face, face_dofs);
 }
@@ -261,8 +252,7 @@ void Geometric<dim>::GetFaceDofs(const int &face, Array<int> &face_dofs) const
 * Purpose:
 *    This function returns the H1 adjacent faces
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::VertexGetAdjacentFaces(const int &vertex, Array<int> &adj_faces) const
+void Geometric::VertexGetAdjacentFaces(const int &vertex, Array<int> &adj_faces) const
 {
    vertex_edge.GetRow(vertex, adj_faces);
 }
@@ -276,8 +266,7 @@ void Geometric<dim>::VertexGetAdjacentFaces(const int &vertex, Array<int> &adj_f
 * Purpose:
 *    This function returns the number of adjacent faces
 ****************************************************************************************************/
-template<int dim>
-int Geometric<dim>::GetNumAdjFaces(const int &vertex) const
+int Geometric::GetNumAdjFaces(const int &vertex) const
 {
    Array<int> adj_faces;
    vertex_edge.GetRow(vertex, adj_faces);
@@ -294,8 +283,7 @@ int Geometric<dim>::GetNumAdjFaces(const int &vertex) const
 * Purpose:
 *    This function returns the H1L adjacent vertices
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::VertexGetAdjacentVertices(const int &vertex, Array<int> &adj_vertices) const
+void Geometric::VertexGetAdjacentVertices(const int &vertex, Array<int> &adj_vertices) const
 {
    Array<int> faces_row, face_dofs;
    vertex_edge.GetRow(vertex, faces_row);
@@ -328,8 +316,7 @@ void Geometric<dim>::VertexGetAdjacentVertices(const int &vertex, Array<int> &ad
 *  (-1,1) ---> (-1,-1)
 *  (x, y) ---> (-y, x)
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::Orthogonal(Vector &v) const
+void Geometric::Orthogonal(Vector &v) const
 {
    assert(v.Size() == dim);
    if (dim == 2)
@@ -356,8 +343,7 @@ void Geometric<dim>::Orthogonal(Vector &v) const
 * Example:
 *  (1,0) ---> (0,-1)
 ****************************************************************************************************/
-template<int dim>
-void Geometric<dim>::Perpendicular(Vector &v) const
+void Geometric::Perpendicular(Vector &v) const
 {
    assert(v.Size() == dim);
    if (dim == 2)
@@ -371,11 +357,6 @@ void Geometric<dim>::Perpendicular(Vector &v) const
       MFEM_ABORT("Can only rotate 2D vectors\n");
    }
 }
-
-/* Explicit instantiation */
-template class Geometric<1>;
-template class Geometric<2>;
-template class Geometric<3>;
 
 } // ns hydroLO
 } // ns mfem

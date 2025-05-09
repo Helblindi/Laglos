@@ -43,8 +43,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class SedovLLNLProblem: public ProblemBase<dim>
+class SedovLLNLProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -58,7 +57,7 @@ private:
    string _indicator = "Sedov"; // Possible: saltzmann
 
 public:
-   SedovLLNLProblem()
+   SedovLLNLProblem(const int &_dim) : ProblemBase(_dim)
    {
       if (dim != 2)
       {

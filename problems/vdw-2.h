@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class VdwTest2: public ProblemBase<dim>
+class VdwTest2: public ProblemBase
 {
 private:
    /*********************************************************
@@ -66,7 +65,7 @@ private:
    // double eR = 12.661115131212163;
 
 public:
-   VdwTest2() 
+   VdwTest2(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

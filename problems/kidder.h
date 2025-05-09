@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class KidderProblem: public ProblemBase<dim>
+class KidderProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -75,7 +74,7 @@ private:
    }
 
 public:
-   KidderProblem() : tau(compute_focusing_time()), t_exact(0.)
+   KidderProblem(const int &_dim) : ProblemBase(_dim), tau(compute_focusing_time()), t_exact(0.)
    {
       cout << "rho1: " << rho1 << endl;
       cout << "rho2: " << rho2 << endl;
@@ -237,8 +236,8 @@ public:
       } 
    }
 
-   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override { }
-   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) override
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override { }
+   void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric *geom=NULL, const ParGridFunction *x_gf=NULL) override
    {
       // Need to update the current time since the function in LaglosSolver that calls GetBoundaryState does not have access to the current time
       t_exact = t;

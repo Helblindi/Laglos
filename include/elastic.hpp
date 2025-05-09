@@ -28,10 +28,10 @@ enum ShearEnergyMethod {
    AVERAGE_ENERGY
 };
 
-template<int dim>
 class Elastic
 {
 private:
+   const int dim;
    ShearEnergyMethod shear_method;
    ShearEOS shear_eos;
    ParFiniteElementSpace &H1, &L2;
@@ -45,12 +45,14 @@ private:
    double mu = -1.; // Shear modulus
 
 public:
-   Elastic(ParFiniteElementSpace &h1_fes,
+   Elastic(const int &_dim,
+           ParFiniteElementSpace &h1_fes,
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
            ShearEOS _shear_eos = ShearEOS::MOONEY_RIVLIN,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_C) : 
+      dim(_dim),
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),

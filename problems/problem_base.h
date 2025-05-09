@@ -42,7 +42,6 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
 class ProblemBase
 {
 private:
@@ -62,11 +61,13 @@ private:
    double cfl_time_change = 0.;
 
 protected:
+   const int dim;
    double a = 0., b = 0., gamma = 0.;
    double q = 0., p_inf = 0., mu = 0.;
    std::unique_ptr<EquationOfState> eos = NULL;  // Pointer to the EOS object
 
 public:
+   ProblemBase(const int &_dim) : dim(_dim) {}
    // Setters
    void set_a(const double &_a) { a = _a; }
    void set_b(const double &_b) { b = _b; }
@@ -106,19 +107,19 @@ public:
    virtual double get_shear_modulus(const int &cell_attr = 0) const { return mu; }
    virtual void lm_update(const double b_covolume) {}
    virtual void update(Vector vec, double t = 0.) {}
-   virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
-   virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL, const ParGridFunction &x_gf=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
+   virtual void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
+   virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric *geom=NULL, const ParGridFunction *x_gf=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
    virtual void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t=0.) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
 
    /* ProblemDescription */
-   static double internal_energy(const Vector &U, const double e_sheer)
+   double internal_energy(const Vector &U, const double e_sheer)
    {
       const double &rho = 1./U[0];
       const double &e = specific_internal_energy(U, e_sheer);
       return rho * e;
    }
 
-   static double specific_internal_energy(const Vector &U, const double e_sheer)
+   double specific_internal_energy(const Vector &U, const double e_sheer)
    {
       // Verify e_sheer > 0.
       // TODO: This is a temporary fix. The correct fix is to ensure that e_sheer is always positive.
@@ -126,7 +127,7 @@ public:
       /* Subtract out kinetic and sheer energy */
       Vector v;
       velocity(U, v);
-      const double E = U[dim + 1]; // specific total energy
+      double E = U[dim + 1]; // specific total energy
       double val = E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
 
       // Verify sie > 0.
@@ -139,7 +140,7 @@ public:
       return val;
    }
 
-   static inline void velocity(const Vector & U, Vector &vel)
+   inline void velocity(const Vector & U, Vector &vel)
    {
       vel.SetSize(dim);
       for (int i = 0; i < dim; i++)

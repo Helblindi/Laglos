@@ -40,8 +40,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class IsentropicVortex: public ProblemBase<dim>
+class IsentropicVortex: public ProblemBase
 {
 private:
    /*********************************************************
@@ -63,7 +62,7 @@ private:
    double vc_0 = 0., vc_1 = 0.; // u_inf
 
 public:
-   IsentropicVortex()
+   IsentropicVortex(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);
@@ -84,7 +83,7 @@ public:
       this->set_b(b_covolume);
    }
 
-   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric<dim> &geom=NULL) override
+   void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override
    {
       Array<int> dofs_list;
       ess_bdr = 0;

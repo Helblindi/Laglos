@@ -28,7 +28,7 @@
 
 
 ## Mass Error Calculation
-All calculations related to the local mass error are calculated in the function LagrangianLOOperator<dim>::CheckMassConservation.
+All calculations related to the local mass error are calculated in the function LagrangianLOOperator::CheckMassConservation.
 The mass error is a relative quantity and is defined as 
 $$ \text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho}}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}} $$ 
 where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the measure of the cell at time $t^n$, and $T_c^n$ is the specific volume of a cell at time $t^n$.

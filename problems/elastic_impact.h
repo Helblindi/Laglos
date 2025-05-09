@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ElasticImpact: public ProblemBase<dim>
+class ElasticImpact: public ProblemBase
 {
 private:
    /*********************************************************
@@ -61,7 +60,7 @@ private:
    const double _mu = 2.6E10;
 
 public:
-   ElasticImpact()
+   ElasticImpact(const int &_dim) : ProblemBase(_dim)
    {
       this->set_gamma(_gamma);
       this->set_pinf(p_inf);

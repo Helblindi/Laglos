@@ -300,9 +300,9 @@ int test_Vi_geo()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    Vector Vgeo(dim), V_ex(dim), V_error(dim);
@@ -431,9 +431,9 @@ int test_Ci_geo()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix Cgeo(dim), Cgeo_0(dim), C_error(dim);
@@ -548,7 +548,7 @@ int test_RT_vel()
    pmesh->SetNodalGridFunction(&x_gf);
    x_gf.SyncAliasMemory(S);
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
    Vector one(dim);
    one = 1.;
@@ -573,7 +573,7 @@ int test_RT_vel()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Compute intermediate face velocities
    double t = 0., error = 0.;
@@ -794,9 +794,9 @@ int test_IntGradRT()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -928,9 +928,9 @@ int test_IntGradRT2()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -1065,9 +1065,9 @@ int test_IntGradRT_quadratic()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Necessary parameters
    DenseMatrix dm(dim), true_grad(dim), grad_error(dim);
@@ -1197,9 +1197,9 @@ int test_determinant()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    // Bread and butter of test
    // First determinant test
@@ -1353,9 +1353,9 @@ void plot_velocities()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), true_vel(dim);
    double t = 0.;
@@ -1714,9 +1714,9 @@ void test_vel_field_1()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
@@ -1929,9 +1929,9 @@ void test_vel_field_2()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new ProblemTemplate<dim>();
+   ProblemBase * problem_class = new ProblemTemplate();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim);
    DenseMatrix dm(dim);
@@ -2138,9 +2138,9 @@ void test_RT_nodal_vel()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    Vector _vel(dim), vec_res(dim), node_v(dim);
    DenseMatrix dm(dim);

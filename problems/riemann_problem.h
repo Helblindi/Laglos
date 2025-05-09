@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class RiemannProblem: public ProblemBase<dim>
+class RiemannProblem: public ProblemBase
 {
 private:
    /*********************************************************
@@ -77,7 +76,7 @@ private:
    double x0 = 1.;
 
 public:
-   RiemannProblem()
+   RiemannProblem(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

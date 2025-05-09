@@ -15,20 +15,21 @@ namespace hydroLO
  * Class to represent the local mass conservation
  * constraints on our Lagrange Multiplier problem
  */
-template <int dim>
 class LocalMassConservationOperatorDense : public Operator
 {
 private:
+   const int dim;
    const ParGridFunction &X;
    const int num_cells, input_size;
-   const Geometric<dim> &geom;
+   const Geometric &geom;
    double dt; 
    mutable DenseMatrix grad;
 
 public:
-   LocalMassConservationOperatorDense(const Geometric<dim> &_geom, const ParGridFunction &_X, 
+   LocalMassConservationOperatorDense(const int &_dim, const Geometric &_geom, const ParGridFunction &_X, 
                                  const int &_num_cells, const int &_input_size, const double &_dt)
       : Operator(_num_cells, _input_size),
+        dim(_dim),
         num_cells(_num_cells),
         input_size(_input_size),
         grad(_num_cells, _input_size),
@@ -156,24 +157,26 @@ public:
    }
 };
 
-template<int dim>
 class zeroDenseMatrixDense : public Operator
 {
 private:
+   const int dim;
    DenseMatrix dm;
    mutable DenseMatrix grad;
 
 public:
-   zeroDenseMatrixDense(const int &height, const int &width) : 
+   zeroDenseMatrixDense(const int &_dim, const int &height, const int &width) : 
       Operator(height, width),
+      dim(_dim),
       dm(height, width),
       grad(dim, width)
    {
       grad = 0.;
       dm = 0.;
    }
-   zeroDenseMatrixDense(const int &n) :
+   zeroDenseMatrixDense(const int &_dim, const int &n) :
       Operator(n,n),
+      dim(_dim),
       dm(n),
       grad(n,n)
    {
@@ -215,22 +218,23 @@ public:
  * 
  * Note that both velocity vectors are of size dim * NVDofsH1
  */
-template <int dim>
 class OptimizedMeshVelocityProblemDense : public OptimizationProblem
 {
 private:
+   const int dim;
    const Vector &V_target;
    Vector massvec, d_lo, d_hi;
-   const LocalMassConservationOperatorDense<dim> LMCoper;
-   zeroDenseMatrixDense<dim> zDMoper;
+   const LocalMassConservationOperatorDense LMCoper;
+   zeroDenseMatrixDense zDMoper;
 
 public:
-   OptimizedMeshVelocityProblemDense(const Geometric<dim> &_geom, const Vector &_V_target, const Vector &_massvec, 
+   OptimizedMeshVelocityProblemDense(const int &_dim, const Geometric &_geom, const Vector &_V_target, const Vector &_massvec, 
                                 const ParGridFunction &_X, const int num_cells,
                                 const double &dt, const Vector &xmin, const Vector &xmax) 
       : OptimizationProblem(_V_target.Size(), NULL, NULL),
-        LMCoper(_geom, _X, num_cells, input_size, dt),
-        zDMoper(1, input_size),
+        dim(_dim),
+        LMCoper(dim, _geom, _X, num_cells, input_size, dt),
+        zDMoper(dim, 1, input_size),
       //   OptimizationProblem(_V_target.Size(), &LMCoper, &zDMoper),
         V_target(_V_target), massvec(_massvec), d_lo(1), d_hi(1)
    {

@@ -82,20 +82,21 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 *
 * Purpose: Instantiate LagrangianLOOperator class.
 ****************************************************************************************************/
-template<int dim>
-LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
-                                                ParFiniteElementSpace &h1,
-                                                ParFiniteElementSpace &h1_l,
-                                                ParFiniteElementSpace &l2,
-                                                ParFiniteElementSpace &l2v,
-                                                ParFiniteElementSpace &cr,
-                                                const ParGridFunction &rho0_gf,
-                                                ParLinearForm *m,
-                                                ProblemBase<dim> *_pb,
-                                                Array<int> offset,
-                                                bool use_viscosity,
-                                                bool mm, 
-                                                double CFL) :
+LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
+                                           const int size,
+                                           ParFiniteElementSpace &h1,
+                                           ParFiniteElementSpace &h1_l,
+                                           ParFiniteElementSpace &l2,
+                                           ParFiniteElementSpace &l2v,
+                                           ParFiniteElementSpace &cr,
+                                           const ParGridFunction &rho0_gf,
+                                           ParLinearForm *m,
+                                           ProblemBase *_pb,
+                                           Array<int> offset,
+                                           bool use_viscosity,
+                                           bool mm, 
+                                           double CFL) :
+   dim(_dim),
    TimeDependentOperator(size),
    H1(h1),
    H1_L(h1_l),
@@ -117,7 +118,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    m_lf(m),
    pb(_pb),
    block_offsets(offset),
-   geom(offset, H1, L2),
+   geom(_dim, offset, H1, L2),
    Vsize_H1(H1.GetVSize()),
    TVSize_H1(H1.TrueVSize()),
    GTVSize_H1(H1.GlobalTrueVSize()),
@@ -150,7 +151,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    mm(mm),
    CFL(CFL),
    ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
-   elastic(H1, L2, rho0_gf, ir) //NF//MS
+   elastic(dim, H1, L2, rho0_gf, ir) //NF//MS
 {
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
@@ -225,7 +226,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
          MFEM_WARNING("May need to enforce additional BCs.\n");
          if (pb->has_mv_boundary_conditions())
          {
-            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, geom);
+            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, &geom);
          }
 
          ess_tdofs.Append(add_ess_tdofs);
@@ -263,8 +264,7 @@ LagrangianLOOperator<dim>::LagrangianLOOperator(const int size,
    cout << "num_edges: " << num_edges << endl;
 }
 
-template<int dim>
-LagrangianLOOperator<dim>::~LagrangianLOOperator()
+LagrangianLOOperator::~LagrangianLOOperator()
 {
    delete dij_sparse;
    dij_sparse = nullptr;
@@ -287,8 +287,7 @@ LagrangianLOOperator<dim>::~LagrangianLOOperator()
  * @note This function assumes that the elasticity model is being used and that
  *       the necessary data structures (e.g., elastic object) are properly initialized.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
+void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
 {
    assert(use_elasticity);
    sigmaD_e.SetSize(3);
@@ -332,8 +331,7 @@ void LagrangianLOOperator<dim>::ComputeSigmaDComp(const Vector &S, const int &e,
  *
  * @note This function will need to be modified for 2D and 3D.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
+void LagrangianLOOperator::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
 {
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2);
@@ -362,8 +360,7 @@ void LagrangianLOOperator<dim>::ComputeSigmaGF(const Vector &S, ParGridFunction 
  *
  * @note This function will need to be modified for 2D and 3D.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
+void LagrangianLOOperator::ComputeFGF(ParGridFunction &f_gf) const
 {
    assert(this->use_elasticity);
    assert(f_gf.Size() == NDofs_L2);
@@ -377,8 +374,7 @@ void LagrangianLOOperator<dim>::ComputeFGF(ParGridFunction &f_gf) const
    }
 }
 
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
+void LagrangianLOOperator::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
 {
    assert(this->use_elasticity);
    assert(e_sheer_gf.Size() == NDofs_L2);
@@ -391,8 +387,7 @@ void LagrangianLOOperator<dim>::ComputeESheerGF(ParGridFunction &e_sheer_gf) con
 
 
 /* This Mult method is not mass conservative by itself */
-template<int dim>
-void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
 {
    // Make sure that the mesh positions correspond to the ones in S. This is
    // needed only because some mfem time integrators don't update the solution
@@ -435,8 +430,7 @@ void LagrangianLOOperator<dim>::Mult(const Vector &S, Vector &dS_dt) const
  * @param S The input state vector.
  * @param dS_dt The output time derivative of the state vector.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
 {
    chrono_state.Start();
 
@@ -780,8 +774,7 @@ void LagrangianLOOperator<dim>::SolveHydro(const Vector &S, Vector &dS_dt) const
  *
  * @note This function should be run after the LagrangianLOOperator::Mult` function.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const double &dt)
+void LagrangianLOOperator::EnforceL2BC(Vector &S, const double &t, const double &dt)
 {
    int el, info;
    Array<int> vel_dofs(dim);
@@ -862,8 +855,7 @@ void LagrangianLOOperator<dim>::EnforceL2BC(Vector &S, const double &t, const do
  *
  * @note This function should be run before the `ODESolver::Step` function.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::UpdateMeshVelocityBCs(const double &t, const double &dt)
+void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &dt)
 {
    if (pb->get_mv_bcs_need_updating())
    {
@@ -874,7 +866,7 @@ void LagrangianLOOperator<dim>::UpdateMeshVelocityBCs(const double &t, const dou
 
       /* Reset additional boundary conditions from previous iteration */
       bdr_vals.SetSize(ess_tdofs_cart_size);
-      pb->update_additional_BCs(t, timestep_first, add_bdr_vals, geom, x_gf);
+      pb->update_additional_BCs(t, timestep_first, add_bdr_vals, &geom, &x_gf);
       bdr_vals.Append(add_bdr_vals);
    }
 }
@@ -891,8 +883,7 @@ void LagrangianLOOperator<dim>::UpdateMeshVelocityBCs(const double &t, const dou
  * @param S The input state vector.
  * @param dS_dt The output time derivative of the state vector.
  */
-template<int dim>
-void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
 {
    // cout << "========================================\n"
    //      << "          SolveMeshVelocities           \n"
@@ -1155,8 +1146,7 @@ void LagrangianLOOperator<dim>::SolveMeshVelocities(const Vector &S, Vector &dS_
 *  4) Assemble, Finalize, ParallelAssemble calls
 *  5) HypreParMatrix::MergeDiagAndOffd --> SparseMatrix
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::InitializeDijMatrix()
+void LagrangianLOOperator::InitializeDijMatrix()
 {
    switch (dim)
    {
@@ -1184,7 +1174,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
    // Create dummy coefficients
    using namespace std::placeholders;
    std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase<dim>::rho0, pb, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::rho0, pb, std::placeholders::_1, std::placeholders::_2);
 
    FunctionCoefficient rho_coeff(rho0_static);
 
@@ -1210,8 +1200,7 @@ void LagrangianLOOperator<dim>::InitializeDijMatrix()
 *
 * Purpose:
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
+void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
 {
    // cout << "=======================================\n"
    //      << "           Build Dij Matrix            \n"
@@ -1313,8 +1302,7 @@ void LagrangianLOOperator<dim>::BuildDijMatrix(const Vector &S)
 *  This is accomplished by iterative over each cell and computing the corresponding max dt, then 
 *  a minimum of the current dt, and the computed restriction.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
+void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 {
    // cout << "CalculateTimestep\n";
    double t_min = 1.;
@@ -1411,8 +1399,7 @@ void LagrangianLOOperator<dim>::CalculateTimestep(const Vector &S)
 *     This function is a helper function to identify which entity a node corresponds to
 *     and to convert from the global numbering to the entity's numbering.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetEntityDof(const int GDof, DofEntity & entity, int & EDof)
+void LagrangianLOOperator::GetEntityDof(const int GDof, DofEntity & entity, int & EDof)
 {
    // cout << "================== \n GetEntityDof \n================== \n";
    
@@ -1476,8 +1463,7 @@ void LagrangianLOOperator<dim>::GetEntityDof(const int GDof, DofEntity & entity,
 *  BdrElementIndexingArray[face] = bdr_attr, and if the face is an interior face, then we will have
 *  BdrElementIndexingArray[face] = -1.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
+void LagrangianLOOperator::CreateBdrElementIndexingArray()
 {
    cout << "Constructing BdrElementIndexingArray:\n";
    for (int i = 0; i < pmesh->GetNBE(); i++)
@@ -1501,8 +1487,7 @@ void LagrangianLOOperator<dim>::CreateBdrElementIndexingArray()
 *  Note that this function will label a vertex with 5 if that vertex lies on the corner, indicating 
 *  that the vertex velocity should be set to 0 to preserve the slip BCs on both of its faces.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
+void LagrangianLOOperator::CreateBdrVertexIndexingArray()
 {
    // 3DTODO: Will need to modify this for faces instead of edges
    Array<int> fids, oris;
@@ -1577,8 +1562,7 @@ void LagrangianLOOperator<dim>::CreateBdrVertexIndexingArray()
 *  Note that this function will label a cell with 5 if that cell lies on the corner, indicating 
 *  that the cell velocity should be set to 0 to preserve the slip BCs on both of its faces.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::FillCellBdrFlag()
+void LagrangianLOOperator::FillCellBdrFlag()
 {
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
@@ -1612,8 +1596,7 @@ void LagrangianLOOperator<dim>::FillCellBdrFlag()
 }
 
 
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext)
+void LagrangianLOOperator::ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext)
 {
    // cout << "ComputeKidderAvgIntExtRadii\n";
    Vector face_x(dim);
@@ -1661,8 +1644,7 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgIntExtRadii(const Vector &S, dou
 }
 
 
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy)
+void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy)
 {
    ParGridFunction sv_gf;
    Vector* sptr = const_cast<Vector*>(&S);
@@ -1708,8 +1690,7 @@ void LagrangianLOOperator<dim>::ComputeKidderAvgDensityAndEntropy(const Vector &
 *     reversed orientation, or twisted, and thus the mesh has 
 *     collapsed.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeMinDetJ(int &cell, double &minDetJ)
+void LagrangianLOOperator::ComputeMinDetJ(int &cell, double &minDetJ)
 {
    ElementTransformation * trans;
    minDetJ = 100.;
@@ -1754,8 +1735,7 @@ void LagrangianLOOperator<dim>::ComputeMinDetJ(int &cell, double &minDetJ)
 *  In addition, if ts_min_detJ which is calculated in the routine ComputeMinDetJ returns negative,
 *  this function returns true to indicate that the mesh has collapsed.
 ****************************************************************************************************/
-template<int dim>
-bool LagrangianLOOperator<dim>::ComputeTimeSeriesData(const Vector & S, const double &t, const double &dt)
+bool LagrangianLOOperator::ComputeTimeSeriesData(const Vector & S, const double &t, const double &dt)
 {
    ts_dijmax.Append(dij_sparse->MaxNorm());
    ts_t.Append(t);
@@ -1809,8 +1789,7 @@ bool LagrangianLOOperator<dim>::ComputeTimeSeriesData(const Vector & S, const do
 *           3----F-----4
 *
 ****************************************************************************************************/
-template<int dim>
-bool LagrangianLOOperator<dim>::IsMeshCollapsedGeom(const Vector &S)
+bool LagrangianLOOperator::IsMeshCollapsedGeom(const Vector &S)
 {
    mfem::Mesh::FaceInformation FI;
    Array<int> fids, oris, verts, face_dofs;
@@ -1879,8 +1858,7 @@ bool LagrangianLOOperator<dim>::IsMeshCollapsedGeom(const Vector &S)
 *  This function is used to enforce the exact solution on the boundary at a
 *  particular cell.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
+void LagrangianLOOperator::EnforceExactBCOnCell(const Vector &S, const int & cell, const double &t, 
                                                      const double &dt, Vector & state_val)
 {
    // cout << "========================================\n"
@@ -1935,8 +1913,7 @@ void LagrangianLOOperator<dim>::EnforceExactBCOnCell(const Vector &S, const int 
 *  Postprocess the density to be exactly mass conservative.  This function must be called
 *  after the mesh motion has been calculated.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
+void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
 {
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
@@ -1993,8 +1970,7 @@ void LagrangianLOOperator<dim>::SetMassConservativeDensity(Vector &S, double &pc
 * Purpose:
 *  Simply invert the specific volume
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const
+void LagrangianLOOperator::ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const
 {
    Vector* sptr = const_cast<Vector*>(&S);
    ParGridFunction sv_gf;
@@ -2018,8 +1994,7 @@ void LagrangianLOOperator<dim>::ComputeDensity(const Vector &S, ParGridFunction 
 *  Given a cell, return the hydrodynamic state variables of that cell, i.e. in vector for get
 *  (specific volume, velocity, specific total energy)
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, const int cell, Vector &U) const
+void LagrangianLOOperator::GetCellStateVector(const Vector &S, const int cell, Vector &U) const
 {
    U.SetSize(dim + 2);
 
@@ -2065,8 +2040,7 @@ void LagrangianLOOperator<dim>::GetCellStateVector(const Vector &S, const int ce
 *  This function is used to update the BlockVector S with the newly computed hydrodynamic state
 *  variables on the given cell.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S, const int cell, const Vector &U) const
+void LagrangianLOOperator::SetCellStateVector(Vector &S, const int cell, const Vector &U) const
 {
    Array<int> dofs;
    Array<int> sub_dofs;
@@ -2119,8 +2093,7 @@ void LagrangianLOOperator<dim>::SetCellStateVector(Vector &S, const int cell, co
 *        |                                  |
 *       \/ (face)                          \/ (face)
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const
+void LagrangianLOOperator::CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const
 {
    // cout << "=======================================\n"
    //      << "  Calculating outward normal integral  \n"
@@ -2210,8 +2183,7 @@ void LagrangianLOOperator<dim>::CalcOutwardNormalInt(const Vector &S, const int 
 *
 *  The definition of the intermediate face velocity is given by eq (5.7).
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &S) const
+void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) const
 {
    // cout << "=======================================\n"
    //      << "   ComputeIntermediateFaceVelocities   \n"
@@ -2292,8 +2264,7 @@ void LagrangianLOOperator<dim>::ComputeIntermediateFaceVelocities(const Vector &
 *  To set the viscosity coefficient to be used with the TargetOptimizedMeshVelocityProblem
 *  in the SolveHiOp function.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMVTargetViscCoeff(const double & coeff)
+void LagrangianLOOperator::SetMVTargetViscCoeff(const double & coeff)
 {
    if (coeff < 0.)
    {
@@ -2314,8 +2285,7 @@ void LagrangianLOOperator<dim>::SetMVTargetViscCoeff(const double & coeff)
 *     3) Adjacent cell face based mesh movement (LS based)
 *     4) CAVEAT Weighted LS
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMVOption(const int & option)
+void LagrangianLOOperator::SetMVOption(const int & option)
 {
    this->mv_option = option;
 }
@@ -2332,8 +2302,7 @@ void LagrangianLOOperator<dim>::SetMVOption(const int & option)
 *     2) Average of corners, Q1 type.
 *     Default) Use computed velocity, RT or Vf
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetFVOption(const int & option)
+void LagrangianLOOperator::SetFVOption(const int & option)
 {
    this->fv_option = option;
 }
@@ -2357,8 +2326,7 @@ void LagrangianLOOperator<dim>::SetFVOption(const int & option)
 *                   velocities.
 *     4) Default  - No mesh iteration.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMVIterationOption(const int &option)
+void LagrangianLOOperator::SetMVIterationOption(const int &option)
 {
    this->mv_it_option = option;
 }
@@ -2374,8 +2342,7 @@ void LagrangianLOOperator<dim>::SetMVIterationOption(const int &option)
 *  To enable the use of and set the number of iterations for the 
 *  IterativeCornerVelocityMC() function.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMVIteration(const int num_iterations) { 
+void LagrangianLOOperator::SetMVIteration(const int num_iterations) { 
    this->use_corner_velocity_MC_iteration = true;
    this->corner_velocity_MC_num_iterations = num_iterations; 
 }
@@ -2390,8 +2357,7 @@ void LagrangianLOOperator<dim>::SetMVIteration(const int num_iterations) {
 *  To enable the use of and set the amount of viscosity to add to the 
 *  cell-area based corner node mesh velocity iteration.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMMViscFace(const double mm_visc)
+void LagrangianLOOperator::SetMMViscFace(const double mm_visc)
 {
    this->mm_visc_face = mm_visc;
 }
@@ -2406,8 +2372,7 @@ void LagrangianLOOperator<dim>::SetMMViscFace(const double mm_visc)
 *  To enable the use of and set the amount of viscosity to add to the 
 *  cell-area based corner node mesh velocity iteration.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetMMCell(const double mm_consistency)
+void LagrangianLOOperator::SetMMCell(const double mm_consistency)
 {
    this->mm_cell = mm_consistency;
 }
@@ -2423,8 +2388,7 @@ void LagrangianLOOperator<dim>::SetMMCell(const double mm_consistency)
 *  Return intermediate face velocity corresponding to the given face.
 *  NOTE: This function requires that ComputeIntermediateFaceVelocities has been run.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetIntermediateFaceVelocity(const int & face, Vector & vel) const
+void LagrangianLOOperator::GetIntermediateFaceVelocity(const int & face, Vector & vel) const
 {
    assert(face < num_faces);
    // Retrieve face velocity from object
@@ -2447,8 +2411,7 @@ void LagrangianLOOperator<dim>::GetIntermediateFaceVelocity(const int & face, Ve
 *  NOTE: This function requires that ComputeIntermediateFaceVelocities has been run,
 *        though this value will change after the corrective velocities have been computed.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetCorrectedFaceVelocity(const int & face, const Vector & vel)
+void LagrangianLOOperator::SetCorrectedFaceVelocity(const int & face, const Vector & vel)
 {
    assert(face < num_faces);
    // Retrieve face velocity from object
@@ -2471,8 +2434,7 @@ void LagrangianLOOperator<dim>::SetCorrectedFaceVelocity(const int & face, const
 *  NOTE: This function requires that ComputeIntermediateFaceVelocities has been run,
 *        though this value will change after the corrective velocities have been computed.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetCorrectedFaceVelocity(const int & face, Vector & vel)
+void LagrangianLOOperator::GetCorrectedFaceVelocity(const int & face, Vector & vel)
 {
    assert(face < num_faces);
    // Retrieve face velocity from object
@@ -2496,8 +2458,7 @@ void LagrangianLOOperator<dim>::GetCorrectedFaceVelocity(const int & face, Vecto
 *        that v_CR_gf_corrected has been filled (i.e. that ComputeCorrectiveFaceVelocities() 
 *        has been run).
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetCorrectedFaceFlux(const int & face, const Vector & flux)
+void LagrangianLOOperator::SetCorrectedFaceFlux(const int & face, const Vector & flux)
 {
    assert(face < num_faces);
    // Retrieve face velocity from object
@@ -2523,8 +2484,7 @@ void LagrangianLOOperator<dim>::SetCorrectedFaceFlux(const int & face, const Vec
 *        that v_CR_gf_corrected has been filled (i.e. that ComputeCorrectiveFaceVelocities() 
 *        has been run).
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetCorrectedFaceFlux(const int & face, Vector & flux)
+void LagrangianLOOperator::GetCorrectedFaceFlux(const int & face, Vector & flux)
 {
    assert(face < num_faces);
    // Retrieve face velocity from object
@@ -2546,8 +2506,7 @@ void LagrangianLOOperator<dim>::GetCorrectedFaceFlux(const int & face, Vector & 
 *  This function is used when computing values for the convergence tables.  It does this by computing
 *  the sum of the local mass loss at each element.
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
+double LagrangianLOOperator::CalcMassLoss(const Vector &S)
 {
    // cout << "=======================================\n"
    //      << "             CalcMassLoss              \n"
@@ -2583,8 +2542,7 @@ double LagrangianLOOperator<dim>::CalcMassLoss(const Vector &S)
 * Purpose:
 *  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFunction & mc_gf)
+void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunction & mc_gf)
 {
    // cout << "=======================================\n"
    //      << "         CheckMassConservation         \n"
@@ -2662,8 +2620,7 @@ void LagrangianLOOperator<dim>::CheckMassConservation(const Vector &S, ParGridFu
 *  computes the largest positive value alpha_i satisfying
 *        det(alpha_i\mathbb{I} - \frac{dt}{2}C_i) = alpha_i^{d-1}
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const double &dt, double & alpha, int obj_index)
+void LagrangianLOOperator::ComputeDeterminant(const DenseMatrix &C, const double &dt, double & alpha, int obj_index)
 {
    // cout << "=====================\n";
    // cout << "Computing determinant\n";
@@ -2712,8 +2669,7 @@ void LagrangianLOOperator<dim>::ComputeDeterminant(const DenseMatrix &C, const d
 *   are designed to bubble in the direction of the normal vector 
 *   to conserve mass locally.
 ***********************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::
+void LagrangianLOOperator::
    ComputeCorrectiveFaceVelocities(Vector &S, const double & t, const double & dt,
                                     const string flag, // Default NA
                                     void (*test_vel)(const Vector&, const double&, Vector&)) // Default NULL
@@ -2942,8 +2898,7 @@ void LagrangianLOOperator<dim>::
 *   are used in the iterative procedure to recompute corner node 
 *   velocities.
 ***********************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::
+void LagrangianLOOperator::
    ComputeCorrectiveFaceFluxes(Vector &S, const double & t, const double & dt)
 {
    assert(dim > 1); // There is no need for this function in dim=1
@@ -3029,8 +2984,7 @@ void LagrangianLOOperator<dim>::
 *  Since the mesh motion does not depends on a value for the node corresponding to the center of the 
 *  element, we fill the actual grid function with the average of the moved adjacent corners
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
+void LagrangianLOOperator::SetCellCenterAsCenter(Vector &S)
 {
    x_gf.MakeRef(&H1, S, block_offsets[0]);
 
@@ -3095,8 +3049,7 @@ void LagrangianLOOperator<dim>::SetCellCenterAsCenter(Vector &S)
 *  ensure the center node remains inside the cell.  This is done 
 *  by taking the hydrodynamic velocity at the cell.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const
+void LagrangianLOOperator::FillCenterVelocitiesWithL2(const Vector &S, Vector &dSdt) const
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
    ParGridFunction dxdt;
@@ -3152,8 +3105,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithL2(const Vector &S, Vect
 *  ensure the center node remains inside the cell.  This is done 
 *  by average the values at the four corner nodes of the cell.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &dxdt) const
+void LagrangianLOOperator::FillCenterVelocitiesWithAvg(Vector &dxdt) const
 {
    // Since we cannot use Serendipity elements, we must update cell center velocities
    Vector Vc(dim), Uc(dim+2), node_v(dim);
@@ -3224,8 +3176,7 @@ void LagrangianLOOperator<dim>::FillCenterVelocitiesWithAvg(Vector &dxdt) const
 *  This function is merely for testing purposes and should not be implemented in the full program
 *  as the purpose of moving the face nodes is to ensure local mass conservation.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(ParGridFunction &dxdt) const
+void LagrangianLOOperator::FillFaceVelocitiesWithAvg(ParGridFunction &dxdt) const
 {
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
@@ -3270,8 +3221,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithAvg(ParGridFunction &dxdt)
 *
 * Purpose:
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(ParGridFunction &dxdt) const
+void LagrangianLOOperator::FillFaceVelocitiesWithButterfly(ParGridFunction &dxdt) const
 {
    mfem::Mesh::FaceInformation FI;
    Vector face_velocity(dim), tmp_vel(dim), vdof1_v(dim), vdof2_v(dim);
@@ -3424,8 +3374,7 @@ void LagrangianLOOperator<dim>::FillFaceVelocitiesWithButterfly(ParGridFunction 
 * Purpose:
 *  This function sets ViGeo.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SetViGeo(const int &node, const Vector &vel)
+void LagrangianLOOperator::SetViGeo(const int &node, const Vector &vel)
 {
    MFEM_ABORT("Function deprecated.\n");
    for (int i = 0; i < dim; i++)
@@ -3446,8 +3395,7 @@ void LagrangianLOOperator<dim>::SetViGeo(const int &node, const Vector &vel)
 *  This function returns Vi_geo.
 *  NOTE: Function LagrangianLOOperator::ComputeGeoVRaviart must be called first.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
+void LagrangianLOOperator::GetViGeo(const int & node, Vector & vel)
 {
    for (int i = 0; i < dim; i++)
    {
@@ -3465,8 +3413,7 @@ void LagrangianLOOperator<dim>::GetViGeo(const int & node, Vector & vel)
 * Purpose:
 *  This function returns the cartesian location corresponding to a global node.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::UpdateMesh(const Vector & S) const 
+void LagrangianLOOperator::UpdateMesh(const Vector & S) const 
 {
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -3486,8 +3433,7 @@ void LagrangianLOOperator<dim>::UpdateMesh(const Vector & S) const
 * Purpose:
 *  The results of this program can be used to plot the same problem at multiple refinements.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S, 
+void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S, 
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
@@ -3576,8 +3522,7 @@ void LagrangianLOOperator<dim>::SaveStateVecsToFile(const Vector &S,
 * Purpose:
 *  Save timeseries arrays to file.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix)
+void LagrangianLOOperator::SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix)
 {
    const int num_timesteps = ts_timestep.Size();
 
@@ -3655,8 +3600,7 @@ void LagrangianLOOperator<dim>::SaveTimeSeriesArraysToFile(const string &output_
 *  Compute the tensor product of two vectors.
 *        
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const
+void LagrangianLOOperator::tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const
 {
    const int v1_len = v1.Size(), v2_len = v2.Size();
    for (int i = 0; i < v1_len; i++)
@@ -3690,8 +3634,7 @@ void LagrangianLOOperator<dim>::tensor(const Vector & v1, const Vector & v2, Den
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l) const
+void LagrangianLOOperator::ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l) const
 {
    mfem::Mesh::FaceInformation FI;
    Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
@@ -3761,8 +3704,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormal(const Vector &S, ParGridFuncti
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
+void LagrangianLOOperator::ComputeGeoVNormalDistributedViscosity(Vector &S)
 {
    mfem::Mesh::FaceInformation FI;
    Vector node_v(dim), Ri(dim), n_vec(dim), Vf(dim), y(dim);
@@ -3908,8 +3850,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVNormalDistributedViscosity(Vector &S)
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
+void LagrangianLOOperator::ComputeGeoVCellFaceNormal(Vector &S)
 {
    cout << "ComputeGeoVCellFaceNormal call\n";
    mfem::Mesh::FaceInformation FI;
@@ -4148,8 +4089,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCellFaceNormal(Vector &S)
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVCAVEAT(Vector &S)
+void LagrangianLOOperator::ComputeGeoVCAVEAT(Vector &S)
 {
    // cout << "==========ComputeGeoVCaveat==========\n";
    mfem::Mesh::FaceInformation FI;
@@ -4314,8 +4254,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEAT(Vector &S)
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
+void LagrangianLOOperator::ComputeGeoVCAVEATCellFace(Vector &S)
 {
    // cout << "ComputeGeoVCAVEATCellFace call\n";
    mfem::Mesh::FaceInformation FI;
@@ -4596,8 +4535,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFace(Vector &S)
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
+void LagrangianLOOperator::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 {
    // cout << "ComputeGeoVCAVEATCellFaceWeighted call\n";
    mfem::Mesh::FaceInformation FI;
@@ -4916,8 +4854,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 *
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const double & dt)
+void LagrangianLOOperator::IterativeCornerVelocityMC(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityMC=====\n";
    // Optional run time parameters
@@ -5298,8 +5235,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityMC(Vector &S, const doubl
 *  NOTE: Interior faces. 
 *  
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double & dt)
+double LagrangianLOOperator::ComputeIterationNormMC(Vector &S, const double & dt)
 {
    double val = 0., denom_val = 0.;
    int num_broken = 0, total_num = 0;
@@ -5474,8 +5410,7 @@ double LagrangianLOOperator<dim>::ComputeIterationNormMC(Vector &S, const double
 *
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const double & dt)
+void LagrangianLOOperator::IterativeCornerVelocityLS(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityLS=====\n";
    // Optional run time parameters
@@ -5847,8 +5782,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLS(Vector &S, const doubl
 *
 * Purpose:
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::compute_alpha(const Vector &Vadj, const Vector &AadjR, 
+double LagrangianLOOperator::compute_alpha(const Vector &Vadj, const Vector &AadjR, 
                                                 const Vector &Vnode, const Vector &AnodeR, 
                                                 const Vector &V3n, const Vector &a3nR, 
                                                 const Vector &n_vec, const Vector &tau_vec,
@@ -5891,8 +5825,7 @@ double LagrangianLOOperator<dim>::compute_alpha(const Vector &Vadj, const Vector
 *  Compute object we are trying to minimize, to include viscosity.
 *  NOTE: Interior vertices. 
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const double & dt)
+double LagrangianLOOperator::ComputeIterativeLSGamma(Vector &S, const double & dt)
 {
    double ret_val = 0.;
    double vw = 1., wn = 1., wt = 0.;
@@ -6003,8 +5936,7 @@ double LagrangianLOOperator<dim>::ComputeIterativeLSGamma(Vector &S, const doubl
 *                              | V_i^(k) |
 *  NOTE: Interior vertices. 
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeIterationNorm(const Vector &S, const ParGridFunction &mv_gf_prev_it, const double & dt)
+double LagrangianLOOperator::ComputeIterationNorm(const Vector &S, const ParGridFunction &mv_gf_prev_it, const double & dt)
 {
    Vector Vi_prev(dim), Vi_next(dim), temp_vec(dim);
    double numer = 0., denom = 0.;
@@ -6040,8 +5972,7 @@ double LagrangianLOOperator<dim>::ComputeIterationNorm(const Vector &S, const Pa
 
 *  NOTE: Interior vertices. 
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double & D)
+double LagrangianLOOperator::ComputeFaceSecantNorm(Vector &S, const double & D)
 {
    double num = 0., denom = 0.;
    int num_broken = 0, total_num = 0;
@@ -6107,8 +6038,7 @@ double LagrangianLOOperator<dim>::ComputeFaceSecantNorm(Vector &S, const double 
 *  Note: The basis taken for the l2 norm is that formed by the normal and tangent
 *  vectors at the half step.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, const double & dt)
+void LagrangianLOOperator::IterativeCornerVelocityTNLSnoncart(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityTNLSnoncart=====\n";
    // Optional run time parameters
@@ -6451,8 +6381,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityTNLSnoncart(Vector &S, co
 *  iteration.
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S, const Vector &S_old, const double &dt)
+void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S, const Vector &S_old, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolumeFaceVisc=====\n";
    /* Optional run time parameters */
@@ -6671,8 +6600,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeFaceVisc(Vect
 *  iteration.
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt)
+void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S, const Vector &S_old, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolumeCellVisc=====\n";
    /* Optional run time parameters */
@@ -6839,8 +6767,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeCellVisc(Vect
 *  iteration.
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt)
+void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolumeMv2Visc=====\n";
    /* Optional run time parameters */
@@ -7006,8 +6933,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2Visc(Vecto
 *  iteration.
 *  Note: This function will modify mv_gf in the BlockVector S
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt)
+void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt)
 {
    // cout << "=====IterativeCornerVelocityLSCellVolumeMv2FaceVisc=====\n";
    /* Optional run time parameters */
@@ -7216,8 +7142,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(V
 *           IterativeCornerVelocityLSCellVolumeMv2FaceVisc
 *  to compare the contribution
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it)
+void LagrangianLOOperator::VerifyContributions(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it)
 {
    MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
@@ -7331,8 +7256,7 @@ void LagrangianLOOperator<dim>::VerifyContributions(const Vector &S, const Vecto
 *  To compute the volume of a given cell according to Despres paper.  This is a Q1
 *  computation and assumes the faces do not move for conservation.
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &cell)
+double LagrangianLOOperator::ComputeCellVolume(const Vector &S, const int &cell)
 {
    Array<int> verts;
    switch (dim)
@@ -7386,8 +7310,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolume(const Vector &S, const int &
 * Purpose: 
 *  Compute the sum of the change in mass over all cells in the mesh.
 ****************************************************************************************************/
-template<int dim>
-double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
+double LagrangianLOOperator::ComputeCellVolumeNorm(const Vector &S, const Vector &S_old, const double &dt)
 {
    MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
@@ -7444,8 +7367,7 @@ double LagrangianLOOperator<dim>::ComputeCellVolumeNorm(const Vector &S, const V
 * 
 *  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it)
+void LagrangianLOOperator::compare_gamma2(const Vector &S, const Vector &S_old, const double &dt, const int &it)
 {
    MFEM_ABORT("Function deprecated\n");
    Vector* sptr_old = const_cast<Vector*>(&S_old);
@@ -7535,8 +7457,7 @@ void LagrangianLOOperator<dim>::compare_gamma2(const Vector &S, const Vector &S_
 * 
 *  NOTE: We must use Jacobi method in stead of Gauss-Seidel.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
+void LagrangianLOOperator::ComputeAverageVelocities(Vector &S)
 {
    cout << "=====ComputeAverageVelocities=====\n";
    double theta = 0.01;
@@ -7616,8 +7537,7 @@ void LagrangianLOOperator<dim>::ComputeAverageVelocities(Vector &S)
 /*
 *
 */
-template<int dim>
-void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const double & dt)
+void LagrangianLOOperator::IterativeCornerVelocityFLUXLS(Vector &S, const double & dt)
 {
    // cout << "=====IterativeCornerVelocityFLUXLS=====\n";
    // Optional run time parameters
@@ -8018,8 +7938,7 @@ void LagrangianLOOperator<dim>::IterativeCornerVelocityFLUXLS(Vector &S, const d
 * Purpose:
 *  To compute the weighted average of the adjacent cell velocities.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v)
+void LagrangianLOOperator::ComputeCellAverageVelocityAtNode(const Vector &S, const Vector &S_old, const int node, const bool &is_weighted, int td_flag, Vector &node_v)
 {
    // cout << "========================================\n"
    //      << "ComputeCellAverageVelocityAtNode\n"
@@ -8108,8 +8027,7 @@ void LagrangianLOOperator<dim>::ComputeCellAverageVelocityAtNode(const Vector &S
 *  Note: This function assumes that m_hpv has been populated and contains
 *  the initial mass of all cells in the mesh.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const double &dt, Vector &massvec)
+void LagrangianLOOperator::CalcMassVolumeVector(const Vector &S, const double &dt, Vector &massvec)
 {
    // cout << "=======================================\n"
    //      << "          CalcMassVolumeVector         \n"
@@ -8154,8 +8072,7 @@ void LagrangianLOOperator<dim>::CalcMassVolumeVector(const Vector &S, const doub
 * Purpose:
 *  
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator::CalcCellAveragedCornerVelocityVector(const Vector &S, const Vector &S_old, const bool &is_weighted, int td_flag, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "    CalcCellAveragedVelocityVector     \n"
@@ -8182,8 +8099,7 @@ void LagrangianLOOperator<dim>::CalcCellAveragedCornerVelocityVector(const Vecto
 * Purpose:
 * Note: This function assumes that mv_gf is defined on all geometric corner nodes of the mesh.  
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf)
+void LagrangianLOOperator::DistributeFaceViscosityToVelocity(const Vector &S, Vector &mv_gf)
 {
    MFEM_ABORT("Function deprecated\n");
    assert(mv_gf.Size() == dim * NVDofs_H1);
@@ -8242,8 +8158,7 @@ void LagrangianLOOperator<dim>::DistributeFaceViscosityToVelocity(const Vector &
  * Function: SolveHiopDense
  * TODO: combine with SolveHiop function with a dense/sparse flag
  */
-template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator::SolveHiOpDense(const Vector &S, const Vector &S_old, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "            SolveHiOpDense             \n"
@@ -8332,7 +8247,7 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
    }
 
    /* Solve for the corner node velocities */
-   OptimizedMeshVelocityProblemDense<dim> omv_problem(geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
+   OptimizedMeshVelocityProblemDense omv_problem(dim, geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
    optsolver->SetOptimizationProblem(omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
@@ -8356,8 +8271,7 @@ void LagrangianLOOperator<dim>::SolveHiOpDense(const Vector &S, const Vector &S_
 * Purpose:
 *  This function computes the lumped mass matrix for the velocity space.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
+void LagrangianLOOperator::ComputeVelocityLumpedMass(Vector & row_sums)
 {
    // cout << "=======================================\n"
    //      << "       ComputeVelocityLumpedMass       \n"
@@ -8393,8 +8307,7 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMass(Vector & row_sums)
 * Purpose:
 *  This function computes the lumped mass matrix for the velocity space.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S, Vector & row_sums)
+void LagrangianLOOperator::ComputeVelocityLumpedMassByHand(const Vector &S, Vector & row_sums)
 {
    // cout << "=======================================\n"
    //      << "     ComputeVelocityLumpedMassHand     \n"
@@ -8433,8 +8346,7 @@ void LagrangianLOOperator<dim>::ComputeVelocityLumpedMassByHand(const Vector &S,
 * Purpose:
 *  Compute the average mass of the adjacent cells to a given node.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeAverageMassAtGeo(const Vector &S, Vector &vec_weights)
+void LagrangianLOOperator::ComputeAverageMassAtGeo(const Vector &S, Vector &vec_weights)
 {
    vec_weights.SetSize(H1Lc.GetNDofs());
    Array<int> cells_row;
@@ -8476,8 +8388,7 @@ void LagrangianLOOperator<dim>::ComputeAverageMassAtGeo(const Vector &S, Vector 
 *  This function solves for the velocity vector at the corner vertices by using
 *  an OptimizationSolver from MFEM.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, const int &lm_option, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
+void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const int &lm_option, const int & target_option, const double &t, const double &dt, ParGridFunction &mv_gf_l)
 {
    // cout << "=======================================\n"
    //      << "               SolveHiOp               \n"
@@ -8609,8 +8520,8 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          ComputeAverageMassAtGeo(S, _vecWeights);
 
          /* Instantiate problem */
-         omv_problem = new TargetOptimizedMeshVelocityProblem<dim>(
-            geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
+         omv_problem = new TargetOptimizedMeshVelocityProblem(
+            dim, geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
             ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
@@ -8633,7 +8544,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
          /* Instantiate problem */
-         omv_problem = new ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
+         omv_problem = new ViscousOptimizedMeshVelocityProblem(dim, geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
          break;
       }
       default:
@@ -8706,8 +8617,7 @@ void LagrangianLOOperator<dim>::SolveHiOp(const Vector &S, const Vector &S_old, 
 *
 *  This function is essential to go from ViGeo to Vi.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeCiGeo(const ParGridFunction &mv_gf_l, const int & node, DenseMatrix & res)
+void LagrangianLOOperator::ComputeCiGeo(const ParGridFunction &mv_gf_l, const int & node, DenseMatrix & res)
 {
    // cout << "=======================================\n"
    //      << "             ComputeCiGeo              \n"
@@ -8780,8 +8690,7 @@ void LagrangianLOOperator<dim>::ComputeCiGeo(const ParGridFunction &mv_gf_l, con
 *       have already been called.  If the functions have not been called, then the 
 *       returned velocity will be 0.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::IntGrad(const ParGridFunction &mv_gf_l, const int cell, DenseMatrix & res)
+void LagrangianLOOperator::IntGrad(const ParGridFunction &mv_gf_l, const int cell, DenseMatrix & res)
 {
    // cout << "=======================================\n"
    //      << "             IntGrad            \n"
@@ -8829,8 +8738,7 @@ void LagrangianLOOperator<dim>::IntGrad(const ParGridFunction &mv_gf_l, const in
 *  velocity with which to move the mesh from the geometric velocity.
 *  
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
+void LagrangianLOOperator::ComputeLinearizedNodeVelocities(
    const ParGridFunction &mv_gf_l, ParGridFunction &mv_gf_linearized,
    const double &t, const double &dt, const string, 
    void (*test_vel)(const Vector&, const double&, Vector&))
@@ -8886,8 +8794,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocities(
 *     [alpha_i I - (dt/2) C_i]^-1 Vigeo.
 *  
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
+void LagrangianLOOperator::ComputeLinearizedNodeVelocity(
    const ParGridFunction &mv_gf_l, const int & node, const double & dt, Vector &node_v, bool &is_dt_changed)
 {
    // cout << "=======================================\n"
@@ -9002,8 +8909,7 @@ void LagrangianLOOperator<dim>::ComputeLinearizedNodeVelocity(
 *  Note: This function fills the Q1 velocity field v_geo_gf and also the mv_gf
 *        in the BlockVector S.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
+void LagrangianLOOperator::ComputeGeoVRaviart(Vector &S)
 {
    // cout << "=======================================\n"
    //      << "          ComputeGeoVRaviart           \n"
@@ -9131,8 +9037,7 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart(Vector &S)
 *  Iterate over cells and average contribution to nodes. Alternate to above
 *  function.
 ****************************************************************************************************/
-template<int dim>
-void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
+void LagrangianLOOperator::ComputeGeoVRaviart2(const Vector &S)
 {
    // cout << "=======================================\n"
    //      << "          ComputeGeoVRaviart2          \n"
@@ -9209,12 +9114,6 @@ void LagrangianLOOperator<dim>::ComputeGeoVRaviart2(const Vector &S)
       if (nz) { v_geo_gf(i) /= nz; }
    }
 }
-
-
-/* Explicit instantiation */
-template class LagrangianLOOperator<1>;
-template class LagrangianLOOperator<2>;
-template class LagrangianLOOperator<3>;
 
 } // end ns hydroLO
 

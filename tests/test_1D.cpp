@@ -208,9 +208,9 @@ int test_flux()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    double _error = 0.;
 
@@ -333,9 +333,9 @@ int test_1d_mesh()
    m->AddDomainIntegrator(new DomainLFIntegrator(one));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "x_gf:\n";
    x_gf.Print(cout);
@@ -355,7 +355,7 @@ int test_1d_mesh()
       assert(k >= 0.);
    }
 
-   hydroLO::LagrangianLOOperator<dim>::DofEntity _dof_entity;
+   hydroLO::LagrangianLOOperator::DofEntity _dof_entity;
    int edof;
    for (int dof = 0; dof < H1FESpace.GetNDofs(); dof++)
    {      
@@ -471,9 +471,9 @@ Purpose:
 //    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
 //    m->Assemble();
 
-//    ProblemBase<dim> * problem_class = new SodProblem<dim>();
+//    ProblemBase * problem_class = new SodProblem();
 
-//    mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+//    mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
 //    Vector _vel(dim), vec_res(dim);
 //    double t = 0., dt = 1.;
@@ -653,9 +653,9 @@ int test_CSV_getter_setter()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);

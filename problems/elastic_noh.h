@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ElasticNoh: public ProblemBase<dim>
+class ElasticNoh: public ProblemBase
 {
 private:
    /*********************************************************
@@ -64,7 +63,7 @@ private:
    const double _mu = 2.6E10;
 
 public:
-   ElasticNoh()
+   ElasticNoh(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

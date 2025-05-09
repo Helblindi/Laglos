@@ -49,8 +49,7 @@ struct TimingData
       L2dof(l2d), H1iter(0), L2iter(0), quad_tstep(0) { }
 };
 
-//
-template <int dim>
+
 class LagrangianLOOperator : public TimeDependentOperator
 {
 protected:
@@ -73,15 +72,16 @@ protected:
    HypreParVector *m_hpv;
 
    // Problem specific
-   ProblemBase<dim> * pb;
+   ProblemBase * pb;
 
    // Geometric
-   Geometric<dim> geom;
+   Geometric geom;
 
    // Matrix to hold max wavespeed values dij
    SparseMatrix * dij_sparse;
 
    // FE spaces local and global sizes
+   const int dim;
    const int Vsize_H1;
    const int TVSize_H1;
    const HYPRE_Int GTVSize_H1;
@@ -158,10 +158,11 @@ protected:
    Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int, ts_kidder_avg_density, ts_kidder_avg_entropy;
 
 public:
-   Elastic<dim> elastic; //NF//MS
+   Elastic elastic; //NF//MS
    enum DofEntity {corner, face, cell};
 
-   LagrangianLOOperator(const int size,
+   LagrangianLOOperator(const int &_dim,
+                        const int size,
                         ParFiniteElementSpace &h1,
                         ParFiniteElementSpace &h1_l,
                         ParFiniteElementSpace &l2,
@@ -169,7 +170,7 @@ public:
                         ParFiniteElementSpace &cr,
                         const ParGridFunction &rho0_gf,
                         ParLinearForm *m,
-                        ProblemBase<dim> *_pb,
+                        ProblemBase *_pb,
                         Array<int> offset,
                         bool use_viscosity,
                         bool mm,

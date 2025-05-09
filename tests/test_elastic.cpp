@@ -82,7 +82,7 @@ int tester()
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);            
    delete mesh;
 
-   ProblemBase<dim> * problem_class = new ElasticShocktube<dim>();
+   ProblemBase * problem_class = new ElasticShocktube();
 
    // Template FE stuff to construct hydro operator
    H1_FECollection H1FEC(order_mv, dim);
@@ -128,15 +128,15 @@ int tester()
    // and Coefficient class requires std::function arguments
    using namespace std::placeholders;
    std::function<double(const Vector &,const double)> sv0_static = 
-      std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<void(const Vector &, const double, Vector &)> v0_static = 
-      std::bind(&ProblemBase<dim>::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      std::bind(&ProblemBase::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
    std::function<double(const Vector &,const double)> ste0_static = 
-      std::bind(&ProblemBase<dim>::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> p0_static = 
-      std::bind(&ProblemBase<dim>::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
 
    // Initialize specific volume, velocity, and specific total energy
    FunctionCoefficient sv_coeff(sv0_static);
@@ -168,7 +168,7 @@ int tester()
    ste_gf.SyncAliasMemory(S);
 
    /* Create Lagrangian Low Order Solver Object */
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
    hydro.SetElasticity(true);

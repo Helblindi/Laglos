@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class ProblemTemplate : public ProblemBase<dim>
+class ProblemTemplate : public ProblemBase
 {
 private:
    /*********************************************************
@@ -63,7 +62,7 @@ private:
    double _cfl_time_change = 0.01;
 
 public:
-   ProblemTemplate()
+   ProblemTemplate(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

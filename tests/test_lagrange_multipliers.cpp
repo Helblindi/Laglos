@@ -131,7 +131,7 @@ int test_lmsparse_viscous_obj_get_gradient()
    delete mesh;
 
    // Creat Problem object
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
    H1_FECollection H1FEC(2 /*order_mv*/, 2 /*dim*/);
    H1_FECollection H1FEC_L(1, 2);
@@ -174,7 +174,7 @@ int test_lmsparse_viscous_obj_get_gradient()
    Vector xmin(H1FESpace_L.GetNDofs()), xmax(H1FESpace_L.GetNDofs());
    xmin = -1.E12; 
    xmax = 1.E12;
-   ViscousOptimizedMeshVelocityProblem<dim>(geom, massvec, x_gf, L2FESpace.GetNDofs(), 1., xmin, xmax, HessI, HessJ, I, J, ess_tdofs, BdrVertexIndexingArray);
+   ViscousOptimizedMeshVelocityProblem(geom, massvec, x_gf, L2FESpace.GetNDofs(), 1., xmin, xmax, HessI, HessJ, I, J, ess_tdofs, BdrVertexIndexingArray);
 
    delete problem_class;
    problem_class = NULL;

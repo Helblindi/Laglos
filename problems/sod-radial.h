@@ -42,8 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-template<int dim>
-class SodRadial: public ProblemBase<dim>
+class SodRadial: public ProblemBase
 {
 private:
    /*********************************************************
@@ -63,7 +62,7 @@ private:
 
 
 public:
-   SodRadial()
+   SodRadial(const int &_dim) : ProblemBase(_dim)
    {
       this->set_a(_a);
       this->set_b(_b);

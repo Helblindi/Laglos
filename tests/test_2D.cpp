@@ -204,9 +204,9 @@ int tester()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
 
@@ -344,9 +344,9 @@ int test_flux()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
    hydro.SetMVOption(mv_option);
    hydro.SetFVOption(fv_option);
 
@@ -497,9 +497,9 @@ int test_vel_field_1()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 
@@ -688,9 +688,9 @@ int test_CSV_getter_setter()
    m->AddDomainIntegrator(new DomainLFIntegrator(one_const_coeff));
    m->Assemble();
 
-   ProblemBase<dim> * problem_class = new SodProblem<dim>();
+   ProblemBase * problem_class = new SodProblem();
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "S:\n";
    S.Print(cout);
@@ -1633,16 +1633,16 @@ void plot_mv_smooth()
    // Initialize specific volume, velocity, and specific total energy
    // Change class variables into static std::functions since virtual static member functions are not an option
    // and Coefficient class requires std::function arguments
-   ProblemBase<dim> * problem_class = new SmoothWave<dim>();
+   ProblemBase * problem_class = new SmoothWave();
    using namespace std::placeholders;
    std::function<double(const Vector &,const double)> sv0_static = 
-      std::bind(&ProblemBase<dim>::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<void(const Vector &, const double, Vector &)> v0_static = 
-      std::bind(&ProblemBase<dim>::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      std::bind(&ProblemBase::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
    std::function<double(const Vector &,const double)> ste0_static = 
-      std::bind(&ProblemBase<dim>::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
    std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase<dim>::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+      std::bind(&ProblemBase::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
 
    VectorFunctionCoefficient v_exact_coeff(dim, v0_static);
 
@@ -1673,7 +1673,7 @@ void plot_mv_smooth()
 
    cout << "gridFunctions initiated.\n";
 
-   mfem::hydroLO::LagrangianLOOperator<dim> hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
+   mfem::hydroLO::LagrangianLOOperator hydro(H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, m, problem_class, use_viscosity, _mm, CFL);
 
    cout << "Done constructing hydro op\n";
 

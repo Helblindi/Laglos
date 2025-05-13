@@ -4,7 +4,7 @@ SOURCE_DIR="$1"
 OUTPUT_FILE="$2"
 
 # Full path to the executable
-EXECUTABLE="${SOURCE_DIR}/build/laglos"
+EXECUTABLE="${SOURCE_DIR}/build/Laglos"
 
 # Check that the executable exists
 if [[ ! -x "$EXECUTABLE" ]]; then

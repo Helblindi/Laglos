@@ -2596,14 +2596,19 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
    }
 
    double cell_ratio = (double)counter / (double)NDofs_L2;
+   double _mass_error = num / denom;
+   double _interior_mass_error = interior_num / interior_denom;
 
-   cout << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl
-   ///TODO: Add in pct cells ppd if -ppd is enabled
-        << "Initial mass sum: " << denom 
-        << ", Current mass sum: " << current_mass_sum << endl
-        << "Mass Error: " << num / denom << endl
-        << "Interior Mass Error: " << interior_num / interior_denom << endl
-        << "--------------------------------------\n";
+   if (_mass_error > 1.E-12 || _interior_mass_error > 1.E-12 || cell_ratio > 1.E-12)
+   {
+      cout << "--------------------------------------\n"
+           << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl
+           << "Initial mass sum: " << denom 
+           << ", Current mass sum: " << current_mass_sum << endl
+           << "Mass Error: " << _mass_error << endl
+           << "Interior Mass Error: " << _interior_mass_error << endl
+           << "--------------------------------------\n";
+   }
 }
 
 

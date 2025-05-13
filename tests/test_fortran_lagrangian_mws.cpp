@@ -24,7 +24,7 @@ extern "C" {
       double *in_rhol, double *in_ul, double *in_el, double *in_pl,
       double *in_rhor, double *in_ur, double *in_er, double *in_pr,
       double *in_tol, bool *want_iter,double *lambda_maxl_out,
-      double *lambda_maxr_out, double *pstar, int *k, double* b_covolume);
+      double *lambda_maxr_out, double *pstar, int *k, double* b_covolume, double* p_inf);
 
    double* __arbirary_eos_lagrangian_lambda_module_MOD_phi_(double *p);
 }
@@ -48,6 +48,7 @@ int main(int argc, char **argv)
    double eL, eR;
    double a_vdw = 1.;
    double b_vdw = 1.;
+   double p_inf = 0.;
    double gamma_vdw = 1.02;
    double gamma_ideal = 1.4;
    double lambdaL, lambdaR, pstar, vstar;
@@ -106,11 +107,9 @@ int main(int argc, char **argv)
 
          eL = gamma_law_internal(rhoL, pL);
          eR = gamma_law_internal(rhoR, pR);
- 
          __arbitrary_eos_lagrangian_lambda_module_MOD_lambda_arbitrary_eos(
             &rhoL, &uL, &eL, &pL, &rhoR, &uR, &eR, &pR, &tol, 
-            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b);
-         
+            &want_iter, &lambdaL, &lambdaR, &pstar, &k, &b, &p_inf);
          next_tol = false;
 
          // Output

@@ -90,17 +90,28 @@ add_test(NAME CompareSod2D
 )
 
 
-# Test elastic functions
-add_executable(TestElastic EXCLUDE_FROM_ALL test_elastic.cpp "${MFEM_DIR}" "${PROJECT_SOURCE_DIR}/src/laglos_solver.cpp" "${PROJECT_SOURCE_DIR}/src/geometry.cpp")
-target_link_libraries(TestElastic PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_lagrangian_greedy vdw_fortran)
-add_test(NAME TestElastic COMMAND TestElastic)
+#### Test elastic functions ####
+## Elastic Impact
+file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestElasticImpact
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh ${PROJECT_SOURCE_DIR} "elastic_impact_output.txt"
+)
+# add_test(NAME CompareSod2D
+#   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+#     ${CMAKE_CURRENT_BINARY_DIR}/sod2d_output.txt
+#     ${PROJECT_SOURCE_DIR}/tests/output_ref/sod2d.txt
+#     11 # Ignore timing data at the end of the file as this fluctuates
+# )
+## Elastic Shocktube
 
 # Create a new target to build and run tests
 # This ensure make all doesn't make every test at each compilation stage
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestElastic)
+add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS)
 
 # Custom target to clean tmp testing directory
 add_custom_target(clean_tests

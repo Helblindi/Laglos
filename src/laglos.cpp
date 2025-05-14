@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
    bool mm = true;
    bool check_mesh = true;
    bool post_process_density = false;
-   bool use_elasticity = false;
+   int elastic_eos = 0;
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
@@ -239,8 +239,12 @@ int main(int argc, char *argv[]) {
                   "Enable or disable checking if the mesh has twisted.");
    args.AddOption(&post_process_density, "-ppd", "--post-process-density", "-no-ppd", "--no-post-process-density",
                   "Enable or disable density post processing to guarantee conservation of mass.");
-   args.AddOption(&use_elasticity, "-ue", "--use-elasticity", "-no-ue", "--no-use-elasticity",
-                  "Enable or disable the use of elasticity."); //NF//MS
+   args.AddOption(&elastic_eos, "-ue", "--use-elasticity",
+                  "Choose equation of state for shear energy:"
+                  "\n\t 00 - No shear energy,"
+                  "\n\t 01 - Neo Hookean EOS,"
+                  "\n\t 02 - Mooney Rivlin EOS,"
+                  "\n\t 03 - Aortic EOS"); //NF//MS
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities:"
                   "\n\t 00 - Arithmetic avg of adj cells,"
@@ -895,21 +899,18 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
    hydro.SetMVLinOption(do_mv_linearization);
    hydro.SetFVOption(fv_option);
-   if (use_elasticity) //NF//MS
+   if (elastic_eos) //NF//MS
    {
-      hydro.SetElasticity(use_elasticity);
-      const double _mu = problem_class->get_shear_modulus();
-      if (_mu < 1.e-12)
+      if (problem_class->get_shear_modulus() < 1.e-12)
       {
          MFEM_WARNING("Elasticity has been chosen, but the shear modulus is 0, meaning this is the fluid case.");
       }
-      hydro.SetShearModulus(_mu);
    }
 
    /* 
@@ -970,7 +971,7 @@ int main(int argc, char *argv[]) {
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
    }
 
-   if (problem == 1 || problem == 3 || use_elasticity)
+   if (problem == 1 || problem == 3 || elastic_eos)
    {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
@@ -978,9 +979,9 @@ int main(int argc, char *argv[]) {
          hydro.GetCellStateVector(S, i, U);
          double _rho = 1. / U[0];
          double _esheer = 0.;
-         if (use_elasticity)
+         if (elastic_eos)
          {
-            _esheer = hydro.elastic.e_sheer(i);
+            _esheer = hydro.elastic->e_sheer(i);
          }
          double _sie = problem_class->specific_internal_energy(U, _esheer);
          double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
@@ -1032,7 +1033,7 @@ int main(int argc, char *argv[]) {
       VisualizeField(vis_ste, vishost, visport, ste_gf,
                      "Specific Total Energy", Wx, Wy, Ww, Wh);
 
-      if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
+      if (problem == 1 || problem == 3 || problem == 16 || elastic_eos)
       {
          Wx += offx;
          VisualizeField(vis_press, vishost, visport, press_gf,
@@ -1045,7 +1046,7 @@ int main(int argc, char *argv[]) {
                         "Gamma", Wx, Wy, Ww, Wh);
       }
       //NF//MS
-      if (use_elasticity)
+      if (elastic_eos)
       {
          // Compute Sigma and F
          hydro.ComputeSigmaGF(S, sigma_gf);
@@ -1217,7 +1218,7 @@ int main(int argc, char *argv[]) {
    ste_ofs.close();
 
    /* Print gamma/pressure grid function for Triple Point problem */
-   if (problem == 1 || problem == 3 || problem == 16 || use_elasticity)
+   if (problem == 1 || problem == 3 || problem == 16 || elastic_eos)
    {
       std::ostringstream _press_name;
       _press_name << gfprint_path 
@@ -1438,7 +1439,7 @@ int main(int argc, char *argv[]) {
                               "Specific Total Energy",
                               Wx, Wy, Ww,Wh);
 
-            if (problem == 1 || problem == 3 || problem == 16 || use_elasticity) // Visualize pressure
+            if (problem == 1 || problem == 3 || problem == 16 || elastic_eos) // Visualize pressure
             {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
@@ -1446,9 +1447,9 @@ int main(int argc, char *argv[]) {
                   hydro.GetCellStateVector(S, i, U);
                   double _rho = 1. / U[0];
                   double _esheer = 0.;
-                  if (use_elasticity)
+                  if (elastic_eos)
                   {
-                     _esheer = hydro.elastic.e_sheer(i);
+                     _esheer = hydro.elastic->e_sheer(i);
                   }
                   double _sie = problem_class->specific_internal_energy(U, _esheer);
                   double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
@@ -1485,7 +1486,7 @@ int main(int argc, char *argv[]) {
             // MFEM_ABORT("Need to implement get_gamma with a cell_attr variable.");
 
             //NF//MS
-            if (use_elasticity)
+            if (elastic_eos)
             {
                // Compute Sigma and F
                hydro.ComputeSigmaGF(S, sigma_gf);

@@ -25,7 +25,7 @@ options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
 options+="-mv ${mv_option} -fv ${fv_option} "
 options+="-rs ${refinements_serial} "
-options+="-ue "
+options+="-ue 1 " # NeoHookean
 echo $options
 
 # Run the executable with input file (adjust args as needed)

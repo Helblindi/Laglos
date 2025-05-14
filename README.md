@@ -257,29 +257,29 @@ To see this implemented, see the execution of the multi-material isentropic vort
 
 ### Elastic shocktube
 ```
-./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue -rs 8
+./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
 ```
 ### Elastic impact
 ```
-./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue -rs 8
+./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
 ```
 ### Elastic shear
 ```
-./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
-./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
-./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
 ```
 ### Elastic shear y direction (rotated x)
 ```
-./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
 ```
 ### Elastic impact + shear
 ```
-./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 0
+./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
 ```
 ### Elastic Isentropic Vortex
 ```
-./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue -rs 1
+./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue 1 -rs 1
 ```
 ### Elastic Projectile Plate
 The final time depends on the shear modulus used, which is modified in the problem file.
@@ -302,16 +302,16 @@ The final times reported in the referenced paper corresponding to their shear mo
 3. $t = 6\times 10^{-4}$
 4. $t = 1.03\times 10^{-4}$
 ```
-./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf .000103 -cfl 0.5 -ue -ppd -rs 1
+./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf .000103 -cfl 0.5 -ue 1 -ppd -rs 1
 ```
 
 ### Elastic Noh
 ```
-./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 6
-./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue -ppd -rs 1
+./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 6
+./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 1
 ```
 
 ### Elastic twist
 ```
-./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue -ppd -rs 6
+./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue 1 -ppd -rs 6
 ```

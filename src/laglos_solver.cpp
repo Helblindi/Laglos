@@ -94,6 +94,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
                                            ProblemBase *_pb,
                                            Array<int> offset,
                                            bool use_viscosity,
+                                           int elastic_eos,
                                            bool mm, 
                                            double CFL) :
    dim(_dim),
@@ -148,10 +149,10 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    ess_bdr(pmesh->bdr_attributes.Max()),
    // Options
    use_viscosity(use_viscosity),
+   use_elasticity(elastic_eos),
    mm(mm),
    CFL(CFL),
-   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
-   elastic(dim, H1, L2, rho0_gf, ir) //NF//MS
+   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)) //NF//MS
 {
    // Transpose face_element to get element_face
    Transpose(*face_element, element_face);
@@ -245,6 +246,13 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    chrono_dij.Clear();
    chrono_hiop.Clear();
 
+   /* Initialize elasticity object */
+   if (use_elasticity)
+   {
+      elastic = new Elastic(dim, elastic_eos, H1, L2, rho0_gf, ir);
+      SetShearModulus(pb->get_shear_modulus());
+   }
+
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
    cout << "Vsize_H1L: " << Vsize_H1L << endl;
@@ -268,6 +276,11 @@ LagrangianLOOperator::~LagrangianLOOperator()
 {
    delete dij_sparse;
    dij_sparse = nullptr;
+   if (use_elasticity)
+   {
+      delete elastic;
+      elastic = nullptr;
+   }
 }
 
 
@@ -310,8 +323,8 @@ void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, Dens
    }
    GetCellStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
-   elastic.ComputeS(e, rho, sigmaD_e);
-   // es = elastic.e_sheer(e);
+   elastic->ComputeS(e, rho, sigmaD_e);
+   // es = elastic->e_sheer(e);
    // flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
    // flux.GetSubMatrix(idx, idy, sigma_e);
    // sigma_e *= -1.;
@@ -369,7 +382,7 @@ void LagrangianLOOperator::ComputeFGF(ParGridFunction &f_gf) const
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      elastic.ComputeAvgF(e, F);
+      elastic->ComputeAvgF(e, F);
       f_gf[e] = F(0,0);
    }
 }
@@ -381,7 +394,7 @@ void LagrangianLOOperator::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      e_sheer_gf[e] = elastic.e_sheer(e);
+      e_sheer_gf[e] = elastic->e_sheer(e);
    }
 }
 
@@ -500,8 +513,8 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
          DenseMatrix _sigmaD(3);
 
          // _sigmaD is 3 x 3
-         elastic.ComputeS(ci, _rho, _sigmaD);
-         _es = elastic.e_sheer(ci);
+         elastic->ComputeS(ci, _rho, _sigmaD);
+         _es = elastic->e_sheer(ci);
 
          F_i = pb->ElasticFlux(_sigmaD, _es, U_i, ci_attr);
       }
@@ -544,8 +557,8 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                DenseMatrix _sigmaD(3);
 
                // _sigmaD is 3 x 3
-               elastic.ComputeS(cj, _rho, _sigmaD);
-               _es = elastic.e_sheer(cj);
+               elastic->ComputeS(cj, _rho, _sigmaD);
+               _es = elastic->e_sheer(cj);
 
                dm = pb->ElasticFlux(_sigmaD, _es, U_j, cj_attr);
             }
@@ -1248,8 +1261,8 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
          double esl = 0., esr = 0.;
          if (use_elasticity)
          {
-            esl = elastic.e_sheer(c);
-            esr = elastic.e_sheer(cp);
+            esl = elastic->e_sheer(c);
+            esr = elastic->e_sheer(cp);
          }
 
          // Compute pressure with given EOS
@@ -1266,7 +1279,6 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
          {
             lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
             lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * pb->get_shear_modulus());
-            // TODO: lambda_max = sqrt(pow(lambda_max, 2) + rho * 4./3. * mu);
          }
          else
          {
@@ -1657,7 +1669,7 @@ void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, do
       GetCellStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
       double e_sheer = 0.;
-      if (use_elasticity) { e_sheer = elastic.e_sheer(cell_it); }
+      if (use_elasticity) { e_sheer = elastic->e_sheer(cell_it); }
       double sie = pb->specific_internal_energy(U, e_sheer);
       double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
@@ -3463,7 +3475,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       pb->velocity(U, vel);
       double rho = 1. / U[0];
       double e_sheer = 0.;
-      if (use_elasticity) { e_sheer = elastic.e_sheer(i); }
+      if (use_elasticity) { e_sheer = elastic->e_sheer(i); }
       double sie = pb->specific_internal_energy(U, e_sheer);
       double attr = pmesh->GetAttribute(i);
       pressure = pb->pressure(rho, sie, attr);

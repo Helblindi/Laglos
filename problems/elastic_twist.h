@@ -61,7 +61,7 @@ private:
 
    /* Problem specific parameters, can be tweaked */
    const double omega = 40000; // revolutions per second
-   const double R = 0.5;      // Internal radius
+   const double R = 0.05;      // Internal radius
    const double R2 = R*R;
 
 public:
@@ -121,7 +121,8 @@ public:
       v = 0.;
       if (t < 1e-12)
       {
-         if (x.Norml2() < R2)
+         double val = x[0] * x[0] + x[1] * x[1];
+         if (val < R2)
          {
             v[0] = -1. * omega * x[1];
             v[1] = omega * x[0];

@@ -51,7 +51,7 @@ private:
    mutable double timestep_first = 0.;
    double _a = 0., _b = 0., _gamma = 5./3.;
    bool _distort_mesh = true;
-   bool _known_exact_solution = true;
+   bool _known_exact_solution = false;
    bool _thbcs = true;
    bool _mvbcs = true;
    bool _mv_bcs_need_updating = true;
@@ -143,6 +143,7 @@ public:
    {
       if (t == 0) { return pow((this->get_gamma() - 1), 2) * 10e-4; } // TODO: Change pressure
       else {
+         MFEM_WARNING("Issues with Salzman exact solution.");
          Vector _n(dim);
          _n[0] = cos(rotation_angle);
          if (dim > 1)

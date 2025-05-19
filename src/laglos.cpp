@@ -694,39 +694,7 @@ int main(int argc, char *argv[]) {
       cout << "distort mesh.\n";
       switch (problem)
       {
-      case 1: // Sod
-      {
-         // Random distortion based on min mesh size
-         Array<double> coords(dim);
-         for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)
-         {
-            int index = vertex + H1FESpace.GetNDofs();
-            coords[0] = x_gf[vertex];
-            coords[1] = x_gf[index];
-
-            double dy = 0.;
-            if (coords[1] >= 0.75 ) {
-               dy = -4 * (coords[1] - 1);
-            } else if (coords[1] >= 0.5) {
-               dy = 4. * (coords[1] - 0.5);
-               dy *= -1;
-            } else if (coords[1] >= 0.25) {
-               dy = -4. * (coords[1] - 0.5);
-            } else if (coords[1] >= 0.) {
-               dy = 4. * coords[1];
-               dy *= -1.;
-            }
-            dy *= hmin;
-
-            double y_new = coords[1] + 2 * (1.-coords[0]) * coords[0] * dm_val * dy;
-
-            double x_new = coords[0] + dm_val * hmin * (1. - coords[1]) * sin(M_PI * coords[0]);
-            x_gf[index] = y_new;
-            x_gf[vertex] = x_new;
-         }
-         break;
-      }
-      case 7: // Saltzmann
+      case 11: // Saltzmann
       {
          Array<double> coords(dim);
          for (int vertex = 0; vertex < H1FESpace.GetNDofs(); vertex++)

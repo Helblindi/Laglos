@@ -1,0 +1,120 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-square-N15.mesh
+   --output-flag default
+   --refine-serial 0
+   --refine-parallel 0
+   --problem 1
+   --ode-solver 1
+   --t-init 0
+   --t-final 0.9
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-visit
+   --no-print
+   --no-mass-correct
+   --use-viscosity
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --post-process-density
+   --use-elasticity 0
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 2
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --optimize-timestep
+   --CFL 1
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 2, spacedim: 2
+Zones min/max: 225 225
+global_vSize: 225
+N dofs: 961
+Num Scalar Vertex DoFs: 256
+Num Scalar edge-interior DoFs: 480
+Num Scalar face-interior DoFs: 0
+Num faces: 480
+dim: 2
+Number of kinematic (position, mesh velocity) dofs: 1922
+Corresponding NDofs: 961
+Corresponding VDim: 2
+Corresponding Vsize: 1922
+Number of specific internal energy dofs: 225
+Corresponding NDofs: 225
+Corresponding VDim: 1
+Corresponding Vsize: 225
+Number of velocity dofs: 450
+Corresponding NDofs: 225
+Corresponding VDim: 2
+Corresponding Vsize: 450
+num interior faces: 420
+num boundary faces: 60
+num total faces: 480
+num boundary elements: 60
+num elements: 225
+Geometric::Non-default constructor
+NDofs_H1: 961
+dim: 2
+Instantiating hydro op
+block offsets: 0 1922 2147 2597
+2822
+Constructing BdrElementIndexingArray:
+Vsize_H1: 1922
+Vsize_H1L: 512
+TVSize_H1: 1922
+GTVSize_H1: 1922
+NDofs_H1: 961
+NVDofs_H1: 256
+NDofs_H1L: 256
+NDofs_L2: 225
+NDofs_L2V: 225
+Vsize_L2V: 450
+num_elements: 225
+num_faces: 480
+num_vertices: 256
+num_edges: 480
+Entering time loop
+step     5,	t = 0.035854,	dt = 0.00809189,	|e| = 2.1555214955e+01
+step    10,	t = 0.083225,	dt = 0.01038947,	|e| = 1.6157571820e+01
+step    15,	t = 0.141281,	dt = 0.01236192,	|e| = 1.3046949572e+01
+step    20,	t = 0.206069,	dt = 0.01329597,	|e| = 1.1049778933e+01
+step    25,	t = 0.274808,	dt = 0.01409256,	|e| = 9.6845776450e+00
+step    30,	t = 0.346822,	dt = 0.01461228,	|e| = 8.6903683710e+00
+step    35,	t = 0.421519,	dt = 0.01523954,	|e| = 7.9333771096e+00
+step    40,	t = 0.499025,	dt = 0.01568837,	|e| = 7.3325227555e+00
+step    45,	t = 0.579799,	dt = 0.01639638,	|e| = 6.8385886148e+00
+step    50,	t = 0.663356,	dt = 0.01696645,	|e| = 6.4256700574e+00
+step    55,	t = 0.750393,	dt = 0.01769192,	|e| = 6.0712058110e+00
+step    60,	t = 0.840197,	dt = 0.01829028,	|e| = 5.7648991795e+00
+step    64,	t = 0.900000,	dt = 0.00424256,	|e| = 5.5867890145e+00
+Program took 3.3215158333e-01s.
+This amounts to 2.2711219373e-05 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+                                total time | t / (dof*ts) 
+  Total time:                    3.322e-01 | 2.271e-05
+  Dij calculation:               6.315e-02 | 4.318e-06
+  Mesh Motion calculation:       1.155e-01 | 7.896e-06
+    Hiop calculation (if used):  0.000e+00 | 0.000e+00
+  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
+  State Update calculation:      1.177e-01 | 8.051e-06
+===========================================================

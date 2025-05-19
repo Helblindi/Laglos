@@ -89,6 +89,40 @@ add_test(NAME CompareSod2D
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+# Sod radial
+
+# Noh
+file(COPY test_noh.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_noh.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestNoh
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_noh.sh ${PROJECT_SOURCE_DIR} "noh_output.txt"
+)
+add_test(NAME CompareNoh
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/noh_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/noh.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+# Sedov
+file(COPY test_sedov.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_sedov.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestSedov
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_sedov.sh ${PROJECT_SOURCE_DIR} "sedov_output.txt"
+)
+add_test(NAME CompareSedov
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/sedov_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/sedov.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+# Saltzman
+
+# Isentropic Vortex
+
 
 #### Test elastic functions ####
 ## Elastic Impact
@@ -98,12 +132,7 @@ add_test(
     NAME TestElasticImpact
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh ${PROJECT_SOURCE_DIR} "elastic_impact_output.txt"
 )
-# add_test(NAME CompareSod2D
-#   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
-#     ${CMAKE_CURRENT_BINARY_DIR}/sod2d_output.txt
-#     ${PROJECT_SOURCE_DIR}/tests/output_ref/sod2d.txt
-#     11 # Ignore timing data at the end of the file as this fluctuates
-# )
+
 ## Elastic Shocktube
 
 # Create a new target to build and run tests

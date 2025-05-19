@@ -94,7 +94,7 @@ public:
       this->set_exact_solution(_known_exact_solution);
 
       // Set Equation of state
-      this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
+      this->eos = std::unique_ptr<EquationOfState>(new PolytropicEOS(1.));
    }
 
    /* Optionally overridden, or removed */
@@ -113,7 +113,7 @@ public:
    double p0(const Vector &x, const double & t) const override
    {
       /* Get initial pressure */
-      double _p0 = pow(rho0(x,0), this->get_gamma());
+      double _p0 = eos->pressure(rho0(x,0), 0., this->get_gamma());
 
       if (t < 1e-12)
       {
@@ -160,9 +160,19 @@ public:
    }
    double sie0(const Vector &x, const double & t) const override
    {
-      double _p = p0(x,t);
-      double _rho = rho0(x,t);
-      return this->eos->energy(_p, _rho, this->get_gamma());
+      if (t < 1.e-12)
+      {
+         double _p = p0(x,t);
+         double _rho = rho0(x,t);
+         return this->eos->energy(_p, _rho, this->get_gamma());
+      }
+      else
+      {
+         /* Energy does not matter for our convergence of the exact solution 
+         in Kidder problem since we only check inside and outside radius. */
+         return 0.;
+      }
+      
    }
 
    /*********************************************************

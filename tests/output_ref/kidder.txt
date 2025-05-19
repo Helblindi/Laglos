@@ -1,0 +1,177 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/full_ring_r0.mesh
+   --output-flag default
+   --refine-serial 0
+   --refine-parallel 0
+   --problem 16
+   --ode-solver 1
+   --t-init 0
+   --t-final 0.1887
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-visit
+   --no-print
+   --no-mass-correct
+   --use-viscosity
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --post-process-density
+   --use-elasticity 0
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 2
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --optimize-timestep
+   --CFL 0.5
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 2, spacedim: 2
+Zones min/max: 500 500
+rho1: 1
+rho2: 2
+r1: 0.9
+r2: 1
+P1: 1
+P2: 4
+focusing time: 0.217945
+global_vSize: 500
+N dofs: 2200
+Num Scalar Vertex DoFs: 600
+Num Scalar edge-interior DoFs: 1100
+Num Scalar face-interior DoFs: 0
+Num faces: 1100
+dim: 2
+Number of kinematic (position, mesh velocity) dofs: 4400
+Corresponding NDofs: 2200
+Corresponding VDim: 2
+Corresponding Vsize: 4400
+Number of specific internal energy dofs: 500
+Corresponding NDofs: 500
+Corresponding VDim: 1
+Corresponding Vsize: 500
+Number of velocity dofs: 1000
+Corresponding NDofs: 500
+Corresponding VDim: 2
+Corresponding Vsize: 1000
+num interior faces: 900
+num boundary faces: 200
+num total faces: 1100
+num boundary elements: 200
+num elements: 500
+Geometric::Non-default constructor
+NDofs_H1: 2200
+dim: 2
+Instantiating hydro op
+block offsets: 0 4400 4900 5900
+6400
+Constructing BdrElementIndexingArray:
+
+
+MFEM Warning: May need to enforce additional BCs.
+
+ ... in function: mfem::hydroLO::LagrangianLOOperator::LagrangianLOOperator(const int &, const int, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, const ParGridFunction &, ParLinearForm *, ProblemBase *, Array<int>, bool, int, bool, double)
+ ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:227
+
+Vsize_H1: 4400
+Vsize_H1L: 1200
+TVSize_H1: 4400
+GTVSize_H1: 4400
+NDofs_H1: 2200
+NVDofs_H1: 600
+NDofs_H1L: 600
+NDofs_L2: 500
+NDofs_L2V: 500
+Vsize_L2V: 1000
+num_elements: 500
+num_faces: 1100
+num_vertices: 600
+num_edges: 1100
+Entering time loop
+step     5,	t = 0.009719,	dt = 0.00197596,	|e| = 3.4138013409e+01
+step    10,	t = 0.019827,	dt = 0.00204890,	|e| = 3.5140753648e+01
+step    15,	t = 0.030176,	dt = 0.00207363,	|e| = 3.6873388848e+01
+step    20,	t = 0.040487,	dt = 0.00205213,	|e| = 3.9391446123e+01
+step    25,	t = 0.050647,	dt = 0.00201438,	|e| = 4.2853697751e+01
+step    30,	t = 0.060532,	dt = 0.00194925,	|e| = 4.7465046394e+01
+step    35,	t = 0.070015,	dt = 0.00185812,	|e| = 5.3434484897e+01
+step    40,	t = 0.078989,	dt = 0.00175104,	|e| = 6.0959324389e+01
+step    45,	t = 0.087395,	dt = 0.00163317,	|e| = 7.0236839541e+01
+step    50,	t = 0.095189,	dt = 0.00150862,	|e| = 8.1438493473e+01
+step    55,	t = 0.102353,	dt = 0.00138234,	|e| = 9.4699139717e+01
+step    60,	t = 0.108892,	dt = 0.00125846,	|e| = 1.1011382421e+02
+step    65,	t = 0.114821,	dt = 0.00113856,	|e| = 1.2770284847e+02
+step    70,	t = 0.120182,	dt = 0.00102964,	|e| = 1.4748515745e+02
+step    75,	t = 0.125035,	dt = 0.00093306,	|e| = 1.6951091063e+02
+step    80,	t = 0.129443,	dt = 0.00084877,	|e| = 1.9386982296e+02
+step    85,	t = 0.133464,	dt = 0.00077576,	|e| = 2.2070372924e+02
+step    90,	t = 0.137149,	dt = 0.00071252,	|e| = 2.5021057109e+02
+step    95,	t = 0.140543,	dt = 0.00065736,	|e| = 2.8264038924e+02
+step   100,	t = 0.143682,	dt = 0.00060873,	|e| = 3.1828429520e+02
+step   105,	t = 0.146593,	dt = 0.00056528,	|e| = 3.5745804931e+02
+step   110,	t = 0.149300,	dt = 0.00052599,	|e| = 4.0048300950e+02
+step   115,	t = 0.151822,	dt = 0.00049011,	|e| = 4.4766830147e+02
+step   120,	t = 0.154172,	dt = 0.00045719,	|e| = 4.9929826674e+02
+step   125,	t = 0.156366,	dt = 0.00042694,	|e| = 5.5562806158e+02
+step   130,	t = 0.158417,	dt = 0.00039919,	|e| = 6.1688796534e+02
+step   135,	t = 0.160336,	dt = 0.00037385,	|e| = 6.8329446281e+02
+step   140,	t = 0.162135,	dt = 0.00035079,	|e| = 7.5506452893e+02
+step   145,	t = 0.163825,	dt = 0.00032987,	|e| = 8.3242926076e+02
+step   150,	t = 0.165417,	dt = 0.00031092,	|e| = 9.1564385979e+02
+step   155,	t = 0.166920,	dt = 0.00029376,	|e| = 1.0049923780e+03
+step   160,	t = 0.168341,	dt = 0.00027817,	|e| = 1.1007870560e+03
+step   165,	t = 0.169689,	dt = 0.00026396,	|e| = 1.2033632009e+03
+step   170,	t = 0.170969,	dt = 0.00025092,	|e| = 1.3130681779e+03
+step   175,	t = 0.172187,	dt = 0.00023891,	|e| = 1.4302467364e+03
+step   180,	t = 0.173348,	dt = 0.00022783,	|e| = 1.5552541179e+03
+step   185,	t = 0.174456,	dt = 0.00021756,	|e| = 1.6884390810e+03
+step   190,	t = 0.175515,	dt = 0.00020802,	|e| = 1.8301403707e+03
+step   195,	t = 0.176528,	dt = 0.00019915,	|e| = 1.9806879036e+03
+step   200,	t = 0.177499,	dt = 0.00019089,	|e| = 2.1404062178e+03
+step   205,	t = 0.178430,	dt = 0.00018322,	|e| = 2.3096189795e+03
+step   210,	t = 0.179325,	dt = 0.00017608,	|e| = 2.4886531626e+03
+step   215,	t = 0.180185,	dt = 0.00016944,	|e| = 2.6778407914e+03
+step   220,	t = 0.181013,	dt = 0.00016326,	|e| = 2.8775196487e+03
+step   225,	t = 0.181812,	dt = 0.00015751,	|e| = 3.0880315303e+03
+step   230,	t = 0.182584,	dt = 0.00015215,	|e| = 3.3097186049e+03
+step   235,	t = 0.183329,	dt = 0.00014714,	|e| = 3.5429184357e+03
+step   240,	t = 0.184051,	dt = 0.00014246,	|e| = 3.7879582319e+03
+step   245,	t = 0.184750,	dt = 0.00013807,	|e| = 4.0451487857e+03
+step   250,	t = 0.185428,	dt = 0.00013396,	|e| = 4.3147783307e+03
+step   255,	t = 0.186086,	dt = 0.00013009,	|e| = 4.5971032437e+03
+step   260,	t = 0.186725,	dt = 0.00012644,	|e| = 4.8923057956e+03
+step   265,	t = 0.187347,	dt = 0.00012299,	|e| = 5.2005437177e+03
+step   270,	t = 0.187952,	dt = 0.00011975,	|e| = 5.5219317056e+03
+step   275,	t = 0.188542,	dt = 0.00011669,	|e| = 5.8565197920e+03
+step   277,	t = 0.188700,	dt = 0.00004231,	|e| = 5.9503017904e+03
+Program took 3.3635385000e+00s.
+This amounts to 2.4198118705e-05 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+                                total time | t / (dof*ts) 
+  Total time:                    3.364e+00 | 2.420e-05
+  Dij calculation:               6.234e-01 | 4.485e-06
+  Mesh Motion calculation:       1.183e+00 | 8.511e-06
+    Hiop calculation (if used):  0.000e+00 | 0.000e+00
+  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
+  State Update calculation:      1.210e+00 | 8.707e-06
+===========================================================

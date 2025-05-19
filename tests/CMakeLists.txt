@@ -147,6 +147,20 @@ add_test(NAME CompareIV
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+# Kidder shell
+file(COPY test_kidder.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_kidder.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestKidder
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_kidder.sh ${PROJECT_SOURCE_DIR} "kidder_output.txt"
+)
+add_test(NAME CompareKidder
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/kidder_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/kidder.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 #### Test elastic functions ####
 ## Elastic Impact
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

@@ -120,6 +120,18 @@ add_test(NAME CompareSedov
 )
 
 # Saltzman
+file(COPY test_saltzman.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_saltzman.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestSaltzman
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_saltzman.sh ${PROJECT_SOURCE_DIR} "saltzman_output.txt"
+)
+add_test(NAME CompareSaltzman
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/saltzman_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/saltzman.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
 
 # Isentropic Vortex
 

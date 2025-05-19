@@ -111,8 +111,8 @@ public:
    double p0(const Vector &x, const double &t) const override
    {
       double _rho = rho0(x,t);
-      double _sie = sie0(x,t);
-      return this->eos->pressure(_rho, _sie, this->get_gamma());
+      // double _sie = sie0(x,t);
+      return this->eos->pressure(_rho, 0., this->get_gamma());
    }
    double rho0(const Vector &x, const double & t) const override
    {

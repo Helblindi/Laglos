@@ -134,7 +134,18 @@ add_test(NAME CompareSaltzman
 )
 
 # Isentropic Vortex
-
+file(COPY test_iv.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_iv.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestIV
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_iv.sh ${PROJECT_SOURCE_DIR} "iv_output.txt"
+)
+add_test(NAME CompareIV
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/iv_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/iv.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
 
 #### Test elastic functions ####
 ## Elastic Impact

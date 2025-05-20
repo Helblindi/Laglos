@@ -78,10 +78,6 @@ public:
    }
 
    /* Override specific update functions */
-   void lm_update(const double b_covolume) override 
-   {
-      this->set_b(b_covolume);
-   }
    virtual void update(Vector params, double t) override {
       // params is a vector [hmax, cell_vol]
       if (t <= 1.e-16)

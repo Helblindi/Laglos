@@ -79,12 +79,6 @@ public:
       return (cell_attr == 1) ? _gamma_1 : _gamma_2;
    }
 
-   /* Override specific update functions */
-   void lm_update(const double b_covolume) override 
-   {
-      this->set_b(b_covolume);
-   }
-
    /*********************************************************
     * Initial State functions
     *********************************************************/

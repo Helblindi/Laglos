@@ -88,7 +88,6 @@ public:
 
    /* Optionally overridden, or removed */
    double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
-   void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
    /*********************************************************

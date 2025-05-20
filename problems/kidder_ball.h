@@ -59,7 +59,6 @@ public:
 
    /* Optionally overridden, or removed */
    double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
-   void lm_update(const double b_covolume) override {}
    void update(Vector vec, double t = 0.) override {}
 
    void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override 

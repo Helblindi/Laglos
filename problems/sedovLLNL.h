@@ -76,12 +76,6 @@ public:
       this->eos = std::unique_ptr<EquationOfState>(new IdealGasEOS());
    }
 
-   /* Override specific update functions */
-   // void lm_update(const double b_covolume) override 
-   // {
-   //    this->set_b(b_covolume);
-   // }
-
    /*********************************************************
     * Initial State functions
     *********************************************************/

@@ -94,22 +94,22 @@ num_faces: 544
 num_vertices: 289
 num_edges: 544
 Entering time loop
-step     5,	t = 0.287072,	dt = 0.05714637,	|e| = 4.0143530132e+01
-step    10,	t = 0.569233,	dt = 0.05590565,	|e| = 4.0150677277e+01
-step    15,	t = 0.844589,	dt = 0.05451837,	|e| = 4.0156526478e+01
-step    20,	t = 1.113235,	dt = 0.05322074,	|e| = 4.0161984090e+01
-step    25,	t = 1.375826,	dt = 0.05207053,	|e| = 4.0167153903e+01
-step    30,	t = 1.633129,	dt = 0.05107454,	|e| = 4.0171858556e+01
-step    35,	t = 1.885901,	dt = 0.05022660,	|e| = 4.0175911450e+01
-step    38,	t = 2.000000,	dt = 0.01409842,	|e| = 4.0177508573e+01
-Program took 2.3456104167e-01s.
-This amounts to 2.3493694077e-05 s per timestep per gridpoint.
+step     5,	t = 0.298323,	dt = 0.05939520,	|e| = 4.0143546733e+01
+step    10,	t = 0.591558,	dt = 0.05809203,	|e| = 4.0150809687e+01
+step    15,	t = 0.877599,	dt = 0.05662164,	|e| = 4.0156916970e+01
+step    20,	t = 1.156513,	dt = 0.05524244,	|e| = 4.0162725301e+01
+step    25,	t = 1.428989,	dt = 0.05401899,	|e| = 4.0168258739e+01
+step    30,	t = 1.695844,	dt = 0.05296088,	|e| = 4.0173274506e+01
+step    35,	t = 1.957893,	dt = 0.05206325,	|e| = 4.0177548252e+01
+step    36,	t = 2.000000,	dt = 0.04210706,	|e| = 4.0178158888e+01
+Program took 2.1783529167e-01s.
+This amounts to 2.2997813732e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.346e-01 | 2.349e-05
-  Dij calculation:               4.531e-02 | 4.538e-06
-  Mesh Motion calculation:       7.949e-02 | 7.961e-06
+  Total time:                    2.178e-01 | 2.300e-05
+  Dij calculation:               4.229e-02 | 4.465e-06
+  Mesh Motion calculation:       7.443e-02 | 7.858e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      8.239e-02 | 8.252e-06
+  State Update calculation:      7.817e-02 | 8.253e-06
 ===========================================================

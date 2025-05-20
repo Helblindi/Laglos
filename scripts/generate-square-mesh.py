@@ -2,16 +2,16 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 21
-   ny_gridpoints = 21
-   xL = -5.
-   xR = 5.
-   yL = -5.
-   yR = 5.
+   nx_gridpoints = 11
+   ny_gridpoints = 11
+   xL = -1.
+   xR = 1.
+   yL = -1.
+   yR = 1.
    x_arr = np.linspace(xL,xR,nx_gridpoints)
    y_arr = np.linspace(yL,yR,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/square-test.mesh"
+   filename = home_dir + "data/noh-10.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -44,11 +44,12 @@ def main():
    el_attr = 1
    for i in range(0, nx_gridpoints - 1):
       for j in range(0, ny_gridpoints - 1):
-         if (i >= (nx_gridpoints - 1) / 4 and i < 3 * (nx_gridpoints - 1) / 4 
-             and j >= (ny_gridpoints - 1) / 4 and j < 3 * (ny_gridpoints - 1) / 4):
-            el_attr = 50
-         else:
-            el_attr = 1
+         # if (i >= (nx_gridpoints - 1) / 4 and i < 3 * (nx_gridpoints - 1) / 4 
+         #     and j >= (ny_gridpoints - 1) / 4 and j < 3 * (ny_gridpoints - 1) / 4):
+         #    el_attr = 50
+         # else:
+         #    el_attr = 1
+         el_attr = 1
          left = j + i*ny_gridpoints
          print("el: ", el_it, ", attr: ", el_attr)
          el_it += 1
@@ -63,10 +64,10 @@ def main():
    # bdry_right = 1
    # bdry_top = 2
 
-   bdry_left = 5
-   bdry_bottom = 5
-   bdry_right = 5
-   bdry_top = 5
+   bdry_left = 4
+   bdry_bottom = 4
+   bdry_right = 4
+   bdry_top = 4
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints - 1) + 2 * (ny_gridpoints - 1)) + "\n")

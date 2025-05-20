@@ -226,7 +226,7 @@ bool CheckGlobalMassConservation(const Vector &x, const Vector &y) const
       sum_old += mass_lumped[i] * x[i];
       sum_new += mass_lumped[i] * y[i];
    }
-   double t_val = abs(sum_old - sum_new);
+   double t_val = abs(sum_old - sum_new) / sum_old;
    if (t_val > 1.e-12)
    {
       cout << "global mass is not conserved, diff: " << t_val << ", sum_old: " << sum_old << ", sum_new: " << sum_new << endl;

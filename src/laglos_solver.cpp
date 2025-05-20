@@ -1254,8 +1254,8 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
          /* Compute max wave speed */ 
          // Some cases require an update to b_covolume at every interface.  This can be done through
          // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
-         double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
-         pb->lm_update(b_covolume);
+         // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
+         // pb->lm_update(b_covolume);
 
          // Compute sheer energy, if applicable
          double esl = 0., esr = 0.;

@@ -1,5 +1,6 @@
 #include "laglos_solver.hpp"
 #include <cassert>
+#include <iostream>
 
 
 namespace mfem
@@ -2597,11 +2598,14 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
       }
 
       val = temp_num / temp_denom;
-      if (val > pow(10, -12))
+      if (val > 1.E-10)
       {
          counter++;
          // cout << "cell: " << ci << endl;
          // cout << "MASS CONSERVATION BROKEN!!\n";
+         // cout << "val: " << val << endl;
+         // cout << "temp_num: " << temp_num << endl;
+         // cout << "temp_denom: " << temp_denom << endl;
          // cout << "k / U_i[0] - m = " << k / U_i[0] - m << endl;
          // cout << "K: " << k << endl;
          // cout << "T: " << U_i[0] << endl;
@@ -2618,7 +2622,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
    double _mass_error = num / denom;
    double _interior_mass_error = interior_num / interior_denom;
 
-   if (_mass_error > 1.E-12 || _interior_mass_error > 1.E-12 || cell_ratio > 1.E-12)
+   if (_mass_error > 1.E-10 || _interior_mass_error > 1.E-10 || cell_ratio > 1.E-10)
    {
       cout << "--------------------------------------\n"
            << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl

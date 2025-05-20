@@ -14,9 +14,6 @@ namespace hydroLO
 {
 namespace CompileTimeVals
 {
-   /* Problem specific */
-   const static int dim = 2;
-
    /**
     * Directory specific information
     * Note: Can change this to a local path that you would like results output to. 

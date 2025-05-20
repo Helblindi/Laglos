@@ -19,44 +19,43 @@
 * Example run time parameters:
 *
 * ----- 1D -----
-* ./Laglos -m ../data/ref-segment.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 8            ## Smooth
-* ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 2. -rs 8            ## Sod
-* ./Laglos -m ../data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8           ## Lax
-# ./Laglos -m ../data/ref-segment.mesh -p 42 -tf 0.667 -cfl 0.2 -rs 8          ## Leblanc
+* ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6 ## Smooth
+* ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 8             ## Sod
+* ./Laglos -m ../data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8             ## Lax
+# ./Laglos -m ../data/ref-segment.mesh -p 42 -tf 0.667 -cfl 0.2 -rs 8            ## Leblanc
 *
 * ----- vdw -----
-* ./Laglos -m ../data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis    ## Vdw1
-* ./Laglos -m ../data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 8 -vis  ## Vdw2 
-* ./Laglos -m ../data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis   ## Vdw3 
-* ./Laglos -m ../data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis  ## Vdw4
+* ./Laglos -m ../data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis      ## Vdw1
+* ./Laglos -m ../data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 8 -vis    ## Vdw2 
+* ./Laglos -m ../data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis     ## Vdw3 
+* ./Laglos -m ../data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis    ## Vdw4
 *
 * --------------------------------------------------------------
 * ----- 2D -----
 * --------------------------------------------------------------
-* ./Laglos -m ../data/ref-square.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 4             ## Smooth wave in 2D
-* ./Laglos -m ../data/shocktube.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0             ## Sod in 2D
-* ./Laglos -m ../data/distorted-tube-2.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0      ## Sod Distorted
-* ./Laglos -m ../data/ref-square.mesh -p 8 -tf 0.2 -cfl 0.25 -rs 4             ## Sod Radial
-* ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 10 -cfl 0.5 -rs 3            ## Isentropic Vortex
-* ./Laglos -m ../data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 1 -rs 0           ## Noh nonuniform (likely need to change BCs)
-* ./Laglos -m ../data/ref-square-c0.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 6          ## Noh
-* ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf .9 -cfl 1 -rs 5             ## Sedov
-* ./Laglos -m ../data/rectangle_saltzmann.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 3   ## Saltzman problem
-* ./Laglos -m ../data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0        ## Kidder shell
+* ./Laglos -m ../data/shocktube.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0               ## Sod in 2D
+* ./Laglos -m ../data/distorted-tube-2.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0        ## Sod Distorted
+* ./Laglos -m ../data/ref-square.mesh -p 8 -tf 0.2 -cfl 0.25 -rs 4               ## Sod Radial
+* ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 10 -cfl 0.5 -rs 3              ## Isentropic Vortex
+* ./Laglos -m ../data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 1 -rs 0             ## Noh nonuniform (likely need to change BCs)
+* ./Laglos -m ../data/ref-square-c0.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 6            ## Noh
+* ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf .9 -cfl 1 -rs 5               ## Sedov
+* ./Laglos -m ../data/rectangle_saltzmann.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 3     ## Saltzman problem
+* ./Laglos -m ../data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0          ## Kidder shell
 * ----- Fails -----
-* ./Laglos -m ../data/triple-point.mesh -p 3 -tf 5. -cfl 0.5 -rs 2             ## Triple Point [Fails]
+* ./Laglos -m ../data/triple-point.mesh -p 3 -tf 5. -cfl 0.5 -rs 2               ## Triple Point [Fails]
 * ----- Untested -----
-* ./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4             ## ICF [Untested]
-* ./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0       ## Kidder ball [Untested]
-* ./Laglos -m ../data/ref-square-c0-N30.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 1       ## Taylor-Green [Untested]
+* ./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4               ## ICF [Untested]
+* ./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0         ## Kidder ball [Untested]
+* ./Laglos -m ../data/ref-square-c0-N30.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 1         ## Taylor-Green [Untested]
 *
 * ----- vdw -----
-* ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis       ## Vdw2 
-* ./Laglos -m ../data/tube-np5-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 2 -vis        ## Vdw3 
-* ./Laglos -m ../data/tube-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis     ## Vdw4
+* ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis         ## Vdw2 
+* ./Laglos -m ../data/tube-np5-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 2 -vis          ## Vdw3 
+* ./Laglos -m ../data/tube-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis       ## Vdw4
 * 
 * --- General Riemann Problem, change riemann_problem.h ---
-* ./Laglos -m ../data/ref-segment-c0.mesh -p 43 -cfl 0.5 -tf 1 -rs 8 -vis      ## General Riemann Problem
+* ./Laglos -m ../data/ref-segment-c0.mesh -p 43 -cfl 0.5 -tf 1 -rs 8 -vis        ## General Riemann Problem
 *
 * --- To generate images for movies
 * -of "output-dir" = directory where files should be saved.
@@ -1899,6 +1898,26 @@ int main(int argc, char *argv[]) {
                   }
                }
             }
+         }
+
+         /* Project 0 on all extrapolated cells, marked with attr = 99 */
+         if (pmesh->attributes.Find(99) != -1)
+         {
+            cout << "projecting zero on cells with attr 99\n";
+            Vector _vec_zero(dim);
+            _vec_zero = 0.;
+            VectorConstantCoefficient _zero_vcc(_vec_zero);
+            // onto approx
+            sv_gf.ProjectCoefficient(_zero_vcc, 99);
+            rho_gf.ProjectCoefficient(_zero_vcc, 99);
+            v_gf.ProjectCoefficient(_zero_vcc, 99);
+            ste_gf.ProjectCoefficient(_zero_vcc, 99);
+
+            // onto exact
+            sv_ex_gf.ProjectCoefficient(_zero_vcc, 99);
+            rho_ex_gf.ProjectCoefficient(_zero_vcc, 99);
+            vel_ex_gf.ProjectCoefficient(_zero_vcc, 99);
+            ste_ex_gf.ProjectCoefficient(_zero_vcc, 99);
          }
 
          /* Compute relative errors */

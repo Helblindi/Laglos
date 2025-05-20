@@ -58,6 +58,23 @@ add_test(NAME TestEOS COMMAND TestEOS)
 
 
 ### Test programs to compare output of various numerical tests
+# Smooth 1D
+file(COPY test_smooth_1d.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_smooth_1d.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestSmooth1D
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_smooth_1d.sh ${PROJECT_SOURCE_DIR} "smooth1d_output.txt"
+)
+
+file(COPY compare_ignore_last_lines.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(NAME CompareSmooth1D
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/smooth1d_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/smooth1d.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 # Sod 1D
 file(COPY test_sod_1d.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
@@ -65,9 +82,6 @@ add_test(
     NAME TestSod1D
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d.sh ${PROJECT_SOURCE_DIR} "sod1d_output.txt"
 )
-
-file(COPY compare_ignore_last_lines.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 add_test(NAME CompareSod1D
   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
     ${CMAKE_CURRENT_BINARY_DIR}/sod1d_output.txt

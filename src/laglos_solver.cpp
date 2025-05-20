@@ -916,6 +916,14 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
          GetIntermediateFaceVelocity(face, _vel);
          geom.UpdateNodeVelocity(dxdt_gf, face, _vel);
       }
+      /* Optionally, enforce boundary conditions */
+      if (pb->has_mv_boundary_conditions())
+      {
+         for (int i = 0; i < ess_tdofs.Size(); i++) { 
+            // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
+            dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
+         }
+      }
       // Since we do not project here, must fill cell center velocities
       FillCenterVelocitiesWithAvg(dS_dt);
    }
@@ -1091,7 +1099,6 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
                // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
                dxdt_gf_l(ess_tdofs[i]) = bdr_vals[i]; 
             }
-
          }
       }
       

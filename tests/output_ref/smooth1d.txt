@@ -7,14 +7,14 @@
                /____/                       
 
 Options used:
-   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-segment.mesh
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-segment-extrapolated.mesh
    --output-flag default
-   --refine-serial 5
+   --refine-serial 1
    --refine-parallel 0
-   --problem 2
+   --problem 40
    --ode-solver 1
    --t-init 0
-   --t-final 0.225
+   --t-final 0.6
    --max-steps -1
    --no-visualization
    --visualization-steps 5
@@ -27,7 +27,7 @@ Options used:
    --gmv-to-greedy-num-steps 0
    --move-mesh
    --check-mesh
-   --no-post-process-density
+   --post-process-density
    --use-elasticity 0
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
@@ -47,81 +47,77 @@ Meshing done
 done with serial refinement
 done with parallel refinement
 dim: 1, spacedim: 1
-Zones min/max: 32 32
-global_vSize: 32
-N dofs: 65
-Num Scalar Vertex DoFs: 33
+Zones min/max: 60 60
+global_vSize: 60
+N dofs: 121
+Num Scalar Vertex DoFs: 61
 Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
-Num faces: 33
+Num faces: 61
 dim: 1
-Number of kinematic (position, mesh velocity) dofs: 65
-Corresponding NDofs: 65
+Number of kinematic (position, mesh velocity) dofs: 121
+Corresponding NDofs: 121
 Corresponding VDim: 1
-Corresponding Vsize: 65
-Number of specific internal energy dofs: 32
-Corresponding NDofs: 32
+Corresponding Vsize: 121
+Number of specific internal energy dofs: 60
+Corresponding NDofs: 60
 Corresponding VDim: 1
-Corresponding Vsize: 32
-Number of velocity dofs: 32
-Corresponding NDofs: 32
+Corresponding Vsize: 60
+Number of velocity dofs: 60
+Corresponding NDofs: 60
 Corresponding VDim: 1
-Corresponding Vsize: 32
-num interior faces: 31
+Corresponding Vsize: 60
+num interior faces: 59
 num boundary faces: 2
-num total faces: 33
+num total faces: 61
 num boundary elements: 2
-num elements: 32
+num elements: 60
 Geometric::Non-default constructor
-NDofs_H1: 65
+NDofs_H1: 121
 dim: 1
 Instantiating hydro op
-block offsets: 0 65 97 129
-161
+block offsets: 0 121 181 241
+301
 Constructing BdrElementIndexingArray:
-Vsize_H1: 65
-Vsize_H1L: 33
-TVSize_H1: 65
-GTVSize_H1: 65
-NDofs_H1: 65
-NVDofs_H1: 33
-NDofs_H1L: 33
-NDofs_L2: 32
-NDofs_L2V: 32
-Vsize_L2V: 32
-num_elements: 32
-num_faces: 33
-num_vertices: 33
+Vsize_H1: 121
+Vsize_H1L: 61
+TVSize_H1: 121
+GTVSize_H1: 121
+NDofs_H1: 121
+NVDofs_H1: 61
+NDofs_H1L: 61
+NDofs_L2: 60
+NDofs_L2V: 60
+Vsize_L2V: 60
+num_elements: 60
+num_faces: 61
+num_vertices: 61
 num_edges: 0
 Entering time loop
-step     5,	t = 0.008697,	dt = 0.00187472,	|e| = 1.2865848224e+01
-step    10,	t = 0.018306,	dt = 0.00195275,	|e| = 1.2920589499e+01
-step    15,	t = 0.028303,	dt = 0.00202923,	|e| = 1.2984284649e+01
-step    20,	t = 0.038653,	dt = 0.00209617,	|e| = 1.3057087131e+01
-step    25,	t = 0.049315,	dt = 0.00215569,	|e| = 1.3138478595e+01
-step    30,	t = 0.060256,	dt = 0.00220877,	|e| = 1.3227558658e+01
-step    35,	t = 0.071442,	dt = 0.00225548,	|e| = 1.3323364954e+01
-step    40,	t = 0.082844,	dt = 0.00229602,	|e| = 1.3424952022e+01
-step    45,	t = 0.094430,	dt = 0.00233083,	|e| = 1.3531434449e+01
-step    50,	t = 0.106175,	dt = 0.00236049,	|e| = 1.3642012357e+01
-step    55,	t = 0.118055,	dt = 0.00238566,	|e| = 1.3755979047e+01
-step    60,	t = 0.130049,	dt = 0.00240694,	|e| = 1.3872719418e+01
-step    65,	t = 0.142138,	dt = 0.00242491,	|e| = 1.3991702891e+01
-step    70,	t = 0.154309,	dt = 0.00244006,	|e| = 1.4112474290e+01
-step    75,	t = 0.166549,	dt = 0.00245281,	|e| = 1.4234644787e+01
-step    80,	t = 0.178846,	dt = 0.00246354,	|e| = 1.4357883319e+01
-step    85,	t = 0.191191,	dt = 0.00247255,	|e| = 1.4481909324e+01
-step    90,	t = 0.203577,	dt = 0.00248011,	|e| = 1.4606488957e+01
-step    95,	t = 0.215997,	dt = 0.00248644,	|e| = 1.4731441141e+01
-step    99,	t = 0.225000,	dt = 0.00153683,	|e| = 1.4821973463e+01
-Program took 2.4905000000e-02s.
-This amounts to 7.7828125000e-06 s per timestep per gridpoint.
+step     5,	t = 0.048265,	dt = 0.00972454,	|e| = 2.2862297845e+01
+step    10,	t = 0.097090,	dt = 0.00973578,	|e| = 2.2759783761e+01
+step    15,	t = 0.144022,	dt = 0.00880812,	|e| = 2.2671182451e+01
+step    20,	t = 0.184827,	dt = 0.00785448,	|e| = 2.2625602861e+01
+step    25,	t = 0.222952,	dt = 0.00752329,	|e| = 2.2609230347e+01
+step    30,	t = 0.260313,	dt = 0.00746190,	|e| = 2.2609877090e+01
+step    35,	t = 0.297778,	dt = 0.00752394,	|e| = 2.2619442186e+01
+step    40,	t = 0.335711,	dt = 0.00763080,	|e| = 2.2633043660e+01
+step    45,	t = 0.374185,	dt = 0.00773471,	|e| = 2.2648079497e+01
+step    50,	t = 0.413130,	dt = 0.00782280,	|e| = 2.2663370827e+01
+step    55,	t = 0.452459,	dt = 0.00789184,	|e| = 2.2678515670e+01
+step    60,	t = 0.492079,	dt = 0.00794371,	|e| = 2.2693448480e+01
+step    65,	t = 0.531920,	dt = 0.00798301,	|e| = 2.2708212895e+01
+step    70,	t = 0.571930,	dt = 0.00801392,	|e| = 2.2722863301e+01
+step    74,	t = 0.600000,	dt = 0.00399589,	|e| = 2.2733052724e+01
+projecting zero on cells with attr 99
+Program took 3.3192250000e-02s.
+This amounts to 7.3760555556e-06 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.491e-02 | 7.783e-06
-  Dij calculation:               5.792e-03 | 1.810e-06
-  Mesh Motion calculation:       4.528e-03 | 1.415e-06
+  Total time:                    3.319e-02 | 7.376e-06
+  Dij calculation:               7.728e-03 | 1.717e-06
+  Mesh Motion calculation:       6.137e-03 | 1.364e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.157e-02 | 3.616e-06
+  State Update calculation:      1.552e-02 | 3.450e-06
 ===========================================================

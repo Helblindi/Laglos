@@ -77,12 +77,6 @@ public:
       this->eos = std::unique_ptr<EquationOfState>(new PolytropicEOS(1.));
    }
 
-   /* Override specific update functions */
-   void lm_update(const double b_covolume) override 
-   {
-      this->set_b(b_covolume);
-   }
-
    void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override
    {
       Array<int> dofs_list;

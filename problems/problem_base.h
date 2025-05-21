@@ -376,12 +376,14 @@ public:
       return result;
    }
 
-   inline double sound_speed(const double &rho, const double &press, const int &cell_attr=0)
+   double sound_speed(const double &rho, const double &press, const double &gamma) const
    {
-      double val = this->get_gamma(cell_attr) * (press + this->get_a() * pow(rho,2)) / (rho * (1. - this->get_b() * rho));
-      val -= 2. * this->get_a() * rho;
-      val = pow(val, 0.5);
-      return val;
+      assert(eos != NULL);
+      return this->eos->sound_speed(rho, press, gamma);
+   }
+
+   double sound_speed(const double &rho, const double &press, const int &cell_attr=0) const {
+      return pressure(rho, press, this->get_gamma(cell_attr));
    }
 
    /*********************************************

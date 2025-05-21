@@ -8,7 +8,7 @@ public:
    virtual ~EquationOfState() = default;
 
    virtual double pressure(double rho, double e, double gamma) const = 0;
-   virtual double sound_speed(double rho, double e, double gamma) const = 0;
+   virtual double sound_speed(double rho, double p, double gamma) const = 0;
    virtual double energy(double pressure, double density, double gamma) const = 0; // specific internal energy
 };
 
@@ -18,11 +18,8 @@ public:
       return (gamma - 1.0) * rho * e;
    }
 
-   double sound_speed(double rho, double e, double gamma) const override {
-      // double p = pressure(rho, e, gamma);
-      // return std::sqrt(gamma * p / rho);
-      throw std::runtime_error("Sound speed not implemented");
-      return 0.;
+   double sound_speed(double rho, double p, double gamma) const override {
+      return sqrt(gamma * p / rho);
    }
 
    double energy(double pressure, double density, double gamma) const override {
@@ -39,22 +36,20 @@ public:
    double pressure(double rho, double e, double gamma) const override {
       double denom = 1.0 - b * rho;
       if (denom <= 0.0) {
+         std::cout << "rho: " << rho << " b*rho: " << b * rho << std::endl;
          throw std::runtime_error("Van der Waals: unphysical density (b * rho >= 1)");
       }
       return ((gamma - 1.0) * (rho * e + a * rho * rho)) / denom - a * rho * rho;
    }
 
-   double sound_speed(double rho, double e, double gamma) const override {
-      // double p = pressure(rho, e, gamma);
-      // double denom = (1.0 - b * rho);
-      // if (denom <= 0.0) {
-      //    throw std::runtime_error("Van der Waals: unphysical density in sound speed");
-      // }
-      // // dp/drho derived assuming e is constant
-      // double dp_drho = (gamma - 1.0) * e * (1.0 + b * rho / denom) / denom / denom - 2.0 * a * rho;
-      // return std::sqrt(dp_drho);
-      throw std::runtime_error("Sound speed not implemented");
-      return 0.;
+   double sound_speed(double rho, double p, double gamma) const override {
+      double denom = rho * (1.0 - b * rho);
+      if (denom <= 0.0) {
+         throw std::runtime_error("Van der Waals: unphysical density in sound speed");
+      }
+      // dp/drho derived assuming e is constant
+      double num = gamma * (p + a * rho * rho);
+      return sqrt(num / denom - 2. * a * rho);
    }
 
    double energy(double pressure, double density, double gamma) const override {
@@ -81,13 +76,14 @@ public:
       return (gamma - 1.0) * (e - q) / denom - gamma * p_inf;
    }
 
-   double sound_speed(double rho, double e, double gamma) const override {
-      // double p = pressure(rho, e, gamma);
-      // double term1 = gamma * (p - p_inf + (a * rho * rho) / (1.0 - b * rho)) / rho;
-      // double term2 = (a * rho) / ((1.0 - b * rho) * (1.0 - b * rho));
-      // return std::sqrt(term1 + term2);
-      throw std::runtime_error("Sound speed not implemented");
-      return 0.;
+   double sound_speed(double rho, double p, double gamma) const override {
+      double denom = rho * (1.0 - b * rho);
+      if (denom <= 0.0) {
+         throw std::runtime_error("NASG: unphysical density in sound speed");
+      }
+      // dp/drho derived assuming e is constant
+      double num = gamma * (p + p_inf);
+      return sqrt(num / denom);
    }
 
    double energy(double pressure, double density, double gamma) const override {
@@ -109,11 +105,8 @@ public:
       return K * std::pow(rho, gamma);
    }
 
-   double sound_speed(double rho, double e, double gamma) const override {
-      // double p = pressure(rho, e, gamma);
-      // return std::sqrt(gamma * p / rho);
-      throw std::runtime_error("Sound speed not implemented");
-      return 0.;
+   double sound_speed(double rho, double p, double gamma) const override {
+      return sqrt(gamma * p / rho);
    }
 
    double energy(double pressure, double density, double gamma) const override {

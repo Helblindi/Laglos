@@ -51,7 +51,7 @@ private:
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
    bool _thbcs = false;
-   bool _mvbcs = false;
+   bool _mvbcs = true;
    string _indicator = "Vdw4";
 
    // Problem specifics
@@ -91,7 +91,6 @@ public:
          }
          else
          {
-            assert(x[0] <= 1.);
             return rhoR;
          }
       }
@@ -142,7 +141,6 @@ public:
          }
          else 
          {
-            assert(x[0] <= 1.);
             return pR;
          }
       }

@@ -56,8 +56,8 @@ private:
    bool _mvbcs = true;
    string _indicator = "";
 
-   double rhoL = 1., rhoR = 0.001, pL = (2./3.)/10., pR = (2./3.)/10.e10, vL = 0., vR = 0.;
-   double x_center = 0.5;
+   double rhoL = 1., rhoR = 0.001, pL = (2./3.)/10., pR = (2./3.)*1.e-10, vL = 0., vR = 0.;
+   double x_center = 0.33;
 
 public:
    LeblancProblem(const int &_dim) : ProblemBase(_dim)
@@ -162,9 +162,27 @@ public:
    }
    double sie0(const Vector &x, const double & t) const override
    {
-      double _p = p0(x,t);
-      double _rho = rho0(x,t);
-      return this->eos->energy(_p, _rho, this->get_gamma());
+      if (t < 1.e-12)
+      {
+         double _p = p0(x,t);
+         double _rho = rho0(x,t);
+         return this->eos->energy(_p, _rho, this->get_gamma());
+      }
+      else
+      {
+         double params[8];
+         params[0] = rhoL; params[3] = rhoR; // rho
+         params[1] = pL; params[4] = pR;     // p
+         params[2] = vL; params[5] = vR;         // u
+         params[6] = this->get_gamma();      // gamma
+         params[7] = x_center;               // x_center
+         riemann1D::init(params);
+
+         double p[2];
+         p[0] = x[0]; p[1] = t;
+         return riemann1D::e(p);
+      }
+      
    }
 
 }; // End class

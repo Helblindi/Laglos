@@ -49,7 +49,11 @@ public:
       }
       // dp/drho derived assuming e is constant
       double num = gamma * (p + a * rho * rho);
-      return sqrt(num / denom - 2. * a * rho);
+      double _val = num / denom - 2. * a * rho;
+      if (_val < 0.0) {
+         throw std::runtime_error("Van der Waals: complex sound speed");
+      }
+      return sqrt(_val);
    }
 
    double energy(double pressure, double density, double gamma) const override {

@@ -63,7 +63,7 @@ private:
    double _a = 0., _b = 0., _gamma = 5./3.;
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
-   bool _thbcs = true; // Indicator for thermal boundary conditions
+   bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "TaylorGreen"; // Possible: saltzmann
 

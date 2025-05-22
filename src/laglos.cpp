@@ -48,7 +48,7 @@
 * ----- Untested -----
 * ./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4                     ## ICF [Untested]
 * ./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0               ## Kidder ball [Untested]
-* ./Laglos -m ../data/ref-square-c0-N30.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 1               ## Taylor-Green [Untested]
+* ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.75 -cfl 0.5 -rs 4                      ## Taylor-Green [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis               ## Vdw2 

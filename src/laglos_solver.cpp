@@ -771,6 +771,13 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
       SetCellStateVector(dS_dt, ci, rhs);
    } // End cell iterator
    chrono_state.Stop();
+
+   /* Lastly, delete allocated memory */
+   if (e_source)
+   {
+      delete e_source;
+      e_source = nullptr;
+   }
 }
 
 

@@ -383,7 +383,7 @@ public:
    }
 
    double sound_speed(const double &rho, const double &press, const int &cell_attr=0) const {
-      return pressure(rho, press, this->get_gamma(cell_attr));
+      return sound_speed(rho, press, this->get_gamma(cell_attr));
    }
 
    /*********************************************

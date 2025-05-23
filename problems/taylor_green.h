@@ -85,8 +85,6 @@ public:
 
    /* Optionally overridden, or removed */
    double get_gamma(const int &cell_attr = 0) const override { return _gamma; }
-   void lm_update(const double b_covolume) override {}
-   void update(Vector vec, double t = 0.) override {}
 
    /*********************************************************
     * Initial State functions
@@ -94,8 +92,12 @@ public:
    double p0(const Vector &x, const double & t) const override
    {
       double _rho = rho0(x,t);
-      double _sie = sie0(x,t);
-      return this->eos->pressure(_rho, _sie, this->get_gamma());
+      // double _sie = sie0(x,t);
+      // return this->eos->pressure(_rho, _sie, this->get_gamma());
+      double val = 1.0 + _rho * (cos(2*M_PI*x(0)) + cos(2*M_PI*x(1))) / 4.0;
+      assert(x.Size() == 2);
+      return val;
+
    }
    double rho0(const Vector &x, const double & t) const override
    {

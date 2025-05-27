@@ -1423,7 +1423,8 @@ int main(int argc, char *argv[]) {
                      _esheer = hydro.elastic->e_sheer(i);
                   }
                   double _sie = problem_class->specific_internal_energy(U, _esheer);
-                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+                  int cell_attr = pmesh->GetAttribute(i);
+                  double pressure = problem_class->pressure(_rho, _sie, cell_attr);
                   press_gf[i] = pressure;
                }
                Wx += offx;

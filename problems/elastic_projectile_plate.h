@@ -58,10 +58,13 @@ private:
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
    // 5.2 elastic projectile plate section 7.1
    double rho_g = 1., rho_s = 8.9E3; // kg/m^3
+   // double rho_g = 1., rho_s = 1.E3; // kg/m^3, aortic
    double v_proj = 800.; // m/s
    const double p_inf = 3.42E10; // Pa
+   // const double p_inf = 7.76E8; // Pa, aortic 
    /* Different shear moduli for projectile plate */
    const double _mu = 9.2E10; // .002
+   // const double _mu = 771.8 * 8.9E3; // For aortic model
    // const double _mu = 9.2E9; // .002 for bounceback
    // const double _mu = 9.2E8; // 0.002 re-stiffens 
    // const double _mu = 0.; // bound to crash

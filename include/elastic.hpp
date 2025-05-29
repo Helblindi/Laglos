@@ -50,11 +50,15 @@ private:
    This direction is used to compute the invariants:
       m = (cos(phi), sin(phi), 0) 
    */
-   double phi = 0.; // angle of fiber direction
+   double phi = M_PI/4.; // angle of fiber direction
    Vector mi;
    DenseMatrix Gi;
    // double A1 = 771.8, B1 = 21.2, D1 = 3.8, w1 = 0.4971;
-   double A1 = 771.8, B1 = 21.2E-6, D1 = 3.8, w1 = 0.;
+   // double A1 = 771.8, B1 = 21.2E-6, A2 = 1., B2 = 1., D1 = 3.8, w1 = 0.;
+   // double A1 = 2.41E6, B1 = 2.41E6, A2 = 1., B2 = 1., D1 = 4.81E6, w1 = 0.01;
+   /* These params were closer to the Neo Hook results when w1 = 0 */
+   double A1 = 0.5 * 9.63E6, B1 = 0.5 * 9.63E6, A2 = 1., B2 = 1., D1 = 0.5 * 3.85E7, w1 = 0.99;
+   // double A1 = 2.41E2, B1 = 2.41E2, A2 = 1., B2 = 1., D1 = 4.81E2, w1 = 0.01;
 
 public:
    Elastic(const int &_dim,
@@ -254,9 +258,15 @@ public:
             cout << "i4: " << i4 << ", i5: " << i5 << endl;
             cout << "val: " << val << endl;
          }
-         double _tt1 = (1. / A1) * (exp(A1 * (i4 - 1.)) - 1.);
-         double _tt2 = (1. / B1) * (exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
+         double _tt1 = (1. / A1) * (exp(A2 * (i4 - 1.)) - 1.);
+         double _tt2 = (1. / B1) * (exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
          double _anisotropic_val = 2. * w1 * D1 * (_tt1 + _tt2);
+         // if (val > 1.E-10 || _anisotropic_val > 1.E-10)
+         // {
+         //    cout << "isotropic: " << val << ", anisotropic: " << _anisotropic_val << endl;
+         // }
+
+         
          if (!std::isnan(_anisotropic_val))
          {
             val += _anisotropic_val;
@@ -270,6 +280,8 @@ public:
             cout << "tt1: " << _tt1 << ", tt2: " << _tt2 << endl;
             MFEM_WARNING("Aortic EOS anisotropic is NaN.\n");
          }
+
+         // cout << "anisotropic ratio: " << _anisotropic_val / val << endl;
 
          return val;
       }
@@ -306,7 +318,7 @@ public:
          compute_i4_i5(c, i4, i5);
 
          double val = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * trc);
-         val += 2. * w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
+         val += 2. * w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
          return val;
       }
       default:
@@ -338,11 +350,11 @@ public:
          case AORTIC:
          {
             /* compute i4 and i5 */
-      double i4, i5;
-      compute_i4_i5(c, i4, i5);
+            double i4, i5;
+            compute_i4_i5(c, i4, i5);
    
             double val = (2. * w1 - 1.) * (B1 / 4.);
-            val -= w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+            val -= w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
             return val;
          }
       default:
@@ -384,7 +396,7 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * (exp(A1 * (i4 - 1.)) - trc * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
+      double val = 2. * w1 * D1 * (A2 / A1 * exp(A2 * (i4 - 1.)) - trc * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
       if (std::isnan(val))
       {
          val = 0.;
@@ -412,7 +424,7 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+      double val = 2. * w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
       if (std::isnan(val))
       {
          val = 0.;

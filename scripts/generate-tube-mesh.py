@@ -2,13 +2,13 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 102401
-   ny_gridpoints = 2
+   nx_gridpoints = 11
+   ny_gridpoints = 3
 
-   x_arr = np.linspace(0.,1,nx_gridpoints)
-   y_arr = np.linspace(0.,1. / (nx_gridpoints - 1),ny_gridpoints)
+   x_arr = np.linspace(0.,5,nx_gridpoints)
+   y_arr = np.linspace(0.,1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/tube-102400x1y.mesh"
+   filename = home_dir + "data/elastic/test.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -45,9 +45,9 @@ def main():
 
    # BOUNDARY
    f.write("boundary\n")
-   bdry_bottom = 2
-   bdry_right = 1
-   bdry_top = 2
+   bdry_bottom = 6
+   bdry_right = 6
+   bdry_top = 6
    bdry_left = 1
    
    # Num boundary faces

@@ -556,6 +556,9 @@ int main(int argc, char *argv[]) {
       case 58: // Elastic noh
          problem_class = new ElasticNoh(dim);
          break;
+      case 59: // Elastic projectile impact (vilar-mair-shu 2d)
+         problem_class = new ElasticProjectileImpact(dim);
+         break;
       case 100:
          problem_class = new TestBCs(dim);
          break;

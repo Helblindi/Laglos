@@ -2,13 +2,13 @@
 import numpy as np
 
 def main():
-   nx_gridpoints = 101
-   ny_gridpoints = 2
+   nx_gridpoints = 11
+   ny_gridpoints = 3
 
-   x_arr = np.linspace(0,1,nx_gridpoints)
-   y_arr = np.linspace(0,1. / (nx_gridpoints - 1),ny_gridpoints)
+   x_arr = np.linspace(0,5,nx_gridpoints)
+   y_arr = np.linspace(0,1,ny_gridpoints)
    home_dir = "/Users/madisonsheridan/Workspace/Laglos/"
-   filename = home_dir + "data/distube-3200x1y.mesh"
+   filename = home_dir + "data/elastic/test-distorted-nonsymmetric.mesh"
    f = open(filename, "w")
 
    # Prelimary information to write to mesh file
@@ -39,7 +39,7 @@ def main():
    for i in range(0, (nx_gridpoints - 1) * ny_gridpoints, ny_gridpoints):
       for j in range(i, i + ny_gridpoints - 1):
          print("i: ", i)
-         f.write("1 3 %d %d %d %d\n" % (j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
+         f.write("50 3 %d %d %d %d\n" % (j, j+ny_gridpoints, j+ny_gridpoints+1, j+1))
          el += 1
    f.write("\n")
 
@@ -47,9 +47,9 @@ def main():
    f.write("boundary\n")
    d_bdry = 5 # Dirichlet BCs for left side.  v = e_x
    bdry_left = 1
-   bdry_bottom = 2
-   bdry_right = 1
-   bdry_top = 2
+   bdry_bottom = 6
+   bdry_right = 6
+   bdry_top = 6
    
    # Num boundary faces
    f.write(str(2*(nx_gridpoints-1) + 2*(ny_gridpoints-1)) + "\n")
@@ -80,7 +80,7 @@ def main():
    for i in range(0, nx_gridpoints):
       for j in range(0, ny_gridpoints):
          # print("i: %.2f, j: %.2f" % (x_arr[i], y_arr[j]))
-         xnew = x_arr[i] + (0.1 - y_arr[j]) * np.sin(np.pi * x_arr[i])
+         xnew = x_arr[i] + (0.1 - y_arr[j]) * np.sin(np.pi * x_arr[i]/5.)
          f.write("%.6f %.6f\n" % (xnew, y_arr[j]))
 
 main()

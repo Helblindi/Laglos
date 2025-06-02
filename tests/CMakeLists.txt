@@ -28,7 +28,6 @@ include_directories(${TEST_SRC_DIR}/src
 
 add_executable(TestCij EXCLUDE_FROM_ALL test_cij_construction.cpp)
 target_link_libraries(TestCij PRIVATE Laglos)
-target_include_directories(TestCij PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME TestCij COMMAND TestCij)
 
 # Validate Fortran Max Wave Speed calculations

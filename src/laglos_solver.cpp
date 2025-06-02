@@ -2125,11 +2125,27 @@ void LagrangianLOOperator::SetStateVector(Vector &S, const int &index, const Vec
 
 
 /****************************************************************************************************
-* Function: BuildCijMatrices
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
+ * @brief Constructs the Cij matrices used in the Lagrangian LO operator.
+ *
+ * This function builds sparse matrices `cij_sparse_x` and `cij_sparse_y` 
+ * that represent the discretized derivative and normal integration operators 
+ * in the x and y directions, respectively. These matrices are used in the 
+ * context of finite element methods for solving partial differential equations.
+ *
+ * The function performs the following steps:
+ * 1. Constructs the x-direction matrix (`cij_sparse_x`) using:
+ *    - A domain integrator for the derivative in the x-direction.
+ *    - An interior face integrator for the normal component in the x-direction.
+ * 2. Constructs the y-direction matrix (`cij_sparse_y`) if the spatial dimension 
+ *    (`dim`) is greater than 1, using similar integrators for the y-direction.
+ * 3. Aborts execution if the spatial dimension is greater than 2, as higher 
+ *    dimensions are not supported.
+ *
+ * @note The function uses MFEM's parallel and sparse matrix capabilities 
+ *       to assemble and finalize the matrices.
+ *
+ * @throws std::runtime_error if the spatial dimension (`dim`) is greater than 2.
+ ****************************************************************************************************/
 void LagrangianLOOperator::BuildCijMatrices()
 {
    // cout << "=======================================\n"
@@ -2174,12 +2190,25 @@ void LagrangianLOOperator::BuildCijMatrices()
    // cout << "done with Cij\n";
 }
 
+
 /****************************************************************************************************
-* Function: GetLocalCij
-* Parameters:
-*
-* Purpose:
-****************************************************************************************************/
+ * @brief Computes the local Cij vector for the given indices i and j.
+ *
+ * This function retrieves the values from sparse matrices (cij_sparse_x, 
+ * cij_sparse_y) corresponding to the indices i and j, and stores them in 
+ * the provided vector `cij`. The function supports 1D and 2D cases, while 
+ * 3D is not yet implemented.
+ *
+ * @param[in] i The row index in the sparse matrix.
+ * @param[in] j The column index in the sparse matrix.
+ * @param[out] cij The vector to store the computed values. Its size is set 
+ *                 to the dimension (dim) of the problem.
+ *
+ * @note If the column index `j` is not found in the sparse matrix for a 
+ *       given row `i`, the corresponding value in `cij` is set to 0.
+ * @note For 3D cases (dim > 2), the function will abort execution with an 
+ *       error message.
+ ****************************************************************************************************/
 void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij)
 {
    // cout << "LagrangianLOOperator::GetLocalCij\n";

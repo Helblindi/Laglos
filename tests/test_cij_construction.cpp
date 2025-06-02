@@ -54,7 +54,6 @@ int CompareCijComputation()
    // serial one given on the command line.
    Mesh *mesh = new Mesh(mesh_file_location, true, true);
    dim = mesh->Dimension();
-   cout << "Meshing done\n";
 
    // Refine the mesh in serial to increase the resolution. In this example
    // we do 'ser_ref_levels' of uniform refinement, where 'ser_ref_levels' is
@@ -64,9 +63,6 @@ int CompareCijComputation()
    {
       mesh->UniformRefinement();
    }
-
-
-   cout << "done with serial refinement\n";
 
    // Define the parallel mesh by a partitioning of the serial mesh. Refine
    // this mesh further in parallel to increase the resolution. Once the
@@ -193,7 +189,6 @@ int CompareCijComputation()
    int cj = 0;
    for (int ci = 0; ci < NE; ci++)
    {
-      cout << "ci: " << ci << endl;
       pmesh->GetElementEdges(ci, fids, oris);
       for (int j=0; j < fids.Size(); j++) // Face iterator
       {
@@ -208,12 +203,11 @@ int CompareCijComputation()
                assert(ci == FI.element[1].index);
                cj = FI.element[0].index; 
             }
-            cout << "ci: " << ci << ", cj: " << cj << endl;
-            cout << "calc outward normal int\n";
+
             hydro.CalcOutwardNormalInt(S, ci, fids[j], n_int);
             c = n_int;
             c /= 2.;
-            cout << "GetLocalCij\n";
+
             hydro.GetLocalCij(ci, cj, cij);
             
             subtract(c, cij, _t);

@@ -136,11 +136,11 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    TVSize_L2V(L2V.TrueVSize()),
    GTVSize_L2V(L2V.GlobalTrueVSize()),
    NDofs_L2V(L2V.GetNDofs()),
+   order_u(L2.GetOrder(0)),
    NE(pmesh->GetNE()),
    NBE(pmesh->GetNBE()),
    BdrElementIndexingArray(pmesh->GetNumFaces()),
    BdrVertexIndexingArray(pmesh->GetNV()),
-   num_elements(L2.GetNE()),
    num_faces(L2.GetNF()),
    num_vertices(pmesh->GetNV()),
    num_edges(pmesh->GetNEdges()),
@@ -267,7 +267,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    cout << "Vsize_L2V: " << Vsize_L2V << endl;
 
    // More readable format
-   cout << "num_elements: " << num_elements << endl;
+   cout << "NE: " << NE << endl;
    cout << "num_faces: " << num_faces << endl;
    cout << "num_vertices: " << num_vertices << endl;
    cout << "num_edges: " << num_edges << endl;
@@ -282,6 +282,13 @@ LagrangianLOOperator::~LagrangianLOOperator()
       delete elastic;
       elastic = nullptr;
    }
+
+   delete cij_sparse_x;
+   cij_sparse_x = nullptr;
+   delete cij_sparse_y;
+   cij_sparse_y = nullptr;
+   delete cij_sparse_z;
+   cij_sparse_z = nullptr;
 }
 
 
@@ -322,7 +329,7 @@ void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, Dens
       idx[i] = i+1;
       idy[i] = i;
    }
-   GetCellStateVector(S,e,U);
+   GetStateVector(S,e,U);
    double rho = 1./U[0], es = 0.;
    elastic->ComputeS(e, rho, sigmaD_e);
    // es = elastic->e_sheer(e);
@@ -446,6 +453,11 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
  */
 void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
 {
+   if (order_u != 0)
+   {
+      MFEM_ABORT("SolveHydro needs updating for order_u > 0\n");
+   }
+
    chrono_state.Start();
 
    Vector rhs(dim+2), c(dim), n_int(dim), U_i(dim+2), U_j(dim+2);
@@ -475,12 +487,12 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
        e_source->Assemble();
     }
 
-   for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
+   for (int ci = 0; ci < NE; ci++) // Cell iterator
    {
       is_boundary_cell = false;
       Array<int> cell_bdr_arr;
       sum_validation = 0.;
-      GetCellStateVector(S, ci, U_i);
+      GetStateVector(S, ci, U_i);
 
       switch (dim)
       {
@@ -545,7 +557,7 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                assert(ci == FI.element[1].index);
                cj = FI.element[0].index; 
             }
-            GetCellStateVector(S, cj, U_j); 
+            GetStateVector(S, cj, U_j); 
 
             // flux contribution
             DenseMatrix dm;
@@ -768,7 +780,7 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
       rhs /= _mass;
 
       // In either case, update dS_dt
-      SetCellStateVector(dS_dt, ci, rhs);
+      SetStateVector(dS_dt, ci, rhs);
    } // End cell iterator
    chrono_state.Stop();
 
@@ -815,7 +827,7 @@ void LagrangianLOOperator::EnforceL2BC(Vector &S, const double &t, const double 
          pmesh->GetBdrElementAdjacentElement(bdr_ci, el, info);
 
          // cout << "bdr el " << bdr_ci << " has attr " << bdr_attr << " and adj cell " << el << endl;
-         GetCellStateVector(S, el, Ui);
+         GetStateVector(S, el, Ui);
          
          Ui.GetSubVector(vel_dofs, vel);
 
@@ -857,7 +869,7 @@ void LagrangianLOOperator::EnforceL2BC(Vector &S, const double &t, const double 
          } // end switch(bdr_attr)
 
          Ui.SetSubVector(vel_dofs, vel);
-         SetCellStateVector(S, el, Ui);
+         SetStateVector(S, el, Ui);
       }
    } // End pb->has_th_boundary_conditions()
 }
@@ -909,6 +921,11 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
    // cout << "========================================\n"
    //      << "          SolveMeshVelocities           \n"
    //      << "========================================\n";
+   if (order_u != 0)
+   {
+      MFEM_ABORT("SolveMeshVelocities needs updating for order_u > 0\n");
+   }
+
    chrono_mm.Start();
    ParGridFunction dxdt_gf, dxdt_gf_l(&H1_L);
    dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
@@ -1154,7 +1171,7 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
 * Purpose:
 *  The purpose of this function is to initialize a SparseMatrix with the sparsity pattern
 *  that corresponds to the adjacency matrix of the mesh.  I.E. this functions constructs a matrix
-*  of size num_elements x num_elements where the nonzero elements are for each element row
+*  of size NE x NE where the nonzero elements are for each element row
 *  are the cell indices in the stencil. This SparseMatrix will encode the max wave speed of
 *  each corresponding local Riemann problem.  An example of cells in the stencil of cell c is given
 *  below.
@@ -1197,7 +1214,7 @@ void LagrangianLOOperator::InitializeDijMatrix()
    }
 
    // Initialize SparseMatrix
-   dij_sparse = new SparseMatrix(num_elements, num_elements, el_num_faces+1);
+   dij_sparse = new SparseMatrix(NE, NE, el_num_faces+1);
 
    // Create dummy coefficients
    using namespace std::placeholders;
@@ -1245,10 +1262,10 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
       c = FI.element[0].index;
       cp = FI.element[1].index;
 
-      GetCellStateVector(S, c, Uc);
+      GetStateVector(S, c, Uc);
       if (FI.IsInterior())
       {
-         GetCellStateVector(S, cp, Ucp);
+         GetStateVector(S, cp, Ucp);
 
          // Get normal, d, and |F|
          CalcOutwardNormalInt(S, c, face, n_int);
@@ -1343,12 +1360,12 @@ void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 
    mfem::Mesh::FaceInformation FI;
 
-   for (int ci = 0; ci < NDofs_L2; ci++) // Cell iterator
+   for (int ci = 0; ci < NE; ci++) // Cell iterator
    {
       // cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
 
-      GetCellStateVector(S, ci, U_i);
+      GetStateVector(S, ci, U_i);
 
       // Compute mass at time tn
       const double k = pmesh->GetElementVolume(ci);
@@ -1679,9 +1696,9 @@ void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, do
    Vector U(dim+2);
    avg_density = 0., avg_entropy = 0.;
 
-   for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
+   for (int cell_it = 0; cell_it < NE; cell_it++)
    {
-      GetCellStateVector(S, cell_it, U);
+      GetStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
       double e_sheer = 0.;
       if (use_elasticity) { e_sheer = elastic->e_sheer(cell_it); }
@@ -1693,8 +1710,8 @@ void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, do
       avg_entropy += entropy;
    }
 
-   avg_density /= NDofs_L2;
-   avg_entropy /= NDofs_L2;
+   avg_density /= NE;
+   avg_entropy /= NE;
 }
 
 
@@ -1823,7 +1840,7 @@ bool LagrangianLOOperator::IsMeshCollapsedGeom(const Vector &S)
    Vector n_vec(dim), temp_vec(dim), face_x(dim), vert_x(dim);
    int face_dof;
 
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       if (dim != 2)
       {
@@ -1951,7 +1968,7 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
    sv_gf.MakeRef(&L2, S, block_offsets[1]);
    rel_mass_corrected = 0.;
 
-   for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
+   for (int cell_it = 0; cell_it < NE; cell_it++)
    {
       // Get cell mass
       const double m = m_hpv->Elem(cell_it);
@@ -1979,7 +1996,7 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
    }
 
    // Set pct corrected to be appended to timeseries data
-   pct_corrected = double(num_corrected_cells)/NDofs_L2;
+   pct_corrected = double(num_corrected_cells)/NE;
 
    /* Append onto timeseries data */
    ts_ppd_pct_cells.Append(pct_corrected);
@@ -2011,22 +2028,25 @@ void LagrangianLOOperator::ComputeDensity(const Vector &S, ParGridFunction &rho_
 
 
 /****************************************************************************************************
-* Function: GetCellStateVector
+* Function: GetStateVector
 * Parameters:
-*  S    - BlockVector that stores mesh information, mesh velocity, and state variables.
-*  cell - Index representing the cell
-*  U    - Returned vector contained the hydrodynamic state variables
+*  S     - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  index - L2 dofs index
+*  U     - Returned vector contained the hydrodynamic state variables
 *
 * Purpose:
 *  Given a cell, return the hydrodynamic state variables of that cell, i.e. in vector for get
 *  (specific volume, velocity, specific total energy)
 ****************************************************************************************************/
-void LagrangianLOOperator::GetCellStateVector(const Vector &S, const int cell, Vector &U) const
+void LagrangianLOOperator::GetStateVector(const Vector &S, const int &index, Vector &U) const
 {
+   // Ensure index is validAdd commentMore actions
+   if (index >= NDofs_L2) { MFEM_ABORT("Index out of range.\n"); }
+
    U.SetSize(dim + 2);
 
    // This happens when a face is a boundary face, one of the cells index is -1q
-   if (cell == -1) {
+   if (index == -1) {
       U = 0.;
       return;
    }
@@ -2039,39 +2059,42 @@ void LagrangianLOOperator::GetCellStateVector(const Vector &S, const int cell, V
    ste_gf.MakeRef(&L2, *sptr, block_offsets[3]);
 
    // Retrieve specific volume on cell
-   U[0] = sv_gf.Elem(cell);
+   U[0] = sv_gf.Elem(index);
 
-   // Retrieve cell velocity 
+   // Retrieve index velocity 
    // Here the corresponding gridfunction is a stacked vector:
    // Ex: x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4
    for (int i = 0; i < dim; i++)
    {
-      int index = cell + i*NDofs_L2;
-      assert(index < v_gf.Size());
-      U[i+1] = v_gf.Elem(index);
+      int _ind = index + i*NDofs_L2;
+      assert(_ind < v_gf.Size());
+      U[i+1] = v_gf.Elem(_ind);
    }
 
-   // Retrieve cell specific total energy
-   U[dim+1] = ste_gf.Elem(cell);
+   // Retrieve index specific total energy
+   U[dim+1] = ste_gf.Elem(index);
 }
 
 
 /****************************************************************************************************
-* Function: SetCellStateVector
+* Function: SetStateVector
 * Parameters:
-*  S    - BlockVector that stores mesh information, mesh velocity, and state variables.
-*  cell - Index representing the cell
-*  U    - Vector containing state variables to be put into BlockVector object S.
+*  S     - BlockVector that stores mesh information, mesh velocity, and state variables.
+*  index - L2 dofs index
+*  U     - Vector containing state variables to be put into BlockVector object S.
 *
 * Purpose:
 *  This function is used to update the BlockVector S with the newly computed hydrodynamic state
 *  variables on the given cell.
 ****************************************************************************************************/
-void LagrangianLOOperator::SetCellStateVector(Vector &S, const int cell, const Vector &U) const
+void LagrangianLOOperator::SetStateVector(Vector &S, const int &index, const Vector &U) const
 {
+   // Ensure index is validAdd commentMore actions
+   if (index >= NDofs_L2) { MFEM_ABORT("Index out of range.\n"); }
+
    Array<int> dofs;
    Array<int> sub_dofs;
-   dofs.Append(cell);
+   dofs.Append(index);
    sub_dofs.Append(1);
 
    // Get current state grid functions
@@ -2086,7 +2109,7 @@ void LagrangianLOOperator::SetCellStateVector(Vector &S, const int cell, const V
 
    for (int i = 1; i < dim; i++)
    {
-      dofs.Append(cell + i*NDofs_L2);
+      dofs.Append(index + i*NDofs_L2);
       sub_dofs.Append(i+1);
    }
 
@@ -2098,6 +2121,103 @@ void LagrangianLOOperator::SetCellStateVector(Vector &S, const int cell, const V
    sv_gf.SyncAliasMemory(S);
    v_gf.SyncAliasMemory(S);
    ste_gf.SyncAliasMemory(S);
+}
+
+
+/****************************************************************************************************
+* Function: BuildCijMatrices
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
+void LagrangianLOOperator::BuildCijMatrices()
+{
+   // cout << "=======================================\n"
+   //      << "         Building Cij Matrices         \n"
+   //      << "=======================================\n";
+   ConstantCoefficient one(1.0);
+   ParBilinearForm Cxbf(&L2), Cybf(&L2);
+
+   /* x */
+   Cxbf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 0)));
+   Cxbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   Cxbf.Assemble();
+   Cxbf.Finalize();
+   HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
+   cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2, 10);
+   Cx_hpm->MergeDiagAndOffd(*cij_sparse_x);
+
+   /* y */
+   if (dim > 1)
+   {
+      Cybf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 1)));
+      Cybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
+      Cybf.Assemble();
+      Cybf.Finalize();
+      HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
+      cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2, 10);
+      Cy_hpm->MergeDiagAndOffd(*cij_sparse_y);
+   }
+   
+   if (dim > 2)
+   {
+      MFEM_ABORT("Dim > 2 not currently supported.\n");
+   }
+
+   // cout << "cij_x: ";
+   // cij_sparse_x->Print(cout);
+   // if (dim > 1)
+   // {
+   //    cout << "cij_y: ";
+   //    cij_sparse_y->Print(cout);
+   // }
+   // cout << "done with Cij\n";
+}
+
+/****************************************************************************************************
+* Function: GetLocalCij
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
+void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij)
+{
+   // cout << "LagrangianLOOperator::GetLocalCij\n";
+   cij.SetSize(dim);
+   cij = 0.;
+
+   Array<int> cols;
+   Vector vals;
+   int col_index;
+
+   /* Get x val */
+   cij_sparse_x->GetRow(i, cols, vals);
+   col_index = cols.Find(j);
+   if (col_index != -1) {
+      cij[0] = vals[col_index];
+   } else {
+      // cout << "col not found\n";
+      cij[0] = 0.;
+   }
+
+   /* Get y and z vals, if applicable */
+   if (dim > 1)
+   {
+      cij_sparse_y->GetRow(i, cols, vals);
+      col_index = cols.Find(j);
+      if (col_index != -1) {
+         cij[1] = vals[col_index];
+      } else {
+         // cout << "col not found for i: " << i << ", j: " << j << "\n";
+         cij[1] = 0.;
+      }
+
+      if (dim > 2)
+      {
+         MFEM_ABORT("3D not yet implemented\n");
+      }
+   }
+
 }
 
 
@@ -2125,6 +2245,7 @@ void LagrangianLOOperator::CalcOutwardNormalInt(const Vector &S, const int cell,
    // cout << "=======================================\n"
    //      << "  Calculating outward normal integral  \n"
    //      << "=======================================\n";
+   MFEM_ASSERT(order_u == 0, "This function is only implemented for order_u = 0.\n");
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
@@ -2232,7 +2353,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       c = FI.element[0].index;
       cp = FI.element[1].index;
 
-      GetCellStateVector(S, c, Uc);
+      GetStateVector(S, c, Uc);
 
       // Get normal, d, and |F|
       CalcOutwardNormalInt(S, c, face, n_int);
@@ -2248,7 +2369,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
 
       if (FI.IsInterior())
       {
-         GetCellStateVector(S, cp, Ucp);
+         GetStateVector(S, cp, Ucp);
 
          // Get max wave speed
          d = dij_sparse->Elem(c, cp);
@@ -2542,7 +2663,7 @@ double LagrangianLOOperator::CalcMassLoss(const Vector &S)
 
    double num = 0., denom = 0.;
 
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
@@ -2551,7 +2672,7 @@ double LagrangianLOOperator::CalcMassLoss(const Vector &S)
       }
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
-      GetCellStateVector(S, ci, U_i);
+      GetStateVector(S, ci, U_i);
       num += abs((k / U_i[0]) - m);
       denom += abs(m);
    }
@@ -2582,11 +2703,11 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
    double temp_num = 0., temp_denom = 0., val = 0.;
    double interior_num = 0., interior_denom = 0.;
    
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       const double m = m_hpv->Elem(ci);
       const double k = pmesh->GetElementVolume(ci);
-      GetCellStateVector(S, ci, U_i);
+      GetStateVector(S, ci, U_i);
 
       current_mass = k / U_i[0];
       temp_num = abs(current_mass - m);
@@ -2625,7 +2746,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
       mc_gf[ci] = val;
    }
 
-   double cell_ratio = (double)counter / (double)NDofs_L2;
+   double cell_ratio = (double)counter / (double)NE;
    double _mass_error = num / denom;
    double _interior_mass_error = interior_num / interior_denom;
 
@@ -2753,8 +2874,8 @@ void LagrangianLOOperator::
          // Get adjacent cell information
          c = FI.element[0].index;
          cp = FI.element[1].index;
-         GetCellStateVector(S, c, Uc);
-         GetCellStateVector(S, cp, Ucp);
+         GetStateVector(S, c, Uc);
+         GetStateVector(S, cp, Ucp);
          pb->velocity(Uc, cell_c_v);
          pb->velocity(Ucp, cell_cp_v);
 
@@ -3027,7 +3148,7 @@ void LagrangianLOOperator::SetCellCenterAsCenter(Vector &S)
    Vector cell_x(dim), node_x(dim);
 
    Array<int> verts;
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       // Get center node dof
       int cell_vdof;
@@ -3092,7 +3213,7 @@ void LagrangianLOOperator::FillCenterVelocitiesWithL2(const Vector &S, Vector &d
 
    Vector Uc(dim+2), node_v(dim);
 
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       // Get center node dof
       int cell_vdof;
@@ -3118,7 +3239,7 @@ void LagrangianLOOperator::FillCenterVelocitiesWithL2(const Vector &S, Vector &d
          }
       }
 
-      GetCellStateVector(S, ci, Uc);
+      GetStateVector(S, ci, Uc);
       pb->velocity(Uc, node_v);
       
       // Get corresponding velocity from ParGridFunction
@@ -3146,7 +3267,7 @@ void LagrangianLOOperator::FillCenterVelocitiesWithAvg(Vector &dxdt) const
    Vector Vc(dim), Uc(dim+2), node_v(dim);
 
    Array<int> verts;
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       // Get center node dof
       int cell_vdof;
@@ -3432,6 +3553,7 @@ void LagrangianLOOperator::SetViGeo(const int &node, const Vector &vel)
 ****************************************************************************************************/
 void LagrangianLOOperator::GetViGeo(const int & node, Vector & vel)
 {
+   MFEM_ABORT("Function deprecated\n");
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NVDofs_H1;
@@ -3472,6 +3594,11 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
+   if (order_u != 0)
+   {
+      MFEM_ABORT("GetStateVector needs updating for order_u > 0\n");
+   }
+
    Vector center(dim), U(dim+2), vel(dim);
    double pressure=0., ss=0.;
 
@@ -3489,7 +3616,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
    for (int i = 0; i < NDofs_L2; i++)
    {
       // compute pressure and sound speed on the fly
-      GetCellStateVector(S, i, U);
+      GetStateVector(S, i, U);
       pb->velocity(U, vel);
       double rho = 1. / U[0];
       double e_sheer = 0.;
@@ -3781,7 +3908,7 @@ void LagrangianLOOperator::ComputeGeoVNormalDistributedViscosity(Vector &S)
 
                c = FI.element[0].index;
                cp = FI.element[1].index;
-               GetCellStateVector(S,c,Uc);
+               GetStateVector(S,c,Uc);
                // Retrieve corresponding normal (orientation doesn't matter)
                CalcOutwardNormalInt(S, c, face, n_vec);
                c_norm = n_vec.Norml2();
@@ -3789,7 +3916,7 @@ void LagrangianLOOperator::ComputeGeoVNormalDistributedViscosity(Vector &S)
 
                if (FI.IsInterior())
                {
-                  GetCellStateVector(S,cp,Ucp);
+                  GetStateVector(S,cp,Ucp);
                   d = dij_sparse->Elem(c,cp);
 
                   /* Compute average velocity across face */
@@ -3842,7 +3969,7 @@ void LagrangianLOOperator::ComputeGeoVNormalDistributedViscosity(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             break;
@@ -4078,7 +4205,7 @@ void LagrangianLOOperator::ComputeGeoVCellFaceNormal(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             break;
@@ -4180,12 +4307,12 @@ void LagrangianLOOperator::ComputeGeoVCAVEAT(Vector &S)
 
                // Compute weight
                double rhoc = 0., rhocp = 0.;
-               GetCellStateVector(S, c, Uc);
+               GetStateVector(S, c, Uc);
                
                rhoc = 1. / Uc[0];
                if (FI.IsInterior())
                {
-                  GetCellStateVector(S, cp, Ucp);
+                  GetStateVector(S, cp, Ucp);
                   rhocp = 1 / Ucp[0];
                }
                weight = rhoc + rhocp;
@@ -4249,7 +4376,7 @@ void LagrangianLOOperator::ComputeGeoVCAVEAT(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             break;
@@ -4389,12 +4516,12 @@ void LagrangianLOOperator::ComputeGeoVCAVEATCellFace(Vector &S)
 
                            // Compute weight
                            double rhoc = 0., rhocp = 0.;
-                           GetCellStateVector(S, c, Uc);
+                           GetStateVector(S, c, Uc);
                            
                            // rhoc = 1. / Uc[0];
                            // if (FI.IsInterior())
                            // {
-                           //    GetCellStateVector(S, cp, Ucp);
+                           //    GetStateVector(S, cp, Ucp);
                            //    rhocp = 1 / Ucp[0];
                            // }
                            // double weight = rhoc + rhocp;
@@ -4530,7 +4657,7 @@ void LagrangianLOOperator::ComputeGeoVCAVEATCellFace(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             break;
@@ -4670,12 +4797,12 @@ void LagrangianLOOperator::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 
                            // Compute weight
                            double rhoc = 0., rhocp = 0.;
-                           GetCellStateVector(S, c, Uc);
+                           GetStateVector(S, c, Uc);
                            
                            rhoc = 1. / Uc[0];
                            if (FI.IsInterior())
                            {
-                              GetCellStateVector(S, cp, Ucp);
+                              GetStateVector(S, cp, Ucp);
                               rhocp = 1. / Ucp[0];
                            }
                            double weight = rhoc + rhocp;
@@ -4756,12 +4883,12 @@ void LagrangianLOOperator::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
 
                            // Compute weight
                            double rhoc = 0., rhocp = 0., weight = 0.;
-                           GetCellStateVector(S, c, Uc);
+                           GetStateVector(S, c, Uc);
                            
                            rhoc = 1. / Uc[0];
                            if (FI.IsInterior())
                            {
-                              GetCellStateVector(S, cp, Ucp);
+                              GetStateVector(S, cp, Ucp);
                               rhocp = 1. / Ucp[0];
                               weight = rhoc + rhocp;
                            }
@@ -4851,7 +4978,7 @@ void LagrangianLOOperator::ComputeGeoVCAVEATCellFaceWeighted(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             break;
@@ -5320,8 +5447,8 @@ double LagrangianLOOperator::ComputeIterationNormMC(Vector &S, const double & dt
          // Get adjacent cell information
          c = FI.element[0].index;
          cp = FI.element[1].index;
-         GetCellStateVector(S, c, Uc);
-         GetCellStateVector(S, cp, Ucp);
+         GetStateVector(S, c, Uc);
+         GetStateVector(S, cp, Ucp);
          pb->velocity(Uc, cell_c_v);
          pb->velocity(Ucp, cell_cp_v);
 
@@ -6741,7 +6868,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S
             if (mm_visc_face != 0.)
             {
                // Retrieve cell velocity
-               GetCellStateVector(S, el_index, Uc);
+               GetStateVector(S, el_index, Uc);
                pb->velocity(Uc, Vcell_np1);
                // cout << "cell: " << el_index << "vel: ";
                // Vcell_np1.Print(cout);
@@ -7163,125 +7290,6 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector
 
 
 /****************************************************************************************************
-* Function: VerifyContributions
-* Parameters:
-*  S      - BlockVector corresponding to (n+1)th timestep that stores mesh information, 
-*           mesh velocity, and state variables.
-*  S_old  - BlockVector corresponding to nth timestep that stores mesh information, 
-*           mesh velocity, and state variables.
-*  mv2_gf - 
-*  dt     - Current timestep size
-*
-* Purpose:
-*  This function is to be run following the function
-*           IterativeCornerVelocityLSCellVolumeMv2FaceVisc
-*  to compare the contribution
-****************************************************************************************************/
-void LagrangianLOOperator::VerifyContributions(const Vector &S, const Vector &S_old, const ParGridFunction &mv2_gf, const double &dt, const int &it)
-{
-   MFEM_ABORT("Function deprecated\n");
-   Vector* sptr_old = const_cast<Vector*>(&S_old);
-   double gamma_numer = 0., gamma_c_numer = 0., gamma_f_numer = 0., denom = 0.;
-
-   ParGridFunction sv_gf, sv_old_gf, mv_gf;
-   sv_old_gf.MakeRef(&L2, *sptr_old, block_offsets[1]);
-
-   // Move vertices of S_temp to compute cell volume norm
-   Vector S_temp = S;
-   Vector *stemp_ptr = const_cast<Vector*>(&S_temp);
-   x_gf.MakeRef(&H1, *stemp_ptr, block_offsets[0]);
-   MFEM_ABORT("Need to remove mv_gf implementation\n");
-   mv_gf.MakeRef(&H1, *stemp_ptr, block_offsets[1]);
-   sv_gf.MakeRef(&L2, *stemp_ptr, block_offsets[1]);
-   add(x_gf, dt, mv_gf, x_gf);
-
-   Array<int> cells_row;
-   double sum_k = 0., Kcn = 0.;
-   Vector Uc(dim+2), Vnode(dim), Vnode_mv2(dim), temp_vec(dim);
-   int bdr_ind, cells_length;
-
-   Vector V1(dim), V2(dim);
-   Vector a1(dim), a2(dim);
-   mfem::Mesh::FaceInformation FI;
-   double F;
-   Array<int> face_dofs_row;
-
-   // Sum over all cells
-   for (int ci = 0; ci < NDofs_L2; ci++)
-   {
-      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
-      {
-         // Skip boundary cells
-         continue;
-      }
-
-      double Kn = ComputeCellVolume(S_old, ci);
-      double Knp1 = ComputeCellVolume(S_temp, ci);
-      double Tn = sv_old_gf.Elem(ci);
-      double Tnp1 = sv_gf.Elem(ci);
-
-      double tmp_val = pow((Kn / Tn) - (Knp1 / Tnp1), 2);
-      gamma_numer += tmp_val;
-      denom += pow(Kn/Tn, 2);
-   }
-
-   // Iterate over all geometric nodes except corners
-   for (int node = 0; node < NDofs_H1L; node++)
-   {
-      sum_k = 0.;
-      bdr_ind = BdrVertexIndexingArray[node];
-
-      // All nodes minus corner nodes will contribute
-      if (bdr_ind != 5)
-      {
-         vertex_element->GetRow(node, cells_row);
-         cells_length = cells_row.Size();
-
-         geom.GetNodeVelocity(S, node, Vnode);
-         geom.GetNodeVelocity(mv2_gf, node, Vnode_mv2);
-
-         for (int cell_it = 0; cell_it < cells_length; cell_it++)
-         {
-            int el_index = cells_row[cell_it];
-            Kcn = pmesh->GetElementVolume(el_index);
-
-            sum_k += Kcn;
-         }
-         subtract(Vnode, Vnode_mv2, temp_vec);
-         gamma_c_numer += sum_k * pow(temp_vec.Norml2(), 2);
-      }
-   }
-
-   // Iterate over all faces
-   for (int face = 0; face < num_faces; face++)
-   {
-      FI = pmesh->GetFaceInformation(face);
-      H1.GetFaceDofs(face,face_dofs_row);
-      int face_dof1 = face_dofs_row[0], face_dof2 = face_dofs_row[1];
-
-      geom.GetNodePositionFromBV(S, face_dof1, a1);
-      geom.GetNodePositionFromBV(S, face_dof2, a2);
-      geom.GetNodeVelocity(S, face_dof1, V1);
-      geom.GetNodeVelocity(S, face_dof2, V2);
-
-      subtract(a2, a1, temp_vec);
-      F = temp_vec.Norml2();
-
-      subtract(V2, V1, temp_vec);
-      gamma_f_numer += pow(F,2) * pow(temp_vec.Norml2(), 2);
-   }
-
-   double gamma = sqrt(gamma_numer / denom);
-   double gamma_c = sqrt(mm_cell * pow(dt,2) * gamma_c_numer / denom);
-   double gamma_f = sqrt(mm_visc_face * pow(dt,2) * gamma_f_numer / denom);
-   cout << "it: " << it 
-        <<  ", minimized quantity: " << gamma
-        << ", viscosity on cells: " << gamma_c 
-        << ", viscosity on faces: " << gamma_f << endl;
-}
-
-
-/****************************************************************************************************
 * Function: ComputeCellVolume
 * Parameters:
 *  S        - BlockVector representing FiniteElement information
@@ -7366,7 +7374,7 @@ double LagrangianLOOperator::ComputeCellVolumeNorm(const Vector &S, const Vector
    double cell_val = 0., face_val = 0.;
 
    // Sum over all cells
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
@@ -7426,7 +7434,7 @@ void LagrangianLOOperator::compare_gamma2(const Vector &S, const Vector &S_old, 
    int bdr_ind, cells_length;
 
    // Sum over all cells
-   for (int ci = 0; ci < NDofs_L2; ci++)
+   for (int ci = 0; ci < NE; ci++)
    {
       if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
       {
@@ -7464,7 +7472,7 @@ void LagrangianLOOperator::compare_gamma2(const Vector &S, const Vector &S_old, 
             int el_index = cells_row[cell_it];
             Kcn = pmesh->GetElementVolume(el_index);
 
-            GetCellStateVector(S, el_index, Uc);
+            GetStateVector(S, el_index, Uc);
             pb->velocity(Uc, Vcell);
 
             sum_k += Kcn;
@@ -7998,20 +8006,20 @@ void LagrangianLOOperator::ComputeCellAverageVelocityAtNode(const Vector &S, con
       {
       case 0: // S_OLD
       {
-         GetCellStateVector(S_old, el_index, Uc);
+         GetStateVector(S_old, el_index, Uc);
          pb->velocity(Uc, Vcell);
          break;
       }
       case 1: // S_NEW 
       {
-         GetCellStateVector(S, el_index, Uc);
+         GetStateVector(S, el_index, Uc);
          pb->velocity(Uc, Vcell);
          break;
       }
       case 2: // MIDPOINT
       {
-         GetCellStateVector(S_old, el_index, Uc);
-         GetCellStateVector(S, el_index, Ucnp1);
+         GetStateVector(S_old, el_index, Uc);
+         GetStateVector(S, el_index, Ucnp1);
 
          pb->velocity(Uc, Vcell);
          pb->velocity(Ucnp1, Vcellnp1);
@@ -8073,7 +8081,7 @@ void LagrangianLOOperator::CalcMassVolumeVector(const Vector &S, const double &d
    sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
 
    /* Iterate over all cells in mesh and compute constraint */
-   for (int cell_it = 0; cell_it < NDofs_L2; cell_it++)
+   for (int cell_it = 0; cell_it < NE; cell_it++)
    {
       double Tnp1 = sv_gf.Elem(cell_it);
       double m = m_hpv->Elem(cell_it);
@@ -8155,8 +8163,8 @@ void LagrangianLOOperator::DistributeFaceViscosityToVelocity(const Vector &S, Ve
          F = n_int.Norml2();
          n_int /= F;
          d = dij_sparse->Elem(c,cp);
-         GetCellStateVector(S, c, Uc);
-         GetCellStateVector(S, cp, Ucp);
+         GetStateVector(S, c, Uc);
+         GetStateVector(S, cp, Ucp);
 
          /* Get corner indices */
          H1.GetFaceDofs(face, face_dofs_row);
@@ -8203,7 +8211,7 @@ void LagrangianLOOperator::SolveHiOpDense(const Vector &S, const Vector &S_old, 
 
    MFEM_ABORT("Why are you using the dense implementation when Sparse is available?\n");
 
-   Vector massvec(NDofs_L2);
+   Vector massvec(NE);
    ParGridFunction V_target(&H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -8282,7 +8290,7 @@ void LagrangianLOOperator::SolveHiOpDense(const Vector &S, const Vector &S_old, 
    }
 
    /* Solve for the corner node velocities */
-   OptimizedMeshVelocityProblemDense omv_problem(dim, geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax);
+   OptimizedMeshVelocityProblemDense omv_problem(dim, geom, V_target, massvec, x_gf, NE, dt, xmin, xmax);
    optsolver->SetOptimizationProblem(omv_problem);
    optsolver->SetMaxIter(this->corner_velocity_MC_num_iterations);
    optsolver->SetPrintLevel(0);
@@ -8383,6 +8391,7 @@ void LagrangianLOOperator::ComputeVelocityLumpedMassByHand(const Vector &S, Vect
 ****************************************************************************************************/
 void LagrangianLOOperator::ComputeAverageMassAtGeo(const Vector &S, Vector &vec_weights)
 {
+   MFEM_ABORT("Deprecated\n");
    vec_weights.SetSize(H1Lc.GetNDofs());
    Array<int> cells_row;
 
@@ -8431,7 +8440,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
    assert(target_option < 10);
    assert(mv_gf_l.Size() == Vsize_H1L);
 
-   Vector massvec(NDofs_L2);
+   Vector massvec(NE);
    ParGridFunction V_target(&H1_L), mv_gf_l_out(mv_gf_l);
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
@@ -8465,7 +8474,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
    Calculate sparsity patterns for Gradient of the constraint vector as it is the same
    whether or not the target or viscous option is used
    */
-   SetHiopConstraintGradSparsityPattern(pmesh, num_elements, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
+   SetHiopConstraintGradSparsityPattern(pmesh, NE, NVDofs_H1, HiopCGradIArr, HiopCGradJArr);
 
    OptimizationProblem * omv_problem = NULL;
    switch (lm_option)
@@ -8556,7 +8565,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
 
          /* Instantiate problem */
          omv_problem = new TargetOptimizedMeshVelocityProblem(
-            dim, geom, V_target, massvec, x_gf, NDofs_L2, dt, xmin, xmax, 
+            dim, geom, V_target, massvec, x_gf, NE, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
             ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
@@ -8579,7 +8588,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NVDofs_H1, HiopHessIArr, HiopHessJArr);
 
          /* Instantiate problem */
-         omv_problem = new ViscousOptimizedMeshVelocityProblem(dim, geom, massvec, x_gf, NDofs_L2, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
+         omv_problem = new ViscousOptimizedMeshVelocityProblem(dim, geom, massvec, x_gf, NE, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
          break;
       }
       default:
@@ -8730,7 +8739,7 @@ void LagrangianLOOperator::IntGrad(const ParGridFunction &mv_gf_l, const int cel
    // cout << "=======================================\n"
    //      << "             IntGrad            \n"
    //      << "=======================================\n";
-
+   MFEM_ABORT("Function deprecated\n");
    ParGridFunction H1Lc_gf(&H1Lc), mv_gf_copy(mv_gf_l);
    const int _size = H1Lc.GetVSize();
 
@@ -8949,7 +8958,7 @@ void LagrangianLOOperator::ComputeGeoVRaviart(Vector &S)
    // cout << "=======================================\n"
    //      << "          ComputeGeoVRaviart           \n"
    //      << "=======================================\n";
-
+   MFEM_ABORT("Function deprecated\n");
    Vector node_v(dim), n_vec(dim);
    Vector ivf(dim), v_cell(dim);
    Array<int> element_row, cell_faces_row;
@@ -8988,7 +8997,7 @@ void LagrangianLOOperator::ComputeGeoVRaviart(Vector &S)
          case 2: // Cell Center
          {
             Vector Uc(dim+2);
-            GetCellStateVector(S, EDof, Uc);
+            GetStateVector(S, EDof, Uc);
             pb->velocity(Uc, node_v);
 
             /* Put this velocity into mv_gf */
@@ -9077,6 +9086,7 @@ void LagrangianLOOperator::ComputeGeoVRaviart2(const Vector &S)
    // cout << "=======================================\n"
    //      << "          ComputeGeoVRaviart2          \n"
    //      << "=======================================\n";
+   MFEM_ABORT("Function deprecated\n");
    Vector n_vec(dim), ivf(dim), v_cell(dim), node_x(dim), _shape_fun(dim);
    Array<int> cell_faces_row, oris, zones_per_dof, vdofs;
    int row_length, cell_faces_length;

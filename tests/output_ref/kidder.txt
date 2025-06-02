@@ -9,6 +9,7 @@
 Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/full_ring_r0.mesh
    --output-flag default
+   --order-thermo 0
    --refine-serial 0
    --refine-parallel 0
    --problem 16
@@ -37,7 +38,6 @@ Options used:
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
    --mesh-motion-consistency-coefficient-on-cells 0
-   --optimize-timestep
    --CFL 0.5
    --no-set-dt-to-h
    --timestep 0.001
@@ -103,7 +103,7 @@ NDofs_H1L: 600
 NDofs_L2: 500
 NDofs_L2V: 500
 Vsize_L2V: 1000
-num_elements: 500
+NE: 500
 num_faces: 1100
 num_vertices: 600
 num_edges: 1100
@@ -164,14 +164,14 @@ step   265,	t = 0.187347,	dt = 0.00012299,	|e| = 5.2005437177e+03
 step   270,	t = 0.187952,	dt = 0.00011975,	|e| = 5.5219317056e+03
 step   275,	t = 0.188542,	dt = 0.00011669,	|e| = 5.8565197920e+03
 step   277,	t = 0.188700,	dt = 0.00004231,	|e| = 5.9503017904e+03
-Program took 3.3565472083e+00s.
-This amounts to 2.4147821643e-05 s per timestep per gridpoint.
+Program took 4.3276842917e+00s.
+This amounts to 3.1134419365e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    3.357e+00 | 2.415e-05
-  Dij calculation:               6.205e-01 | 4.464e-06
-  Mesh Motion calculation:       1.168e+00 | 8.401e-06
+  Total time:                    4.328e+00 | 3.113e-05
+  Dij calculation:               1.490e+00 | 1.072e-05
+  Mesh Motion calculation:       1.207e+00 | 8.681e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.222e+00 | 8.794e-06
+  State Update calculation:      1.269e+00 | 9.129e-06
 ===========================================================

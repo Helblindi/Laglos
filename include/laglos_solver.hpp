@@ -7,6 +7,7 @@
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
+#include "laglos_assembly.hpp"
 #include "elastic.hpp" //NF//MS
 #include <iostream>
 #include <fstream>
@@ -80,6 +81,11 @@ protected:
    // Matrix to hold max wavespeed values dij
    SparseMatrix * dij_sparse;
 
+   // Matrices to hold geometric vectors cij
+   SparseMatrix * cij_sparse_x;
+   SparseMatrix * cij_sparse_y;
+   SparseMatrix * cij_sparse_z;
+
    // FE spaces local and global sizes
    const int dim;
    const int Vsize_H1;
@@ -94,6 +100,7 @@ protected:
    const int TVSize_L2;
    const HYPRE_Int GTVSize_L2;
    const int NDofs_L2;
+   const int order_u;
 
    const int Vsize_L2V;
    const int TVSize_L2V;
@@ -121,7 +128,7 @@ protected:
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
    int el_num_faces;
-   const int num_elements, num_vertices, num_faces, num_edges;
+   const int num_vertices, num_faces, num_edges;
 
    double CFL;
    double timestep = 0.001;
@@ -203,10 +210,12 @@ public:
    void BuildDijMatrix(const Vector &S);
    void CalculateTimestep(const Vector &S);
 
-   void GetCellStateVector(const Vector &S, const int cell, Vector &U) const;
-   void SetCellStateVector(Vector &S_new, const int cell, const Vector &U) const;
+   void GetStateVector(const Vector &S, const int &index, Vector &U) const;
+   void SetStateVector(Vector &S_new, const int &index, const Vector &U) const;
 
    /* cij comp */
+   void BuildCijMatrices();
+   void GetLocalCij(const int &i, const int &j, Vector &cij);
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const;
 
    /* System timing */

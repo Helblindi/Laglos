@@ -4,6 +4,7 @@ list(APPEND HDRS
    lagrange-multiplier.hpp
    riemann1D.hpp
    initial_vals.hpp
+   laglos_assembly.hpp
    laglos_solver.hpp
    lagrange_multiplier.hpp
    lambda_max_lagrange.h

@@ -184,7 +184,6 @@ int main(int argc, char *argv[]) {
    int mv_it_option = 0;
    int mv_n_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
-   bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
@@ -198,6 +197,8 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&output_flag, "-of", "--output-flag", 
                   "Directory that output files should be placed");
+   args.AddOption(&order_u, "-ot", "--order-thermo",
+                  "Order (degree) of the thermodynamic finite element space.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
@@ -274,9 +275,6 @@ int main(int argc, char *argv[]) {
                   "Set the amount of viscosity to add to the mesh motion iteration on the faces.");
    args.AddOption(&mm_cell, "-mmcc", "--mesh-motion-consistency-coefficient-on-cells",
                   "Set the coefficient for the consistency term defined on the adjacent cells.");
-   args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
-                  "--no-optimize-timestep",
-                  "Enable or disable timestep optimization using CFL.");
    args.AddOption(&CFL, "-cfl", "--CFL",
                   "CFL value to use.");
    args.AddOption(&convergence_testing, "-ct", "--set-dt-to-h", "-no-ct", 
@@ -297,11 +295,11 @@ int main(int argc, char *argv[]) {
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
 
-   // Check that convergence testing and optimizing the timestep are not both set to true
-   if (optimize_timestep && convergence_testing)
+   /* Arg checks */
+   if (elastic_eos > 0 && order_u > 0)
    {
-      cout << "Cannot both optimize the timestep and set the timestep for convergence testing.\n";
-      return -1;
+      MFEM_ABORT("Elasticity cannot be used with order_u > 0. "
+                 "Set order_u = 0 to use elasticity.");
    }
 
    // Set output_flag string
@@ -947,7 +945,7 @@ int main(int argc, char *argv[]) {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
       {
-         hydro.GetCellStateVector(S, i, U);
+         hydro.GetStateVector(S, i, U);
          double _rho = 1. / U[0];
          double _esheer = 0.;
          if (elastic_eos)
@@ -1284,6 +1282,7 @@ int main(int argc, char *argv[]) {
          hydro.SetViscOption(greedy);
       }
       hydro.chrono_dij.Start();
+      hydro.BuildCijMatrices();
       hydro.BuildDijMatrix(S);
       hydro.chrono_dij.Stop();
       /* Check if we need to change CFL */
@@ -1294,11 +1293,8 @@ int main(int argc, char *argv[]) {
          hydro.SetCFL(CFL_new);
       }
 
-      if (optimize_timestep)
-      {
-         hydro.CalculateTimestep(S);
-         dt = hydro.GetTimestep();
-      }
+      hydro.CalculateTimestep(S);
+      dt = hydro.GetTimestep();
 
       if (t + dt >= t_final)
       {
@@ -1415,7 +1411,7 @@ int main(int argc, char *argv[]) {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
                {
-                  hydro.GetCellStateVector(S, i, U);
+                  hydro.GetStateVector(S, i, U);
                   double _rho = 1. / U[0];
                   double _esheer = 0.;
                   if (elastic_eos)

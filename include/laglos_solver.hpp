@@ -154,6 +154,9 @@ protected:
    Array<int> HiopDGradIArr, HiopDGradJArr;
    Array<double> HiopDGradData;
 
+   bool is_L2_connectivity_built = false;
+   Table L2Connectivity;
+
    int ess_tdofs_cart_size;
    Array<int> ess_bdr, dofs_list, ess_tdofs;
    mutable Array<double> bdr_vals;
@@ -215,7 +218,9 @@ public:
 
    /* cij comp */
    void BuildCijMatrices();
-   void GetLocalCij(const int &i, const int &j, Vector &cij);
+   void GetLocalCij(const int &i, const int &j, Vector &cij) const;
+   void BuildL2ConnectivityTable();
+   void GetL2ConnectivityTable(Table &_L2Connectivity) const;
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const;
 
    /* System timing */

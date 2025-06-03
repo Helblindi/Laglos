@@ -275,20 +275,33 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
 LagrangianLOOperator::~LagrangianLOOperator()
 {
-   delete dij_sparse;
-   dij_sparse = nullptr;
+   if (dij_sparse)
+   {
+      delete dij_sparse;
+      dij_sparse = nullptr;
+   }
    if (use_elasticity)
    {
       delete elastic;
       elastic = nullptr;
    }
 
-   delete cij_sparse_x;
-   cij_sparse_x = nullptr;
-   delete cij_sparse_y;
-   cij_sparse_y = nullptr;
-   delete cij_sparse_z;
-   cij_sparse_z = nullptr;
+   /* Free memory for Cij matrices */
+   if (cij_sparse_x)
+   {
+      delete cij_sparse_x;
+      cij_sparse_x = nullptr;
+   }
+   if (cij_sparse_y && dim > 1)
+   {
+      delete cij_sparse_y;
+      cij_sparse_y = nullptr;
+   }
+   if (cij_sparse_z && dim > 2)
+   {
+      delete cij_sparse_z;
+      cij_sparse_z = nullptr;
+   }
 }
 
 
@@ -1193,28 +1206,8 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
 ****************************************************************************************************/
 void LagrangianLOOperator::InitializeDijMatrix()
 {
-   switch (dim)
-   {
-      case 1: 
-      {
-         el_num_faces = pmesh->GetElement(0)->GetNVertices();
-         break;
-      }
-      case 2: 
-      {
-         el_num_faces = pmesh->GetElement(0)->GetNEdges();
-         break;
-      }
-      case 3: 
-      {
-         el_num_faces = pmesh->GetElement(0)->GetNFaces();
-         break;
-      }
-      default: MFEM_ABORT("Wrong dimension given.\n");
-   }
-
    // Initialize SparseMatrix
-   dij_sparse = new SparseMatrix(NE, NE, el_num_faces+1);
+   dij_sparse = new SparseMatrix(NE, NE);
 
    // Create dummy coefficients
    using namespace std::placeholders;
@@ -1250,38 +1243,30 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
    // cout << "=======================================\n"
    //      << "           Build Dij Matrix            \n"
    //      << "=======================================\n";
-   mfem::Mesh::FaceInformation FI;
-   int c, cp;
-   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), n_vec(dim);
-   double F, lambda_max, d, dij_avg = 0.;
-
-   for (int face = 0; face < num_faces; face++) // face iterator
+   if (!is_L2_connectivity_built)
    {
-      // cout << "face: " << face << endl;
-      FI = pmesh->GetFaceInformation(face);
-      c = FI.element[0].index;
-      cp = FI.element[1].index;
+      MFEM_ABORT("L2 Dof Connectivity Table must be built.\n");
+   }
 
-      GetStateVector(S, c, Uc);
-      if (FI.IsInterior())
+   int cj, denom = 0;
+   Vector Ui(dim+2), Uj(dim+2), n_int(dim), c(dim), n_vec(dim);
+   double F, lambda_max, d, dij_avg = 0.;
+   Array<int> row;
+
+   for (int dof_it = 0; dof_it < NDofs_L2; dof_it++)
+   {
+      GetStateVector(S, dof_it, Ui);
+      L2Connectivity.GetRow(dof_it, row);
+
+      for (int j = 0; j < row.Size(); j++)
       {
-         GetStateVector(S, cp, Ucp);
+         cj = row[j];
+         GetStateVector(S, cj, Uj);
+         GetLocalCij(dof_it, cj, c);
 
-         // Get normal, d, and |F|
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
-         double F = n_vec.Norml2();
-         n_vec /= F;
-
-         if (1. - n_vec.Norml2() > 1e-12)
-         {
-            cout << "n_vec: ";
-            n_vec.Print(cout);
-            MFEM_ABORT("Invalid normal vector.\n");
-         }
-         c_vec = n_int;
-         c_vec /= 2.;
-         double c_norm = c_vec.Norml2();
+         double c_norm = c.Norml2();
+         n_vec = c;
+         n_vec /= c_norm;
 
          /* Compute max wave speed */ 
          // Some cases require an update to b_covolume at every interface.  This can be done through
@@ -1293,43 +1278,39 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
          double esl = 0., esr = 0.;
          if (use_elasticity)
          {
-            esl = elastic->e_sheer(c);
-            esr = elastic->e_sheer(cp);
+            esl = elastic->e_sheer(dof_it);
+            esr = elastic->e_sheer(cj);
          }
 
          // Compute pressure with given EOS
-         double rhoL = 1. / Uc[0];
-         double sieL = pb->specific_internal_energy(Uc, esl);
-         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(c));
+         double rhoL = 1. / Ui[0];
+         double sieL = pb->specific_internal_energy(Ui, esl);
+         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(dof_it));
 
-         double rhoR = 1. / Ucp[0];
-         double sieR = pb->specific_internal_energy(Ucp, esr);
-         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cp));
+         double rhoR = 1. / Uj[0];
+         double sieR = pb->specific_internal_energy(Uj, esr);
+         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cj));
 
          // Finally compute lambda max
          if (use_elasticity)
          {
-            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+            lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
             lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * pb->get_shear_modulus());
          }
          else
          {
-            lambda_max = pb->compute_lambda_max(Uc, Ucp, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+            lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
          }
          
          d = lambda_max * c_norm;
          dij_avg += d;
+         denom++;
 
-         dij_sparse->Elem(c,cp) = d;
-         dij_sparse->Elem(cp,c) = d;
-
-         if (dim == 1)
-         {
-            lambda_max_vec[face] = lambda_max; // TODO: remove, only temporary
-         }
+         dij_sparse->Elem(dof_it,cj) = d;
+         dij_sparse->Elem(cj,dof_it) = d;
       }
    } // End face iterator
-   dij_avg = dij_avg / num_faces;
+   dij_avg = dij_avg / denom;
    ts_dijavg.Append(dij_avg);
 }
 
@@ -2157,10 +2138,11 @@ void LagrangianLOOperator::BuildCijMatrices()
    /* x */
    Cxbf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 0)));
    Cxbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   Cxbf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
    Cxbf.Assemble();
    Cxbf.Finalize();
    HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
-   cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2, 10);
+   cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2);
    Cx_hpm->MergeDiagAndOffd(*cij_sparse_x);
 
    /* y */
@@ -2168,10 +2150,11 @@ void LagrangianLOOperator::BuildCijMatrices()
    {
       Cybf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 1)));
       Cybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
+      Cybf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
       Cybf.Assemble();
       Cybf.Finalize();
       HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
-      cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2, 10);
+      cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2);
       Cy_hpm->MergeDiagAndOffd(*cij_sparse_y);
    }
    
@@ -2187,6 +2170,17 @@ void LagrangianLOOperator::BuildCijMatrices()
    //    cout << "cij_y: ";
    //    cij_sparse_y->Print(cout);
    // }
+
+   if (!is_L2_connectivity_built)
+   {
+      cout << "Building connectivity\n";
+      // Build connectivity table by looking at Cij sparse matrices
+      BuildL2ConnectivityTable();
+
+      // Only need to build connectivity table once
+      is_L2_connectivity_built = true;
+   }
+
    // cout << "done with Cij\n";
 }
 
@@ -2209,7 +2203,7 @@ void LagrangianLOOperator::BuildCijMatrices()
  * @note For 3D cases (dim > 2), the function will abort execution with an 
  *       error message.
  ****************************************************************************************************/
-void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij)
+void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij) const
 {
    // cout << "LagrangianLOOperator::GetLocalCij\n";
    cij.SetSize(dim);
@@ -2247,6 +2241,70 @@ void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij)
       }
    }
 
+}
+
+/****************************************************************************************************
+* Function: BuildL2ConnectivityTable
+* Parameters:
+*
+* Purpose:
+****************************************************************************************************/
+void LagrangianLOOperator::BuildL2ConnectivityTable()
+{
+   // cout << "=======================================\n"
+   //      << "    Building L2 Connectivity Table     \n"
+   //      << "=======================================\n";
+   Array<Connection> list;
+      
+   /* x */
+   const int *Ix = cij_sparse_x->GetI(), *Jx = cij_sparse_x->GetJ();
+   
+   for (int i = 0, k=0; i < cij_sparse_x->Height(); i++)
+   {
+      for (int end = Ix[i+1]; k < end; k++)
+      {
+         list.Append(Connection(i, Jx[k]));
+      }
+   }
+
+   /* y */
+   if (dim > 1)
+   {
+      const int *Iy = cij_sparse_y->GetI(), *Jy = cij_sparse_y->GetJ();
+   
+      for (int i = 0, k=0; i < cij_sparse_y->Height(); i++)
+      {
+         for (int end = Iy[i+1]; k < end; k++)
+         {
+            list.Append(Connection(i, Jy[k]));
+         }
+      }
+
+      if (dim > 2)
+      {
+         MFEM_ABORT("3D not yet implemented\n");
+      }
+   }
+
+   /* Must sort list and ensure each connection is unique before creating table */
+   list.Sort();
+   list.Unique();
+   L2Connectivity.MakeFromList(NDofs_L2, list); 
+
+   /* Output rows of table */
+   // Array<int> row;
+   // for (int i = 0; i < NDofs_L2; i++)
+   // {
+   //    cout << "connections for L2 dof i: " << i << ": ";
+   //    L2Connectivity.GetRow(i, row);
+   //    row.Print(cout);
+   // }
+}
+
+void LagrangianLOOperator::GetL2ConnectivityTable(Table &_L2Connectivity) const
+{
+   MFEM_ASSERT(is_L2_connectivity_built, "L2 connectivity table has not been built yet.\n");
+   _L2Connectivity = this->L2Connectivity;
 }
 
 

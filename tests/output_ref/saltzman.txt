@@ -104,6 +104,7 @@ num_faces: 555
 num_vertices: 306
 num_edges: 555
 Entering time loop
+Building connectivity
 Changing CFL for Saltzman at time = 0.0120598
 step     5,	t = 0.030154,	dt = 0.00401852,	|e| = 1.6800550276e+00
 step    10,	t = 0.047638,	dt = 0.00298326,	|e| = 2.4414152763e+00
@@ -194,14 +195,14 @@ step   430,	t = 0.588046,	dt = 0.00113844,	|e| = 1.3155831560e+01
 step   435,	t = 0.593734,	dt = 0.00113746,	|e| = 1.3234464694e+01
 step   440,	t = 0.599425,	dt = 0.00113831,	|e| = 1.3313007952e+01
 step   441,	t = 0.600000,	dt = 0.00057461,	|e| = 1.3320860967e+01
-Program took 3.3708947500e+00s.
-This amounts to 3.0505834842e-05 s per timestep per gridpoint.
+Program took 3.4386432500e+00s.
+This amounts to 3.1118943439e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    3.371e+00 | 3.051e-05
-  Dij calculation:               1.203e+00 | 1.089e-05
-  Mesh Motion calculation:       9.721e-01 | 8.797e-06
+  Total time:                    3.439e+00 | 3.112e-05
+  Dij calculation:               1.317e+00 | 1.192e-05
+  Mesh Motion calculation:       9.084e-01 | 8.221e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      9.302e-01 | 8.418e-06
+  State Update calculation:      9.631e-01 | 8.716e-06
 ===========================================================

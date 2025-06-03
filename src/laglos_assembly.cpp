@@ -82,26 +82,26 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
       if (w != 0.0)
       {
          for (int i = 0; i < nd1; i++)
+         {
             for (int j = i; j < nd1; j++)
             {
-               // skew symmetric
-               elmat(i, j) -= w * shape1(i) * shape1(j);
+               // symmetric, see (4.17) 
+               // must accomodate '-'
+               elmat(i, j) += w * shape1(i) * shape1(j);
+               elmat(j, i) += w * shape1(i) * shape1(j);
             }
-      }
+         }
 
-      if (nd2)
-      {
-         el2.CalcPhysShape(*Trans.Elem2, shape2);
+         if (nd2)
+         {
+            el2.CalcPhysShape(*Trans.Elem2, shape2);
 
-         if (w != 0.0)
             for (int i = 0; i < nd2; i++)
                for (int j = 0; j < nd1; j++)
                {
                   elmat(nd1+i, j) += w * shape2(i) * shape1(j);
                }
 
-         if (w != 0.0)
-         {
             for (int i = 0; i < nd2; i++)
                for (int j = i; j < nd2; j++)
                {
@@ -115,20 +115,20 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
                   elmat(i, nd1+j) -= w * shape1(i) * shape2(j);
                }
          }
-      }
+      }      
 
-      /* Set diagonal entries accordingly */
-      Vector diag;
-      elmat.GetDiag(diag);
-      if (w != 0.0 && diag.Norml2() < 1E-12)
-      {
-         Vector row_sums;
-         elmat.GetRowSums(row_sums);
-         for (int i = 0; i < elmat.Height(); i++)
-         {
-            elmat(i,i) = -1. * row_sums[i];
-         }
-      }
+      // /* Set diagonal entries accordingly */
+      // Vector diag;
+      // elmat.GetDiag(diag);
+      // if (w != 0.0 && diag.Norml2() < 1E-12)
+      // {
+      //    Vector row_sums;
+      //    elmat.GetRowSums(row_sums);
+      //    for (int i = 0; i < elmat.Height(); i++)
+      //    {
+      //       elmat(i,i) = -1. * row_sums[i];
+      //    }
+      // }
 
    }
 

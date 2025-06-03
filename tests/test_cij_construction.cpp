@@ -1,5 +1,6 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
+#include "mfem/fem/fe_coll.hpp"
 #include "test_problems_include.h"
 #include "var-config.h"
 #include <cassert>
@@ -34,6 +35,8 @@ static int myid = -1;
 /* ---------------- End Parameters ---------------- */
 
 int CompareCijComputation();
+void TestU2();
+int ValidateCijComputationOrder1();
 
 int main(int argc, char *argv[])
 {
@@ -44,7 +47,10 @@ int main(int argc, char *argv[])
 
    int d = 0;
    d+= CompareCijComputation();
-   cout << "end of main. d: " << d << endl;
+   d += ValidateCijComputationOrder1();
+
+   // TestU2();
+
    return d;
 }
 
@@ -232,5 +238,290 @@ int CompareCijComputation()
    delete m;
    delete pmesh;
 
+   return 0;
+}
+
+
+void TestU2()
+{
+   cout << "Testing U2 problem..." << endl;
+   // On all processors, use the default builtin 1D/2D/3D mesh or read the
+   // serial one given on the command line.
+   Mesh *mesh = new Mesh(mesh_file_location, true, true);
+   dim = mesh->Dimension();
+
+   // Refine the mesh in serial to increase the resolution. In this example
+   // we do 'ser_ref_levels' of uniform refinement, where 'ser_ref_levels' is
+   // a command-line parameter. If the mesh is of NURBS type, we convert it
+   // to a (piecewise-polynomial) high-order mesh.
+   for (int lev = 0; lev < 1; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   // Define the parallel mesh by a partitioning of the serial mesh. Refine
+   // this mesh further in parallel to increase the resolution. Once the
+   // parallel mesh is defined, the serial mesh can be deleted.
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   delete mesh;
+
+   int NE = pmesh->GetNE(), ne_min, ne_max;
+   MPI_Reduce(&NE, &ne_min, 1, MPI_INT, MPI_MIN, 0, pmesh->GetComm());
+   MPI_Reduce(&NE, &ne_max, 1, MPI_INT, MPI_MAX, 0, pmesh->GetComm());
+   double hmin, hmax, kmin, kmax;
+   pmesh->GetCharacteristics(hmin, hmax, kmin, kmax);
+
+   // Set up problem
+   ProblemBase * problem_class = new SodProblem(dim);
+
+   // Define the parallel finite element spaces. We use:
+   // - H1 (Q2, continuous) for mesh movement.
+   // - L2 (Q0, discontinuous) for state variables
+   // - CR/RT for mesh reconstruction at nodes
+   H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC_L(1, dim);
+   L2_FECollection L2FEC(1, dim, BasisType::Positive);
+   FiniteElementCollection * CRFEC;
+   if (dim == 1)
+   {
+      CRFEC = new CrouzeixRaviartFECollection();
+   }
+   else
+   {
+      CRFEC = new RT_FECollection(0, dim);
+   }
+
+   ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
+   ParFiniteElementSpace H1FESpace_L(pmesh, &H1FEC_L, dim);
+   /* Finite element space solely constructed for continuous representation of density field */
+   ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
+   ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
+
+   /* The monolithic BlockVector stores unknown fields as:
+   *   - 0 -> position
+   *   - 1 -> specific volume
+   *   - 2 -> velocity (L2V)
+   *   - 3 -> speific total energy
+   */
+   const int Vsize_l2 = L2FESpace.GetVSize();
+   const int Vsize_l2v = L2VFESpace.GetVSize();
+   const int Vsize_h1 = H1FESpace.GetVSize();
+   Array<int> offset(5);
+   offset[0] = 0;
+   offset[1] = offset[0] + Vsize_h1;
+   offset[2] = offset[1] + Vsize_l2;
+   offset[3] = offset[2] + Vsize_l2v;
+   offset[4] = offset[3] + Vsize_l2;
+   BlockVector S(offset, Device::GetMemoryType());
+
+   // Define GridFunction objects for the position, mesh velocity and specific
+   // volume, velocity, and specific internal energy. At each step, each of 
+   // these values will be updated.
+   ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
+   ParGridFunction rho0_gf(&L2FESpace);
+   x_gf.MakeRef(&H1FESpace, S, offset[0]);
+   sv_gf.MakeRef(&L2FESpace, S, offset[1]);
+   v_gf.MakeRef(&L2VFESpace, S, offset[2]);
+   ste_gf.MakeRef(&L2FESpace, S, offset[3]);
+
+   // Initialize x_gf using starting mesh positions
+   pmesh->SetNodalGridFunction(&x_gf);
+   // Sync the data location of x_gf with its base, S
+   x_gf.SyncAliasMemory(S);
+
+   // Change class variables into static std::functions since virtual static member functions are not an option
+   // and Coefficient class requires std::function arguments
+   using namespace std::placeholders;
+   std::function<double(const Vector &,const double)> sv0_static = 
+      std::bind(&ProblemBase::sv0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<void(const Vector &, const double, Vector &)> v0_static = 
+      std::bind(&ProblemBase::v0, problem_class, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+   std::function<double(const Vector &,const double)> ste0_static = 
+      std::bind(&ProblemBase::ste0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> rho0_static = 
+      std::bind(&ProblemBase::rho0, problem_class, std::placeholders::_1, std::placeholders::_2);
+   std::function<double(const Vector &,const double)> p0_static = 
+      std::bind(&ProblemBase::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
+
+   // Initialize specific volume, velocity, and specific total energy
+   FunctionCoefficient sv_coeff(sv0_static);
+   sv_coeff.SetTime(t_init);
+   sv_gf.ProjectCoefficient(sv_coeff);
+
+   VectorFunctionCoefficient v_coeff(dim, v0_static);
+   v_coeff.SetTime(t_init);
+   v_gf.ProjectCoefficient(v_coeff);
+
+   // While the ste_coeff is not used for initialization in the Sedov case,
+   // it is necessary for plotting the exact solution
+   FunctionCoefficient ste_coeff(ste0_static);
+   ste_coeff.SetTime(t_init);
+   ste_gf.ProjectCoefficient(ste_coeff);
+
+
+   // PLF to build mass vector
+   FunctionCoefficient rho_coeff(rho0_static); 
+   rho_coeff.SetTime(t_init);
+   ParLinearForm *m = new ParLinearForm(&L2FESpace);
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->Assemble();
+
+   /* Initialize rho0_gf */
+   rho0_gf.ProjectCoefficient(rho_coeff);
+
+   FunctionCoefficient p_coeff(p0_static);
+   p_coeff.SetTime(t_init);
+
+   /* Create Lagrangian Low Order Solver Object */
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
+   hydro.BuildCijMatrices();
+
+   ParGridFunction L2_coords(&L2VFESpace);
+   pmesh->GetNodes(L2_coords);
+   cout << "L2 coordinates:\n";
+   L2_coords.Print(cout);
+
+   /* free memory */
+   cout << "freeing memory..." << endl;
+   delete problem_class;
+   delete CRFEC;
+   delete m;
+   delete pmesh;
+   cout << "done." << endl;
+}
+
+/*
+The values of Cij should match the definition given in equation (4.17) in the paper:
+Guermond, Popov, Tomas: 
+"Invariant domain preserving discretization-independent schemes and convex limiting for hyperbolic systems."
+*/
+int ValidateCijComputationOrder1()
+{
+   // This function is a placeholder for validating the Cij computation order 1.
+   // It can be implemented with specific tests or assertions as needed.
+   cout << "Validating Cij computation order 1..." << endl;
+   Mesh *mesh = new Mesh(Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL, true));
+   dim = mesh->Dimension();
+   ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
+   delete mesh;
+
+   L2_FECollection L2FEC(1, dim, BasisType::Positive);
+   ParFiniteElementSpace L2(pmesh, &L2FEC);
+
+   const int NDofs_L2 = L2.GetNDofs();
+   const int NE = pmesh->GetNE();
+   ConstantCoefficient one(1.0);
+   ParBilinearForm Cxbf(&L2), Cybf(&L2);
+   ParGridFunction x_gf(&L2);
+   pmesh->GetNodes(x_gf);
+   cout << "nodes:\n";
+   x_gf.Print(cout);
+
+   cout << "dim: " << dim << ", NE: " << NE << ", NDofs_L2: " << NDofs_L2 << endl;
+
+
+   /* x */
+   cout << "----------------Assembling Cx...\n";
+   // Cxbf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 0)));
+   Cxbf.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
+   // Cxbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   Cxbf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   Cxbf.Assemble();
+   Cxbf.Finalize();
+   HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
+   SparseMatrix * cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2);
+   Cx_hpm->MergeDiagAndOffd(*cij_sparse_x);
+
+   /* y */
+   cout << "----------------Assembling Cy...\n";
+   // Cybf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 1)));
+   Cybf.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
+   // Cybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
+   Cybf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
+   Cybf.Assemble();
+   Cybf.Finalize();
+   HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
+   SparseMatrix * cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2);
+   Cy_hpm->MergeDiagAndOffd(*cij_sparse_y);
+
+   /* Make L2 Connectivity */
+   Array<Connection> list;
+      
+   /* x */
+   const int *Ix = cij_sparse_x->GetI(), *Jx = cij_sparse_x->GetJ();
+   for (int i = 0, k=0; i < cij_sparse_x->Height(); i++)
+   {
+      for (int end = Ix[i+1]; k < end; k++)
+      {
+         list.Append(Connection(i, Jx[k]));
+      }
+   }
+
+   /* y */
+   const int *Iy = cij_sparse_y->GetI(), *Jy = cij_sparse_y->GetJ();
+
+   for (int i = 0, k=0; i < cij_sparse_y->Height(); i++)
+   {
+      for (int end = Iy[i+1]; k < end; k++)
+      {
+         list.Append(Connection(i, Jy[k]));
+      }
+   }
+
+
+
+   /* Must sort list and ensure each connection is unique before creating table */
+   list.Sort();
+   list.Unique();
+   Table L2Connectivity;
+   L2Connectivity.MakeFromList(NDofs_L2, list);
+
+   cout << "L2Connectivity:\n";
+   L2Connectivity.Print(cout);
+
+   /* Validate each entry */
+   Array<int> row, cols;
+   Vector vals, cij(dim);
+   int cj, col_index;
+   for (int ci = 0; ci < NDofs_L2; ci++)
+   {
+      L2Connectivity.GetRow(ci, row);
+      for (int j = 0; j < row.Size(); j++)
+      {
+         cij = 0.;
+         cj = row[j];
+
+         /* Get x val */
+         cij_sparse_x->GetRow(ci, cols, vals);
+         col_index = cols.Find(cj);
+         if (col_index != -1) {
+            cij[0] = vals[col_index];
+         } else {
+            // cout << "col not found\n";
+            cij[0] = 0.;
+         }
+
+         /* Get y val */
+         cij_sparse_y->GetRow(ci, cols, vals);
+         col_index = cols.Find(cj);
+         if (col_index != -1) {
+            cij[1] = vals[col_index];
+         } else {
+            // cout << "col not found for i: " << i << ", j: " << j << "\n";
+            cij[1] = 0.;
+         }
+         cout << "i: " << ci << ", j: " << cj << ", cij: ";
+         cij.Print(cout);
+      }
+   }
+
+
+
+
+   delete cij_sparse_x;
+   delete cij_sparse_y;
+   delete pmesh;
    return 0;
 }

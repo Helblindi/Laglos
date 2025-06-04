@@ -571,6 +571,19 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                cj = FI.element[0].index; 
             }
             GetStateVector(S, cj, U_j); 
+            Vector cij(dim), _t(dim);
+            GetLocalCij(ci, cj, cij);
+            subtract(c, cij, _t);
+            if (_t.Norml2() > 1.e-10)
+            {
+               cout << "cij computation does not match outward normal!\n";
+               cout << "i: " << ci << ", j: " << cj << endl;
+               cout << "Outward normal: ";
+               c.Print(cout);
+               cout << "cij: ";
+               cij.Print(cout);
+               MFEM_ABORT("cij computation does not match outward normal!\n");
+            }
 
             // flux contribution
             DenseMatrix dm;
@@ -2426,7 +2439,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
    
    mfem::Mesh::FaceInformation FI;
    int c, cp;
-   Vector Uc(dim+2), Ucp(dim+2), n_int(dim), c_vec(dim), Vf(dim), Vf_flux(dim); 
+   Vector Uc(dim+2), Ucp(dim+2), cij(dim), Vf(dim), Vf_flux(dim); 
    Vector n_vec(dim);
    double d, c_norm, F;
 
@@ -2443,8 +2456,9 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       GetStateVector(S, c, Uc);
 
       // Get normal, d, and |F|
-      CalcOutwardNormalInt(S, c, face, n_int);
-      n_vec = n_int;
+      GetLocalCij(c, cp, cij);
+      cij *= 2.;
+      n_vec = cij;
       F = n_vec.Norml2();
       n_vec /= F;
       if (1. - n_vec.Norml2() > 1e-12)
@@ -2925,7 +2939,7 @@ void LagrangianLOOperator::
 
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
-   Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
+   Vector Vf(dim), cij(dim), n_vec(dim), face_velocity(dim);
    Vector Uc(dim+2), Ucp(dim+2);
    Vector cell_c_v(dim), cell_cp_v(dim), cell_center_v(dim); // For computation of bmn
    Array<int> row;
@@ -2967,8 +2981,9 @@ void LagrangianLOOperator::
          pb->velocity(Ucp, cell_cp_v);
 
          // Calculate outer normal
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
+         GetLocalCij(c, cp, cij);
+         cij *= 2.;
+         n_vec = cij;
          double F = n_vec.Norml2();
          n_vec /= F;
 
@@ -3150,7 +3165,7 @@ void LagrangianLOOperator::
    // cout << "========================================================\n";
    /* Parameters needed for face velocity calculations */
    mfem::Mesh::FaceInformation FI;
-   Vector Vf(dim), n_int(dim), n_vec(dim), face_velocity(dim);
+   Vector Vf(dim), cij(dim), n_vec(dim), face_velocity(dim);
    Vector cell_c_v(dim), cell_cp_v(dim), cell_center_v(dim); // For computation of bmn
    Array<int> row;
    int face_dof = 0, face_vdof2 = 0, c = 0, cp = 0;
@@ -3178,8 +3193,9 @@ void LagrangianLOOperator::
          cp = FI.element[1].index;
 
          // Calculate outer normal
-         CalcOutwardNormalInt(S, c, face, n_int);
-         n_vec = n_int;
+         GetLocalCij(c, cp, cij);
+         cij *= 2.;
+         n_vec = cij;
          double F = n_vec.Norml2();
          n_vec /= F;
 

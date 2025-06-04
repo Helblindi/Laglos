@@ -2136,7 +2136,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    ParBilinearForm Cxbf(&L2), Cybf(&L2);
 
    /* x */
-   Cxbf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 0)));
+   Cxbf.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
    Cxbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
    Cxbf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
    Cxbf.Assemble();
@@ -2148,7 +2148,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    /* y */
    if (dim > 1)
    {
-      Cybf.AddDomainIntegrator(new TransposeIntegrator(new DerivativeIntegrator(one, 1)));
+      Cybf.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
       Cybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
       Cybf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
       Cybf.Assemble();

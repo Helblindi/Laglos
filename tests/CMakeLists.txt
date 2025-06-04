@@ -187,6 +187,12 @@ add_test(
     NAME TestElasticImpact
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh ${PROJECT_SOURCE_DIR} "elastic_impact_output.txt"
 )
+add_test(NAME CompareElasticImpact
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/elastic_impact_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_impact.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
 
 ## Elastic Shocktube
 

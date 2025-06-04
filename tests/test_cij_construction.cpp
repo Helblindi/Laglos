@@ -1,12 +1,8 @@
 #include "mfem.hpp"
 #include "laglos_solver.hpp"
-#include "mfem/fem/fe_coll.hpp"
 #include "test_problems_include.h"
 #include "var-config.h"
 #include <cassert>
-#include <fstream>
-#include <sstream>
-#include <cmath>
 
 using namespace std;
 using namespace mfem;
@@ -37,6 +33,7 @@ static int myid = -1;
 int CompareCijComputation();
 void TestU2();
 int ValidateCijComputationOrder1();
+int TestDGNormalIntegrator();
 
 int main(int argc, char *argv[])
 {
@@ -46,9 +43,9 @@ int main(int argc, char *argv[])
    myid = Mpi::WorldRank();
 
    int d = 0;
-   d+= CompareCijComputation();
+   d += CompareCijComputation();
    d += ValidateCijComputationOrder1();
-
+   d += TestDGNormalIntegrator();
    // TestU2();
 
    return d;
@@ -404,6 +401,13 @@ int ValidateCijComputationOrder1()
    cout << "Validating Cij computation order 1..." << endl;
    Mesh *mesh = new Mesh(Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL, true));
    dim = mesh->Dimension();
+   /* Optional serial refinement */
+   int num_refinements = 1;
+   for (int lev = 0; lev < num_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+   
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
    delete mesh;
 
@@ -517,10 +521,28 @@ int ValidateCijComputationOrder1()
    Table L2Connectivity;
    hydro.GetL2ConnectivityTable(L2Connectivity);
 
-   /* Check for skew symmetry */
-   Vector cij(dim), cji(dim), _t(dim);
+   Vector cij(dim), cji(dim), _t(dim), sum(dim);;
    for (int i = 0; i < NDofs_L2; i++)
    {
+      MFEM_WARNING("May want to check row sums for interior dofs.");
+      /*
+      I have manually checked that row sums for interior dofs is 0
+      for smaller meshes.
+      In order to do this at scaled I would need to rebase my fork of
+      mfem to get access to the new function
+      FiniteElementSpace::GetExteriorTrueDofs()
+      */
+      // sum = 0.;
+      // for (int j = 0; j < NDofs_L2; j++)
+      // {
+      //    hydro.GetLocalCij(i,j,cij);
+      //    cout << "Cij[" << i << "][" << j << "] = ";
+      //    cij.Print(cout);
+      //    sum.Add(1., cij);
+      // }
+      // cout << "Row " << i << " sum: " << sum.Norml2() << endl;
+
+      /* Check that resulting matrices are skew symmetric */
       for (int j = i+1; j < NDofs_L2; j++)
       {
          hydro.GetLocalCij(i, j, cij);
@@ -540,5 +562,101 @@ int ValidateCijComputationOrder1()
    }
 
    delete pmesh;
+   return 0;
+}
+
+int TestDGNormalIntegrator()
+{
+   // This function is a placeholder for testing the DGNormalIntegrator.
+   // It can be implemented with specific tests or assertions as needed.
+   cout << "Testing DGNormalIntegrator..." << endl;
+
+   Mesh *mesh = new Mesh(Mesh::MakeCartesian2D(1, 1, Element::QUADRILATERAL, true));
+   dim = mesh->Dimension();
+   /* Optional serial refinement */
+   int num_refinements = 0;
+   for (int lev = 0; lev < num_refinements; lev++)
+   {
+      mesh->UniformRefinement();
+   }
+
+   L2_FECollection L2FEC(1, dim, BasisType::Positive);
+   FiniteElementSpace L2(mesh, &L2FEC);
+   const int NDofs_L2 = L2.GetNDofs();
+   BilinearForm xbf(&L2), ybf(&L2);
+   ConstantCoefficient one(1.0);
+
+   // xbf.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
+   xbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   xbf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   xbf.Assemble();
+   xbf.Finalize();
+   SparseMatrix xmat_sparse = xbf.SpMat();
+
+   // ybf.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
+   ybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
+   ybf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
+   ybf.Assemble();
+   ybf.Finalize();
+   SparseMatrix ymat_sparse = ybf.SpMat();
+   
+   // cout << "xmat_sparse:\n";
+   // xmat_sparse.Print(cout);
+   // cout << "ymat_sparse:\n";
+   // ymat_sparse.Print(cout);
+
+   // Array<int> cols;
+   // Vector vals, cij(dim);;
+   // int col_index;
+
+   /* Get cij */
+   // for (int i = 0; i < NDofs_L2; i++)
+   // {
+   //    for (int j = 0; j < NDofs_L2; j++)
+   //    {
+   //       cij = 0.;
+   //       xmat_sparse.GetRow(i, cols, vals);
+   //       col_index = cols.Find(j);
+   //       if (col_index != -1) {
+   //          cij[0] = vals[col_index];
+   //       } else {
+   //          // cout << "col not found\n";
+   //          cij[0] = 0.;
+   //       }
+
+   //       ymat_sparse.GetRow(i, cols, vals);
+   //       col_index = cols.Find(j);
+   //       if (col_index != -1) {
+   //          cij[1] = vals[col_index];
+   //       } else {
+   //          // cout << "col not found for i: " << i << ", j: " << j << "\n";
+   //          cij[1] = 0.;
+   //       }
+   //       cout << "Cij[" << i << "][" << j << "] = ";
+   //       cij.Print(cout);
+   //    }
+   // }
+
+   /* Free memory */
+   delete mesh;
+
+   /* Check symmetry */
+   if (xmat_sparse.IsSymmetric() < 1.E-10 && ymat_sparse.IsSymmetric() < 1.E-10)
+   {
+      cout << "Both matrices are symmetric.\n";
+      return 0;
+   }
+   else
+   {
+      cout << "At least one matrix is not symmetric.\n";
+      cout << "symm val x: " << xmat_sparse.IsSymmetric() << endl;
+      cout << "symm val y: " << ymat_sparse.IsSymmetric() << endl;
+      cout << "xmat_sparse:\n";
+      xmat_sparse.Print(cout);
+      cout << "ymat_sparse:\n";
+      ymat_sparse.Print(cout);
+      return 1;
+   }
+
    return 0;
 }

@@ -181,6 +181,9 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    cell_bdr_flag_gf = -1.;
    FillCellBdrFlag();
 
+   /* Init L2 tables */
+   L2.BuildDofToArrays();
+
    // Initialize LagrangeMultipliers
    LagrangeMultipliers = 0; // TODO: Play with different value here for initialization???
 
@@ -463,202 +466,111 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
  * @tparam dim The dimension of the problem (1, 2, or 3).
  * @param S The input state vector.
  * @param dS_dt The output time derivative of the state vector.
+ *
+ * @note This method currently fails on the Kidder problem.
  */
-void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
-{
-   if (order_u != 0)
+ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
+ {
+   if (order_u > 0)
    {
-      MFEM_ABORT("SolveHydro needs updating for order_u > 0\n");
+      MFEM_ABORT("When order_u > 0, may not need row sums to be 0.\n");
    }
-
    chrono_state.Start();
 
-   Vector rhs(dim+2), c(dim), n_int(dim), U_i(dim+2), U_j(dim+2);
-   Array<int> fids, oris; 
+   Vector rhs(dim+2), cij(dim), U_i(dim+2), U_j(dim+2);
+   Array<int> row;
 
-   int cj = 0;
    double d;
 
-   mfem::Mesh::FaceInformation FI;
    H1.ExchangeFaceNbrData();
 
-   bool is_boundary_cell = false;
-
-   Vector sum_validation(dim);
-
-    /* Add in e_source for taylor green */
-    LinearForm *e_source = nullptr;
-    if (pb->get_indicator() == "TaylorGreen")
-    {
-        // Needed since the Assemble() defaults to PA.
-       L2.GetMesh()->DeleteGeometricFactors();
-       e_source = new LinearForm(&L2);
-       TaylorCoefficient coeff;
-       IntegrationRule ir = IntRules.Get(L2.GetFE(0)->GetGeomType(), 2);
-       DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
-       e_source->AddDomainIntegrator(d);
-       e_source->Assemble();
-    }
-
-   for (int ci = 0; ci < NE; ci++) // Cell iterator
+   /* Add in e_source for taylor green */
+   LinearForm *e_source = nullptr;
+   if (pb->get_indicator() == "TaylorGreen")
    {
-      is_boundary_cell = false;
-      Array<int> cell_bdr_arr;
-      sum_validation = 0.;
-      GetStateVector(S, ci, U_i);
+      // Needed since the Assemble() defaults to PA.
+      L2.GetMesh()->DeleteGeometricFactors();
+      e_source = new LinearForm(&L2);
+      TaylorCoefficient coeff;
+      IntegrationRule ir = IntRules.Get(L2.GetFE(0)->GetGeomType(), 2);
+      DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
+      e_source->AddDomainIntegrator(d);
+      e_source->Assemble();
+   }
 
-      switch (dim)
-      {
-         case 1: 
-         {
-            pmesh->GetElementVertices(ci, fids);
-            break;
-         }
-         case 2:
-         {
-            pmesh->GetElementEdges(ci, fids, oris);
-            break;
-         }
-         case 3:
-         {
-            pmesh->GetElementFaces(ci, fids, oris);
-            break;
-         }
-         default:
-         {
-            MFEM_ABORT("Incorrect dimension provided.\n");
-         }
-      }
+   for (int i = 0; i < NDofs_L2; i++) // L2 dof iterator
+   {
+      GetStateVector(S, i, U_i);
+
+      L2Connectivity.GetRow(i, row);
       DenseMatrix F_i;
       //NF//MS
-      int ci_attr = pmesh->GetAttribute(ci);
-      if (use_elasticity && ci_attr == 50)
+      int el_i = L2.GetElementForDof(i);
+      int attr_i = pmesh->GetAttribute(el_i);
+
+      if (use_elasticity && attr_i == 50)
       {
          const double _rho = 1./U_i[0];
          double _es = 0.;
          DenseMatrix _sigmaD(3);
 
          // _sigmaD is 3 x 3
-         elastic->ComputeS(ci, _rho, _sigmaD);
-         _es = elastic->e_sheer(ci);
+         elastic->ComputeS(el_i, _rho, _sigmaD);
+         _es = elastic->e_sheer(el_i);
 
-         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, ci_attr);
+         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, attr_i);
       }
       else
       {
-         F_i = pb->flux(U_i, ci_attr);
+         F_i = pb->flux(U_i, attr_i);
       }
 
       rhs = 0.;
 
-      for (int j=0; j < fids.Size(); j++) // Face iterator
+      for (int j_it=0; j_it < row.Size(); j_it++) // Adjacent dof iterator
       {
-         CalcOutwardNormalInt(S, ci, fids[j], n_int);
-         c = n_int;
-         c /= 2.;
-         sum_validation.Add(1., c);
+         int j = row[j_it];
+         GetLocalCij(i,j,cij);
+         GetStateVector(S, j, U_j);
 
-         FI = pmesh->GetFaceInformation(fids[j]);
+         DenseMatrix dm(dim+2, dim);
+         Vector y(dim+2);
+         F_i.Mult(cij, y);
 
-         if (FI.IsInterior())
+         rhs -= y;
+
+         // Should I put Fi contribution into dm before?
+         /* Optionally enforce BC on PDE */
+         int bdr_ind = BdrVertexIndexingArray[i];
+         if (i == j && bdr_ind > 3 && pb->get_indicator() == "saltzmann")
          {
-            // Get index information/state vector for second cell
-            if (ci == FI.element[0].index) { 
-               cj = FI.element[1].index; 
-            }
-            else { 
-               assert(ci == FI.element[1].index);
-               cj = FI.element[0].index; 
-            }
-            GetStateVector(S, cj, U_j); 
-            Vector cij(dim), _t(dim);
-            GetLocalCij(ci, cj, cij);
-            subtract(c, cij, _t);
-            if (_t.Norml2() > 1.e-10)
+            // cout << "Enforcing saltzmann BC on dof " << i << endl;
+            if (order_u > 0)
             {
-               cout << "cij computation does not match outward normal!\n";
-               cout << "i: " << ci << ", j: " << cj << endl;
-               cout << "Outward normal: ";
-               c.Print(cout);
-               cout << "cij: ";
-               cij.Print(cout);
-               MFEM_ABORT("cij computation does not match outward normal!\n");
+               MFEM_ABORT("Implementation not compatible with order_u > 0.\n");
             }
-
-            // flux contribution
-            DenseMatrix dm;
-            //NF//MS
-            int cj_attr = pmesh->GetAttribute(cj);
-            if (use_elasticity && cj_attr == 50)
+            Array<int> fids;
+            Vector cF(dim);
+            element_face.GetRow(i,fids);
+            for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
             {
-               const double _rho = 1./U_j[0];
-               double _es = 0.;
-               DenseMatrix _sigmaD(3);
-
-               // _sigmaD is 3 x 3
-               elastic->ComputeS(cj, _rho, _sigmaD);
-               _es = elastic->e_sheer(cj);
-
-               dm = pb->ElasticFlux(_sigmaD, _es, U_j, cj_attr);
-            }
-            else
-            {
-               dm = pb->flux(U_j, cj_attr);
-            }
-
-            dm += F_i; 
-            Vector y(dim+2);
-            dm.Mult(c, y);
-
-            rhs -= y;
-
-            /* viscosity contribution */
-            if (use_viscosity)
-            {
-               d = dij_sparse->Elem(ci, cj); 
-
-               Vector z = U_j;
-               z -= U_i;
-               rhs.Add(d, z);
-
-               /* REMOVE, checking visocity */
-               // Array<int> tmp_dofs(2);
-               // tmp_dofs[0] = 1, tmp_dofs[1]=2;
-               // Vector tmp_vel(dim);
-               // z.GetSubVector(tmp_dofs, tmp_vel);
-               // if (tmp_vel[0] < 0.)
-               // {
-               //    cout << "\tcells ci " << ci << " and cj " << cj << " have a neg vel contribution:\n";
-               //    tmp_vel.Print(cout);
-               //    cout << "corresponding d: " << d << endl;
-               // }
-            }
-         }
-         else
-         {
-            assert(FI.IsBoundary());
-            is_boundary_cell = true;
-            int bdr_attr = BdrElementIndexingArray[fids[j]];
-            // cout << "boundary attribute for face " << fids[j] << ": " << bdr_attr << endl;
-            cell_bdr_arr.Append(bdr_attr);
-            Vector y_temp(dim+2), y_temp_bdry(dim+2), U_i_bdry(dim+2);
-            F_i.Mult(c, y_temp);
-            U_i_bdry = U_i;
-
-            /* Enforce Boundary Conditions */
-            if (pb->get_indicator() == "saltzmann")
-            {
-               // Check bdry flag
-               int bdr_attribute = BdrElementIndexingArray[fids[j]]; 
-
-               switch (bdr_attribute)
+               int fid = fids[fid_it];
+               int fid_ind = BdrElementIndexingArray[fid];
+               switch (fid_ind)
                {
-               case 5:
-               // Left wall
+               case -1: // Interior face
                {
+                  // Do nothing, this is an interior face
+                  break;
+               }
+               case 5: // Left wall
+               {
+                  CalcOutwardNormalInt(S, i, fid, cF);
+                  cF /= 2.; 
+
                   double _rho = 3.9992502342988532;
                   double _p = 1.3334833281256551;
-                  Vector _v(dim);
+                  Vector _v(dim), yd(dim+2);
                   _v = 0.;
                   _v[0] = 1.; //e_x
                   Vector _v_neg = _v, _vp = _v;
@@ -673,140 +585,140 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                   }
                   F_i_bdry.SetRow(dim+1, _vp);
 
-                  F_i_bdry.Mult(c, y_temp_bdry);
-                  y_temp += y_temp_bdry;
+                  F_i_bdry.Mult(cF, yd);
+                  rhs -= yd;
                   break;
                }
-               // case 1:
-               // case 2:
-               // case 3:
-               // {
-               //    // Negate velocity
-               //    for (int _it = 0; _it < dim; _it++)
-               //    {
-               //       U_i_bdry[_it + 1] = U_i_bdry[_it + 1] * -1;
-               //    }
-               //    DenseMatrix F_i_slip = pb->flux(U_i_bdry, pmesh->GetAttribute(i));
-               //    F_i_slip.Mult(c, y_temp_bdry);
-               //    // y_temp *= 2.;
-               //    break;
-               // }
-               
-               default:
+               default: // Other boundary faces
                {
-                  // cout << "invalid boundary attribute: " << bdr_attribute << endl;
-                  // cout << "cell : " << ci << endl;
-                  // cout << "face: " << fids[j] << endl;  
-                  y_temp *= 2.; 
+                  Vector yb(dim+2);
+                  CalcOutwardNormalInt(S, i, fid, cF);
+                  cF /= 2.; 
+                  dm.Mult(cF, yb);
+                  rhs -= yb;
                   break;
                }
-               } // switch (bdr_attr)
-            } // if saltzmann
-            else if (pb->get_indicator() == "Kidder")
-            {
-               int bdr_attribute = BdrElementIndexingArray[fids[j]];
 
-               switch (bdr_attribute)
-               {
-               case 4: // inner radius
-               case 5: // outer radius
-               {
-                  // Need face_x for boundary velocity
-                  Array<int> face_dofs;
-                  Vector face_x(dim), cell_v(dim), cell_vp(dim);
-                  H1.GetFaceDofs(fids[j], face_dofs);
-                  int face_dof = face_dofs[2];
-                  geom.GetNodePositionFromBV(S,face_dof, face_x);
-                  /* 
-                  Need boundary state for Kidder
-                  Note that t should have been set using update_additional_BCs
-                  */
-                  pb->GetBoundaryState(face_x, bdr_attribute, U_i_bdry);
-                  // MFEM_ABORT("Need to replace 't'\n");
-
-                  /* 
-                  * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
-                  * So instead of this call:
-                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
-                  * We modify just the pressure in the flux F_i
-                  */
-                  DenseMatrix F_i_bdry = F_i;
-                  F_i_bdry.GetRow(0, cell_v);
-                  cell_v *= -1.; // Negate the velocity
-                  double _rho = 1. / U_i_bdry[0];
-                  double _esi = 0.;
-                  if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
-                  double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
-                  double _press = pb->pressure(_rho, _sie, bdr_attribute);
-                  for (int i = 0; i < dim; i++)
-                  {
-                     F_i_bdry(i+1, i) = _press;
-                  }
-                  cell_vp = cell_v;
-                  cell_vp *= _press;
-                  F_i_bdry.SetRow(dim+1, cell_vp);
-
-                  F_i_bdry.Mult(c, y_temp_bdry);
-                  y_temp += y_temp_bdry;
-                  break;
-               }
-               default:
-               {
-                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
-                  y_temp *= 2.; 
-                  break;
-               }
                }
             }
-            // else if (use_elasticity && ci_attr == 50)
-            // {
-            //    /* Negate sigma */
-            //    DenseMatrix F_i_bdry = F_i;
+         }
+         // else if (i == j && bdr_ind > 0 && pb->get_indicator() == "Kidder")
+         // {
+         //    if (order_u > 0)
+         //    {
+         //       MFEM_ABORT("Implementation not compatible with order_u > 0.\n");
+         //    }
+         //    switch (bdr_ind)
+         //    {
+         //    case 4: // inner radius
+         //    case 5: // outer radius
+         //    {
+         //       // Need face_x for boundary velocity
+         //       Vector U_i_bdry(dim+2);
+         //       Array<int> face_dofs;
+         //       Vector face_x(dim), cell_v(dim), cell_vp(dim);
+         //       H1.GetFaceDofs(fids[j], face_dofs);
+         //       int face_dof = face_dofs[2];
+         //       geom.GetNodePositionFromBV(S,face_dof, face_x);
+         //       /* 
+         //       Need boundary state for Kidder
+         //       Note that t should have been set using update_additional_BCs
+         //       */
+         //       pb->GetBoundaryState(face_x, bdr_ind, U_i_bdry);
+         //       // MFEM_ABORT("Need to replace 't'\n");
 
-            //    for (int i = 0; i < dim; i++)
-            //    {
-            //       for (int j = 0; j < dim; j++)
-            //       {
-            //          F_i_bdry(i+1, j) *= -1.;
-            //       }
-            //    }
+         //       /* 
+         //       * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
+         //       * So instead of this call:
+         //       *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
+         //       * We modify just the pressure in the flux F_i
+         //       */
+         //       DenseMatrix F_i_bdry = F_i;
+         //       F_i_bdry.GetRow(0, cell_v);
+         //       cell_v *= -1.; // Negate the velocity
+         //       double _rho = 1. / U_i_bdry[0];
+         //       double _esi = 0.;
+         //       if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
+         //       double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
+         //       double _press = pb->pressure(_rho, _sie, bdr_ind);
+         //       for (int i = 0; i < dim; i++)
+         //       {
+         //          F_i_bdry(i+1, i) = _press;
+         //       }
+         //       cell_vp = cell_v;
+         //       cell_vp *= _press;
+         //       F_i_bdry.SetRow(dim+1, cell_vp);
 
-            //    Vector sigmap;
-            //    F_i_bdry.GetRow(dim+1, sigmap);
-            //    sigmap *= -1.;
-            //    F_i_bdry.SetRow(dim+1, sigmap);
+         //       F_i_bdry.Mult(c, y_temp_bdry);
+         //       y_temp += y_temp_bdry;
+         //       break;
+         //    }
+         //    default:
+         //    {
+         //       MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+         //       break;
+         //    }
+         //    }
+         // }
+         else
+         {
+            // flux contribution
+            
+            //NF//MS
+            int el_j = L2.GetElementForDof(j);
+            int attr_j = pmesh->GetAttribute(el_j);
+            if (use_elasticity && attr_j == 50)
+            {
+               const double _rho = 1./U_j[0];
+               double _es = 0.;
+               DenseMatrix _sigmaD(3);
 
-            //    F_i_bdry.Mult(c, y_temp_bdry);
-            //    y_temp += y_temp_bdry;
-            // }
+               // _sigmaD is 3 x 3
+               elastic->ComputeS(el_j, _rho, _sigmaD);
+               _es = elastic->e_sheer(el_j);
+
+               dm = pb->ElasticFlux(_sigmaD, _es, U_j, attr_j);
+            }
             else
             {
-               y_temp *= 2.;
+               dm = pb->flux(U_j, attr_j);
             }
-            
-            // Add in boundary contribution
-            rhs -= y_temp;
-         } // End boundary face        
+            dm.Mult(cij, y);
+            rhs -= y;
+         }
 
-      } // End Face iterator
+         /* viscosity contribution */
+         if (use_viscosity)
+         {
+            d = dij_sparse->Elem(i,j); 
+
+            Vector z = U_j;
+            z -= U_i;
+            rhs.Add(d, z);
+         }   
+      } // End adjacent dof iterator
 
       /* Add in e_source for taylor green */
       if (pb->get_indicator() == "TaylorGreen")
       {
          // cout << "LF size: " << e_source->Size() << endl;
-         rhs[dim+1] += e_source->Elem(ci);
+         rhs[dim+1] += e_source->Elem(i);
       }
 
       /* 
       Compute current mass, rather than assume mass is conserved
       In several methods we've attempted, mass has not been conserved
       */
-      double k = pmesh->GetElementVolume(ci);
+      if (order_u > 0)
+      {
+         MFEM_ABORT("When order_u > 0, need a different way to compute mass.\n");
+      }
+      double k = pmesh->GetElementVolume(el_i);
       double _mass = k / U_i[0];
       rhs /= _mass;
 
       // In either case, update dS_dt
-      SetStateVector(dS_dt, ci, rhs);
+      SetStateVector(dS_dt, i, rhs);
    } // End cell iterator
    chrono_state.Stop();
 
@@ -816,7 +728,7 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
       delete e_source;
       e_source = nullptr;
    }
-}
+ }
 
 
 /**
@@ -2147,6 +2059,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    //      << "=======================================\n";
    ConstantCoefficient one(1.0);
    ParBilinearForm Cxbf(&L2), Cybf(&L2);
+   Vector row_sums_x(NDofs_L2), row_sums_y(NDofs_L2);
 
    /* x */
    Cxbf.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
@@ -2157,6 +2070,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
    cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2);
    Cx_hpm->MergeDiagAndOffd(*cij_sparse_x);
+   cij_sparse_x->GetRowSums(row_sums_x);
 
    /* y */
    if (dim > 1)
@@ -2169,11 +2083,23 @@ void LagrangianLOOperator::BuildCijMatrices()
       HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
       cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2);
       Cy_hpm->MergeDiagAndOffd(*cij_sparse_y);
+      cij_sparse_y->GetRowSums(row_sums_y);
    }
    
    if (dim > 2)
    {
       MFEM_ABORT("Dim > 2 not currently supported.\n");
+   }
+
+   /* Ensure row sums are 0 by setting the diagonal entries accordingly */
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      cij_sparse_x->Elem(i,i) = -row_sums_x[i];
+
+      if (dim > 1)
+      {
+         cij_sparse_y->Elem(i,i) = -row_sums_y[i];
+      }
    }
 
    // cout << "cij_x: ";
@@ -2215,9 +2141,13 @@ void LagrangianLOOperator::BuildCijMatrices()
  *       given row `i`, the corresponding value in `cij` is set to 0.
  * @note For 3D cases (dim > 2), the function will abort execution with an 
  *       error message.
+ * @note i will always be a valid index, but sometimes j will be -1 to indicate
+ *       a boundary face. We must accomodate for this case by setting j = i.
  ****************************************************************************************************/
 void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij) const
 {
+   double _j = j;
+   if (j == -1) { _j = i; }
    // cout << "LagrangianLOOperator::GetLocalCij\n";
    cij.SetSize(dim);
    cij = 0.;
@@ -2228,7 +2158,7 @@ void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij) 
 
    /* Get x val */
    cij_sparse_x->GetRow(i, cols, vals);
-   col_index = cols.Find(j);
+   col_index = cols.Find(_j);
    if (col_index != -1) {
       cij[0] = vals[col_index];
    } else {
@@ -2240,11 +2170,11 @@ void LagrangianLOOperator::GetLocalCij(const int &i, const int &j, Vector &cij) 
    if (dim > 1)
    {
       cij_sparse_y->GetRow(i, cols, vals);
-      col_index = cols.Find(j);
+      col_index = cols.Find(_j);
       if (col_index != -1) {
          cij[1] = vals[col_index];
       } else {
-         // cout << "col not found for i: " << i << ", j: " << j << "\n";
+         // cout << "col not found for i: " << i << ", _j: " << _j << "\n";
          cij[1] = 0.;
       }
 
@@ -2452,11 +2382,14 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       FI = pmesh->GetFaceInformation(face);
       c = FI.element[0].index;
       cp = FI.element[1].index;
+      // cout << "c: " << c << ", cp: " << cp << endl;
 
       GetStateVector(S, c, Uc);
 
       // Get normal, d, and |F|
       GetLocalCij(c, cp, cij);
+      // cout << "cij: ";
+      // cij.Print(cout);
       cij *= 2.;
       n_vec = cij;
       F = n_vec.Norml2();

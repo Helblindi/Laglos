@@ -479,10 +479,10 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
  */
  void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
  {
-   if (order_u > 0)
-   {
-      MFEM_ABORT("When order_u > 0, may not need row sums to be 0.\n");
-   }
+   // if (order_u > 0)
+   // {
+   //    MFEM_ABORT("When order_u > 0, may not need row sums to be 0.\n");
+   // }
    chrono_state.Start();
 
    Vector rhs(dim+2), cij(dim), U_i(dim+2), U_j(dim+2);
@@ -735,12 +735,13 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       Compute current mass, rather than assume mass is conserved
       In several methods we've attempted, mass has not been conserved
       */
-      if (order_u > 0)
-      {
-         MFEM_ABORT("When order_u > 0, need a different way to compute mass.\n");
-      }
-      double k = pmesh->GetElementVolume(el_i);
-      double _mass = k / U_i[0];
+      // if (order_u > 0)
+      // {
+      //    MFEM_ABORT("When order_u > 0, need a different way to compute mass.\n");
+      // }
+      // double k = pmesh->GetElementVolume(el_i);
+      // double _mass = k / U_i[0];
+      double _mass = m_hpv->Elem(i);
       rhs /= _mass;
 
       // In either case, update dS_dt
@@ -1176,7 +1177,7 @@ void LagrangianLOOperator::InitializeDijMatrix()
       k.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
       k.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
       k.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
-      
+
       if (dim > 2)
       {
          MFEM_ABORT("3D not implemented.\n");
@@ -1294,74 +1295,27 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
 ****************************************************************************************************/
 void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 {
-   // cout << "CalculateTimestep\n";
-   double t_min = 1.;
-   double t_temp = 0;
-   double mi = 0;
-   int cj = 0;
-
-   Array<int> fids, oris;
+   // cout << "LagrangianLOOperator::CalculateTimestep\n";
+   double t_min = 1., t_temp = 0, mi = 0;
+   Array<int> row;
    Vector U_i(dim+2), U_j(dim+2);
    double d=0., temp_sum = 0.;
 
-   mfem::Mesh::FaceInformation FI;
-
-   for (int ci = 0; ci < NE; ci++) // Cell iterator
+   for (int i = 0; i < NDofs_L2; i++) // L2 dof iterator
    {
       // cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
+      GetStateVector(S, i, U_i);
+      mi = m_hpv->Elem(i);
+      L2Connectivity.GetRow(i, row);
 
-      GetStateVector(S, ci, U_i);
-
-      // Compute mass at time tn
-      const double k = pmesh->GetElementVolume(ci);
-      mi = k / U_i[0];
-
-      if (mi <= 0.)
+      for (int j_it=0; j_it < row.Size(); j_it++) // Face iterator
       {
-         cout <<  "Invalid mass at cell " << ci << ": " << mi << endl;
-         MFEM_ABORT("Invalid mass.\n");
-      }
+         int j = row[j_it];
 
-      H1.ExchangeFaceNbrData();
-
-      switch (dim)
-      {
-         case 1: 
+         if (i != j)
          {
-            pmesh->GetElementVertices(ci, fids);
-            break;
-         }
-         case 2:
-         {
-            pmesh->GetElementEdges(ci, fids, oris);
-            break;
-         }
-         case 3:
-         {
-            pmesh->GetElementFaces(ci, fids, oris);
-         }
-      }
-
-      for (int j=0; j < fids.Size(); j++) // Face iterator
-      {
-         FI = pmesh->GetFaceInformation(fids[j]);
-
-         if (FI.IsInterior())
-         {
-            // Get index information/state vector for second cell
-            if (ci == FI.element[0].index) { 
-               cj = FI.element[1].index; 
-            }
-            else { 
-               cj = FI.element[0].index; 
-            }
-
-            d = dij_sparse->Elem(ci, cj); 
-
-            // cout << "face: " << fids[j] << endl;
-            // cout << "d for ci " << ci << " and cj " << cj << ": " << d << endl;
-
+            d = dij_sparse->Elem(i, j); 
             temp_sum += d;
          }
       }
@@ -1369,7 +1323,6 @@ void LagrangianLOOperator::CalculateTimestep(const Vector &S)
       t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
       if (t_temp < t_min && t_temp > 1.e-12) { 
-         // cout << "timestep reduced\n";
          t_min = t_temp;
       }
    } // End cell iterator

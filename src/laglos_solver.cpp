@@ -447,7 +447,15 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
    /* Update dx_dt */
    if (this->compute_mv)
    {
-      SolveMeshVelocities(S, dS_dt);
+      if (order_u == 0)
+      {
+         SolveMeshVelocitiesLO(S, dS_dt);
+      }
+      else
+      {
+         SolveMeshVelocitiesHO(S, dS_dt);
+      }
+      
    }
    else
    {
@@ -870,9 +878,66 @@ void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &
 }
 
 
+/**
+ * @brief Solves for the high-order mesh velocities in a Lagrangian framework.
+ *
+ * This function computes the mesh velocities using high-order methods and projects
+ * them onto the appropriate finite element space. It optionally enforces boundary
+ * conditions if specified.
+ *
+ * @param S The input state vector containing the solution data.
+ * @param dS_dt The output vector where the computed mesh velocities are stored.
+ *
+ * @note This function is only relevant for cases where `order_u > 0`. If `order_u == 0`,
+ *       the function will abort with an error message.
+ *
+ * @details
+ * - The function uses `ParGridFunction` objects to reference and manipulate the input
+ *   and output vectors within the finite element spaces `H1` and `L2V`.
+ * - Mesh velocities are computed by projecting the velocity coefficient onto the
+ *   `dxdt_gf` grid function.
+ * - If boundary conditions are specified (`pb->has_mv_boundary_conditions()`), the
+ *   function enforces them by setting the values of essential degrees of freedom (`ess_tdofs`)
+ *   to the corresponding boundary values (`bdr_vals`).
+ * - The function uses a timer (`chrono_mm`) to measure the execution time.
+ *
+ * @throws std::runtime_error If `order_u == 0`, indicating that the function is not
+ *         applicable for the given configuration.
+ */
+void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt) const
+{
+   // cout << "========================================\n"
+   //      << "         SolveMeshVelocitiesHO          \n"
+   //      << "========================================\n";
+   if (order_u == 0)
+   {
+      MFEM_ABORT("SolveMeshVelocitiesHO only relevant for order_u > 0\n");
+   }
+   chrono_mm.Start();
+
+   ParGridFunction dxdt_gf, v_gf;
+   Vector* sptr = const_cast<Vector*>(&S);
+   dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
+   v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
+
+   GridFunctionCoefficient v_gf_coeff(&v_gf);
+   dxdt_gf.ProjectCoefficient(v_gf_coeff);
+
+   /* Optionally, enforce boundary conditions */
+   if (pb->has_mv_boundary_conditions())
+   {
+      for (int i = 0; i < ess_tdofs.Size(); i++) { 
+         // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
+         dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
+      }
+   }
+
+   chrono_mm.Stop();
+}
+
 
 /**
- * @brief Solves for the mesh velocities.
+ * @brief Solves for the mesh velocities for the LO method.
  *
  * This function computes the mesh velocities based on the current state vector. It handles both 1D and higher dimensions,
  * applying different methods for computing the mesh velocities depending on the specified options.
@@ -881,14 +946,14 @@ void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &
  * @param S The input state vector.
  * @param dS_dt The output time derivative of the state vector.
  */
-void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt) const
 {
    // cout << "========================================\n"
-   //      << "          SolveMeshVelocities           \n"
+   //      << "         SolveMeshVelocitiesLO          \n"
    //      << "========================================\n";
    if (order_u != 0)
    {
-      MFEM_ABORT("SolveMeshVelocities needs updating for order_u > 0\n");
+      MFEM_ABORT("SolveMeshVelocitiesLO only relevant for order_u = 0\n");
    }
 
    chrono_mm.Start();
@@ -1853,6 +1918,10 @@ void LagrangianLOOperator::EnforceExactBCOnCell(const Vector &S, const int & cel
 ****************************************************************************************************/
 void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
 {
+   if(order_u > 0)
+   {
+      MFEM_ABORT("SetMassConservativeDensity not implemented for order_u > 0.\n");
+   }
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
    //      << "========================================\n";
@@ -3618,10 +3687,10 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
                                                     const string &output_file_prefix, 
                                                     const string &output_file_suffix)
 {
-   if (order_u != 0)
-   {
-      MFEM_ABORT("GetStateVector needs updating for order_u > 0\n");
-   }
+   // if (order_u != 0)
+   // {
+   //    MFEM_ABORT("SaveStateVecsToFile needs updating for order_u > 0\n");
+   // }
 
    Vector center(dim), U(dim+2), vel(dim);
    double pressure=0., ss=0.;
@@ -3637,6 +3706,9 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
    }
    fstream_sv << "\n";
 
+   ParGridFunction nodes(&L2V);
+   pmesh->GetNodes(nodes);
+
    for (int i = 0; i < NDofs_L2; i++)
    {
       // compute pressure and sound speed on the fly
@@ -3650,16 +3722,16 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       double attr = pmesh->GetAttribute(el_i);
       pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
-      pmesh->GetElementCenter(i, center);
+      // pmesh->GetElementCenter(i, center);
 
       // Get relevant quantities
-      double _x = center[0], _y = 0., _z = 0;
+      double _x = nodes[i], _y = 0., _z = 0;
       double _vx = vel[0], _vy = 0., _vz = 0.;
       if (dim > 1) {
-         _y = center[1];
+         _y = nodes[i + NDofs_L2];
          _vy = vel[1];
          if (dim > 2) {
-            _z = center[2];
+            _z = nodes[i + 2*NDofs_L2];
             _vz = vel[2];
          }
       }

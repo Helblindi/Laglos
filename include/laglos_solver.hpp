@@ -236,7 +236,8 @@ public:
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);
-   void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
+   void SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt) const;
+   void SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt) const;
    void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);
    void SetComputeMV(const bool & option) { this->compute_mv = option; }

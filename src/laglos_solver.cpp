@@ -155,22 +155,50 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    CFL(CFL),
    ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)) //NF//MS
 {
-   // Transpose face_element to get element_face
-   Transpose(*face_element, element_face);
-   Transpose(*edge_vertex, vertex_edge);
-
    if (Mpi::Root())
    {
       cout << "Instantiating hydro op\n";
       cout << "block offsets: ";
+      block_offsets.Print(cout);
    }
-   
-   block_offsets.Print(cout);
-   // block_offsets[0] = 0;
-   // block_offsets[1] = block_offsets[0] + Vsize_H1;
-   // block_offsets[2] = block_offsets[1] + Vsize_L2;
-   // block_offsets[3] = block_offsets[2] + Vsize_L2V;
-   // block_offsets[4] = block_offsets[3] + Vsize_L2;
+
+   // Initialize arrays of tdofs
+   // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
+   // that the boundaries are straight.
+   if (ess_bdr.Size() > 0)
+   {
+      for (int d = 0; d < dim; d++)
+      {
+         // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
+         // i.e., we must enforce v_x/y/z = 0 for the velocity components.
+         ess_bdr = 0; ess_bdr[d] = 1;
+         H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
+         ess_tdofs.Append(dofs_list);
+      }
+      /* Set bdr_vals for dofs that should be 0 */
+      ess_tdofs_cart_size = ess_tdofs.Size();
+      bdr_vals.SetSize(ess_tdofs_cart_size);
+      bdr_vals = 0.;
+
+      if (ess_bdr.Size() > 4)
+      {
+         if (Mpi::Root())
+         {
+            MFEM_WARNING("May need to enforce additional BCs.\n");
+         }
+         if (pb->has_mv_boundary_conditions())
+         {
+            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, &geom);
+         }
+
+         ess_tdofs.Append(add_ess_tdofs);
+         bdr_vals.Append(add_bdr_vals);
+      }
+   }
+
+   // Transpose face_element to get element_face
+   Transpose(*face_element, element_face);
+   Transpose(*edge_vertex, vertex_edge);
 
    // This way all face indices that do not correspond to bdr elements will have val -1.
    // I.e. if global face index k corresponds to an interior face, then BdrElementIndexingArray[k] = -1.
@@ -211,40 +239,6 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Initialize Dij sparse
    InitializeDijMatrix();   
-
-   // Initialize arrays of tdofs
-   // Boundary conditions: all tests use v.n = 0 on the boundary, and we assume
-   // that the boundaries are straight.
-   if (ess_bdr.Size() > 0)
-   {
-      for (int d = 0; d < dim; d++)
-      {
-         // Attributes 1/2/3 correspond to fixed-x/y/z boundaries,
-         // i.e., we must enforce v_x/y/z = 0 for the velocity components.
-         ess_bdr = 0; ess_bdr[d] = 1;
-         H1_L.GetEssentialTrueDofs(ess_bdr, dofs_list, d);
-         ess_tdofs.Append(dofs_list);
-      }
-      /* Set bdr_vals for dofs that should be 0 */
-      ess_tdofs_cart_size = ess_tdofs.Size();
-      bdr_vals.SetSize(ess_tdofs_cart_size);
-      bdr_vals = 0.;
-
-      if (ess_bdr.Size() > 4)
-      {
-         if (Mpi::Root())
-         {
-            MFEM_WARNING("May need to enforce additional BCs.\n");
-         }
-         if (pb->has_mv_boundary_conditions())
-         {
-            pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, &geom);
-         }
-
-         ess_tdofs.Append(add_ess_tdofs);
-         bdr_vals.Append(add_bdr_vals);
-      }
-   }
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);

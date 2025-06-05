@@ -1160,16 +1160,28 @@ void LagrangianLOOperator::InitializeDijMatrix()
    // Initialize SparseMatrix
    dij_sparse = new SparseMatrix(NE, NE);
 
-   // Create dummy coefficients
-   using namespace std::placeholders;
-   std::function<double(const Vector &,const double)> rho0_static = 
-      std::bind(&ProblemBase::rho0, pb, std::placeholders::_1, std::placeholders::_2);
-
-   FunctionCoefficient rho_coeff(rho0_static);
+   // Create dummy coefficient
+   ConstantCoefficient one(1.0);
 
    // Assemble SparseMatrix object
    ParBilinearForm k(&L2);
-   k.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(rho_coeff, 1.0, 1.0));
+   /* Inherit sparsity pattern from x */
+   k.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
+   k.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   k.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
+
+   /* Inherit sparsity pattern from y, which may be different */
+   if (dim > 1)
+   {
+      k.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
+      k.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
+      k.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
+      
+      if (dim > 2)
+      {
+         MFEM_ABORT("3D not implemented.\n");
+      }
+   }
 
    k.Assemble();
    k.Finalize();

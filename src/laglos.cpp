@@ -953,9 +953,10 @@ int main(int argc, char *argv[]) {
             _esheer = hydro.elastic->e_sheer(i);
          }
          double _sie = problem_class->specific_internal_energy(U, _esheer);
-         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+         int el_i = L2FESpace.GetElementForDof(i);
+         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
          press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(el_i));
       }
    }
 
@@ -1419,7 +1420,8 @@ int main(int argc, char *argv[]) {
                      _esheer = hydro.elastic->e_sheer(i);
                   }
                   double _sie = problem_class->specific_internal_energy(U, _esheer);
-                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+                  int el_i = L2FESpace.GetElementForDof(i);
+                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
                   press_gf[i] = pressure;
                }
                Wx += offx;
@@ -1434,7 +1436,8 @@ int main(int argc, char *argv[]) {
                ParGridFunction gamma_gf(&L2FESpace);
                for (int i = 0; i < gamma_gf.Size(); i++)
                {
-                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+                  int el_i = L2FESpace.GetElementForDof(i);
+                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(el_i));
                }
                // gamma
                Wx += offx;

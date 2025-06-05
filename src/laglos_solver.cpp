@@ -326,6 +326,10 @@ LagrangianLOOperator::~LagrangianLOOperator()
  */
 void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
 {
+   if (order_u > 0)
+   {
+      MFEM_ABORT("LagrangianLOOperator::ComputeSigmaDComp: order_u > 0 is not supported yet.");
+   }
    assert(use_elasticity);
    sigmaD_e.SetSize(3);
    sigmaD_e = 0.;
@@ -370,6 +374,10 @@ void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, Dens
  */
 void LagrangianLOOperator::ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const
 {
+   if (order_u > 0)
+   {
+      MFEM_ABORT("LagrangianLOOperator::ComputeSigmaGF: order_u > 0 is not supported yet.");
+   }
    assert(this->use_elasticity);
    assert(sigma_gf.Size() == NDofs_L2);
    sigma_gf = 0.;
@@ -645,7 +653,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
                   /* 
                   * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
                   * So instead of this call:
-                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
+                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(el_i));
                   * We modify just the pressure in the flux F_i
                   */
                   DenseMatrix F_i_bdry = F_i;
@@ -1228,11 +1236,13 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
          // Compute pressure with given EOS
          double rhoL = 1. / Ui[0];
          double sieL = pb->specific_internal_energy(Ui, esl);
-         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(dof_it));
+         int el_dof_it = L2.GetElementForDof(dof_it);
+         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(el_dof_it));
 
          double rhoR = 1. / Uj[0];
          double sieR = pb->specific_internal_energy(Uj, esr);
-         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(cj));
+         int el_j = L2.GetElementForDof(cj);
+         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(el_j));
 
          // Finally compute lambda max
          if (use_elasticity)
@@ -1605,6 +1615,10 @@ void LagrangianLOOperator::ComputeKidderAvgIntExtRadii(const Vector &S, double &
 
 void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy)
 {
+   if (order_u > 0)
+   {
+      MFEM_ABORT("ComputeKidderAvgDensityAndEntropy not implemented for order_u > 0.\n");
+   }
    ParGridFunction sv_gf;
    Vector* sptr = const_cast<Vector*>(&S);
    sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
@@ -3667,7 +3681,8 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       double e_sheer = 0.;
       if (use_elasticity) { e_sheer = elastic->e_sheer(i); }
       double sie = pb->specific_internal_energy(U, e_sheer);
-      double attr = pmesh->GetAttribute(i);
+      int el_i = L2.GetElementForDof(i);
+      double attr = pmesh->GetAttribute(el_i);
       pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
       pmesh->GetElementCenter(i, center);

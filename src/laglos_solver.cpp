@@ -527,6 +527,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
 
       rhs = 0.;
 
+      int bdr_ind = cell_bdr_flag_gf[i];
       for (int j_it=0; j_it < row.Size(); j_it++) // Adjacent dof iterator
       {
          int j = row[j_it];
@@ -541,7 +542,6 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
 
          // Should I put Fi contribution into dm before?
          /* Optionally enforce BC on PDE */
-         int bdr_ind = BdrVertexIndexingArray[i];
          if (i == j && bdr_ind > 3 && pb->get_indicator() == "saltzmann")
          {
             // cout << "Enforcing saltzmann BC on dof " << i << endl;
@@ -602,64 +602,82 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
                }
             }
          }
-         // else if (i == j && bdr_ind > 0 && pb->get_indicator() == "Kidder")
-         // {
-         //    if (order_u > 0)
-         //    {
-         //       MFEM_ABORT("Implementation not compatible with order_u > 0.\n");
-         //    }
-         //    switch (bdr_ind)
-         //    {
-         //    case 4: // inner radius
-         //    case 5: // outer radius
-         //    {
-         //       // Need face_x for boundary velocity
-         //       Vector U_i_bdry(dim+2);
-         //       Array<int> face_dofs;
-         //       Vector face_x(dim), cell_v(dim), cell_vp(dim);
-         //       H1.GetFaceDofs(fids[j], face_dofs);
-         //       int face_dof = face_dofs[2];
-         //       geom.GetNodePositionFromBV(S,face_dof, face_x);
-         //       /* 
-         //       Need boundary state for Kidder
-         //       Note that t should have been set using update_additional_BCs
-         //       */
-         //       pb->GetBoundaryState(face_x, bdr_ind, U_i_bdry);
-         //       // MFEM_ABORT("Need to replace 't'\n");
+         else if (i == j && bdr_ind > 3 && pb->get_indicator() == "Kidder")
+         {
+            // cout << "Enforcing Kidder BC on dof " << i << endl;
+            if (order_u > 0)
+            {
+               MFEM_ABORT("Implementation not compatible with order_u > 0.\n");
+            }
+            Array<int> fids;
+            Vector cF(dim);
+            element_face.GetRow(i,fids);
+            for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
+            {
+               int fid = fids[fid_it];
+               int fid_ind = BdrElementIndexingArray[fid];
+               // cout << "el: " << i << ", fid: " << fid << ", fid_ind: " << fid_ind << endl;
+               switch (fid_ind)
+               {
+               case -1: // Interior face
+               {
+                  // Do nothing, this is an interior face
+                  break;
+               }
+               case 5: // outer radius
+               case 4: // inner radius
+               {
+                  // MFEM_ABORT("Never seeing attr 5, only 4. Must be a cell bdr issue.");
+                  // Need face_x for boundary velocity
+                  Vector U_i_bdry(dim+2);
+                  Array<int> face_dofs;
+                  Vector face_x(dim), cell_v(dim), cell_vp(dim);
+                  H1.GetFaceDofs(fid, face_dofs);
+                  int face_dof = face_dofs[2];
+                  geom.GetNodePositionFromBV(S,face_dof, face_x);
+                  /* 
+                  Need boundary state for Kidder
+                  Note that t should have been set using update_additional_BCs
+                  */
+                  pb->GetBoundaryState(face_x, fid_ind, U_i_bdry);
+                  // MFEM_ABORT("Need to replace 't'\n");
 
-         //       /* 
-         //       * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
-         //       * So instead of this call:
-         //       *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
-         //       * We modify just the pressure in the flux F_i
-         //       */
-         //       DenseMatrix F_i_bdry = F_i;
-         //       F_i_bdry.GetRow(0, cell_v);
-         //       cell_v *= -1.; // Negate the velocity
-         //       double _rho = 1. / U_i_bdry[0];
-         //       double _esi = 0.;
-         //       if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
-         //       double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
-         //       double _press = pb->pressure(_rho, _sie, bdr_ind);
-         //       for (int i = 0; i < dim; i++)
-         //       {
-         //          F_i_bdry(i+1, i) = _press;
-         //       }
-         //       cell_vp = cell_v;
-         //       cell_vp *= _press;
-         //       F_i_bdry.SetRow(dim+1, cell_vp);
+                  /* 
+                  * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
+                  * So instead of this call:
+                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(ci));
+                  * We modify just the pressure in the flux F_i
+                  */
+                  DenseMatrix F_i_bdry = F_i;
+                  F_i_bdry.GetRow(0, cell_v);
+                  cell_v *= -1.; // Negate the velocity
+                  double _rho = 1. / U_i_bdry[0];
+                  double _esi = 0.;
+                  if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
+                  double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
+                  double _press = pb->pressure(_rho, _sie, bdr_ind);
+                  for (int i = 0; i < dim; i++)
+                  {
+                     F_i_bdry(i+1, i) = _press;
+                  }
+                  cell_vp = cell_v;
+                  cell_vp *= _press;
+                  F_i_bdry.SetRow(dim+1, cell_vp);
 
-         //       F_i_bdry.Mult(c, y_temp_bdry);
-         //       y_temp += y_temp_bdry;
-         //       break;
-         //    }
-         //    default:
-         //    {
-         //       MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
-         //       break;
-         //    }
-         //    }
-         // }
+                  CalcOutwardNormalInt(S, i, fid, cF);
+                  cF /= 2.; 
+                  F_i_bdry.Mult(cF, y);
+                  rhs -= y;
+                  break;
+               }
+               default:
+               {
+                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+                  break;
+               }
+               }
+            } // End face iterator
+         }
          else
          {
             // flux contribution
@@ -1471,29 +1489,20 @@ void LagrangianLOOperator::CreateBdrVertexIndexingArray()
                   BdrVertexIndexingArray[index] = bdr_attr;
                }
             }
-            else if (pb->get_indicator() == "Sod" ||
-                     pb->get_indicator() == "TriplePoint" || 
-                     pb->get_indicator() == "riemann" ||
-                     pb->get_indicator() == "Sedov" || 
-                     pb->get_indicator() == "SodRadial" || 
-                     pb->get_indicator() == "TaylorGreen")
+            else 
             {
-               // Mark corner vertices as 5
+               // Mark corner vertices as 99
                // These nodes should not move at all during the simulation
                // Identify these corner vertices as those that already have
                // a value non negative
                if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
                {
-                  BdrVertexIndexingArray[index] = 5;
+                  BdrVertexIndexingArray[index] = 99;
                }
                else 
                {
                   BdrVertexIndexingArray[index] = bdr_attr;
                }
-            }
-            else
-            {
-               BdrVertexIndexingArray[index] = bdr_attr;
             }
          } // end vertex iterator
       }
@@ -1534,7 +1543,7 @@ void LagrangianLOOperator::FillCellBdrFlag()
            pb->get_indicator() == "SodRadial"))
       {
          // Corner cell
-         cell_bdr_flag_gf[row[0]] = 5;
+         cell_bdr_flag_gf[row[0]] = 99;
       }
       else
       {
@@ -6839,7 +6848,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
-      if (bdr_ind != 5)
+      if (bdr_ind != 99)
       {
          /* Get adjacent cells and faces */
          vertex_element->GetRow(node, cells_row);
@@ -7005,7 +7014,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S,
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
-      if (bdr_ind != 5)
+      if (bdr_ind != 99)
       {
          /* Get adjacent cells and faces */
          vertex_element->GetRow(node, cells_row);
@@ -7171,7 +7180,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
-      if (bdr_ind != 5)
+      if (bdr_ind != 99)
       {
          /* Get adjacent cells */
          vertex_element->GetRow(node, cells_row);
@@ -7496,7 +7505,7 @@ void LagrangianLOOperator::compare_gamma2(const Vector &S, const Vector &S_old, 
       bdr_ind = BdrVertexIndexingArray[node];
 
       // All nodes minus corner nodes will contribute
-      if (bdr_ind != 5)
+      if (bdr_ind != 99)
       {
          vertex_element->GetRow(node, cells_row);
          cells_length = cells_row.Size();

@@ -217,6 +217,7 @@ that can be used are
 3. Used to enforce $v_z = 0$.
 4. Used to enforce $v_r = 0$, or in other words 0 radial movement.
 5. Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+99. Off limits as this is used in BdrVertexIndexingArray to indicate corner vertices that should not move at all.
 
 If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
 the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs

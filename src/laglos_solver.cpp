@@ -159,8 +159,12 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    Transpose(*face_element, element_face);
    Transpose(*edge_vertex, vertex_edge);
 
-   cout << "Instantiating hydro op\n";
-   cout << "block offsets: ";
+   if (Mpi::Root())
+   {
+      cout << "Instantiating hydro op\n";
+      cout << "block offsets: ";
+   }
+   
    block_offsets.Print(cout);
    // block_offsets[0] = 0;
    // block_offsets[1] = block_offsets[0] + Vsize_H1;
@@ -228,7 +232,10 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
       if (ess_bdr.Size() > 4)
       {
-         MFEM_WARNING("May need to enforce additional BCs.\n");
+         if (Mpi::Root())
+         {
+            MFEM_WARNING("May need to enforce additional BCs.\n");
+         }
          if (pb->has_mv_boundary_conditions())
          {
             pb->get_additional_BCs(H1_L, ess_bdr, add_ess_tdofs, add_bdr_vals, &geom);
@@ -1473,7 +1480,7 @@ void LagrangianLOOperator::GetEntityDof(const int GDof, DofEntity & entity, int 
 ****************************************************************************************************/
 void LagrangianLOOperator::CreateBdrElementIndexingArray()
 {
-   cout << "Constructing BdrElementIndexingArray:\n";
+   if (Mpi::Root()) { cout << "Constructing BdrElementIndexingArray:\n"; }
    for (int i = 0; i < pmesh->GetNBE(); i++)
    {
       int bdr_attr = pmesh->GetBdrAttribute(i);

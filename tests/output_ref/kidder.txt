@@ -91,7 +91,7 @@ Constructing BdrElementIndexingArray:
 MFEM Warning: May need to enforce additional BCs.
 
  ... in function: mfem::hydroLO::LagrangianLOOperator::LagrangianLOOperator(const int &, const int, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, const ParGridFunction &, ParLinearForm *, ProblemBase *, Array<int>, bool, int, bool, double)
- ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:231
+ ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:237
 
 Vsize_H1: 4400
 Vsize_H1L: 1200
@@ -165,14 +165,14 @@ step   265,	t = 0.187347,	dt = 0.00012299,	|e| = 5.2005437177e+03
 step   270,	t = 0.187952,	dt = 0.00011975,	|e| = 5.5219317056e+03
 step   275,	t = 0.188542,	dt = 0.00011669,	|e| = 5.8565197920e+03
 step   277,	t = 0.188700,	dt = 0.00004231,	|e| = 5.9503017904e+03
-Program took 4.1052492917e+00s.
-This amounts to 2.9534167566e-05 s per timestep per gridpoint.
+Program took 3.7752130833e+00s.
+This amounts to 2.7159806355e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.105e+00 | 2.953e-05
-  Dij calculation:               1.790e+00 | 1.288e-05
-  Mesh Motion calculation:       9.755e-01 | 7.018e-06
+  Total time:                    3.775e+00 | 2.716e-05
+  Dij calculation:               1.719e+00 | 1.236e-05
+  Mesh Motion calculation:       9.362e-01 | 6.735e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      9.809e-01 | 7.057e-06
+  State Update calculation:      8.584e-01 | 6.175e-06
 ===========================================================

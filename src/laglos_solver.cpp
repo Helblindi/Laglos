@@ -221,6 +221,25 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
+   // cout << "init mhpv\n";
+   // for (int i = 0; i < NDofs_L2; i++)
+   // {
+   //    cout << "m_hpv[" << i << "] = " << m_hpv->Elem(i) << endl;
+   // }
+
+   // Build dof volume vector to compute current mass
+   // when order_u, this is cell volume
+   ParLinearForm * k_lf = new ParLinearForm(&L2);
+   ConstantCoefficient one_coeff(1.0);
+   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff));
+   k_lf->Assemble();
+   k_hpv = k_lf->ParallelAssemble();
+   delete k_lf;
+   // cout << "init k_hpv\n";
+   // for (int i = 0; i < NDofs_L2; i++)
+   // {
+   //    cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << endl;
+   // }
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
@@ -744,13 +763,19 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       Compute current mass, rather than assume mass is conserved
       In several methods we've attempted, mass has not been conserved
       */
-      // if (order_u > 0)
+      double k = k_hpv->Elem(i);
+      double _mass = k / U_i[0];
+
+      // double _mass2 = m_hpv->Elem(i);
+      // if (abs(_mass - _mass2) > 1e-10)
       // {
-      //    MFEM_ABORT("When order_u > 0, need a different way to compute mass.\n");
+      //    if (Mpi::Root())
+      //    {
+      //       cout << "Mass mismatch at " << i << ", " << _mass << " vs " << _mass2 << endl;
+      //       cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << ", tau: " << U_i[0] << endl;
+      //    }
+      //    MFEM_ABORT("Mass mismatch in LagrangianLOOperator::SolveHydro.\n");
       // }
-      // double k = pmesh->GetElementVolume(el_i);
-      // double _mass = k / U_i[0];
-      double _mass = m_hpv->Elem(i);
       rhs /= _mass;
 
       // In either case, update dS_dt
@@ -1919,27 +1944,30 @@ void LagrangianLOOperator::EnforceExactBCOnCell(const Vector &S, const int & cel
 ****************************************************************************************************/
 void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
 {
-   if(order_u > 0)
-   {
-      MFEM_ABORT("SetMassConservativeDensity not implemented for order_u > 0.\n");
-   }
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
    //      << "========================================\n";
+   if(order_u > 0)
+   {
+      // MFEM_ABORT("SetMassConservativeDensity not implemented for order_u > 0.\n");
+      MFEM_WARNING("Mat need to adjust SetMassConservativeDensity for order_u > 0.\nPossibly look at LagrangianHydroOperator::ComputeDensity function.\n");
+      
+   }
    UpdateMesh(S);
    int num_corrected_cells = 0;
    ParGridFunction sv_gf;
    sv_gf.MakeRef(&L2, S, block_offsets[1]);
    rel_mass_corrected = 0.;
 
-   for (int cell_it = 0; cell_it < NE; cell_it++)
+   for (int i = 0; i < NDofs_L2; i++)
    {
       // Get cell mass
-      const double m = m_hpv->Elem(cell_it);
+      const double m = m_hpv->Elem(i);
 
       // Get new cell volume
-      const double k_new = pmesh->GetElementVolume(cell_it);
-      const double sv_new= sv_gf.Elem(cell_it);
+      // const double k_new = pmesh->GetElementVolume(i);
+      const double k_new = k_hpv->Elem(i);
+      const double sv_new= sv_gf.Elem(i);
 
       // Compute sv that gives exact mass conservation
       const double sv_new_mc = k_new / m;
@@ -1949,11 +1977,11 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
       if (val > 1.E-12)
       {
          num_corrected_cells += 1;
-         sv_gf.Elem(cell_it) = sv_new_mc;
+         sv_gf.Elem(i) = sv_new_mc;
          rel_mass_corrected += val / sv_new_mc;
          if (sv_new_mc <= 0.)
          {
-            cout << "cell " << cell_it << ", sv: " << sv_new_mc << endl;
+            cout << "dof: " << i << ", sv: " << sv_new_mc << endl;
             MFEM_ABORT("Invalid value for the specific volume\n");
          }
       }
@@ -3671,6 +3699,20 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    H1.GetMesh()->NewNodes(x_gf, false);
    L2.GetMesh()->NewNodes(x_gf, false);
    pmesh->NewNodes(x_gf, false);
+
+   /* Update volumes at L2 dofs */
+   ParLinearForm * k_lf = new ParLinearForm(&L2);
+   ConstantCoefficient one_coeff(1.0);
+   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff));
+   k_lf->Assemble();
+   k_hpv = k_lf->ParallelAssemble();
+   delete k_lf;
+
+   // cout << "Update mesh k_hpv:\n";
+   // for (int i = 0; i < NDofs_L2; i++)
+   // {
+   //    cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << endl;
+   // }
 }
 
 

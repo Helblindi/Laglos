@@ -72,6 +72,8 @@ protected:
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
 
+   mutable HypreParVector *k_hpv;
+
    // Problem specific
    ProblemBase * pb;
 

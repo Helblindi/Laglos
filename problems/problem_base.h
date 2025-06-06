@@ -128,7 +128,13 @@ public:
       Vector v;
       velocity(U, v);
       double E = U[dim + 1]; // specific total energy
-      double val = E - 0.5 * pow(v.Norml2(), 2) - e_sheer;
+      double _ske = 0.5 * pow(v.Norml2(), 2); // specific kinetic energy
+      if (std::isnan(e_sheer) || std::isnan(E) || std::isnan(_ske))
+      {
+         cout << "E: " << E << ", v: " << v.Norml2() << ", e_sheer: " << e_sheer << ", _ske: " << _ske << endl;
+         MFEM_ABORT("NaN values in specific internal energy computation.\n");
+      }
+      double val = E - _ske - e_sheer;
 
       // Verify sie > 0.
       if (val <  -std::numeric_limits<double>::epsilon())
@@ -422,7 +428,8 @@ public:
    }
 
    double pressure(const double &rho, const double &sie, const int &cell_attr=0) const {
-      return pressure(rho, sie, this->get_gamma(cell_attr));
+      const double _g = this->get_gamma(cell_attr);
+      return pressure(rho, sie, _g);
    }
 
    /*********************************************

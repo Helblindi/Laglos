@@ -212,11 +212,12 @@ and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
 Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
 that can be used are
 
-1. Used to enforce $v_x = 0$.
-2. Used to enforce $v_y = 0$.
-3. Used to enforce $v_z = 0$.
-4. Used to enforce $v_r = 0$, or in other words 0 radial movement.
-5. Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+> - 0 - Free boundary condition
+> - 1 - Used to enforce $v_x = 0$.
+> - 2 - Used to enforce $v_y = 0$.
+> - 3 - Used to enforce $v_z = 0$.
+> - 4 - Used to enforce $v_r = 0$, or in other words 0 radial movement.
+> - 5 - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
 
 If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
 the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs
@@ -314,4 +315,15 @@ The final times reported in the referenced paper corresponding to their shear mo
 ### Elastic twist
 ```
 ./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue 1 -ppd -rs 6
+```
+
+### Elastic projectile impact
+This is a test case outlined in vilar-main-shu-2d. Currently
+not yielding great results, perhaps due to the mesh velocity 
+computation we employ.  Have tried it on a cartesian and
+distorted mesh. 
+```
+./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
+
+./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
 ```

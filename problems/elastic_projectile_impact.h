@@ -42,58 +42,44 @@ namespace mfem
 namespace hydroLO
 {
 
-class ElasticProjectilePlate: public ProblemBase
+class ElasticProjectileImpact: public ProblemBase
 {
 private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _gamma_g = 1.4, _gamma_s = 4.22;
+   // double _gamma_g = 1.4, _gamma_s = 4.22;
+   double _gamma_g = 1.4, _gamma_s = 3.4; // aortic
    const int cell_attr_g = 1, cell_attr_s = 50;
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
-   bool _mvbcs = false; // Indicator for mv boundary conditions
-   string _indicator = "ElasticProjectilePlate";
+   bool _mvbcs = true; // Indicator for mv boundary conditions
+   bool _distort_mesh = false;
+   string _indicator = "ElasticProjectileImpact";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
-   // 5.2 elastic projectile plate section 7.1
-   double rho_g = 1., rho_s = 8.9E3; // kg/m^3
-   // double rho_g = 1., rho_s = 1.E3; // kg/m^3, aortic
-   double v_proj = 800.; // m/s
-   const double p_inf = 3.42E10; // Pa
-   // const double p_inf = 7.76E8; // Pa, aortic 
-   /* Different shear moduli for projectile plate */
-   const double _mu = 9.2E10; // .002
-   // const double _mu = 771.8 * 8.9E3; // For aortic model
-   // const double _mu = 9.2E9; // .002 for bounceback
-   // const double _mu = 9.2E8; // 0.002 re-stiffens 
-   // const double _mu = 0.; // bound to crash
+   // Elastic projectile impact - See vilar-shu-maire-2D
+   double rho_g = 1., rho_s = 2.7E3; // kg/m^3, aortic
+   double v_proj = -150.; // m/s
+   const double p_inf = 2.15E10; // Pa, aortic 
+   const double _mu = 2.6E10; // For aortic model
+
 
 
    /* helper function to determine the region based on x,y coords */
-   bool is_solid_region(const Vector &x) const
-   {
-      return (is_projectile_region(x) || is_plate_region(x));
-   }
    bool is_projectile_region(const Vector &x) const
    {
       double _x = x[0];
       double _y = x[1];
       /* projectile location */
-      if (_x >= 0.2 && _x <= .3 && _y >= 0.45 && _y <= 0.55) { return true; }
-      else { return false; }
-   }
-   bool is_plate_region(const Vector &x) const
-   {
-      double _x = x[0];
-      double _y = x[1];
-      /* plate location */
-      if (_x >= 0.3 && _x <= .4 && _y >= 0.25 && _y <= 0.75) { return true; }
-      return false;
+      if (_x >= 0. && _x <= 5. && _y >= 0. && _y <= 1.) { return true; }
+      else { 
+         cout << "_x: " << _x << ", _y: " << _y << endl;
+         return false; }
    }
 
 public:
-   ElasticProjectilePlate(const int &_dim) : ProblemBase(_dim)
+   ElasticProjectileImpact(const int &_dim) : ProblemBase(_dim)
    {
       if (dim != 2)
       {
@@ -108,6 +94,7 @@ public:
       this->set_shear_modulus(_mu);
       this->set_thbcs_indicator(_thbcs);
       this->set_mvbcs_indicator(_mvbcs);
+      this->set_distort_mesh(_distort_mesh);
       this->set_exact_solution(_known_exact_solution);
 
       // Set Equation of state
@@ -122,12 +109,6 @@ public:
       assert((cell_attr == cell_attr_s || cell_attr == cell_attr_g) && "Must pass in a cell_attr to any ProblemBase::get_gamma funcalls.\n");
       return (cell_attr == cell_attr_s) ? _gamma_s : _gamma_g;
    }
-   
-   /* Override specific update functions */
-   void lm_update(const double b_covolume) override 
-   {
-      this->set_b(b_covolume);
-   }
 
    void get_additional_BCs(const FiniteElementSpace &fes, Array<int> ess_bdr, Array<int> &add_ess_tdofs, Array<double> &add_bdr_vals, const Geometric *geom=NULL) override
    {
@@ -136,7 +117,7 @@ public:
       ess_bdr[4] = 1;
 
       /* 
-      Boundary conditions: This test enforces dirichlet at left boundary on
+      Boundary conditions: This test enforces dirichlet at right boundary on
       the x-coord only. [marker 5] 
       The remaining boundary is treated with do-nothing bcs. 
       */
@@ -161,7 +142,7 @@ public:
    {
       if (t < 1e-12)
       {
-         if (is_solid_region(x)) {
+         if (is_projectile_region(x)) {
             // const double _gam = _gamma_s;
             // return this->rho0(x, t) * this->sie0(x,t) / (_gam - 1.0) - p_inf * _gam;
             return 0.;
@@ -184,7 +165,7 @@ public:
    double rho0(const Vector &x, const double & t) const override
    {
       assert(t < 1e-12); // No exact solution
-      if (is_solid_region(x)) {
+      if (is_projectile_region(x)) {
          return rho_s;
       } else {
          return rho_g;
@@ -204,7 +185,7 @@ public:
       cout << "sie0\n";
       double _rho = rho0(x,t);
       double _p = p0(x,t);
-      if (is_solid_region(x))
+      if (is_projectile_region(x))
       {
          return this->eos->energy(_p, _rho, _gamma_s);
       }

@@ -720,27 +720,27 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                }
                }
             }
-            // else if (use_elasticity && ci_attr == 50)
-            // {
-            //    /* Negate sigma */
-            //    DenseMatrix F_i_bdry = F_i;
+            else if (use_elasticity && ci_attr == 50)
+            {
+               /* Negate sigma */
+               DenseMatrix F_i_bdry = F_i;
 
-            //    for (int i = 0; i < dim; i++)
-            //    {
-            //       for (int j = 0; j < dim; j++)
-            //       {
-            //          F_i_bdry(i+1, j) *= -1.;
-            //       }
-            //    }
+               for (int i = 0; i < dim; i++)
+               {
+                  for (int j = 0; j < dim; j++)
+                  {
+                     F_i_bdry(i+1, j) *= -1.;
+                  }
+               }
 
-            //    Vector sigmap;
-            //    F_i_bdry.GetRow(dim+1, sigmap);
-            //    sigmap *= -1.;
-            //    F_i_bdry.SetRow(dim+1, sigmap);
+               Vector sigmap;
+               F_i_bdry.GetRow(dim+1, sigmap);
+               sigmap *= -1.;
+               F_i_bdry.SetRow(dim+1, sigmap);
 
-            //    F_i_bdry.Mult(c, y_temp_bdry);
-            //    y_temp += y_temp_bdry;
-            // }
+               F_i_bdry.Mult(c, y_temp_bdry);
+               y_temp += y_temp_bdry;
+            }
             else
             {
                y_temp *= 2.;
@@ -3495,7 +3495,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       double e_sheer = 0.;
       if (use_elasticity) { e_sheer = elastic->e_sheer(i); }
       double sie = pb->specific_internal_energy(U, e_sheer);
-      double attr = pmesh->GetAttribute(i);
+      int attr = pmesh->GetAttribute(i);
       pressure = pb->pressure(rho, sie, attr);
       ss = pb->sound_speed(rho, pressure, attr);
       pmesh->GetElementCenter(i, center);

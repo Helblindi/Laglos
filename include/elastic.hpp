@@ -40,8 +40,8 @@ private:
    const IntegrationRule &ir;
    const int NE, NDofs_L2, nqp;
 
-   // Reference to physical Jacobian for the initial mesh.
-   // These are computed only at time zero and stored here.
+   // Reference to physical Jacobian for the initial mesh
+   // These are computed only at time zero and stored here
    DenseTensor Jac0inv;
    double mu = -1.; // Shear modulus
 
@@ -50,10 +50,16 @@ private:
    This direction is used to compute the invariants:
       m = (cos(phi), sin(phi), 0) 
    */
-   double phi = 0.; // angle of fiber direction
+   double phi = M_PI/4.; // angle of fiber direction
    Vector mi;
    DenseMatrix Gi;
-   double A1 = 771.8, B1 = 21.2, D1 = 3.8, w1 = 0.4971;
+   // double A1 = 771.8, B1 = 21.2, D1 = 3.8, w1 = 0.4971;
+   // double A1 = 771.8, B1 = 21.2E-6, A2 = 1., B2 = 1., D1 = 3.8, w1 = 0.;
+   // double A1 = 2.41E6, B1 = 2.41E6, A2 = 1., B2 = 1., D1 = 4.81E6, w1 = 0.01;
+   /* These params were closer to the Neo Hook results when w1 = 0 */
+   double stiffness = 9.63E5;
+   double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
+   // double A1 = 2.41E2, B1 = 2.41E2, A2 = 1., B2 = 1., D1 = 4.81E2, w1 = 0.01;
 
 public:
    Elastic(const int &_dim,
@@ -243,7 +249,41 @@ public:
 
          /* Compute shear energy */
          double val = (1. - 2 * w1) * ((A1 / 2.) * (trc - 3.) + (B1 / 4.) * (trc*trc - trc2 - 6.));
-         val += 2. * w1 * D1 * ((1. / A1) * (exp(A1 * (i4 - 1.)) - 1.) + (1. / B1) * (exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.));
+         if (std::isnan(val))
+         {
+            cout << "c:\n";
+            c.Print(cout);
+            cout << "c2:\n";
+            c2.Print(cout);
+            cout << "trc: " << trc << ", trc2: " << trc2 << endl;
+            cout << "i4: " << i4 << ", i5: " << i5 << endl;
+            cout << "val: " << val << endl;
+         }
+         double _tt1 = (1. / A2) * (exp(A2 * (i4 - 1.)) - 1.);
+         double _tt2 = (1. / B2) * (exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
+         double _anisotropic_val = 2. * w1 * D1 * (_tt1 + _tt2);
+         // if (val > 1.E-10 || _anisotropic_val > 1.E-10)
+         // {
+         //    cout << "isotropic: " << val << ", anisotropic: " << _anisotropic_val << endl;
+         // }
+
+         
+         if (!std::isnan(_anisotropic_val))
+         {
+            val += _anisotropic_val;
+         }
+         else
+         {
+            cout << "_anisotropic_val is nan\n";
+            cout << "w1: " << w1 << ", D1: " << D1 << ", A1: " << A1 << ", B1: " << B1 << endl;
+            cout << "trc: " << trc << ", trc2: " << trc2 << endl;
+            cout << "i4: " << i4 << ", i5: " << i5 << endl;
+            cout << "tt1: " << _tt1 << ", tt2: " << _tt2 << endl;
+            MFEM_WARNING("Aortic EOS anisotropic is NaN.\n");
+         }
+
+         // cout << "anisotropic ratio: " << _anisotropic_val / val << endl;
+
          return val;
       }
       default:
@@ -279,7 +319,7 @@ public:
          compute_i4_i5(c, i4, i5);
 
          double val = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * trc);
-         val += 2. * w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
+         val += 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
          return val;
       }
       default:
@@ -311,11 +351,11 @@ public:
          case AORTIC:
          {
             /* compute i4 and i5 */
-      double i4, i5;
-      compute_i4_i5(c, i4, i5);
+            double i4, i5;
+            compute_i4_i5(c, i4, i5);
    
             double val = (2. * w1 - 1.) * (B1 / 4.);
-            val -= w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+            val -= w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
             return val;
          }
       default:
@@ -330,12 +370,12 @@ public:
       assert(shear_eos == ShearEOS::AORTIC);
 
       /* compute i4 and i5 */
-      DenseMatrix _res(3);
+      DenseMatrix _res(3), _res2(3);
       Mult(c, Gi, _res);
       i4 = _res.Trace();
       Mult(c, c, _res);
-      Mult(_res, Gi, _res);
-      i5 = _res.Trace();
+      Mult(_res, Gi, _res2);
+      i5 = _res2.Trace();
    }
  
    double des_di4(const DenseMatrix &c) const
@@ -357,7 +397,12 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * (exp(A1 * (i4 - 1.)) - trc * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
+      double val = 2. * w1 * D1 * (exp(A2 * (i4 - 1.)) - trc * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
+      if (std::isnan(val))
+      {
+         val = 0.;
+         MFEM_WARNING("Aortic EOS shear energy derivative computation failed in des_di4.\n");
+      }
       return val;
    }
  
@@ -380,7 +425,12 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * exp(B1 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+      double val = 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+      if (std::isnan(val))
+      {
+         val = 0.;
+         MFEM_WARNING("Aortic EOS shear energy derivative computation failed in des_di5.\n");
+      }
       return val;
    }
  
@@ -523,9 +573,10 @@ public:
       /* Handle anistropic contribution */
       if (shear_eos == ShearEOS::AORTIC)
       {
+         // cout << "===== Anisotropic contribution =====\n";
          /* des_di4 portion */
          double c4_coeff = des_di4(c);
-         DenseMatrix c4_tf(3), c5_tf(3), _tmp(3);
+         DenseMatrix c4_tf(3), c5_tf(3), _tmp(3), _tmp2(3);
          mfem::Mult(F, Gi, _tmp);
          mfem::Mult(_tmp, FT, c4_tf);
          c4_tf *= std::pow(C.Det(), -1./3.);
@@ -536,12 +587,13 @@ public:
          /* des_di5 portion */
          double c5_coeff = 2. * des_di5(c);
          mfem::Mult(F, C, _tmp);
-         mfem::Mult(_tmp, Gi, _tmp);
-         mfem::Mult(_tmp, F, c5_tf);
+         mfem::Mult(_tmp, Gi, _tmp2);
+         mfem::Mult(_tmp2, F, c5_tf);
          c5_tf *= std::pow(C.Det(), -2./3.);
          mfem::Mult(c2, Gi, _tmp);
          mfem::Add(c5_tf, I, -1./3. * _tmp.Trace(), c5_tf);
          mfem::Add(S, c5_tf, c5_coeff, S);
+         // cout << "=====================================\n";
       }
 
       /* Finally, multiply by 2rho */

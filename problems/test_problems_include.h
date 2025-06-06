@@ -32,6 +32,7 @@
 #include "elastic_impact_shear.h"
 #include "elastic_isentropic_vortex.h"
 #include "elastic_projectile_plate.h"
+#include "elastic_projectile_impact.h"
 #include "elastic_twist.h"
 #include "elastic_noh.h"
 

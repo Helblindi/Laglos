@@ -556,6 +556,9 @@ int main(int argc, char *argv[]) {
       case 58: // Elastic noh
          problem_class = new ElasticNoh(dim);
          break;
+      case 59: // Elastic projectile impact (vilar-mair-shu 2d)
+         problem_class = new ElasticProjectileImpact(dim);
+         break;
       case 100:
          problem_class = new TestBCs(dim);
          break;
@@ -1423,7 +1426,8 @@ int main(int argc, char *argv[]) {
                      _esheer = hydro.elastic->e_sheer(i);
                   }
                   double _sie = problem_class->specific_internal_energy(U, _esheer);
-                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+                  int cell_attr = pmesh->GetAttribute(i);
+                  double pressure = problem_class->pressure(_rho, _sie, cell_attr);
                   press_gf[i] = pressure;
                }
                Wx += offx;

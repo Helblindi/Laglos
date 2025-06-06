@@ -57,7 +57,8 @@ private:
    // double A1 = 771.8, B1 = 21.2E-6, A2 = 1., B2 = 1., D1 = 3.8, w1 = 0.;
    // double A1 = 2.41E6, B1 = 2.41E6, A2 = 1., B2 = 1., D1 = 4.81E6, w1 = 0.01;
    /* These params were closer to the Neo Hook results when w1 = 0 */
-   double A1 = 0.5 * 9.63E6, B1 = 0.5 * 9.63E6, A2 = 1., B2 = 1., D1 = 0.5 * 3.85E7, w1 = 0.99;
+   double stiffness = 9.63E5;
+   double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
    // double A1 = 2.41E2, B1 = 2.41E2, A2 = 1., B2 = 1., D1 = 4.81E2, w1 = 0.01;
 
 public:
@@ -258,8 +259,8 @@ public:
             cout << "i4: " << i4 << ", i5: " << i5 << endl;
             cout << "val: " << val << endl;
          }
-         double _tt1 = (1. / A1) * (exp(A2 * (i4 - 1.)) - 1.);
-         double _tt2 = (1. / B1) * (exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
+         double _tt1 = (1. / A2) * (exp(A2 * (i4 - 1.)) - 1.);
+         double _tt2 = (1. / B2) * (exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
          double _anisotropic_val = 2. * w1 * D1 * (_tt1 + _tt2);
          // if (val > 1.E-10 || _anisotropic_val > 1.E-10)
          // {
@@ -318,7 +319,7 @@ public:
          compute_i4_i5(c, i4, i5);
 
          double val = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * trc);
-         val += 2. * w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
+         val += 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
          return val;
       }
       default:
@@ -396,7 +397,7 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * (A2 / A1 * exp(A2 * (i4 - 1.)) - trc * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
+      double val = 2. * w1 * D1 * (exp(A2 * (i4 - 1.)) - trc * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
       if (std::isnan(val))
       {
          val = 0.;
@@ -424,7 +425,7 @@ public:
       double i4, i5;
       compute_i4_i5(c, i4, i5);
 
-      double val = 2. * w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+      double val = 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
       if (std::isnan(val))
       {
          val = 0.;

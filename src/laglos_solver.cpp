@@ -720,27 +720,27 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
                }
                }
             }
-            // else if (use_elasticity && ci_attr == 50)
-            // {
-            //    /* Negate sigma */
-            //    DenseMatrix F_i_bdry = F_i;
+            else if (use_elasticity && ci_attr == 50)
+            {
+               /* Negate sigma */
+               DenseMatrix F_i_bdry = F_i;
 
-            //    for (int i = 0; i < dim; i++)
-            //    {
-            //       for (int j = 0; j < dim; j++)
-            //       {
-            //          F_i_bdry(i+1, j) *= -1.;
-            //       }
-            //    }
+               for (int i = 0; i < dim; i++)
+               {
+                  for (int j = 0; j < dim; j++)
+                  {
+                     F_i_bdry(i+1, j) *= -1.;
+                  }
+               }
 
-            //    Vector sigmap;
-            //    F_i_bdry.GetRow(dim+1, sigmap);
-            //    sigmap *= -1.;
-            //    F_i_bdry.SetRow(dim+1, sigmap);
+               Vector sigmap;
+               F_i_bdry.GetRow(dim+1, sigmap);
+               sigmap *= -1.;
+               F_i_bdry.SetRow(dim+1, sigmap);
 
-            //    F_i_bdry.Mult(c, y_temp_bdry);
-            //    y_temp += y_temp_bdry;
-            // }
+               F_i_bdry.Mult(c, y_temp_bdry);
+               y_temp += y_temp_bdry;
+            }
             else
             {
                y_temp *= 2.;

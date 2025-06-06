@@ -276,6 +276,12 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
       elastic = new Elastic(dim, elastic_eos, H1, L2, rho0_gf, ir);
       SetShearModulus(pb->get_shear_modulus());
    }
+   
+   /* If using high order, must build table relating H1 dofs to L2 dofs */
+   if (order_u > 0)
+   {
+      BuildDofH1DofL2Table();
+   }
 
    // Print some dimension information
    cout << "Vsize_H1: " << Vsize_H1 << endl;
@@ -901,6 +907,28 @@ void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &
       pb->update_additional_BCs(t, timestep_first, add_bdr_vals, &geom, &x_gf);
       bdr_vals.Append(add_bdr_vals);
    }
+}
+
+
+void LagrangianLOOperator::BuildDofH1DofL2Table()
+{
+   // cout << "========================================\n"
+   //      << "         BuildDofH1DofL2Table           \n"
+   //      << "========================================\n";
+   if (NDofs_H1 == 0 || NDofs_L2 == 0)
+   {
+      MFEM_ABORT("NDofs_H1 or NDofs_L2 is zero, cannot build dof table.\n");
+   }
+
+   Array<Connection> list;
+
+
+
+   dof_h1_dof_l2.MakeFromList(NDofs_H1, list);
+
+   cout << "dof_h1_dof_l2 table:\n";
+   dof_h1_dof_l2.Print(cout);
+   assert(false);
 }
 
 

@@ -118,6 +118,10 @@ protected:
    bool use_elasticity = false;
    const IntegrationRule ir;
 
+   // HO
+   Table dof_h1_dof_l2; // Table to relate H1 and L2 dofs
+   void BuildDofH1DofL2Table();
+
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
    Table element_face;

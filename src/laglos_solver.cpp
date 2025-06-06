@@ -947,7 +947,7 @@ void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt)
    v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
 
    GridFunctionCoefficient v_gf_coeff(&v_gf);
-   dxdt_gf.ProjectCoefficient(v_gf_coeff);
+   dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
 
    /* Optionally, enforce boundary conditions */
    if (pb->has_mv_boundary_conditions())

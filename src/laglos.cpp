@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 2;  // Order of mesh movement approximation space
+   int order_k = 2;  // Order of mesh movement approximation space
    int order_u = 0;
    int ode_solver_type = 1;
    double t_init = 0.0;
@@ -199,6 +199,8 @@ int main(int argc, char *argv[]) {
                   "Directory that output files should be placed");
    args.AddOption(&order_u, "-ot", "--order-thermo",
                   "Order (degree) of the thermodynamic finite element space.");
+   args.AddOption(&order_k, "-ok", "--order-kinetic",
+                  "Order (degree) of the mesh velocity finite element space.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
@@ -295,12 +297,17 @@ int main(int argc, char *argv[]) {
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
 
-   /* Arg checks */
+   /***** Arg checks *****/
    if (elastic_eos > 0 && order_u > 0)
    {
       MFEM_ABORT("Elasticity cannot be used with order_u > 0. "
                  "Set order_u = 0 to use elasticity.");
    }
+   if (order_u > 0 && order_k != order_u)
+   {
+      MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");
+   }
+   /**** End arg checks *****/
 
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
@@ -562,10 +569,10 @@ int main(int argc, char *argv[]) {
    }
 
    // Define the parallel finite element spaces. We use:
-   // - H1 (Q2, continuous) for mesh movement.
-   // - L2 (Q0, discontinuous) for state variables
-   // - CR/RT for mesh reconstruction at nodes
-   H1_FECollection H1FEC(order_mv, dim);
+   // - H1 (continuous) for mesh movement. (Q1 / order_k)
+   // - L2 (discontinuous) for state variables (Q0 / order_u)
+   // - CR/RT for mesh velocity reconstruction at nodes
+   H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;
@@ -575,7 +582,7 @@ int main(int argc, char *argv[]) {
    }
    else
    {
-      CRFEC = new RT_FECollection(0, dim);
+      CRFEC = new RT_FECollection(order_u, dim);
    }
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
@@ -1227,7 +1234,7 @@ int main(int argc, char *argv[]) {
    visit_dc.Save();
 
    ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   paraview_dc.SetLevelsOfDetail(order_mv);
+   paraview_dc.SetLevelsOfDetail(order_k);
    paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
    paraview_dc.RegisterField("Specific Volume", &sv_gf);
    paraview_dc.RegisterField("Density", &rho_gf);

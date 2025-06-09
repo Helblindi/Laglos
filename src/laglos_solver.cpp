@@ -1,4 +1,5 @@
 #include "laglos_solver.hpp"
+#include "mfem/fem/fe/fe_l2.hpp"
 #include <cassert>
 #include <iostream>
 
@@ -912,23 +913,73 @@ void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &
 
 void LagrangianLOOperator::BuildDofH1DofL2Table()
 {
-   // cout << "========================================\n"
-   //      << "         BuildDofH1DofL2Table           \n"
-   //      << "========================================\n";
+   cout << "========================================\n"
+        << "         BuildDofH1DofL2Table           \n"
+        << "========================================\n";
    if (NDofs_H1 == 0 || NDofs_L2 == 0)
    {
       MFEM_ABORT("NDofs_H1 or NDofs_L2 is zero, cannot build dof table.\n");
    }
 
+   if (H1.GetOrder(0) != L2.GetOrder(0))
+   {
+      MFEM_ABORT("H1 and L2 must have the same order for H1 dof L2 dof table to be built.");
+   }
+
    Array<Connection> list;
 
+   /* Iterate over elements */
+   Array<int> l2_dofs, h1_dofs;
+
+   /* l2 dofs are in lexicographic ordering, need to convert this ordering to be that of the H1 space */
+   auto fe = dynamic_cast<const TensorBasisElement*>(H1.GetFE(0));
+   if (!fe)
+   {
+      MFEM_ABORT("finite element is not a TensorBasisElement.\n");
+   }
+   auto dof_map = fe->GetDofMap();
+
+   for (int el_it = 0; el_it < NE; el_it++)
+   {
+      // cout << "el: " << el_it << endl;
+      // Get L2 dofs for the element
+      L2.GetElementDofs(el_it, l2_dofs);
+      // Get H1 dofs for the element
+      H1.GetElementDofs(el_it, h1_dofs);
+
+      // cout << "L2 dofs: ";
+      // for (int i = 0; i < l2_dofs.Size(); i++)
+      // {
+      //    cout << l2_dofs[dof_map[i]] << " ";
+      // }
+      // cout << endl;
+      // cout << "H1 dofs: ";
+      // h1_dofs.Print(cout);
+      
+      MFEM_ASSERT(l2_dofs.Size() == h1_dofs.Size(), "L2 and H1 dofs must have the same size for the element.");
+
+      for (int i = 0; i < l2_dofs.Size(); i++)
+      {
+         // Get the L2 dof
+         int l2_dof = l2_dofs[dof_map[i]]; // Use the dof_map to get the correct L2 dof
+         // Get the H1 dof
+         int h1_dof = h1_dofs[i];
+
+         // cout << "l2_dof: " << l2_dof << ", h1_dof: " << h1_dof << endl;
+         // Add connection from H1 dof to L2 dof
+         list.Append(Connection(h1_dof, l2_dof));
+      }
+
+   }
 
 
+   /* List must be sorted and free from duplicated before table is created */
+   list.Sort();
    dof_h1_dof_l2.MakeFromList(NDofs_H1, list);
 
-   cout << "dof_h1_dof_l2 table:\n";
-   dof_h1_dof_l2.Print(cout);
-   assert(false);
+   // cout << "dof_h1_dof_l2 table:\n";
+   // dof_h1_dof_l2.Print(cout);
+   // assert(false);
 }
 
 

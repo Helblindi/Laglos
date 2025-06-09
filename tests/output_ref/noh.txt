@@ -10,6 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/noh.mesh
    --output-flag default
    --order-thermo 0
+   --order-kinetic 2
    --refine-serial 0
    --refine-parallel 0
    --problem 10
@@ -131,14 +132,14 @@ step   165,	t = 0.573659,	dt = 0.00297586,	|e| = 1.5102038501e+01
 step   170,	t = 0.588521,	dt = 0.00297019,	|e| = 1.5105049510e+01
 step   174,	t = 0.600000,	dt = 0.00257502,	|e| = 1.5107391892e+01
 [Noh] Projecting zero on the boundary cells.
-Program took 4.9296268333e+00s.
-This amounts to 3.1299217989e-05 s per timestep per gridpoint.
+Program took 4.1802734167e+00s.
+This amounts to 2.6541418519e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.930e+00 | 3.130e-05
-  Dij calculation:               2.002e+00 | 1.271e-05
-  Mesh Motion calculation:       1.213e+00 | 7.701e-06
+  Total time:                    4.180e+00 | 2.654e-05
+  Dij calculation:               1.999e+00 | 1.269e-05
+  Mesh Motion calculation:       1.022e+00 | 6.488e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.410e+00 | 8.952e-06
+  State Update calculation:      9.165e-01 | 5.819e-06
 ===========================================================

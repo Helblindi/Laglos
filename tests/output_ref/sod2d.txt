@@ -10,6 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/shocktube.mesh
    --output-flag default
    --order-thermo 0
+   --order-kinetic 2
    --refine-serial 0
    --refine-parallel 0
    --problem 2
@@ -163,14 +164,14 @@ step   325,	t = 0.215556,	dt = 0.00068325,	|e| = 5.9528248517e+01
 step   330,	t = 0.218972,	dt = 0.00068325,	|e| = 5.9671434232e+01
 step   335,	t = 0.222388,	dt = 0.00068324,	|e| = 5.9814331559e+01
 step   339,	t = 0.225000,	dt = 0.00056178,	|e| = 5.9923351566e+01
-Program took 5.2613372917e+00s.
-This amounts to 3.0949042892e-05 s per timestep per gridpoint.
+Program took 4.4578724167e+00s.
+This amounts to 2.6222778922e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    5.261e+00 | 3.095e-05
-  Dij calculation:               2.074e+00 | 1.220e-05
-  Mesh Motion calculation:       1.397e+00 | 8.217e-06
+  Total time:                    4.458e+00 | 2.622e-05
+  Dij calculation:               2.087e+00 | 1.228e-05
+  Mesh Motion calculation:       1.163e+00 | 6.840e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.487e+00 | 8.745e-06
+  State Update calculation:      9.366e-01 | 5.510e-06
 ===========================================================

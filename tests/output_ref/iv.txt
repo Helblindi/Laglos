@@ -10,6 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/square-vortex.mesh
    --output-flag default
    --order-thermo 0
+   --order-kinetic 2
    --refine-serial 1
    --refine-parallel 0
    --problem 9
@@ -103,14 +104,14 @@ step    25,	t = 1.428989,	dt = 0.05401899,	|e| = 4.0168258739e+01
 step    30,	t = 1.695844,	dt = 0.05296088,	|e| = 4.0173274506e+01
 step    35,	t = 1.957893,	dt = 0.05206325,	|e| = 4.0177548252e+01
 step    36,	t = 2.000000,	dt = 0.04210706,	|e| = 4.0178158888e+01
-Program took 2.9467204167e-01s.
-This amounts to 3.1109801696e-05 s per timestep per gridpoint.
+Program took 3.0625920833e-01s.
+This amounts to 3.2333108988e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.947e-01 | 3.111e-05
-  Dij calculation:               1.181e-01 | 1.247e-05
-  Mesh Motion calculation:       7.354e-02 | 7.764e-06
+  Total time:                    3.063e-01 | 3.233e-05
+  Dij calculation:               1.428e-01 | 1.508e-05
+  Mesh Motion calculation:       7.097e-02 | 7.492e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      8.316e-02 | 8.780e-06
+  State Update calculation:      7.394e-02 | 7.806e-06
 ===========================================================

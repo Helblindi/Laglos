@@ -10,6 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-square-N15.mesh
    --output-flag default
    --order-thermo 0
+   --order-kinetic 2
    --refine-serial 0
    --refine-parallel 0
    --problem 1
@@ -108,14 +109,14 @@ step    50,	t = 0.679844,	dt = 0.01748345,	|e| = 6.3703001433e+00
 step    55,	t = 0.768947,	dt = 0.01794117,	|e| = 6.0205647574e+00
 step    60,	t = 0.861359,	dt = 0.01869177,	|e| = 5.7168629666e+00
 step    63,	t = 0.900000,	dt = 0.00063916,	|e| = 5.6038863970e+00
-Program took 4.4460541667e-01s.
-This amounts to 3.0875376157e-05 s per timestep per gridpoint.
+Program took 3.8425662500e-01s.
+This amounts to 2.6684487847e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.446e-01 | 3.088e-05
-  Dij calculation:               1.763e-01 | 1.224e-05
-  Mesh Motion calculation:       1.129e-01 | 7.839e-06
+  Total time:                    3.843e-01 | 2.668e-05
+  Dij calculation:               1.814e-01 | 1.260e-05
+  Mesh Motion calculation:       9.606e-02 | 6.671e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.252e-01 | 8.691e-06
+  State Update calculation:      8.055e-02 | 5.594e-06
 ===========================================================

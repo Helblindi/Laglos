@@ -418,7 +418,7 @@ int ValidateCijComputationOrder1()
    // - H1 (Q2, continuous) for mesh movement.
    // - L2 (Q0, discontinuous) for state variables
    // - CR/RT for mesh reconstruction at nodes
-   H1_FECollection H1FEC(order_mv, dim);
+   H1_FECollection H1FEC(1, dim);
    H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(1, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;

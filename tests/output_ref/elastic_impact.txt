@@ -10,6 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/elastic/ref-segment.mesh
    --output-flag default
    --order-thermo 0
+   --order-kinetic 2
    --refine-serial 8
    --refine-parallel 0
    --problem 51
@@ -173,14 +174,14 @@ step 320  ,	t = 0.000048,	dt = 0.00000015,	|e| = 1.8057408027e+08
 step 325  ,	t = 0.000049,	dt = 0.00000015,	|e| = 1.8057408037e+08
 step 330  ,	t = 0.000050,	dt = 0.00000015,	|e| = 1.8057408046e+08
 step 332  ,	t = 0.000050,	dt = 0.00000014,	|e| = 1.8057408049e+08
-Program took 2.1423967917e+00s.
-This amounts to 2.5131343746e-05 s per timestep per gridpoint.
+Program took 2.3522502917e+00s.
+This amounts to 2.7593026132e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 2.142e+00                    | 2.513e-05
-  Dij calculation: 9.516e-01               | 1.116e-05
-  Mesh Motion calculation: 1.198e-01       | 1.406e-06
+                                 Total time: 2.352e+00                    | 2.759e-05
+  Dij calculation: 9.681e-01               | 1.136e-05
+  Mesh Motion calculation: 9.405e-02       | 1.103e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 1.011e+00      | 1.186e-05
+  State Update calculation: 1.224e+00      | 1.436e-05
 ===========================================================

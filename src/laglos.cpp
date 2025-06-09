@@ -2025,6 +2025,37 @@ int main(int argc, char *argv[]) {
       cout.rdbuf(strm_buffer);
    }
 
+   /* Close visualization object */
+   if (visualization)
+   {
+      // Make sure all MPI ranks have sent their 'v' solution before initiating
+      // another set of GLVis connections (one from each rank):
+      MPI_Barrier(pmesh->GetComm());
+
+      vis_rho.close();
+      vis_v.close();
+      vis_ste.close();
+
+      vis_rho_ex.close();
+      vis_v_ex.close();
+      vis_ste_ex.close();
+      vis_p_ex.close();
+
+      vis_rho_err.close();
+      vis_v_err.close();
+      vis_ste_err.close();
+      vis_p_err.close();
+
+      vis_press.close();
+      vis_gamma.close();
+      vis_mc.close();
+
+      vis_sig.close();
+      vis_f.close();
+      vis_frho.close();
+      vis_esheer.close();
+   }
+
    cout << "Program took " << chrono.RealTime() << "s.\n";
    double temp_denom = ti * L2FESpace.GetNE();
    double time_per_gp_ts = chrono.RealTime() / temp_denom;

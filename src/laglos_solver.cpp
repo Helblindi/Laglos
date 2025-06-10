@@ -1016,7 +1016,37 @@ void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt)
    // GridFunctionCoefficient v_gf_coeff(&v_gf);
    // dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
 
+   /* 
+   Compute H1 mesh velocities using tensor product inversion 
+   This calculation requires that order_u == order_k, which 
+   we may not want for the elastic cases.
+   */
+   ComputeMVHOfirst(S, dxdt_gf);
+
+   /*
+   */
+
+   /* Optionally, enforce boundary conditions */
+   if (pb->has_mv_boundary_conditions())
+   {
+      for (int i = 0; i < ess_tdofs.Size(); i++) { 
+         // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
+         dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
+      }
+   }
+
+   chrono_mm.Stop();
+   // cout << "end HO mesh velocity calculation\n";
+}
+
+
+void LagrangianLOOperator::ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const
+{
    /* assume order_k == order_u, use H1L2 connectivity table */
+   if (H1.GetOrder(0) != L2.GetOrder(0))
+   {
+      MFEM_ABORT("H1 and L2 must have the same order.");
+   }
    DenseMatrix Mi(dim), dm_tmp(dim);
    Vector Ri(dim), node_v(dim), n_vec(dim), Vf(dim), y(dim), cij(dim);
    Vector U_i(dim+2), U_j(dim+2);
@@ -1111,20 +1141,7 @@ void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt)
          geom.UpdateNodeVelocityVecL(dxdt_gf, h1_dof_it, Vf);
       }
    }
-
-   /* Optionally, enforce boundary conditions */
-   if (pb->has_mv_boundary_conditions())
-   {
-      for (int i = 0; i < ess_tdofs.Size(); i++) { 
-         // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
-         dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
-      }
-   }
-
-   chrono_mm.Stop();
-   // cout << "end HO mesh velocity calculation\n";
 }
-
 
 /**
  * @brief Solves for the mesh velocities for the LO method.

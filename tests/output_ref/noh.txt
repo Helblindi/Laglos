@@ -95,7 +95,6 @@ num_faces: 1860
 num_vertices: 961
 num_edges: 1860
 Entering time loop
-Building connectivity
 step     5,	t = 0.044788,	dt = 0.00646655,	|e| = 1.5000555965e+01
 step    10,	t = 0.071679,	dt = 0.00487720,	|e| = 1.5002205873e+01
 step    15,	t = 0.093909,	dt = 0.00422040,	|e| = 1.5004605529e+01
@@ -132,14 +131,14 @@ step   165,	t = 0.573659,	dt = 0.00297586,	|e| = 1.5102038501e+01
 step   170,	t = 0.588521,	dt = 0.00297019,	|e| = 1.5105049510e+01
 step   174,	t = 0.600000,	dt = 0.00257502,	|e| = 1.5107391892e+01
 [Noh] Projecting zero on the boundary cells.
-Program took 4.1802734167e+00s.
-This amounts to 2.6541418519e-05 s per timestep per gridpoint.
+Program took 4.0970375417e+00s.
+This amounts to 2.6012936772e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.180e+00 | 2.654e-05
-  Dij calculation:               1.999e+00 | 1.269e-05
-  Mesh Motion calculation:       1.022e+00 | 6.488e-06
+  Total time:                    4.097e+00 | 2.601e-05
+  Dij calculation:               1.960e+00 | 1.244e-05
+  Mesh Motion calculation:       1.002e+00 | 6.362e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      9.165e-01 | 5.819e-06
+  State Update calculation:      8.999e-01 | 5.713e-06
 ===========================================================

@@ -91,7 +91,7 @@ block offsets: 0 4400 4900 5900
 MFEM Warning: May need to enforce additional BCs.
 
  ... in function: mfem::hydroLO::LagrangianLOOperator::LagrangianLOOperator(const int &, const int, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, const ParGridFunction &, ParLinearForm *, ProblemBase *, Array<int>, bool, int, bool, double)
- ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:188
+ ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:187
 
 Constructing BdrElementIndexingArray:
 Vsize_H1: 4400
@@ -109,7 +109,6 @@ num_faces: 1100
 num_vertices: 600
 num_edges: 1100
 Entering time loop
-Building connectivity
 step     5,	t = 0.009719,	dt = 0.00197596,	|e| = 3.4138013409e+01
 step    10,	t = 0.019827,	dt = 0.00204890,	|e| = 3.5140753648e+01
 step    15,	t = 0.030176,	dt = 0.00207363,	|e| = 3.6873388848e+01
@@ -166,14 +165,14 @@ step   265,	t = 0.187347,	dt = 0.00012299,	|e| = 5.2005437177e+03
 step   270,	t = 0.187952,	dt = 0.00011975,	|e| = 5.5219317056e+03
 step   275,	t = 0.188542,	dt = 0.00011669,	|e| = 5.8565197920e+03
 step   277,	t = 0.188700,	dt = 0.00004231,	|e| = 5.9503017904e+03
-Program took 3.9511153333e+00s.
-This amounts to 2.8425290168e-05 s per timestep per gridpoint.
+Program took 3.8264035000e+00s.
+This amounts to 2.7528082734e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    3.951e+00 | 2.843e-05
-  Dij calculation:               1.800e+00 | 1.295e-05
-  Mesh Motion calculation:       9.548e-01 | 6.869e-06
+  Total time:                    3.826e+00 | 2.753e-05
+  Dij calculation:               1.745e+00 | 1.255e-05
+  Mesh Motion calculation:       9.335e-01 | 6.716e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      8.833e-01 | 6.355e-06
+  State Update calculation:      8.629e-01 | 6.208e-06
 ===========================================================

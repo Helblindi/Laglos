@@ -1,5 +1,4 @@
 #include "laglos_solver.hpp"
-#include "mfem/fem/fe/fe_l2.hpp"
 #include <cassert>
 #include <iostream>
 
@@ -257,7 +256,8 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    // assert(v_CR_gf.Size() == dim * num_faces);
    // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
-   // Initialize Dij sparse
+   // Initialize Cij and Dij sparse matrices
+   BuildCijMatrices();
    InitializeDijMatrix();   
 
    // Set integration rule for Rannacher-Turek space
@@ -514,6 +514,9 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
  */
  void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
  {
+   // cout << "========================================\n"
+   //      << "               SolveHydro               \n"
+   //      << "========================================\n";
    // if (order_u > 0)
    // {
    //    MFEM_ABORT("When order_u > 0, may not need row sums to be 0.\n");
@@ -796,6 +799,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       delete e_source;
       e_source = nullptr;
    }
+   // cout << "end hydro\n";
  }
 
 
@@ -913,9 +917,9 @@ void LagrangianLOOperator::UpdateMeshVelocityBCs(const double &t, const double &
 
 void LagrangianLOOperator::BuildDofH1DofL2Table()
 {
-   cout << "========================================\n"
-        << "         BuildDofH1DofL2Table           \n"
-        << "========================================\n";
+   // cout << "========================================\n"
+   //      << "         BuildDofH1DofL2Table           \n"
+   //      << "========================================\n";
    if (NDofs_H1 == 0 || NDofs_L2 == 0)
    {
       MFEM_ABORT("NDofs_H1 or NDofs_L2 is zero, cannot build dof table.\n");
@@ -927,59 +931,42 @@ void LagrangianLOOperator::BuildDofH1DofL2Table()
    }
 
    Array<Connection> list;
-
-   /* Iterate over elements */
+   int _capacity = std::pow(2, dim-1) * NDofs_H1;
+   list.Reserve(_capacity);
    Array<int> l2_dofs, h1_dofs;
 
    /* l2 dofs are in lexicographic ordering, need to convert this ordering to be that of the H1 space */
    auto fe = dynamic_cast<const TensorBasisElement*>(H1.GetFE(0));
-   if (!fe)
-   {
-      MFEM_ABORT("finite element is not a TensorBasisElement.\n");
-   }
+   MFEM_ASSERT(fe, "Finite element is not a TensorBasisElement.");
    auto dof_map = fe->GetDofMap();
 
+   /* Iterate over elements */
    for (int el_it = 0; el_it < NE; el_it++)
    {
-      // cout << "el: " << el_it << endl;
-      // Get L2 dofs for the element
       L2.GetElementDofs(el_it, l2_dofs);
-      // Get H1 dofs for the element
       H1.GetElementDofs(el_it, h1_dofs);
 
-      // cout << "L2 dofs: ";
-      // for (int i = 0; i < l2_dofs.Size(); i++)
-      // {
-      //    cout << l2_dofs[dof_map[i]] << " ";
-      // }
-      // cout << endl;
-      // cout << "H1 dofs: ";
-      // h1_dofs.Print(cout);
-      
       MFEM_ASSERT(l2_dofs.Size() == h1_dofs.Size(), "L2 and H1 dofs must have the same size for the element.");
+      MFEM_ASSERT(dof_map.size() == (size_t)l2_dofs.Size(), "dof_map size mismatch");
 
       for (int i = 0; i < l2_dofs.Size(); i++)
       {
-         // Get the L2 dof
-         int l2_dof = l2_dofs[dof_map[i]]; // Use the dof_map to get the correct L2 dof
-         // Get the H1 dof
+         int l2_dof = l2_dofs[dof_map[i]];
          int h1_dof = h1_dofs[i];
-
-         // cout << "l2_dof: " << l2_dof << ", h1_dof: " << h1_dof << endl;
-         // Add connection from H1 dof to L2 dof
+         MFEM_ASSERT(l2_dof >= 0 && l2_dof < NDofs_L2, "l2_dof out of bounds");
+         MFEM_ASSERT(h1_dof >= 0 && h1_dof < NDofs_H1, "h1_dof out of bounds");
          list.Append(Connection(h1_dof, l2_dof));
       }
-
    }
 
-
    /* List must be sorted and free from duplicated before table is created */
+   list.Unique();
    list.Sort();
    dof_h1_dof_l2.MakeFromList(NDofs_H1, list);
 
    // cout << "dof_h1_dof_l2 table:\n";
    // dof_h1_dof_l2.Print(cout);
-   // assert(false);
+   // cout << "end build table\n";
 }
 
 
@@ -1023,10 +1010,107 @@ void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt)
    ParGridFunction dxdt_gf, v_gf;
    Vector* sptr = const_cast<Vector*>(&S);
    dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
-   v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
+   
+   /* Project disc vel field without visc */
+   // v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
+   // GridFunctionCoefficient v_gf_coeff(&v_gf);
+   // dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
 
-   GridFunctionCoefficient v_gf_coeff(&v_gf);
-   dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+   /* assume order_k == order_u, use H1L2 connectivity table */
+   DenseMatrix Mi(dim), dm_tmp(dim);
+   Vector Ri(dim), node_v(dim), n_vec(dim), Vf(dim), y(dim), cij(dim);
+   Vector U_i(dim+2), U_j(dim+2);
+   double F, d;
+   Array<int> adj_l2_dofs;
+   for (int h1_dof_it = 0; h1_dof_it < NDofs_H1; h1_dof_it++)
+   {
+      /* Reset Mi, Ri, Vi */
+      Mi = 0., Ri = 0., node_v = 0.;
+      
+      /* Get adjacent L2 dofs */
+      dof_h1_dof_l2.GetRow(h1_dof_it, adj_l2_dofs);
+      // cout << "h1 dof: " << h1_dof_it 
+      //      << ", adj_l2_dofs: ";
+      // adj_l2_dofs.Print(cout);
+      if (adj_l2_dofs.Size() < 2)
+      {
+         continue; // Skip if there are not enough adjacent L2 dofs
+      }
+      /* Get "adj face" contributions, only counting each face once */
+      for (int i = 0; i < adj_l2_dofs.Size(); i++)
+      {
+         int l2_dof_i = adj_l2_dofs[i];
+         /* Iterate over pairs */
+         for (int j = i+1; j < adj_l2_dofs.Size(); j++)
+         {
+            int l2_dof_j = adj_l2_dofs[j];
+            // cout << "l2_dof_i: " << l2_dof_i 
+            //      << ", l2_dof_j: " << l2_dof_j << endl;
+            // dij_sparse->Print(cout);
+            if (L2Connectivity(l2_dof_i,l2_dof_j) == -1)
+            {
+               // cout << "row not found, skipping.\n";
+               continue; // Skip if there is no connection between l2_dof_i and l2_dof_j
+            }
+
+            // Compute viscous "face" velocity
+            GetStateVector(S, l2_dof_i, U_i);
+            GetStateVector(S, l2_dof_j, U_j);
+            GetLocalCij(l2_dof_i, l2_dof_j, cij);
+            cij *= 2.;
+            n_vec = cij;
+            F = n_vec.Norml2();
+            n_vec /= F;
+            d = dij_sparse->Elem(l2_dof_i, l2_dof_j);
+            pb->velocity(U_i, Vf);
+            Vector vcp; pb->velocity(U_j, vcp);
+            Vf.Add(1., vcp);
+            Vf *= 0.5;
+            if (use_viscosity)
+            {
+               double coeff = d * (U_i[0] - U_j[0]) / F; // This is how 5.7b is defined.
+               Vf.Add(coeff, n_vec);
+            }
+
+            if (dim == 1)
+            {
+               /* this will be the only contribution to the velocity, thus no inversion is necessary */
+               geom.UpdateNodeVelocityVecL(dxdt_gf, h1_dof_it, Vf);
+            }
+            else
+            {
+               // Add the contribution to the dxdt_gf
+               tensor(n_vec, n_vec, dm_tmp);
+               Mi += dm_tmp;
+               dm_tmp.Mult(Vf, y);
+               Ri += y;
+
+               // cout << "i: " << l2_dof_i << ", j: " << l2_dof_j 
+               //    << ", cij: ";
+               // cij.Print();
+               // cout << "n_vec: ";
+               // n_vec .Print(cout);
+               // cout << "dm_tmp: ";
+               // dm_tmp.Print(cout);
+            }
+         }
+
+      }
+      if (dim > 1 && adj_l2_dofs.Size() > 2)
+      {
+         // cout << "Mi: \n";
+         // Mi.Print(cout);
+         // Solve for node_v
+         Mi.Invert();
+         Mi.Mult(Ri, node_v);
+         /* In every case, update the corresponding nodal velocity in S */
+         geom.UpdateNodeVelocityVecL(dxdt_gf, h1_dof_it, node_v);
+      }
+      else
+      {
+         geom.UpdateNodeVelocityVecL(dxdt_gf, h1_dof_it, Vf);
+      }
+   }
 
    /* Optionally, enforce boundary conditions */
    if (pb->has_mv_boundary_conditions())
@@ -1038,6 +1122,7 @@ void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt)
    }
 
    chrono_mm.Stop();
+   // cout << "end HO mesh velocity calculation\n";
 }
 
 
@@ -1329,38 +1414,32 @@ void LagrangianLOOperator::SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt)
 void LagrangianLOOperator::InitializeDijMatrix()
 {
    // Initialize SparseMatrix
-   dij_sparse = new SparseMatrix(NE, NE);
+   assert(is_L2_connectivity_built);
+   int *I = L2Connectivity.GetI();
+   int *J = L2Connectivity.GetJ();
 
-   // Create dummy coefficient
-   ConstantCoefficient one(1.0);
+   dij_I.SetSize(NDofs_L2+1);
+   dij_J.SetSize(L2ConnectivitySize);
+   dij_data.SetSize(L2ConnectivitySize);
+   dij_I[0] = 0; // Initialize first entry to zero
 
-   // Assemble SparseMatrix object
-   ParBilinearForm k(&L2);
-   /* Inherit sparsity pattern from x */
-   k.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
-   k.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
-   k.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
-
-   /* Inherit sparsity pattern from y, which may be different */
-   if (dim > 1)
+   for (int i = 0; i < NDofs_L2; i++)
    {
-      k.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
-      k.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
-      k.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
-
-      if (dim > 2)
+      dij_I[i+1] = I[i+1];
+      for (int j = I[i]; j < I[i+1]; j++)
       {
-         MFEM_ABORT("3D not implemented.\n");
+         dij_J[j] = J[j];
+         dij_data[j] = 1.0; // Initialize all entries to one
       }
    }
+   
+   bool ownij = false;
+   bool owna = false;
+   bool is_sorted = true;
+   dij_sparse = new SparseMatrix(dij_I.GetData(), dij_J.GetData(), dij_data.GetData(), NDofs_L2, NDofs_L2, ownij, owna, is_sorted);
 
-   k.Assemble();
-   k.Finalize();
-
-   HypreParMatrix * k_hpm = k.ParallelAssemble();
-   k_hpm->MergeDiagAndOffd(*dij_sparse);
-
-   if (k_hpm) { delete k_hpm; } // Clear memory to avoid leak
+   // cout << "dij_sparse: \n";
+   // dij_sparse->Print(cout);
    // From here, we can modify the sparse matrix according to the sparsity pattern
 }
 
@@ -2277,7 +2356,7 @@ void LagrangianLOOperator::BuildCijMatrices()
 
    if (!is_L2_connectivity_built)
    {
-      cout << "Building connectivity\n";
+      // cout << "Building connectivity\n";
       // Build connectivity table by looking at Cij sparse matrices
       BuildL2ConnectivityTable();
 
@@ -2363,6 +2442,7 @@ void LagrangianLOOperator::BuildL2ConnectivityTable()
    //      << "    Building L2 Connectivity Table     \n"
    //      << "=======================================\n";
    Array<Connection> list;
+   list.Reserve(cij_sparse_x->MaxRowSize() * NDofs_L2);
       
    /* x */
    const int *Ix = cij_sparse_x->GetI(), *Jx = cij_sparse_x->GetJ();
@@ -2372,6 +2452,7 @@ void LagrangianLOOperator::BuildL2ConnectivityTable()
       for (int end = Ix[i+1]; k < end; k++)
       {
          list.Append(Connection(i, Jx[k]));
+         list.Append(Connection(Jx[k], i)); // Ensure symmetry
       }
    }
 
@@ -2385,6 +2466,7 @@ void LagrangianLOOperator::BuildL2ConnectivityTable()
          for (int end = Iy[i+1]; k < end; k++)
          {
             list.Append(Connection(i, Jy[k]));
+            list.Append(Connection(Jy[k], i)); // Ensure symmetry
          }
       }
 
@@ -2397,7 +2479,10 @@ void LagrangianLOOperator::BuildL2ConnectivityTable()
    /* Must sort list and ensure each connection is unique before creating table */
    list.Sort();
    list.Unique();
+   L2ConnectivitySize = list.Size();
    L2Connectivity.MakeFromList(NDofs_L2, list); 
+   // cout << "L2 conenctivity\n";
+   // L2Connectivity.Print(cout);
 
    /* Output rows of table */
    // Array<int> row;

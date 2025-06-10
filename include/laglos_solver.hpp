@@ -81,6 +81,8 @@ protected:
    Geometric geom;
 
    // Matrix to hold max wavespeed values dij
+   Array<int> dij_I, dij_J;
+   Array<double> dij_data;
    SparseMatrix * dij_sparse;
 
    // Matrices to hold geometric vectors cij
@@ -161,6 +163,7 @@ protected:
    Array<double> HiopDGradData;
 
    bool is_L2_connectivity_built = false;
+   int L2ConnectivitySize = 0;
    Table L2Connectivity;
 
    int ess_tdofs_cart_size;

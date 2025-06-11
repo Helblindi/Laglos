@@ -478,15 +478,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
    /* Update dx_dt */
    if (this->compute_mv)
    {
-      if (order_t == 0)
-      {
-         SolveMeshVelocitiesLO(S, dS_dt);
-      }
-      else
-      {
-         SolveMeshVelocitiesHO(S, dS_dt);
-      }
-      
+      SolveMeshVelocities(S, dS_dt);
    }
    else
    {
@@ -974,99 +966,6 @@ void LagrangianLOOperator::BuildDofH1DofL2Table()
 }
 
 
-/**
- * @brief Solves for the high-order mesh velocities in a Lagrangian framework.
- *
- * This function computes the mesh velocities using high-order methods and projects
- * them onto the appropriate finite element space. It optionally enforces boundary
- * conditions if specified.
- *
- * @param S The input state vector containing the solution data.
- * @param dS_dt The output vector where the computed mesh velocities are stored.
- *
- * @note This function is only relevant for cases where `order_t > 0`. If `order_t == 0`,
- *       the function will abort with an error message.
- *
- * @details
- * - The function uses `ParGridFunction` objects to reference and manipulate the input
- *   and output vectors within the finite element spaces `H1` and `L2V`.
- * - Mesh velocities are computed by projecting the velocity coefficient onto the
- *   `dxdt_gf` grid function.
- * - If boundary conditions are specified (`pb->has_mv_boundary_conditions()`), the
- *   function enforces them by setting the values of essential degrees of freedom (`ess_tdofs`)
- *   to the corresponding boundary values (`bdr_vals`).
- * - The function uses a timer (`chrono_mm`) to measure the execution time.
- *
- * @throws std::runtime_error If `order_t == 0`, indicating that the function is not
- *         applicable for the given configuration.
- */
-void LagrangianLOOperator::SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt) const
-{
-   // cout << "========================================\n"
-   //      << "         SolveMeshVelocitiesHO          \n"
-   //      << "========================================\n";
-   if (order_t == 0)
-   {
-      MFEM_ABORT("SolveMeshVelocitiesHO only relevant for order_t > 0\n");
-   }
-   chrono_mm.Start();
-
-   ParGridFunction dxdt_gf, v_gf;
-   Vector* sptr = const_cast<Vector*>(&S);
-   dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
-
-   ComputeIntermediateFaceVelocities(S);
-
-   if (dim == 1)
-   {
-      /* Use intermediate face velocities to move the mesh */
-      for (int face = 0; face < smesh_num_faces; face++)
-      {
-         Vector _vel(dim);
-         GetIntermediateFaceVelocity(face, _vel);
-         geom.UpdateNodeVelocity(dxdt_gf, face, _vel);
-      }
-      /* Optionally, enforce boundary conditions */
-      if (pb->has_mv_boundary_conditions())
-      {
-         for (int i = 0; i < ess_tdofs.Size(); i++) { 
-            // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
-            dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
-         }
-      }
-   }
-   else {
-      /* Project disc vel field without visc */
-      // v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
-      // GridFunctionCoefficient v_gf_coeff(&v_gf);
-      // dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
-
-      /* 
-      Compute H1 mesh velocities using tensor product inversion 
-      This calculation requires that order_t == order_k, which 
-      we may not want for the elastic cases.
-      */
-      // ComputeMVHOfirst(S, dxdt_gf);
-
-      /*
-      */
-      ComputeGeoVNormal(S, dxdt_gf);
-
-      /* Optionally, enforce boundary conditions */
-      if (pb->has_mv_boundary_conditions())
-      {
-         for (int i = 0; i < ess_tdofs.Size(); i++) { 
-            // cout << "ess_tdof: " << ess_tdofs[i] << ", bdr val: " << bdr_vals[i] <<endl;
-            dxdt_gf(ess_tdofs[i]) = bdr_vals[i]; 
-         }
-      }
-   }
-   
-   chrono_mm.Stop();
-   // cout << "end HO mesh velocity calculation\n";
-}
-
-
 void LagrangianLOOperator::ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const
 {
    /* assume order_k == order_t, use H1L2 connectivity table */
@@ -1181,16 +1080,11 @@ void LagrangianLOOperator::ComputeMVHOfirst(const Vector &S, ParGridFunction &dx
  * @param S The input state vector.
  * @param dS_dt The output time derivative of the state vector.
  */
-void LagrangianLOOperator::SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) const
 {
    // cout << "========================================\n"
-   //      << "         SolveMeshVelocitiesLO          \n"
+   //      << "         SolveMeshVelocities          \n"
    //      << "========================================\n";
-   if (order_t != 0)
-   {
-      MFEM_ABORT("SolveMeshVelocitiesLO only relevant for order_t = 0\n");
-   }
-
    chrono_mm.Start();
    ParGridFunction dxdt_gf;
    dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
@@ -1227,6 +1121,25 @@ void LagrangianLOOperator::SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt)
       20-29 - Sparse LM
       30    - Sparse Viscous LM
       */
+      case -2:
+      {
+         if (order_t == 0)
+         {
+            MFEM_ABORT("Only relevant for order_t > 0\n");
+         }
+         ComputeMVHOfirst(S, dxdt_gf);
+         break;
+      }
+      case -1:
+      {
+         /* Project disc vel field without visc */
+         ParGridFunction v_gf;
+         Vector* sptr = const_cast<Vector*>(&S);
+         v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
+         GridFunctionCoefficient v_gf_coeff(&v_gf);
+         dxdt_gf.ProjectDiscCoefficient(v_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+         break;
+      }
 
       case 0: // arithmetic average of adjacent cells with distributed viscosity
       {

@@ -250,7 +250,7 @@ public:
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);
-   void SolveMeshVelocitiesLO(const Vector &S, Vector &dS_dt) const;
+   void SolveMeshVelocities(const Vector &S, Vector &dS_dt) const;
    void SetMVTargetViscCoeff(const double & coeff);
    void SetMVOption(const int & option);
    void SetComputeMV(const bool & option) { this->compute_mv = option; }
@@ -267,7 +267,6 @@ public:
    void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
    void GetCorrectedFaceFlux(const int & face, Vector & flux);   
    // HO
-   void SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt) const;
    void ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    void SetViGeo(const int &node, const Vector &vel);

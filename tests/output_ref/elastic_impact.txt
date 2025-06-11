@@ -10,7 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/elastic/ref-segment.mesh
    --output-flag default
    --order-thermo 0
-   --order-kinetic 2
+   --order-kinetic 1
    --refine-serial 8
    --refine-parallel 0
    --problem 51
@@ -34,7 +34,7 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
@@ -50,16 +50,16 @@ done with parallel refinement
 dim: 1, spacedim: 1
 Zones min/max: 256 256
 global_vSize: 256
-N dofs: 513
+N dofs: 257
 Num Scalar Vertex DoFs: 257
 Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 257
 dim: 1
-Number of kinematic (position, mesh velocity) dofs: 513
-Corresponding NDofs: 513
+Number of kinematic (position, mesh velocity) dofs: 257
+Corresponding NDofs: 257
 Corresponding VDim: 1
-Corresponding Vsize: 513
+Corresponding Vsize: 257
 Number of specific internal energy dofs: 256
 Corresponding NDofs: 256
 Corresponding VDim: 1
@@ -74,11 +74,11 @@ num total faces: 257
 num boundary elements: 2
 num elements: 256
 Geometric::Non-default constructor
-NDofs_H1: 513
+NDofs_H1: 257
 dim: 1
 Instantiating hydro op
-block offsets: 0 513 769 1025
-1281
+block offsets: 0 257 513 769
+1025
 Constructing BdrElementIndexingArray:
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -86,16 +86,16 @@ Constructing BdrElementIndexingArray:
 @------------------------------------------@
 @ shear_eos         : NEO_HOOKEAN          @
 @ ShearEnergyMethod : AVERAGE_F            @
-@ nqp               : 3                    @
+@ nqp               : 2                    @
 @ NDofs_L2          : 256                  @
 @ NE                : 256                  @
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-Vsize_H1: 513
+Vsize_H1: 257
 Vsize_H1L: 257
-TVSize_H1: 513
-GTVSize_H1: 513
-NDofs_H1: 513
+TVSize_H1: 257
+GTVSize_H1: 257
+NDofs_H1: 257
 NVDofs_H1: 257
 NDofs_H1L: 257
 NDofs_L2: 256
@@ -104,7 +104,7 @@ Vsize_L2V: 256
 NE: 256
 num_faces: 257
 num_vertices: 257
-num_edges: 0
+smesh_num_faces: 257
 Entering time loop
 step 5    ,	t = 0.000001,	dt = 0.00000015,	|e| = 1.8057407418e+08
 step 10   ,	t = 0.000002,	dt = 0.00000015,	|e| = 1.8057407430e+08
@@ -173,14 +173,14 @@ step 320  ,	t = 0.000048,	dt = 0.00000015,	|e| = 1.8057408027e+08
 step 325  ,	t = 0.000049,	dt = 0.00000015,	|e| = 1.8057408037e+08
 step 330  ,	t = 0.000050,	dt = 0.00000015,	|e| = 1.8057408046e+08
 step 332  ,	t = 0.000050,	dt = 0.00000014,	|e| = 1.8057408049e+08
-Program took 2.3032449583e+00s.
-This amounts to 2.7018170025e-05 s per timestep per gridpoint.
+Program took 2.1482788333e+00s.
+This amounts to 2.5200342921e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 2.303e+00                    | 2.702e-05
-  Dij calculation: 9.313e-01               | 1.092e-05
-  Mesh Motion calculation: 9.275e-02       | 1.088e-06
+                                 Total time: 2.148e+00                    | 2.520e-05
+  Dij calculation: 8.863e-01               | 1.040e-05
+  Mesh Motion calculation: 6.704e-02       | 7.864e-07
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 1.220e+00      | 1.431e-05
+  State Update calculation: 1.132e+00      | 1.328e-05
 ===========================================================

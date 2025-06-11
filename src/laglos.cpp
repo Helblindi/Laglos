@@ -155,8 +155,8 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_k = 2;  // Order of mesh movement approximation space
-   int order_u = 0;
+   int order_k = 1;  // Order of mesh movement approximation space
+   int order_t = 0;
    int ode_solver_type = 1;
    double t_init = 0.0;
    double t_final = 0.6;
@@ -180,7 +180,7 @@ int main(int argc, char *argv[]) {
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
-   int fv_option = 2;
+   int fv_option = 0;
    int mv_it_option = 0;
    int mv_n_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&output_flag, "-of", "--output-flag", 
                   "Directory that output files should be placed");
-   args.AddOption(&order_u, "-ot", "--order-thermo",
+   args.AddOption(&order_t, "-ot", "--order-thermo",
                   "Order (degree) of the thermodynamic finite element space.");
    args.AddOption(&order_k, "-ok", "--order-kinetic",
                   "Order (degree) of the mesh velocity finite element space.");
@@ -298,14 +298,18 @@ int main(int argc, char *argv[]) {
    if (Mpi::Root()) { args.PrintOptions(cout); }
 
    /***** Arg checks *****/
-   if (elastic_eos > 0 && order_u > 0)
+   if (elastic_eos > 0 && order_t > 0)
    {
-      MFEM_ABORT("Elasticity cannot be used with order_u > 0. "
-                 "Set order_u = 0 to use elasticity.");
+      MFEM_ABORT("Elasticity cannot be used with order_t > 0. "
+                 "Set order_t = 0 to use elasticity.");
    }
-   if (order_u > 0 && order_k != order_u)
+   // if (order_t > 0 && order_k != order_t)
+   // {
+   //    MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");
+   // }
+   if (fv_option > 0 && order_k != order_t + 2)
    {
-      MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");
+      MFEM_ABORT("If a different face velocity is to be used, the mesh velocity order must be equal to the thermodynamic order + 2.");
    }
    /**** End arg checks *****/
 
@@ -431,6 +435,7 @@ int main(int argc, char *argv[]) {
    // parallel mesh is defined, the serial mesh can be deleted.
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
    ParMesh *pmesh0 = new ParMesh(MPI_COMM_WORLD, *mesh);
+   ParMesh *smesh = new ParMesh(ParMesh::MakeRefined(*pmesh, order_t+1, BasisType::ClosedUniform));;
    delete mesh;
    for (int lev = 0; lev < rp_levels; lev++)
    {
@@ -570,11 +575,11 @@ int main(int argc, char *argv[]) {
 
    // Define the parallel finite element spaces. We use:
    // - H1 (continuous) for mesh movement. (Q1 / order_k)
-   // - L2 (discontinuous) for state variables (Q0 / order_u)
+   // - L2 (discontinuous) for state variables (Q0 / order_t)
    // - CR/RT for mesh velocity reconstruction at nodes
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   L2_FECollection L2FEC(order_t, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -582,7 +587,7 @@ int main(int argc, char *argv[]) {
    }
    else
    {
-      CRFEC = new RT_FECollection(order_u, dim);
+      CRFEC = new RT_FECollection(0, dim);
    }
 
    ParFiniteElementSpace H1FESpace(pmesh, &H1FEC, dim);
@@ -591,7 +596,7 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
-   ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
+   ParFiniteElementSpace CRFESpace(smesh, CRFEC, dim);
 
    // Define the explicit ODE solver used for time integration.
    ODESolver *ode_solver = NULL;
@@ -742,76 +747,6 @@ int main(int argc, char *argv[]) {
          break;
       }
       } // switch
-
-      // Adjust all face nodes to be averages of their adjacent corners
-      mfem::Mesh::FaceInformation FI;
-      for (int face = 0; face < pmesh->GetNumFaces(); face++)
-      {
-         FI = pmesh->GetFaceInformation(face);
-         Array<int> face_dof_row;
-         H1FESpace.GetFaceDofs(face, face_dof_row);
-
-         int face_dof = face_dof_row[2];
-         int index0 = face_dof_row[0];
-         int index1 = face_dof_row[1];
-         for (int i = 0; i < dim; i++)
-         {
-            int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
-            int node0_index = index0 + i * H1FESpace.GetNDofs();
-            int node1_index = index1 + i * H1FESpace.GetNDofs();
-            x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
-         }
-      }
-
-      // Adjust all cell center to be averages of corners
-      Vector cell_x(dim);
-      Array<int> verts;
-      for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
-      {
-         int cell_vdof;
-         cell_x = 0.;
-         // Get center node dof, average, and update
-         switch (dim)
-         {
-         case 1:
-         {
-            cell_vdof = L2FESpace.GetNF() + ci;
-
-            pmesh->GetElementVertices(ci, verts);
-
-            for (int j = 0; j < verts.Size(); j++)
-            {
-               cell_x[0] += x_gf[verts[j]];
-            }
-            cell_x /= verts.Size();
-            x_gf[cell_vdof] = cell_x[0];
-            break;
-         }
-         case 2:
-         {
-            cell_vdof = H1FESpace.GetNVDofs() + L2FESpace.GetNF() + ci;
-
-            pmesh->GetElementVertices(ci, verts);
-
-            for (int j = 0; j < verts.Size(); j++)
-            {
-               cell_x[0] += x_gf[verts[j]];
-               int index = verts[j] + H1FESpace.GetNDofs();
-               cell_x[1] += x_gf[index];
-            }
-            cell_x /= verts.Size();
-
-            x_gf[cell_vdof] = cell_x[0];
-            int index = cell_vdof + H1FESpace.GetNDofs();
-            x_gf[index] = cell_x[1];
-            break;
-         }
-         default:
-         {
-            MFEM_ABORT("Incorrect dim value provided.\n");
-         }
-         }
-      } // end cell center average
 
       // Update pmesh reference grid function
       pmesh->NewNodes(x_gf, false);
@@ -1147,12 +1082,17 @@ int main(int argc, char *argv[]) {
    // Print initialized mesh and gridfunctions
    // Can be visualized with glvis -np # -m *.mesh
    //                        glvis -m *.mesh -g *.gf
-   std::ostringstream mesh_name, rho_name, v_name, ste_name, mv_name;
+   std::ostringstream smesh_name, mesh_name, rho_name, v_name, ste_name, mv_name;
    mesh_name << gfprint_path 
                << setfill('0') 
                << setw(6)
                << 0
                << ".mesh";
+   smesh_name << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << ".smesh";
    rho_name  << gfprint_path 
                << setfill('0') 
                << setw(6)
@@ -1178,6 +1118,11 @@ int main(int argc, char *argv[]) {
    mesh_ofs.precision(8);
    pmesh->PrintAsOne(mesh_ofs);
    mesh_ofs.close();
+
+   std::ofstream smesh_ofs(smesh_name.str().c_str());
+   smesh_ofs.precision(8);
+   smesh->PrintAsOne(smesh_ofs);
+   smesh_ofs.close();
 
    std::ofstream rho_ofs(rho_name.str().c_str());
    rho_ofs.precision(8);
@@ -2044,6 +1989,7 @@ int main(int argc, char *argv[]) {
         << "===========================================================\n";
    
    delete pmesh;
+   delete smesh;
    delete pmesh0;
    delete CRFEC;
    delete problem_class;

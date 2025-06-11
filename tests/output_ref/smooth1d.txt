@@ -10,7 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-segment-extrapolated.mesh
    --output-flag default
    --order-thermo 0
-   --order-kinetic 2
+   --order-kinetic 1
    --refine-serial 1
    --refine-parallel 0
    --problem 40
@@ -34,7 +34,7 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
@@ -50,16 +50,16 @@ done with parallel refinement
 dim: 1, spacedim: 1
 Zones min/max: 60 60
 global_vSize: 60
-N dofs: 121
+N dofs: 61
 Num Scalar Vertex DoFs: 61
 Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 61
 dim: 1
-Number of kinematic (position, mesh velocity) dofs: 121
-Corresponding NDofs: 121
+Number of kinematic (position, mesh velocity) dofs: 61
+Corresponding NDofs: 61
 Corresponding VDim: 1
-Corresponding Vsize: 121
+Corresponding Vsize: 61
 Number of specific internal energy dofs: 60
 Corresponding NDofs: 60
 Corresponding VDim: 1
@@ -74,17 +74,17 @@ num total faces: 61
 num boundary elements: 2
 num elements: 60
 Geometric::Non-default constructor
-NDofs_H1: 121
+NDofs_H1: 61
 dim: 1
 Instantiating hydro op
-block offsets: 0 121 181 241
-301
+block offsets: 0 61 121 181
+241
 Constructing BdrElementIndexingArray:
-Vsize_H1: 121
+Vsize_H1: 61
 Vsize_H1L: 61
-TVSize_H1: 121
-GTVSize_H1: 121
-NDofs_H1: 121
+TVSize_H1: 61
+GTVSize_H1: 61
+NDofs_H1: 61
 NVDofs_H1: 61
 NDofs_H1L: 61
 NDofs_L2: 60
@@ -93,7 +93,7 @@ Vsize_L2V: 60
 NE: 60
 num_faces: 61
 num_vertices: 61
-num_edges: 0
+smesh_num_faces: 61
 Entering time loop
 step     5,	t = 0.048265,	dt = 0.00972454,	|e| = 2.2862297845e+01
 step    10,	t = 0.097090,	dt = 0.00973578,	|e| = 2.2759783761e+01
@@ -111,14 +111,14 @@ step    65,	t = 0.531920,	dt = 0.00798301,	|e| = 2.2708212895e+01
 step    70,	t = 0.571930,	dt = 0.00801392,	|e| = 2.2722863301e+01
 step    74,	t = 0.600000,	dt = 0.00399589,	|e| = 2.2733052724e+01
 projecting zero on cells with attr 99
-Program took 4.5897666667e-02s.
-This amounts to 1.0199481481e-05 s per timestep per gridpoint.
+Program took 4.6653333333e-02s.
+This amounts to 1.0367407407e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.590e-02 | 1.020e-05
-  Dij calculation:               2.049e-02 | 4.554e-06
-  Mesh Motion calculation:       4.942e-03 | 1.098e-06
+  Total time:                    4.665e-02 | 1.037e-05
+  Dij calculation:               2.195e-02 | 4.879e-06
+  Mesh Motion calculation:       3.558e-03 | 7.906e-07
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.590e-02 | 3.534e-06
+  State Update calculation:      1.660e-02 | 3.689e-06
 ===========================================================

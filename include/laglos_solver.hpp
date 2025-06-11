@@ -68,7 +68,7 @@ protected:
    // Stores mesh velocities from the previous iteration 
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
-   ParMesh *pmesh;
+   ParMesh *pmesh, *smesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
 
@@ -104,7 +104,7 @@ protected:
    const int TVSize_L2;
    const HYPRE_Int GTVSize_L2;
    const int NDofs_L2;
-   const int order_u;
+   const int order_t;
 
    const int Vsize_L2V;
    const int TVSize_L2V;
@@ -131,12 +131,17 @@ protected:
    Table * vertex_element;
    Table * face_element;
    Table * edge_vertex;
+
+   Table * smesh_vertex_element;
+   Table * smesh_edge_vertex;
+   Table smesh_vertex_edge;
    Array<int> block_offsets;
    Array<int> BdrElementIndexingArray; // Array to identify boundary faces
    Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
 
    int el_num_faces;
-   const int num_vertices, num_faces, num_edges;
+   const int num_vertices, num_faces;
+   const int smesh_num_faces;
 
    double CFL;
    double timestep = 0.001;
@@ -263,7 +268,7 @@ public:
    void GetCorrectedFaceFlux(const int & face, Vector & flux);   
    // HO
    void SolveMeshVelocitiesHO(const Vector &S, Vector &dS_dt) const;
-   void ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const;    
+   void ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    void SetViGeo(const int &node, const Vector &vel);
    void GetViGeo(const int & node, Vector & vel);
@@ -287,7 +292,7 @@ public:
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
-   void ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l) const;
+   void ComputeGeoVNormal(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)
    void ComputeGeoVNormalDistributedViscosity(Vector &S);

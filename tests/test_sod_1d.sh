@@ -18,12 +18,11 @@ problem=2
 final_time=.225
 cfl=0.5
 mv_option=2
-fv_option=2
 refinements_serial=5
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
-options+="-mv ${mv_option} -fv ${fv_option} "
+options+="-mv ${mv_option} "
 options+="-rs ${refinements_serial} "
 echo $options
 

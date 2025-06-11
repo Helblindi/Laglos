@@ -10,7 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/full_ring_r0.mesh
    --output-flag default
    --order-thermo 0
-   --order-kinetic 2
+   --order-kinetic 1
    --refine-serial 0
    --refine-parallel 0
    --problem 16
@@ -34,7 +34,7 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
@@ -57,16 +57,16 @@ P1: 1
 P2: 4
 focusing time: 0.217945
 global_vSize: 500
-N dofs: 2200
+N dofs: 600
 Num Scalar Vertex DoFs: 600
-Num Scalar edge-interior DoFs: 1100
+Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 1100
 dim: 2
-Number of kinematic (position, mesh velocity) dofs: 4400
-Corresponding NDofs: 2200
+Number of kinematic (position, mesh velocity) dofs: 1200
+Corresponding NDofs: 600
 Corresponding VDim: 2
-Corresponding Vsize: 4400
+Corresponding Vsize: 1200
 Number of specific internal energy dofs: 500
 Corresponding NDofs: 500
 Corresponding VDim: 1
@@ -81,24 +81,24 @@ num total faces: 1100
 num boundary elements: 200
 num elements: 500
 Geometric::Non-default constructor
-NDofs_H1: 2200
+NDofs_H1: 600
 dim: 2
 Instantiating hydro op
-block offsets: 0 4400 4900 5900
-6400
+block offsets: 0 1200 1700 2700
+3200
 
 
 MFEM Warning: May need to enforce additional BCs.
 
  ... in function: mfem::hydroLO::LagrangianLOOperator::LagrangianLOOperator(const int &, const int, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, const ParGridFunction &, ParLinearForm *, ProblemBase *, Array<int>, bool, int, bool, double)
- ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:187
+ ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:190
 
 Constructing BdrElementIndexingArray:
-Vsize_H1: 4400
+Vsize_H1: 1200
 Vsize_H1L: 1200
-TVSize_H1: 4400
-GTVSize_H1: 4400
-NDofs_H1: 2200
+TVSize_H1: 1200
+GTVSize_H1: 1200
+NDofs_H1: 600
 NVDofs_H1: 600
 NDofs_H1L: 600
 NDofs_L2: 500
@@ -107,7 +107,7 @@ Vsize_L2V: 1000
 NE: 500
 num_faces: 1100
 num_vertices: 600
-num_edges: 1100
+smesh_num_faces: 1100
 Entering time loop
 step     5,	t = 0.009719,	dt = 0.00197596,	|e| = 3.4138013409e+01
 step    10,	t = 0.019827,	dt = 0.00204890,	|e| = 3.5140753648e+01
@@ -165,14 +165,14 @@ step   265,	t = 0.187347,	dt = 0.00012299,	|e| = 5.2005437177e+03
 step   270,	t = 0.187952,	dt = 0.00011975,	|e| = 5.5219317056e+03
 step   275,	t = 0.188542,	dt = 0.00011669,	|e| = 5.8565197920e+03
 step   277,	t = 0.188700,	dt = 0.00004231,	|e| = 5.9503017904e+03
-Program took 3.8264035000e+00s.
-This amounts to 2.7528082734e-05 s per timestep per gridpoint.
+Program took 3.4783635833e+00s.
+This amounts to 2.5024198441e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    3.826e+00 | 2.753e-05
-  Dij calculation:               1.745e+00 | 1.255e-05
-  Mesh Motion calculation:       9.335e-01 | 6.716e-06
+  Total time:                    3.478e+00 | 2.502e-05
+  Dij calculation:               1.642e+00 | 1.182e-05
+  Mesh Motion calculation:       6.842e-01 | 4.922e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      8.629e-01 | 6.208e-06
+  State Update calculation:      8.827e-01 | 6.350e-06
 ===========================================================

@@ -10,7 +10,7 @@ Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/square-vortex.mesh
    --output-flag default
    --order-thermo 0
-   --order-kinetic 2
+   --order-kinetic 1
    --refine-serial 1
    --refine-parallel 0
    --problem 9
@@ -34,7 +34,7 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
@@ -50,16 +50,16 @@ done with parallel refinement
 dim: 2, spacedim: 2
 Zones min/max: 256 256
 global_vSize: 256
-N dofs: 1089
+N dofs: 289
 Num Scalar Vertex DoFs: 289
-Num Scalar edge-interior DoFs: 544
+Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 544
 dim: 2
-Number of kinematic (position, mesh velocity) dofs: 2178
-Corresponding NDofs: 1089
+Number of kinematic (position, mesh velocity) dofs: 578
+Corresponding NDofs: 289
 Corresponding VDim: 2
-Corresponding Vsize: 2178
+Corresponding Vsize: 578
 Number of specific internal energy dofs: 256
 Corresponding NDofs: 256
 Corresponding VDim: 1
@@ -74,17 +74,17 @@ num total faces: 544
 num boundary elements: 64
 num elements: 256
 Geometric::Non-default constructor
-NDofs_H1: 1089
+NDofs_H1: 289
 dim: 2
 Instantiating hydro op
-block offsets: 0 2178 2434 2946
-3202
+block offsets: 0 578 834 1346
+1602
 Constructing BdrElementIndexingArray:
-Vsize_H1: 2178
+Vsize_H1: 578
 Vsize_H1L: 578
-TVSize_H1: 2178
-GTVSize_H1: 2178
-NDofs_H1: 1089
+TVSize_H1: 578
+GTVSize_H1: 578
+NDofs_H1: 289
 NVDofs_H1: 289
 NDofs_H1L: 289
 NDofs_L2: 256
@@ -93,7 +93,7 @@ Vsize_L2V: 512
 NE: 256
 num_faces: 544
 num_vertices: 289
-num_edges: 544
+smesh_num_faces: 544
 Entering time loop
 step     5,	t = 0.298323,	dt = 0.05939520,	|e| = 4.0143546733e+01
 step    10,	t = 0.591558,	dt = 0.05809203,	|e| = 4.0150809687e+01
@@ -103,14 +103,14 @@ step    25,	t = 1.428989,	dt = 0.05401899,	|e| = 4.0168258739e+01
 step    30,	t = 1.695844,	dt = 0.05296088,	|e| = 4.0173274506e+01
 step    35,	t = 1.957893,	dt = 0.05206325,	|e| = 4.0177548252e+01
 step    36,	t = 2.000000,	dt = 0.04210706,	|e| = 4.0178158888e+01
-Program took 2.5007033333e-01s.
-This amounts to 2.6401006475e-05 s per timestep per gridpoint.
+Program took 2.2954650000e-01s.
+This amounts to 2.4234216639e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.501e-01 | 2.640e-05
-  Dij calculation:               1.186e-01 | 1.253e-05
-  Mesh Motion calculation:       6.138e-02 | 6.480e-06
+  Total time:                    2.295e-01 | 2.423e-05
+  Dij calculation:               1.129e-01 | 1.192e-05
+  Mesh Motion calculation:       4.504e-02 | 4.755e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      5.348e-02 | 5.647e-06
+  State Update calculation:      5.589e-02 | 5.901e-06
 ===========================================================

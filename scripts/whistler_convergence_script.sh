@@ -29,11 +29,11 @@ problem=4
 final_time=.6
 cfl=0.5
 mv_option=2
-fv_option=2
+fv_option=0
 mv_it_op=2
 mv_iter_n=2
 mm_visc=0.
-output_location="Notes/cellvol-20240614/it2/noh/cflp5-novisc"
+output_location="testing/noh"
 output_file="${bin_dir}/out-noh-novisc-r"
 ########
 

@@ -1,0 +1,360 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-segment.mesh
+   --output-flag default
+   --order-thermo 1
+   --order-kinetic 2
+   --refine-serial 3
+   --refine-parallel 0
+   --problem 2
+   --ode-solver 1
+   --t-init 0
+   --t-final 0.225
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-visit
+   --no-print
+   --no-mass-correct
+   --use-viscosity
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --no-post-process-density
+   --use-elasticity 0
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 0
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --CFL 0.1
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 1, spacedim: 1
+Zones min/max: 8 8
+global_vSize: 16
+N dofs: 17
+Num Scalar Vertex DoFs: 9
+Num Scalar edge-interior DoFs: 0
+Num Scalar face-interior DoFs: 0
+Num faces: 9
+dim: 1
+Number of kinematic (position, mesh velocity) dofs: 17
+Corresponding NDofs: 17
+Corresponding VDim: 1
+Corresponding Vsize: 17
+Number of specific internal energy dofs: 16
+Corresponding NDofs: 16
+Corresponding VDim: 1
+Corresponding Vsize: 16
+Number of velocity dofs: 16
+Corresponding NDofs: 16
+Corresponding VDim: 1
+Corresponding Vsize: 16
+num interior faces: 7
+num boundary faces: 2
+num total faces: 9
+num boundary elements: 2
+num elements: 8
+Geometric::Non-default constructor
+NDofs_H1: 17
+dim: 1
+Instantiating hydro op
+block offsets: 0 17 33 49
+65
+Constructing BdrElementIndexingArray:
+Vsize_H1: 17
+Vsize_H1L: 9
+TVSize_H1: 17
+GTVSize_H1: 17
+NDofs_H1: 17
+NVDofs_H1: 9
+NDofs_H1L: 9
+NDofs_L2: 16
+NDofs_L2V: 16
+Vsize_L2V: 16
+NE: 8
+num_faces: 9
+num_vertices: 9
+smesh_num_faces: 17
+Entering time loop
+step     5,	t = 0.012123,	dt = 0.00215430,	|e| = 8.9891093635e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.5662750035e-01
+Mass Error: 9.7912000125e-01
+Interior Mass Error: 9.7216000167e-01
+--------------------------------------
+step    10,	t = 0.021806,	dt = 0.00182853,	|e| = 9.0222443592e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.4655105079e-01
+Mass Error: 9.4329262502e-01
+Interior Mass Error: 9.2438985773e-01
+--------------------------------------
+step    15,	t = 0.030424,	dt = 0.00166514,	|e| = 9.0529751813e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.3670224761e-01
+Mass Error: 9.0827465818e-01
+Interior Mass Error: 8.7769593092e-01
+--------------------------------------
+step    20,	t = 0.038420,	dt = 0.00156054,	|e| = 9.0833329949e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.2765015614e-01
+Mass Error: 8.7608944407e-01
+Interior Mass Error: 8.3476992607e-01
+--------------------------------------
+step    25,	t = 0.045988,	dt = 0.00148492,	|e| = 9.1137911851e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.1944840023e-01
+Mass Error: 8.4692764526e-01
+Interior Mass Error: 7.9585769339e-01
+--------------------------------------
+step    30,	t = 0.053232,	dt = 0.00142657,	|e| = 9.1445064752e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.1203998373e-01
+Mass Error: 8.2058660880e-01
+Interior Mass Error: 7.6067962343e-01
+--------------------------------------
+step    35,	t = 0.060220,	dt = 0.00137981,	|e| = 9.1755307303e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 5.0534736032e-01
+Mass Error: 7.9679061447e-01
+Interior Mass Error: 7.2885853932e-01
+--------------------------------------
+step    40,	t = 0.067001,	dt = 0.00134141,	|e| = 9.2068687935e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.9929547022e-01
+Mass Error: 7.7527278300e-01
+Interior Mass Error: 7.0002945857e-01
+--------------------------------------
+step    45,	t = 0.073610,	dt = 0.00130932,	|e| = 9.2385034949e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.9381693682e-01
+Mass Error: 7.5579355313e-01
+Interior Mass Error: 6.7386452180e-01
+--------------------------------------
+step    50,	t = 0.080073,	dt = 0.00128216,	|e| = 9.2704100115e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.8885243855e-01
+Mass Error: 7.3814200373e-01
+Interior Mass Error: 6.5007487323e-01
+--------------------------------------
+step    55,	t = 0.086413,	dt = 0.00125893,	|e| = 9.3025642336e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.8435004452e-01
+Mass Error: 7.2213349163e-01
+Interior Mass Error: 6.2840751586e-01
+--------------------------------------
+step    60,	t = 0.092646,	dt = 0.00123891,	|e| = 9.3349468021e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.8026451402e-01
+Mass Error: 7.0760716097e-01
+Interior Mass Error: 6.0864192661e-01
+--------------------------------------
+step    65,	t = 0.098788,	dt = 0.00122154,	|e| = 9.3675441479e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.7655670481e-01
+Mass Error: 6.9442383932e-01
+Interior Mass Error: 5.9058714942e-01
+--------------------------------------
+step    70,	t = 0.104849,	dt = 0.00120638,	|e| = 9.4003477615e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.7319302788e-01
+Mass Error: 6.8246409914e-01
+Interior Mass Error: 5.7407909418e-01
+--------------------------------------
+step    75,	t = 0.110841,	dt = 0.00119310,	|e| = 9.4333526610e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.7014488657e-01
+Mass Error: 6.7162626336e-01
+Interior Mass Error: 5.5897776315e-01
+--------------------------------------
+step    80,	t = 0.116771,	dt = 0.00118140,	|e| = 9.4665557080e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.6738808157e-01
+Mass Error: 6.6870924123e-01
+Interior Mass Error: 5.5434426609e-01
+--------------------------------------
+step    85,	t = 0.122646,	dt = 0.00117107,	|e| = 9.4999541336e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.6490219775e-01
+Mass Error: 6.7992114451e-01
+Interior Mass Error: 5.6845223441e-01
+--------------------------------------
+step    90,	t = 0.128473,	dt = 0.00116190,	|e| = 9.5335444429e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.6267000210e-01
+Mass Error: 7.0035944455e-01
+Interior Mass Error: 5.9476132364e-01
+--------------------------------------
+step    95,	t = 0.134258,	dt = 0.00115373,	|e| = 9.5673217574e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.6067688049e-01
+Mass Error: 7.1977066908e-01
+Interior Mass Error: 6.1959680978e-01
+--------------------------------------
+step   100,	t = 0.140004,	dt = 0.00114643,	|e| = 9.6012795891e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5891033220e-01
+Mass Error: 7.3822735812e-01
+Interior Mass Error: 6.4305224525e-01
+--------------------------------------
+step   105,	t = 0.145717,	dt = 0.00113986,	|e| = 9.6354099987e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5735953014e-01
+Mass Error: 7.5580500307e-01
+Interior Mass Error: 6.6522547909e-01
+--------------------------------------
+step   110,	t = 0.151398,	dt = 0.00113394,	|e| = 9.6697040540e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5601494614e-01
+Mass Error: 7.7258203070e-01
+Interior Mass Error: 6.8621879439e-01
+--------------------------------------
+step   115,	t = 0.157051,	dt = 0.00112856,	|e| = 9.7041524691e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5486803414e-01
+Mass Error: 7.8863943501e-01
+Interior Mass Error: 7.0613863758e-01
+--------------------------------------
+step   120,	t = 0.162679,	dt = 0.00112365,	|e| = 9.7387462973e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5391095950e-01
+Mass Error: 8.0406008702e-01
+Interior Mass Error: 7.2509497996e-01
+--------------------------------------
+step   125,	t = 0.168284,	dt = 0.00111913,	|e| = 9.7734775422e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5313636526e-01
+Mass Error: 8.1892776647e-01
+Interior Mass Error: 7.4320036840e-01
+--------------------------------------
+step   130,	t = 0.173867,	dt = 0.00111493,	|e| = 9.8083395727e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5253716424e-01
+Mass Error: 8.3332597447e-01
+Interior Mass Error: 7.6056873653e-01
+--------------------------------------
+step   135,	t = 0.179429,	dt = 0.00111100,	|e| = 9.8433272950e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5210634237e-01
+Mass Error: 8.4733660902e-01
+Interior Mass Error: 7.7731407177e-01
+--------------------------------------
+step   140,	t = 0.184973,	dt = 0.00110728,	|e| = 9.8784370363e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5183677061e-01
+Mass Error: 8.6103855541e-01
+Interior Mass Error: 7.9354898657e-01
+--------------------------------------
+step   145,	t = 0.190499,	dt = 0.00110370,	|e| = 9.9136661530e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5172102319e-01
+Mass Error: 8.7450626222e-01
+Interior Mass Error: 8.0938325600e-01
+--------------------------------------
+step   150,	t = 0.196007,	dt = 0.00110020,	|e| = 9.9490123967e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5175120200e-01
+Mass Error: 8.8780834446e-01
+Interior Mass Error: 8.2492233470e-01
+--------------------------------------
+step   155,	t = 0.201497,	dt = 0.00109675,	|e| = 9.9844730876e+00
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5191877482e-01
+Mass Error: 9.0100626380e-01
+Interior Mass Error: 8.4026586754e-01
+--------------------------------------
+step   160,	t = 0.206971,	dt = 0.00109326,	|e| = 1.0020044164e+01
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5221444062e-01
+Mass Error: 9.1415313578e-01
+Interior Mass Error: 8.5550620190e-01
+--------------------------------------
+step   165,	t = 0.212426,	dt = 0.00108969,	|e| = 1.0055719177e+01
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5262803976e-01
+Mass Error: 9.2729272201e-01
+Interior Mass Error: 8.7072692050e-01
+--------------------------------------
+step   170,	t = 0.217864,	dt = 0.00108597,	|e| = 1.0091488312e+01
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5314853018e-01
+Mass Error: 9.4045867600e-01
+Interior Mass Error: 8.8600143776e-01
+--------------------------------------
+step   175,	t = 0.223282,	dt = 0.00108203,	|e| = 1.0127337519e+01
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5376405114e-01
+Mass Error: 9.5367411732e-01
+Interior Mass Error: 9.0139173261e-01
+--------------------------------------
+step   177,	t = 0.225000,	dt = 0.00063686,	|e| = 1.0138745935e+01
+--------------------------------------
+Percentage of cells where mass conservation was broken: 1.0000000000e+00
+Initial mass sum: 2.8125000000e-01, Current mass sum: 4.5397736361e-01
+Mass Error: 9.5788684589e-01
+Interior Mass Error: 9.0631622751e-01
+--------------------------------------
+Program took 2.9806041667e-02s.
+This amounts to 2.0931209036e-05 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+                                total time | t / (dof*ts) 
+  Total time:                    2.981e-02 | 2.093e-05
+  Dij calculation:               1.364e-02 | 9.577e-06
+  Mesh Motion calculation:       2.422e-03 | 1.701e-06
+    Hiop calculation (if used):  0.000e+00 | 0.000e+00
+  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
+  State Update calculation:      1.067e-02 | 7.490e-06
+===========================================================

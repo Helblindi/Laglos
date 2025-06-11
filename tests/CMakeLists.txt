@@ -179,6 +179,21 @@ add_test(NAME CompareKidder
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+### High order tests ###
+## Sod 1D
+file(COPY test_sod_1d_HO.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d_HO.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestSod1DHO
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d_HO.sh ${PROJECT_SOURCE_DIR} "HOsod1d.txt"
+)
+add_test(NAME CompareSod1DHO
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/HOsod1d.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/HOsod1d.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 #### Test elastic functions ####
 ## Elastic Impact
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

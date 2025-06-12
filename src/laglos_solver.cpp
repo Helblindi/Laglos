@@ -139,9 +139,9 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    NDofs_L2V(L2V.GetNDofs()),
    order_t(L2.GetOrder(0)),
    NE(pmesh->GetNE()),
-   NBE(pmesh->GetNBE()),
-   BdrElementIndexingArray(pmesh->GetNumFaces()),
-   BdrVertexIndexingArray(pmesh->GetNV()),
+   smesh_NBE(smesh->GetNBE()),
+   smesh_BdrElementIndexingArray(smesh->GetNumFaces()),
+   smesh_BdrVertexIndexingArray(smesh->GetNV()),
    num_faces(L2.GetNF()),
    num_vertices(pmesh->GetNV()),
    smesh_num_faces(smesh->GetNumFaces()),
@@ -149,6 +149,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    face_element(pmesh->GetFaceToElementTable()),
    edge_vertex(pmesh->GetEdgeVertexTable()),
    smesh_vertex_element(smesh->GetVertexToElementTable()),
+   smesh_face_element(smesh->GetFaceToElementTable()),
    smesh_edge_vertex(smesh->GetEdgeVertexTable()),
    ess_bdr(pmesh->bdr_attributes.Max()),
    // Options
@@ -205,12 +206,12 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    Transpose(*smesh_edge_vertex, smesh_vertex_edge);
 
    // This way all face indices that do not correspond to bdr elements will have val -1.
-   // I.e. if global face index k corresponds to an interior face, then BdrElementIndexingArray[k] = -1.
-   BdrElementIndexingArray = -1.;
+   // I.e. if global face index k corresponds to an interior face, then smesh_BdrElementIndexingArray[k] = -1.
+   smesh_BdrElementIndexingArray = -1.;
    CreateBdrElementIndexingArray();
 
-   // Similar to BdrElementIndexingArray, set default to -1.
-   BdrVertexIndexingArray = -1.;
+   // Similar to smesh_BdrElementIndexingArray, set default to -1.
+   smesh_BdrVertexIndexingArray = -1.;
    CreateBdrVertexIndexingArray();
 
    // Fill cell boundaries
@@ -597,7 +598,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
             for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
             {
                int fid = fids[fid_it];
-               int fid_ind = BdrElementIndexingArray[fid];
+               int fid_ind = smesh_BdrElementIndexingArray[fid];
                switch (fid_ind)
                {
                case -1: // Interior face
@@ -657,7 +658,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
             for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
             {
                int fid = fids[fid_it];
-               int fid_ind = BdrElementIndexingArray[fid];
+               int fid_ind = smesh_BdrElementIndexingArray[fid];
                // cout << "el: " << i << ", fid: " << fid << ", fid_ind: " << fid_ind << endl;
                switch (fid_ind)
                {
@@ -770,6 +771,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       In several methods we've attempted, mass has not been conserved
       */
       double k = k_hpv->Elem(i);
+      // cout << "i: " << i << ", size k_hpv: " << k_hpv->GlobalSize() << endl;
       double _mass = k / U_i[0];
 
       // double _mass2 = m_hpv->Elem(i);
@@ -826,11 +828,11 @@ void LagrangianLOOperator::EnforceL2BC(Vector &S, const double &t, const double 
    // Post processing modify computed values to enforce BCs
    if (pb->has_th_boundary_conditions())
    {
-      for (int bdr_ci = 0; bdr_ci < NBE; bdr_ci++)
+      for (int bdr_ci = 0; bdr_ci < smesh_NBE; bdr_ci++)
       {
          /* Get bdr attr and adjacent cell to enforce conditions on */
-         int bdr_attr = pmesh->GetBdrAttribute(bdr_ci);
-         pmesh->GetBdrElementAdjacentElement(bdr_ci, el, info);
+         int bdr_attr = smesh->GetBdrAttribute(bdr_ci);
+         smesh->GetBdrElementAdjacentElement(bdr_ci, el, info);
 
          // cout << "bdr el " << bdr_ci << " has attr " << bdr_attr << " and adj cell " << el << endl;
          GetStateVector(S, el, Ui);
@@ -1616,32 +1618,32 @@ void LagrangianLOOperator::GetEntityDof(const int GDof, DofEntity & entity, int 
 
 
 /****************************************************************************************************
-* Function: CreateBdrElementIndexingArray
+* Function: Createsmesh_BdrElementIndexingArray
 *  
 * Purpose: 
-*  To fill the Vector BdrElementIndexingArray of size NumFaces. If a face is a boundary face, then
-*  BdrElementIndexingArray[face] = bdr_attr, and if the face is an interior face, then we will have
-*  BdrElementIndexingArray[face] = -1.
+*  To fill the Vector smesh_BdrElementIndexingArray of size NumFaces. If a face is a boundary face, then
+*  smesh_BdrElementIndexingArray[face] = bdr_attr, and if the face is an interior face, then we will have
+*  smesh_BdrElementIndexingArray[face] = -1.
 ****************************************************************************************************/
 void LagrangianLOOperator::CreateBdrElementIndexingArray()
 {
    if (Mpi::Root()) { cout << "Constructing BdrElementIndexingArray:\n"; }
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < smesh_NBE; i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int index = pmesh->GetBdrElementFaceIndex(i);
-      BdrElementIndexingArray[index] = bdr_attr;
+      int bdr_attr = smesh->GetBdrAttribute(i);
+      int index = smesh->GetBdrElementFaceIndex(i);
+      smesh_BdrElementIndexingArray[index] = bdr_attr;
    }
 }
 
 
 /****************************************************************************************************
-* Function: CreateBdrVertexIndexingArray
+* Function: Createsmesh_BdrVertexIndexingArray
 *
 * Purpose: 
-*  To fill the Vector BdrVertexIndexingArray of size Numvertices. If a vertex is a boundary vertex, 
-*  then BdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
-*  have BdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
+*  To fill the Vector smesh_BdrVertexIndexingArray of size Numvertices. If a vertex is a boundary vertex, 
+*  then smesh_BdrVertexIndexingArray[vertex] = 1, and if the vertex is an interior vertex, then we will 
+*  have smesh_BdrVertexIndexingArray[vertex] = -1. This is done by iterating over boundary elements, 
 *  grab edges, and fill in the corresponding boundary attribute for the adjacent vertices
 *
 *  Note that this function will label a vertex with 5 if that vertex lies on the corner, indicating 
@@ -1653,20 +1655,20 @@ void LagrangianLOOperator::CreateBdrVertexIndexingArray()
    Array<int> fids, oris;
    Array<int> verts;
 
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < smesh_NBE; i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrElementFaceIndex(i);
+      int bdr_attr = smesh->GetBdrAttribute(i);
+      int face = smesh->GetBdrElementFaceIndex(i);
 
       if (dim == 1)
       {
-         BdrVertexIndexingArray[face] = bdr_attr;
+         smesh_BdrVertexIndexingArray[face] = bdr_attr;
       }
       else
       {
          assert(dim == 2);
 
-         pmesh->GetEdgeVertices(face, verts);
+         smesh->GetEdgeVertices(face, verts);
          for (int k = 0; k < verts.Size(); k++)
          {
             int index = verts[k];
@@ -1676,9 +1678,9 @@ void LagrangianLOOperator::CreateBdrVertexIndexingArray()
                // Replace the bdr attribute in the array as long as it is not
                // the dirichlet condition (For Saltzmann Problem)
                // This ensures the left wall vertices have the proper indicator
-               if (BdrVertexIndexingArray[index] != 5)
+               if (smesh_BdrVertexIndexingArray[index] != 5)
                {
-                  BdrVertexIndexingArray[index] = bdr_attr;
+                  smesh_BdrVertexIndexingArray[index] = bdr_attr;
                }
             }
             else 
@@ -1687,13 +1689,13 @@ void LagrangianLOOperator::CreateBdrVertexIndexingArray()
                // These nodes should not move at all during the simulation
                // Identify these corner vertices as those that already have
                // a value non negative
-               if (BdrVertexIndexingArray[index] != -1 && BdrVertexIndexingArray[index] != bdr_attr)
+               if (smesh_BdrVertexIndexingArray[index] != -1 && smesh_BdrVertexIndexingArray[index] != bdr_attr)
                {
-                  BdrVertexIndexingArray[index] = 99;
+                  smesh_BdrVertexIndexingArray[index] = 99;
                }
                else 
                {
-                  BdrVertexIndexingArray[index] = bdr_attr;
+                  smesh_BdrVertexIndexingArray[index] = bdr_attr;
                }
             }
          } // end vertex iterator
@@ -1715,14 +1717,14 @@ void LagrangianLOOperator::CreateBdrVertexIndexingArray()
 ****************************************************************************************************/
 void LagrangianLOOperator::FillCellBdrFlag()
 {
-   for (int i = 0; i < pmesh->GetNBE(); i++)
+   for (int i = 0; i < smesh_NBE; i++)
    {
-      int bdr_attr = pmesh->GetBdrAttribute(i);
-      int face = pmesh->GetBdrElementFaceIndex(i);
+      int bdr_attr = smesh->GetBdrAttribute(i);
+      int face = smesh->GetBdrElementFaceIndex(i);
 
       Array<int> row;
       // Get cell
-      face_element->GetRow(face, row);
+      smesh_face_element->GetRow(face, row);
       
       // Each face should only have 1 adjacent cell
       assert(row.Size() == 1);
@@ -2109,7 +2111,7 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
    }
 
    // Set pct corrected to be appended to timeseries data
-   pct_corrected = double(num_corrected_cells)/NE;
+   pct_corrected = double(num_corrected_cells)/NDofs_L2;
 
    /* Append onto timeseries data */
    ts_ppd_pct_cells.Append(pct_corrected);
@@ -2991,7 +2993,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
       mc_gf[l2_dof_it] = val;
    }
 
-   double cell_ratio = (double)counter / (double)NE;
+   double cell_ratio = (double)counter / (double)NDofs_L2;
    double _mass_error = num / denom;
    double _interior_mass_error = interior_num / interior_denom;
 
@@ -4094,8 +4096,6 @@ void LagrangianLOOperator::ComputeGeoVNormal(const Vector &S, ParGridFunction &d
          c_norm = n_vec.Norml2();
          n_vec /= c_norm;
          // cij is not equal on the corner faces
-         
-         
          // c_norm = n_vec.Norml2();
          // n_vec /= c_norm;
 
@@ -4209,7 +4209,7 @@ void LagrangianLOOperator::ComputeGeoVNormalDistributedViscosity(Vector &S)
 
                /* Get viscosity contribution */
                coeff = 0.5 * d * (Ucp[0] - Uc[0]) / c_norm; // This is how 5.7b is defined.
-               if (BdrVertexIndexingArray[node] == -1)
+               if (smesh_BdrVertexIndexingArray[node] == -1)
                {
                   visc_contr.Add(0.5 * coeff, n_vec);
                }
@@ -5332,7 +5332,7 @@ void LagrangianLOOperator::IterativeCornerVelocityMC(Vector &S, const double & d
       // Set corresponding boundary indicator
       // If node is boundary node, will have to add corresponding correction
       // node is interior node if bdr_ind == -1
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
       geom.GetNodeVelocity(S, node, Vnode_n);
@@ -5888,7 +5888,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLS(Vector &S, const double & d
       // Set corresponding boundary indicator
       // If node is boundary node, will have to add corresponding correction
       // node is interior node if bdr_ind == -1
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
       geom.GetNodeVelocity(S, node, Vnode_n);
@@ -6276,7 +6276,7 @@ double LagrangianLOOperator::ComputeIterativeLSGamma(Vector &S, const double & d
    for (int node = 0; node < NDofs_H1L; node++)
    { 
       // Check if node is on boundary
-      int bdr_ind = BdrVertexIndexingArray[node];
+      int bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
       geom.GetNodeVelocity(S, node, Vnode);
@@ -6377,7 +6377,7 @@ double LagrangianLOOperator::ComputeIterationNorm(const Vector &S, const ParGrid
    for (int node = 0; node < NDofs_H1L; node++)
    { 
       // Check if node is on boundary
-      int bdr_ind = BdrVertexIndexingArray[node];
+      int bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       if (bdr_ind == -1)
       {
@@ -6517,7 +6517,7 @@ void LagrangianLOOperator::IterativeCornerVelocityTNLSnoncart(Vector &S, const d
       // Set corresponding boundary indicator
       // If node is boundary node, will have to add corresponding correction
       // node is interior node if bdr_ind == -1
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
       geom.GetNodeVelocity(S, node, Vnode_n);
@@ -6854,7 +6854,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeFaceVisc(Vector &S
       Mi = 0., Ri = 0., predicted_node_v = 0.;
 
       /* bdr_ind = -1 for interior nodes */
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
       // cout << "dt: " << dt << ", node: " << node << ", bdr_ind: " << bdr_ind << endl;
 
       if (bdr_ind == -1)
@@ -7070,7 +7070,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeCellVisc(Vector &S
       /* Reset values for new node */
       Mi = 0., Ri = 0., predicted_node_v = 0.;
       sum_k = 0., sum_vk = 0.;
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
@@ -7236,7 +7236,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2Visc(Vector &S,
       /* Reset values for new node */
       Mi = 0., Ri = 0., predicted_node_v = 0.;
       sum_k = 0.;
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
@@ -7402,7 +7402,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector
       /* Reset values for new node */
       Mi = 0., Ri = 0., predicted_node_v = 0.;
       sum_k = 0.;
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       /* bdr_ind = -1 for interior nodes */
       // if (bdr_ind == -1)
@@ -7728,7 +7728,7 @@ void LagrangianLOOperator::compare_gamma2(const Vector &S, const Vector &S_old, 
    {
       sum_k = 0.;
       sum_vk = 0.;
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // All nodes minus corner nodes will contribute
       if (bdr_ind != 99)
@@ -7789,7 +7789,7 @@ void LagrangianLOOperator::ComputeAverageVelocities(Vector &S)
       geom.GetNodeVelocity(S, node, Vnode);
 
       // Only average for interior nodes
-      int bdr_ind = BdrVertexIndexingArray[node];
+      int bdr_ind = smesh_BdrVertexIndexingArray[node];
       if (bdr_ind == -1)
       {
          // Get cell faces
@@ -7893,7 +7893,7 @@ void LagrangianLOOperator::IterativeCornerVelocityFLUXLS(Vector &S, const double
       // Set corresponding boundary indicator
       // If node is boundary node, will have to add corresponding correction
       // node is interior node if bdr_ind == -1
-      bdr_ind = BdrVertexIndexingArray[node];
+      bdr_ind = smesh_BdrVertexIndexingArray[node];
 
       // Get current nodal velocity and position 
       geom.GetNodeVelocity(S, node, Vnode_n);
@@ -8446,13 +8446,13 @@ void LagrangianLOOperator::DistributeFaceViscosityToVelocity(const Vector &S, Ve
          coeff = 0.5 * d * (Ucp[0] - Uc[0]) / F;
 
          /* Handle ghost face on boundary */
-         if (BdrVertexIndexingArray[node_i] == -1) // interior
+         if (smesh_BdrVertexIndexingArray[node_i] == -1) // interior
          {
             Vi.Add(coeff, n_int);
          } else {
             Vi.Add(2*coeff, n_int);
          }
-         if (BdrVertexIndexingArray[node_j] == -1) // interior
+         if (smesh_BdrVertexIndexingArray[node_j] == -1) // interior
          {
             Vj.Add(coeff, n_int);
          } else {
@@ -8839,7 +8839,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
             dim, geom, V_target, massvec, x_gf, NE, dt, xmin, xmax, 
             HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, 
             HiopDGradIArr, HiopDGradJArr, HiopDGradData, bdr_vals,
-            ess_tdofs, BdrVertexIndexingArray, this->mv_target_visc_coeff,
+            ess_tdofs, smesh_BdrVertexIndexingArray, this->mv_target_visc_coeff,
             _vecWeights);
          break;
       }
@@ -8859,7 +8859,7 @@ void LagrangianLOOperator::SolveHiOp(const Vector &S, const Vector &S_old, const
          SetHiopHessianSparsityPatternViscous(pmesh, geom, H1, NDofs_H1, HiopHessIArr, HiopHessJArr);
 
          /* Instantiate problem */
-         omv_problem = new ViscousOptimizedMeshVelocityProblem(dim, geom, massvec, x_gf, NE, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, BdrVertexIndexingArray);
+         omv_problem = new ViscousOptimizedMeshVelocityProblem(dim, geom, massvec, x_gf, NE, dt, xmin, xmax, HiopHessIArr, HiopHessJArr, HiopCGradIArr, HiopCGradJArr, ess_tdofs, smesh_BdrVertexIndexingArray);
          break;
       }
       default:

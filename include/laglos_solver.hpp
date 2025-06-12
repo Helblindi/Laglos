@@ -112,7 +112,7 @@ protected:
    const int NDofs_L2V;
 
    // Mesh information
-   const int NE, NBE;
+   const int NE, smesh_NBE;
    IntegrationRule RT_ir;
    const int RT_ir_order = 2;
 
@@ -133,11 +133,12 @@ protected:
    Table * edge_vertex;
 
    Table * smesh_vertex_element;
+   Table * smesh_face_element;
    Table * smesh_edge_vertex;
    Table smesh_vertex_edge;
    Array<int> block_offsets;
-   Array<int> BdrElementIndexingArray; // Array to identify boundary faces
-   Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
+   Array<int> smesh_BdrElementIndexingArray; // Array to identify boundary faces
+   Array<int> smesh_BdrVertexIndexingArray;  // Array to identify boundary vertices
 
    int el_num_faces;
    const int num_vertices, num_faces;
@@ -218,7 +219,7 @@ public:
    void FillCellBdrFlag();
    void GetCellBdrFlagGF(ParGridFunction &_cell_bdr_flag_gf) { _cell_bdr_flag_gf = this->cell_bdr_flag_gf; }
 
-   bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
+   bool IsBdrVertex(const int & node) { return (smesh_BdrVertexIndexingArray[node] == 1); }
 
    void SolveHydro(const Vector &S, Vector &dS_dt) const;
    void EnforceL2BC(Vector &S, const double &t, const double &dt);

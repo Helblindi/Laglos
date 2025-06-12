@@ -1508,39 +1508,43 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
 ****************************************************************************************************/
 void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 {
-   // cout << "LagrangianLOOperator::CalculateTimestep\n";
-   double t_min = 1., t_temp = 0, mi = 0;
+   // Use ParGridFunction to store local timestep restrictions per cell
+   ParGridFunction dt_gf(&L2);
+   dt_gf = std::numeric_limits<double>::max();
+
    Array<int> row;
    Vector U_i(dim+2), U_j(dim+2);
-   double d=0., temp_sum = 0.;
+   double d = 0., temp_sum = 0., mi = 0.;
 
-   for (int i = 0; i < NDofs_L2; i++) // L2 dof iterator
+   for (int i = 0; i < NDofs_L2; i++)
    {
-      // cout << "\tcell: " << ci << endl;
       temp_sum = 0.;
       GetStateVector(S, i, U_i);
       mi = m_hpv->Elem(i);
       L2Connectivity.GetRow(i, row);
 
-      for (int j_it=0; j_it < row.Size(); j_it++) // Face iterator
+      for (int j_it = 0; j_it < row.Size(); j_it++)
       {
          int j = row[j_it];
-
          if (i != j)
          {
-            d = dij_sparse->Elem(i, j); 
+            d = dij_sparse->Elem(i, j);
             temp_sum += d;
          }
       }
-      
-      t_temp = 0.5 * ((CFL * mi) / temp_sum );
 
-      if (t_temp < t_min && t_temp > 1.e-12) { 
-         t_min = t_temp;
+      if (temp_sum > 1.e-12)
+      {
+         dt_gf[i] = 0.5 * ((CFL * mi) / temp_sum);
       }
-   } // End cell iterator
+      else
+      {
+         dt_gf[i] = std::numeric_limits<double>::max();
+      }
+   }
 
-   this->timestep = t_min;
+   // Take the minimum over all local timesteps
+   this->timestep = dt_gf.Min();
 }
 
 
@@ -2069,12 +2073,6 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
    //      << "========================================\n";
-   if(order_t > 0)
-   {
-      // MFEM_ABORT("SetMassConservativeDensity not implemented for order_t > 0.\n");
-      MFEM_WARNING("Mat need to adjust SetMassConservativeDensity for order_t > 0.\nPossibly look at LagrangianHydroOperator::ComputeDensity function.\n");
-      
-   }
    UpdateMesh(S);
    int num_corrected_cells = 0;
    ParGridFunction sv_gf;
@@ -2089,6 +2087,7 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_cor
       // Get new cell volume
       // const double k_new = pmesh->GetElementVolume(i);
       const double k_new = k_hpv->Elem(i);
+      // const double k_new = smesh->GetElementVolume(i);
       const double sv_new= sv_gf.Elem(i);
 
       // Compute sv that gives exact mass conservation
@@ -2907,16 +2906,16 @@ double LagrangianLOOperator::CalcMassLoss(const Vector &S)
 
    double num = 0., denom = 0.;
 
-   for (int ci = 0; ci < NE; ci++)
+   for (int l2_dof_it = 0; l2_dof_it < NDofs_L2; l2_dof_it++)
    {
-      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[ci] != -1)
+      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[l2_dof_it] != -1)
       {
          // Skip boundary cells
          continue;
       }
-      const double m = m_hpv->Elem(ci);
-      const double k = pmesh->GetElementVolume(ci);
-      GetStateVector(S, ci, U_i);
+      const double m = m_hpv->Elem(l2_dof_it);
+      const double k = k_hpv->Elem(l2_dof_it);
+      GetStateVector(S, l2_dof_it, U_i);
       num += abs((k / U_i[0]) - m);
       denom += abs(m);
    }
@@ -2939,6 +2938,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
    // cout << "=======================================\n"
    //      << "         CheckMassConservation         \n"
    //      << "=======================================\n";
+   UpdateMesh(S);
    Vector U_i(dim + 2);
    int counter = 0;
 
@@ -2947,11 +2947,12 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
    double temp_num = 0., temp_denom = 0., val = 0.;
    double interior_num = 0., interior_denom = 0.;
    
-   for (int ci = 0; ci < NE; ci++)
+   for (int l2_dof_it = 0; l2_dof_it < NDofs_L2; l2_dof_it++)
    {
-      const double m = m_hpv->Elem(ci);
-      const double k = pmesh->GetElementVolume(ci);
-      GetStateVector(S, ci, U_i);
+      const double m = m_hpv->Elem(l2_dof_it);
+      // const double k_e = pmesh->GetElementVolume(l2_dof_it);
+      const double k = k_hpv->Elem(l2_dof_it);
+      GetStateVector(S, l2_dof_it, U_i);
 
       current_mass = k / U_i[0];
       temp_num = abs(current_mass - m);
@@ -2962,7 +2963,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
       current_mass_sum += current_mass;
 
       // Increment internal mass loss values
-      if (cell_bdr_flag_gf[ci] == -1)
+      if (cell_bdr_flag_gf[l2_dof_it] == -1)
       {
          // Have interior node
          interior_num += temp_num;
@@ -2973,7 +2974,7 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
       if (val > 1.E-10)
       {
          counter++;
-         // cout << "cell: " << ci << endl;
+         // cout << "cell: " << l2_dof_it << endl;
          // cout << "MASS CONSERVATION BROKEN!!\n";
          // cout << "val: " << val << endl;
          // cout << "temp_num: " << temp_num << endl;
@@ -2984,10 +2985,10 @@ void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunctio
          // cout << "m: " << m << endl;
          // cout << "K/T: " << k / U_i[0] << endl;
          // cout << endl;
-         // mc_gf[ci] = val;
+         // mc_gf[l2_dof_it] = val;
       }
       // Fill corresponding cell to indicate graphically the local change in mass, if any
-      mc_gf[ci] = val;
+      mc_gf[l2_dof_it] = val;
    }
 
    double cell_ratio = (double)counter / (double)NE;

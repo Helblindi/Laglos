@@ -19,7 +19,7 @@
 * Example run time parameters:
 *
 * ----- 1D -----
-* ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6       ## Smooth
+* ./Laglos -m ../data/ref-segment.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6                    ## Smooth
 * ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 8                   ## Sod
 * ./Laglos -m ../data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8                   ## Lax
 # ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 42 -tf 0.667 -cfl 0.2 -rs  5    ## Leblanc
@@ -603,10 +603,10 @@ int main(int argc, char *argv[]) {
    switch (ode_solver_type)
    {
       case 1: ode_solver = new ForwardEulerSolver; break;
-      // case 2: ode_solver = new RK2Solver(0.5); break;
-      // case 3: ode_solver = new RK3SSPSolver; break;
-      // case 4: ode_solver = new RK4Solver; break;
-      // case 6: ode_solver = new RK6Solver; break;
+      case 2: ode_solver = new RK2Solver(0.5); break;
+      case 3: ode_solver = new RK3SSPSolver; break;
+      case 4: ode_solver = new RK4Solver; break;
+      case 6: ode_solver = new RK6Solver; break;
       // case 7: ode_solver = new RK2AvgSolver; break;
       default:
          MFEM_ABORT("ode_solver_type not implemented\n");
@@ -1246,9 +1246,16 @@ int main(int argc, char *argv[]) {
          hydro.SetCFL(CFL_new);
       }
 
-      hydro.CalculateTimestep(S);
-      dt = hydro.GetTimestep();
-
+      if (ti == 1 && greedy)
+      {
+         dt = 1.E-4;
+      }
+      else
+      {
+         hydro.CalculateTimestep(S);
+         dt = hydro.GetTimestep();
+      }
+      
       if (t + dt >= t_final)
       {
          dt = t_final - t;

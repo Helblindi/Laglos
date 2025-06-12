@@ -25,7 +25,7 @@ refinements_serial=3
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
 options+="-mv ${mv_option} -ot ${ot} -ok ${ok} "
-options+="-rs ${refinements_serial} "
+options+="-rs ${refinements_serial} -ppd -greedy "
 echo $options
 
 # Run the executable with input file (adjust args as needed)

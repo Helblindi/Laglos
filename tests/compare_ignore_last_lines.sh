@@ -2,7 +2,8 @@
 
 file1="$1"
 file2="$2"
-num_lines="${3:-11}"  # Default to ignoring last 11 lines
+num_tail_lines="${3:-11}"      # Lines to trim from the end
+num_head_skip="${4:-10}"       # Lines to skip from the beginning
 
 # Check if files exist
 [ -f "$file1" ] || { echo "Missing file: $file1"; exit 1; }
@@ -14,20 +15,18 @@ if [ $(wc -l < "$file1") -ne $(wc -l < "$file2") ]; then
     exit 1
 fi
 
-
-# Count total lines
+# Total lines minus head and tail
 total_lines=$(wc -l < "$file1")
-lines_to_keep=$((total_lines - num_lines))
+lines_to_keep=$((total_lines - num_head_skip - num_tail_lines))
 
-# If fewer lines than lines_to_ignore, skip comparison
 if [ "$lines_to_keep" -le 0 ]; then
     echo "File is too short to compare after trimming."
     exit 1
 fi
 
-# Trim and compare
-sed "${lines_to_keep}q" "$file1" > file1_trimmed.txt
-sed "${lines_to_keep}q" "$file2" > file2_trimmed.txt
+# Skip first N lines and trim last M lines
+tail -n +"$((num_head_skip + 1))" "$file1" | head -n "$lines_to_keep" > file1_trimmed.txt
+tail -n +"$((num_head_skip + 1))" "$file2" | head -n "$lines_to_keep" > file2_trimmed.txt
 
 diff -u file1_trimmed.txt file2_trimmed.txt
 exit $?

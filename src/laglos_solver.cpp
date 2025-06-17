@@ -186,10 +186,6 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
       if (ess_bdr.Size() > 4)
       {
-         if (Mpi::Root())
-         {
-            MFEM_WARNING("May need to enforce additional BCs.\n");
-         }
          if (pb->has_mv_boundary_conditions())
          {
             pb->get_additional_BCs(H1, ess_bdr, add_ess_tdofs, add_bdr_vals, &geom);

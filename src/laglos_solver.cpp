@@ -1391,7 +1391,7 @@ void LagrangianLOOperator::InitializeDijMatrix()
       for (int j = I[i]; j < I[i+1]; j++)
       {
          dij_J[j] = J[j];
-         dij_data[j] = 1.0; // Initialize all entries to one
+         dij_data[j] = 0.0; // Initialize all entries to zero
       }
    }
    
@@ -1435,56 +1435,67 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
 
       for (int j = 0; j < row.Size(); j++)
       {
+         d = 0.; // Reset d for each dof_it
          cj = row[j];
+         /* Only need to run computation on upper triangular portion since dij_sparse is symmetric */
+         if (cj < dof_it)
+         {
+            continue;
+         }
+         
          GetStateVector(S, cj, Uj);
          GetLocalCij(dof_it, cj, c);
 
          double c_norm = c.Norml2();
-         n_vec = c;
-         n_vec /= c_norm;
-
-         /* Compute max wave speed */ 
-         // Some cases require an update to b_covolume at every interface.  This can be done through
-         // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
-         // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
-         // pb->lm_update(b_covolume);
-
-         // Compute sheer energy, if applicable
-         double esl = 0., esr = 0.;
-         if (use_elasticity)
+         if (c_norm > 1.e-12)
          {
-            esl = elastic->e_sheer(dof_it);
-            esr = elastic->e_sheer(cj);
-         }
+            n_vec = c;
+            n_vec /= c_norm;
 
-         // Compute pressure with given EOS
-         double rhoL = 1. / Ui[0];
-         double sieL = pb->specific_internal_energy(Ui, esl);
-         int el_dof_it = L2.GetElementForDof(dof_it);
-         double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(el_dof_it));
+            /* Compute max wave speed */ 
+            // Some cases require an update to b_covolume at every interface.  This can be done through
+            // the function ProblemBase::lm_update(), which is overridden only in the functions it is used.
+            // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
+            // pb->lm_update(b_covolume);
 
-         double rhoR = 1. / Uj[0];
-         double sieR = pb->specific_internal_energy(Uj, esr);
-         int el_j = L2.GetElementForDof(cj);
-         double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(el_j));
+            // Compute sheer energy, if applicable
+            double esl = 0., esr = 0.;
+            if (use_elasticity)
+            {
+               esl = elastic->e_sheer(dof_it);
+               esr = elastic->e_sheer(cj);
+            }
 
-         // Finally compute lambda max
-         if (use_elasticity)
-         {
-            lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
-            lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * pb->get_shear_modulus());
+            // Compute pressure with given EOS
+            double rhoL = 1. / Ui[0];
+            double sieL = pb->specific_internal_energy(Ui, esl);
+            int el_dof_it = L2.GetElementForDof(dof_it);
+            double pl = pb->pressure(rhoL, sieL, pmesh->GetAttribute(el_dof_it));
+
+            double rhoR = 1. / Uj[0];
+            double sieR = pb->specific_internal_energy(Uj, esr);
+            int el_j = L2.GetElementForDof(cj);
+            double pr = pb->pressure(rhoR, sieR, pmesh->GetAttribute(el_j));
+
+            // Finally compute lambda max
+            if (use_elasticity)
+            {
+               lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+               lambda_max = sqrt(pow(lambda_max, 2) + std::max(rhoL,rhoR) * 4./3. * pb->get_shear_modulus());
+            }
+            else
+            {
+               lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
+            }
+            
+            d = lambda_max * c_norm;
          }
-         else
-         {
-            lambda_max = pb->compute_lambda_max(Ui, Uj, n_vec, esl, esr, pl, pr, this->use_greedy_viscosity);
-         }
-         
-         d = lambda_max * c_norm;
-         dij_avg += d;
-         denom++;
 
          dij_sparse->Elem(dof_it,cj) = d;
          dij_sparse->Elem(cj,dof_it) = d;
+
+         dij_avg += d;
+         denom++;
       }
    } // End face iterator
    dij_avg = dij_avg / denom;

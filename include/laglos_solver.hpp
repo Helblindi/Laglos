@@ -123,6 +123,12 @@ protected:
    // HO
    Table dof_h1_dof_l2; // Table to relate H1 and L2 dofs
    void BuildDofH1DofL2Table();
+   mutable QuadratureData qdata; // Data associated with each quadrature point in the mesh
+   const int l2dofs_cnt;
+   void ComputeMassConservativeDensity(ParGridFunction &rho) const;
+   Vector initial_masses, initial_volumes;
+   void MassesAndVolumesAtPosition(const ParGridFunction &u, const GridFunction &x,
+                                   Vector &el_mass, Vector &el_vol) const;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
@@ -179,7 +185,7 @@ protected:
    mutable Array<double> add_bdr_vals;
 
    /* Time series data */
-   Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
+   Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_min_detJ, ts_min_detJ_cell;
    Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int, ts_kidder_avg_density, ts_kidder_avg_entropy;
 
 public:
@@ -371,12 +377,14 @@ public:
                              const double &dt, Vector & state_val);
 
    // Enforce Mass Conservation
-   void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
+   void SetMassConservativeDensity(Vector &S);
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
    double CalcMassLoss(const Vector &S);
    void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
+   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf) const;
+   void SetInitialMassesAndVolumes(const Vector &S);
 
    // Compute various time series data
    void ComputeMinDetJ(int &cell, double &minDetJ);

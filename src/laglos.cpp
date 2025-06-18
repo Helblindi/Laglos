@@ -580,6 +580,7 @@ int main(int argc, char *argv[]) {
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_t, dim, BasisType::Positive);
+   L2_FECollection L20FEC(0, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -595,6 +596,7 @@ int main(int argc, char *argv[]) {
    /* Finite element space solely constructed for continuous representation of density field */
    ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L20FESpace(pmesh, &L20FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
    ParFiniteElementSpace CRFESpace(smesh, CRFEC, dim);
 
@@ -811,6 +813,7 @@ int main(int argc, char *argv[]) {
 
    /* Create Lagrangian Low Order Solver Object */
    LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -860,7 +863,7 @@ int main(int argc, char *argv[]) {
    int  visport   = 19916;
 
    ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
-   ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
+   ParGridFunction mc_gf(&L20FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
    /* Gridfunctions used in Triple Point */
@@ -1278,8 +1281,7 @@ int main(int argc, char *argv[]) {
       // Optionally, post process the density
       if (post_process_density)
       {
-         double pct_corrected, rel_mass_corrected;
-         hydro.SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+         hydro.SetMassConservativeDensity(S);
       }
 
       isCollapsed = hydro.ComputeTimeSeriesData(S,t,dt);
@@ -1328,7 +1330,7 @@ int main(int argc, char *argv[]) {
                  << endl;
          }
          // Fill grid function with mass information
-         hydro.CheckMassConservation(S, mc_gf);
+         hydro.ValidateMassConservation(S, mc_gf);
 
          // Turn back on suppression
          if (suppress_output)

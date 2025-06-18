@@ -157,7 +157,11 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    use_elasticity(elastic_eos),
    mm(mm),
    CFL(CFL),
-   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)) //NF//MS
+   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
+   qdata(dim, NE, ir.GetNPoints()),
+   l2dofs_cnt(L2.GetFE(0)->GetDof()),
+   initial_masses(NE),
+   initial_volumes(NE)
 {
    if (Mpi::Root())
    {
@@ -222,11 +226,6 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
-   // cout << "init mhpv\n";
-   // for (int i = 0; i < NDofs_L2; i++)
-   // {
-   //    cout << "m_hpv[" << i << "] = " << m_hpv->Elem(i) << endl;
-   // }
 
    // Build dof volume vector to compute current mass
    // when order_t, this is cell volume
@@ -236,11 +235,6 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    k_lf->Assemble();
    k_hpv = k_lf->ParallelAssemble();
    delete k_lf;
-   // cout << "init k_hpv\n";
-   // for (int i = 0; i < NDofs_L2; i++)
-   // {
-   //    cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << endl;
-   // }
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
@@ -259,7 +253,43 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Initialize Cij and Dij sparse matrices
    BuildCijMatrices();
-   InitializeDijMatrix();   
+   InitializeDijMatrix();  
+   
+   // Values of rho0DetJ0 and Jac0inv at all quadrature points.
+   // Initial local mesh size (assumes all mesh elements are the same).
+   int Ne, ne = NE;
+   double Volume, vol = 0.0;
+   const int NQ = ir.GetNPoints();
+   Vector rho_vals(NQ);
+
+   for (int e = 0; e < NE; e++)
+   {
+      rho0_gf.GetValues(e, ir, rho_vals);
+      ElementTransformation &Tr = *H1.GetElementTransformation(e);
+      for (int q = 0; q < NQ; q++)
+      {
+         const IntegrationPoint &ip = ir.IntPoint(q);
+         Tr.SetIntPoint(&ip);
+         DenseMatrixInverse Jinv(Tr.Jacobian());
+         Jinv.GetInverseMatrix(qdata.Jac0inv(e*NQ + q));
+         const double rho0DetJ0 = Tr.Weight() * rho_vals(q);
+         qdata.rho0DetJ0w(e*NQ + q) = rho0DetJ0 * ir.IntPoint(q).weight;
+      }
+   }
+   for (int e = 0; e < NE; e++) { vol += pmesh->GetElementVolume(e); }
+
+   MPI_Allreduce(&vol, &Volume, 1, MPI_DOUBLE, MPI_SUM, pmesh->GetComm());
+   MPI_Allreduce(&ne, &Ne, 1, MPI_INT, MPI_SUM, pmesh->GetComm());
+   switch (pmesh->GetElementBaseGeometry(0))
+   {
+      case Geometry::SEGMENT: qdata.h0 = Volume / Ne; break;
+      case Geometry::SQUARE: qdata.h0 = sqrt(Volume / Ne); break;
+      case Geometry::TRIANGLE: qdata.h0 = sqrt(2.0 * Volume / Ne); break;
+      case Geometry::CUBE: qdata.h0 = pow(Volume / Ne, 1./3.); break;
+      case Geometry::TETRAHEDRON: qdata.h0 = pow(6.0 * Volume / Ne, 1./3.); break;
+      default: MFEM_ABORT("Unknown zone type!");
+   }
+   qdata.h0 /= (double) H1.GetOrder(0);
 
    // Set integration rule for Rannacher-Turek space
    IntegrationRules IntRulesLo(0, Quadrature1D::GaussLobatto);
@@ -531,7 +561,6 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       L2.GetMesh()->DeleteGeometricFactors();
       e_source = new LinearForm(&L2);
       TaylorCoefficient coeff;
-      IntegrationRule ir = IntRules.Get(L2.GetFE(0)->GetGeomType(), 2);
       DomainLFIntegrator *d = new DomainLFIntegrator(coeff, &ir);
       e_source->AddDomainIntegrator(d);
       e_source->Assemble();
@@ -961,6 +990,46 @@ void LagrangianLOOperator::BuildDofH1DofL2Table()
    // cout << "dof_h1_dof_l2 table:\n";
    // dof_h1_dof_l2.Print(cout);
    // cout << "end build table\n";
+}
+
+
+/**
+ * @brief Computes the mass-conservative density and stores it in the provided ParGridFunction.
+ *
+ * This method assembles the right-hand side (RHS) vector and mass matrix for each element
+ * in the finite element space, solves the local linear system to obtain the density values,
+ * and sets the corresponding subvector in the global density function.
+ *
+ * @param[out] rho The ParGridFunction to be filled with the computed mass-conservative density.
+ *
+ * The function assumes that the L2 finite element space and quadrature data are properly initialized.
+ * It uses a custom DensityIntegrator to assemble the RHS and a MassIntegrator for the mass matrix.
+ * The computation is performed element-wise, ensuring local mass conservation.
+ */
+void LagrangianLOOperator::ComputeMassConservativeDensity(ParGridFunction &rho) const
+{
+   // cout << "========================================\n"
+   //      << "           ComputeDensity                \n"
+   //      << "========================================\n";
+   rho.SetSpace(&L2);
+   DenseMatrix Mrho(l2dofs_cnt);
+   Vector rhs(l2dofs_cnt), rho_z(l2dofs_cnt);
+   Array<int> dofs(l2dofs_cnt);
+   DenseMatrixInverse inv(&Mrho);
+   MassIntegrator _mi(&ir);
+   DensityIntegrator di(qdata);
+   di.SetIntRule(&ir);
+   for (int e = 0; e < NE; e++)
+   {
+      const FiniteElement &fe = *L2.GetFE(e);
+      ElementTransformation &eltr = *L2.GetElementTransformation(e);
+      di.AssembleRHSElementVect(fe, eltr, rhs);
+      _mi.AssembleElementMatrix(fe, eltr, Mrho);
+      inv.Factor();
+      inv.Mult(rhs, rho_z);
+      L2.GetElementDofs(e, dofs);
+      rho.SetSubVector(dofs, rho_z);
+   }
 }
 
 
@@ -2077,52 +2146,20 @@ void LagrangianLOOperator::EnforceExactBCOnCell(const Vector &S, const int & cel
 *  Postprocess the density to be exactly mass conservative.  This function must be called
 *  after the mesh motion has been calculated.
 ****************************************************************************************************/
-void LagrangianLOOperator::SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected)
+void LagrangianLOOperator::SetMassConservativeDensity(Vector &S)
 {
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"
    //      << "========================================\n";
    UpdateMesh(S);
-   int num_corrected_cells = 0;
-   ParGridFunction sv_gf;
+   ParGridFunction sv_gf, rho_gf;
    sv_gf.MakeRef(&L2, S, block_offsets[1]);
-   rel_mass_corrected = 0.;
-
-   for (int i = 0; i < NDofs_L2; i++)
+   ComputeMassConservativeDensity(rho_gf);
+   for (int l2_dof_it = 0; l2_dof_it < NDofs_L2; l2_dof_it++)
    {
-      // Get cell mass
-      const double m = m_hpv->Elem(i);
-
-      // Get new cell volume
-      // const double k_new = pmesh->GetElementVolume(i);
-      const double k_new = k_hpv->Elem(i);
-      // const double k_new = smesh->GetElementVolume(i);
-      const double sv_new= sv_gf.Elem(i);
-
-      // Compute sv that gives exact mass conservation
-      const double sv_new_mc = k_new / m;
-
-      // If needed, replace sv with mass conservative sv
-      double val = abs(sv_new - sv_new_mc);
-      if (val > 1.E-12)
-      {
-         num_corrected_cells += 1;
-         sv_gf.Elem(i) = sv_new_mc;
-         rel_mass_corrected += val / sv_new_mc;
-         if (sv_new_mc <= 0.)
-         {
-            cout << "dof: " << i << ", sv: " << sv_new_mc << endl;
-            MFEM_ABORT("Invalid value for the specific volume\n");
-         }
-      }
+      sv_gf.Elem(l2_dof_it) = 1. / rho_gf.Elem(l2_dof_it);
    }
 
-   // Set pct corrected to be appended to timeseries data
-   pct_corrected = double(num_corrected_cells)/NDofs_L2;
-
-   /* Append onto timeseries data */
-   ts_ppd_pct_cells.Append(pct_corrected);
-   ts_ppd_rel_mag.Append(rel_mass_corrected);
    sv_gf.SyncAliasMemory(S);
 }
 
@@ -2933,85 +2970,126 @@ double LagrangianLOOperator::CalcMassLoss(const Vector &S)
 }
 
 
+/**
+ * @brief Computes the element-wise masses and volumes at the current positions.
+ *
+ * This function calculates the mass and volume for each element in the mesh
+ * using the provided solution vector `rho_gf` and the current nodal positions `x`.
+ * The mass for each element is computed as the integral of `rho_gf` over the element,
+ * weighted by the determinant of the Jacobian and the quadrature weights.
+ * The volume is computed as the integral of 1 over the element, i.e., the sum
+ * of the quadrature weights times the determinant of the Jacobian.
+ *
+ * @param[in]  rho_gf   The ParGridFunction representing the field whose mass is to be computed.
+ * @param[in]  x        The GridFunction representing the current nodal positions.
+ * @param[out] el_mass  Vector to store the computed mass for each element.
+ * @param[out] el_vol   Vector to store the computed volume for each element.
+ */
+void LagrangianLOOperator::MassesAndVolumesAtPosition(
+   const ParGridFunction &rho_gf, const GridFunction &x,
+   Vector &el_mass, Vector &el_vol) const
+{
+   // Only the order of the transformation matters.
+   auto *Tr = x.FESpace()->GetMesh()->GetElementTransformation(0);
+   const FiniteElement *fe = rho_gf.ParFESpace()->GetFE(0);
+   const int nqp = ir.GetNPoints();
+   const int NE = x.FESpace()->GetNE();
+
+   GeometricFactors geom(x, ir, GeometricFactors::DETERMINANTS);
+   auto qi_u = rho_gf.FESpace()->GetQuadratureInterpolator(ir);
+   Vector u_qvals(nqp * NE);
+   // As an L2 function, u has the correct EVector lexicographic ordering.
+   qi_u->Values(rho_gf, u_qvals);
+
+   for (int k = 0; k < NE; k++)
+   {
+      el_mass(k) = 0.0;
+      el_vol(k)  = 0.0;
+      for (int q = 0; q < nqp; q++)
+      {
+         const IntegrationPoint &ip = ir.IntPoint(q);
+         el_mass(k) += ip.weight * geom.detJ(k*nqp + q) * u_qvals(k*nqp + q);
+         el_vol(k)  += ip.weight * geom.detJ(k*nqp + q);
+      }
+   }
+}
+
+
+/**
+ * @brief Initializes the element masses and volumes at the initial configuration.
+ *
+ * This function extracts the position and specific volume fields from the input state vector `S`,
+ * computes the initial density field as the reciprocal of the specific volume, and then calculates
+ * the initial element masses and volumes using the provided density and position information.
+ *
+ * @param[in] S The global state vector containing the position and specific volume fields.
+ *
+ * The function updates the `initial_masses` and `initial_volumes` member variables with the computed values.
+ */
+void LagrangianLOOperator::SetInitialMassesAndVolumes(const Vector &S)
+{
+   // cout << "=======================================\n"
+   //      << "     SetInitialMassesAndVolumes        \n"
+   //      << "=======================================\n";
+   Vector *sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf, sv_gf, rho_gf(&L2);
+   Vector el_masses(NE), el_vols(NE);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      rho_gf.Elem(i) = 1./ sv_gf.Elem(i);
+   }
+   MassesAndVolumesAtPosition(rho_gf, x_gf, initial_masses, initial_volumes);
+}
+
+
 /****************************************************************************************************
-* Function: CheckMassConservation
+* Function: ValidateMassConservation
 * Parameters:
-*  S - BlockVector corresponding to nth timestep that stores mesh information, mesh velocity, 
-*      and state variables.
+*  S     - BlockVector corresponding to nth timestep that stores mesh information, mesh velocity, 
+*          and state variables.
+*  mc_gf - ParGridFunction that will store the mass conservation validation results.
 *
 * Purpose:
 *  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
-void LagrangianLOOperator::CheckMassConservation(const Vector &S, ParGridFunction & mc_gf)
+void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunction &mc_gf) const
 {
    // cout << "=======================================\n"
-   //      << "         CheckMassConservation         \n"
+   //      << "         ValidateMassConservation      \n"
    //      << "=======================================\n";
+   assert(mc_gf.Size() == NE);
    UpdateMesh(S);
-   Vector U_i(dim + 2);
-   int counter = 0;
-
-   double current_mass = 0., current_mass_sum = 0.;
-   double num = 0., denom = 0.;
-   double temp_num = 0., temp_denom = 0., val = 0.;
-   double interior_num = 0., interior_denom = 0.;
-   
-   for (int l2_dof_it = 0; l2_dof_it < NDofs_L2; l2_dof_it++)
+   Vector *sptr = const_cast<Vector*>(&S);
+   ParGridFunction x_gf, sv_gf, rho_gf(&L2);
+   x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   for (int i = 0; i < NDofs_L2; i++)
    {
-      const double m = m_hpv->Elem(l2_dof_it);
-      // const double k_e = pmesh->GetElementVolume(l2_dof_it);
-      const double k = k_hpv->Elem(l2_dof_it);
-      GetStateVector(S, l2_dof_it, U_i);
-
-      current_mass = k / U_i[0];
-      temp_num = abs(current_mass - m);
-      temp_denom = abs(m);
-
-      num += temp_num;
-      denom += temp_denom;
-      current_mass_sum += current_mass;
-
-      // Increment internal mass loss values
-      if (cell_bdr_flag_gf[l2_dof_it] == -1)
-      {
-         // Have interior node
-         interior_num += temp_num;
-         interior_denom += temp_denom;
-      }
-
-      val = temp_num / temp_denom;
-      if (val > 1.E-10)
-      {
-         counter++;
-         // cout << "cell: " << l2_dof_it << endl;
-         // cout << "MASS CONSERVATION BROKEN!!\n";
-         // cout << "val: " << val << endl;
-         // cout << "temp_num: " << temp_num << endl;
-         // cout << "temp_denom: " << temp_denom << endl;
-         // cout << "k / U_i[0] - m = " << k / U_i[0] - m << endl;
-         // cout << "K: " << k << endl;
-         // cout << "T: " << U_i[0] << endl;
-         // cout << "m: " << m << endl;
-         // cout << "K/T: " << k / U_i[0] << endl;
-         // cout << endl;
-         // mc_gf[l2_dof_it] = val;
-      }
-      // Fill corresponding cell to indicate graphically the local change in mass, if any
-      mc_gf[l2_dof_it] = val;
+      rho_gf.Elem(i) = 1./ sv_gf.Elem(i);
    }
 
-   double cell_ratio = (double)counter / (double)NDofs_L2;
-   double _mass_error = num / denom;
-   double _interior_mass_error = interior_num / interior_denom;
+   /* Compute masses and volumes at current step */
+   Vector el_masses(NE), el_vols(NE);
+   MassesAndVolumesAtPosition(rho_gf, x_gf, el_masses, el_vols);
 
-   if (_mass_error > 1.E-10 || _interior_mass_error > 1.E-10 || cell_ratio > 1.E-10)
+   /* Compare cell wise masses to check for conservation */
+   subtract(el_masses, initial_masses, mc_gf);
+   if (mc_gf.Norml2() > 1e-10)
    {
+      int num_broken = 0;
+      for (int i = 0; i < NE; i++)
+      {
+         if (mc_gf.Elem(i) > 1e-10)
+         {
+            num_broken++;
+         }
+      }
       cout << "--------------------------------------\n"
-           << "Percentage of cells where mass conservation was broken: " << cell_ratio << endl
-           << "Initial mass sum: " << denom 
-           << ", Current mass sum: " << current_mass_sum << endl
-           << "Mass Error: " << _mass_error << endl
-           << "Interior Mass Error: " << _interior_mass_error << endl
+           << "Ratio of cells where mass conservation was broken: " << (double)num_broken / NE << endl
+           << "Initial mass sum: " << initial_masses.Sum()
+           << ", Current mass sum: " << el_masses.Sum() << endl
            << "--------------------------------------\n";
    }
 }
@@ -3967,12 +4045,6 @@ void LagrangianLOOperator::SaveTimeSeriesArraysToFile(const string &output_file_
    assert(ts_min_detJ.Size() == num_timesteps);
    assert(ts_min_detJ_cell.Size() == num_timesteps);
 
-   if (post_process_density)
-   {
-      assert(ts_ppd_pct_cells.Size() == num_timesteps);
-      assert(ts_ppd_rel_mag.Size() == num_timesteps);
-   }
-
    // Form filenames and ofstream objects
    std::string sv_file = output_file_prefix + output_file_suffix;
    std::ofstream fstream_sv(sv_file.c_str());
@@ -4001,13 +4073,6 @@ void LagrangianLOOperator::SaveTimeSeriesArraysToFile(const string &output_file_
                  << ts_min_detJ[i] << ","
                  << ts_min_detJ_cell[i];
 
-      // Save ppd values if enabled
-      if (post_process_density)
-      {
-         fstream_sv << ","
-                    << ts_ppd_pct_cells[i] << ","
-                    << ts_ppd_rel_mag[i];
-      }
       // Save interior and exterior radius in case of Kidder problem
       if (pb->get_indicator() == "Kidder")
       {

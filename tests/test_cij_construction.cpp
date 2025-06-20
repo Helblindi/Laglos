@@ -172,8 +172,9 @@ int CompareCijComputation()
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff, &ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
@@ -183,7 +184,7 @@ int CompareCijComputation()
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
    hydro.BuildCijMatrices();
    // assert(false);
    Array<int> fids, oris;
@@ -361,8 +362,9 @@ void TestU2()
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff, &ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
@@ -372,7 +374,7 @@ void TestU2()
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
    hydro.BuildCijMatrices();
 
    ParGridFunction L2_coords(&L2VFESpace);
@@ -505,8 +507,9 @@ int ValidateCijComputationOrder1()
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff, &ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
@@ -516,7 +519,7 @@ int ValidateCijComputationOrder1()
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, _mm, CFL);
    hydro.BuildCijMatrices();
    Table L2Connectivity;
    hydro.GetL2ConnectivityTable(L2Connectivity);

@@ -48,7 +48,7 @@
 * ----- Untested -----
 * ./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4                     ## ICF [Untested]
 * ./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0               ## Kidder ball [Untested]
-* ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.75 -cfl 0.5 -rs 4                      ## Taylor-Green [Untested]
+* ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 4                      ## Taylor-Green [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis               ## Vdw2 
@@ -801,8 +801,9 @@ int main(int argc, char *argv[]) {
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff,&ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
@@ -812,7 +813,7 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
    hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */

@@ -165,6 +165,20 @@ add_test(NAME CompareIV
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+# Taylor Green Vortex
+file(COPY test_tg.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_tg.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestTG
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_tg.sh ${PROJECT_SOURCE_DIR} "tg_output.txt"
+)
+add_test(NAME CompareTG
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/tg_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/tg.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 # Kidder shell
 file(COPY test_kidder.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_kidder.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

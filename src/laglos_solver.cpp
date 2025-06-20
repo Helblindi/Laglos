@@ -90,8 +90,10 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
                                            ParFiniteElementSpace &l2,
                                            ParFiniteElementSpace &l2v,
                                            ParFiniteElementSpace &cr,
+                                           Coefficient &rho0_coeff,
                                            const ParGridFunction &rho0_gf,
                                            ParLinearForm *m,
+                                           const IntegrationRule &_ir,
                                            ProblemBase *_pb,
                                            Array<int> offset,
                                            bool use_viscosity,
@@ -157,11 +159,14 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    use_elasticity(elastic_eos),
    mm(mm),
    CFL(CFL),
-   ir(IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1.GetOrder(0) + L2.GetOrder(0) - 1)), //NF//MS
+   ir(_ir), //NF//MS
    qdata(dim, NE, ir.GetNPoints()),
    l2dofs_cnt(L2.GetFE(0)->GetDof()),
+   l2vdofs_cnt(L2V.GetFE(0)->GetDof()),
    initial_masses(NE),
-   initial_volumes(NE)
+   initial_volumes(NE),
+   Me(l2dofs_cnt, l2dofs_cnt, NE),
+   Me_inv(l2dofs_cnt, l2dofs_cnt, NE)
 {
    if (Mpi::Root())
    {
@@ -226,6 +231,20 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Build mass vector
    m_hpv = m_lf->ParallelAssemble();
+   /* Assemble mass matrices */
+   // TODO: Add option to use lumped vs consistent mass matrix
+   // mi = new LumpedIntegrator(new MassIntegrator(rho0_coeff, &ir));
+   mi = new MassIntegrator(rho0_coeff, &ir);
+
+   for (int e = 0; e < NE; e++)
+   {
+      DenseMatrixInverse inv(&Me(e));
+      const FiniteElement &fe = *L2.GetFE(e);
+      ElementTransformation &Tr = *L2.GetElementTransformation(e);
+      mi->AssembleElementMatrix(fe, Tr, Me(e));
+      inv.Factor();
+      inv.GetInverseMatrix(Me_inv(e));
+   }
 
    // Build dof volume vector to compute current mass
    // when order_t, this is cell volume
@@ -535,29 +554,26 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
  *
  * @note This method currently fails on the Kidder problem.
  */
- void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
- {
+void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
+{
    // cout << "========================================\n"
    //      << "               SolveHydro               \n"
    //      << "========================================\n";
-   // if (order_t > 0)
-   // {
-   //    MFEM_ABORT("When order_t > 0, may not need row sums to be 0.\n");
-   // }
    chrono_state.Start();
 
-   Vector rhs(dim+2), cij(dim), U_i(dim+2), U_j(dim+2);
-   Array<int> row;
-
-   double d;
-
-   H1.ExchangeFaceNbrData();
+   ParGridFunction dsv_gf, dv_gf, dste_gf, sv_gf, v_gf, ste_gf;
+   dsv_gf.MakeRef(&L2, dS_dt, block_offsets[1]);
+   dv_gf.MakeRef(&L2V, dS_dt, block_offsets[2]);
+   dste_gf.MakeRef(&L2, dS_dt, block_offsets[3]);
+   Vector* sptr = const_cast<Vector*>(&S);
+   sv_gf.MakeRef(&L2, *sptr, block_offsets[1]);
+   v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
+   ste_gf.MakeRef(&L2, *sptr, block_offsets[3]);
 
    /* Add in e_source for taylor green */
    LinearForm *e_source = nullptr;
    if (pb->get_indicator() == "TaylorGreen")
    {
-      // Needed since the Assemble() defaults to PA.
       L2.GetMesh()->DeleteGeometricFactors();
       e_source = new LinearForm(&L2);
       TaylorCoefficient coeff;
@@ -565,14 +581,66 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       e_source->AddDomainIntegrator(d);
       e_source->Assemble();
    }
+   Array<int> l2dofs, l2vdofs;
 
-   for (int i = 0; i < NDofs_L2; i++) // L2 dof iterator
+   Vector loc_tau_rhs(l2dofs_cnt), loc_dtau(l2dofs_cnt);
+   Vector loc_e_rhs(l2dofs_cnt), loc_de(l2dofs_cnt), loc_dv_vec(dim*l2dofs_cnt);
+   DenseMatrix loc_v_rhs(l2dofs_cnt, dim), loc_dv(l2dofs_cnt, dim);
+
+   for (int e = 0; e < NE; e++) // element iterator
    {
-      GetStateVector(S, i, U_i);
+      ComputeHydroLocRHS(S, e, loc_tau_rhs, loc_e_rhs, loc_v_rhs);
+      L2.GetElementDofs(e, l2dofs);
 
-      L2Connectivity.GetRow(i, row);
-      DenseMatrix F_i;
-      //NF//MS
+      /* Solve specific volume */
+      Me_inv(e).Mult(loc_tau_rhs, loc_dtau);
+      dsv_gf.SetSubVector(l2dofs, loc_dtau);
+
+      /* Solve velocity */
+      L2V.GetElementVDofs(e, l2vdofs);
+      mfem::Mult(Me_inv(e), loc_v_rhs, loc_dv);
+      loc_dv_vec = 0.;
+      loc_dv.AddToVector(0, loc_dv_vec);
+      dv_gf.SetSubVector(l2vdofs, loc_dv_vec);
+
+      /* Solve energy */
+      /* Add in e_source for taylor green */
+      Vector loc_e_src(l2dofs_cnt);
+      if (pb->get_indicator() == "TaylorGreen")
+      {
+         e_source->GetSubVector(l2dofs, loc_e_src);
+         loc_e_rhs.Add(1., loc_e_src);
+      }
+
+      Me_inv(e).Mult(loc_e_rhs, loc_de);
+      dste_gf.SetSubVector(l2dofs, loc_de);
+   }
+
+   dsv_gf.SyncAliasMemory(dS_dt);
+   dv_gf.SyncAliasMemory(dS_dt);
+   dste_gf.SyncAliasMemory(dS_dt);
+}
+
+void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const
+{
+   // cout << "========================================\n"
+   //      << "          ComputeHydroLocRHS           \n"
+   //      << "========================================\n";
+   loc_tau_rhs.SetSize(l2dofs_cnt);
+   loc_e_rhs.SetSize(l2dofs_cnt);
+   loc_v_rhs.SetSize(l2dofs_cnt, dim);
+   Array<int> l2dofs, row;
+   L2.GetElementDofs(el, l2dofs);
+   DenseMatrix F_i(dim+2, dim);
+   Vector U_i(dim+2), U_j(dim+2), cij(dim), rhs(dim+2);
+
+   H1.ExchangeFaceNbrData();
+
+   for (int dof_it = 0; dof_it < l2dofs_cnt; dof_it++)
+   {
+      int i = l2dofs[dof_it];
+      rhs = 0.;
+      GetStateVector(S, i, U_i);
       int el_i = L2.GetElementForDof(i);
       int attr_i = pmesh->GetAttribute(el_i);
 
@@ -592,14 +660,14 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       {
          F_i = pb->flux(U_i, attr_i);
       }
-
-      rhs = 0.;
-
       int bdr_ind = cell_bdr_flag_gf[i];
-      for (int j_it=0; j_it < row.Size(); j_it++) // Adjacent dof iterator
+      L2Connectivity.GetRow(i, row);
+      // cout << "i: " << i << ", row: ";
+      // row.Print(cout);
+      for (int j_it = 0; j_it < row.Size(); j_it++) // Adjacent dof iterator
       {
          int j = row[j_it];
-         GetLocalCij(i,j,cij);
+         GetLocalCij(i, j, cij);
          GetStateVector(S, j, U_j);
 
          DenseMatrix dm(dim+2, dim);
@@ -627,10 +695,8 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
                switch (fid_ind)
                {
                case -1: // Interior face
-               {
                   // Do nothing, this is an interior face
                   break;
-               }
                case 5: // Left wall
                {
                   CalcOutwardNormalInt(S, i, fid, cF);
@@ -666,7 +732,6 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
                   rhs -= yb;
                   break;
                }
-
                }
             }
          }
@@ -776,7 +841,7 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
          /* viscosity contribution */
          if (use_viscosity)
          {
-            d = dij_sparse->Elem(i,j); 
+            double d = dij_sparse->Elem(i,j); 
 
             Vector z = U_j;
             z -= U_i;
@@ -784,46 +849,19 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
          }   
       } // End adjacent dof iterator
 
-      /* Add in e_source for taylor green */
-      if (pb->get_indicator() == "TaylorGreen")
+      /* Set ith row of loc_tau, loc_v, and loc_e */
+      loc_tau_rhs[dof_it] = rhs[0];
+      Array<int> subv_dofs(dim);
+      for (int it = 0; it < dim; it++)
       {
-         // cout << "LF size: " << e_source->Size() << endl;
-         rhs[dim+1] += e_source->Elem(i);
+         subv_dofs[it] = it + 1;
       }
-
-      /* 
-      Compute current mass, rather than assume mass is conserved
-      In several methods we've attempted, mass has not been conserved
-      */
-      double k = k_hpv->Elem(i);
-      // cout << "i: " << i << ", size k_hpv: " << k_hpv->GlobalSize() << endl;
-      double _mass = k / U_i[0];
-
-      // double _mass2 = m_hpv->Elem(i);
-      // if (abs(_mass - _mass2) > 1e-10)
-      // {
-      //    if (Mpi::Root())
-      //    {
-      //       cout << "Mass mismatch at " << i << ", " << _mass << " vs " << _mass2 << endl;
-      //       cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << ", tau: " << U_i[0] << endl;
-      //    }
-      //    MFEM_ABORT("Mass mismatch in LagrangianLOOperator::SolveHydro.\n");
-      // }
-      rhs /= _mass;
-
-      // In either case, update dS_dt
-      SetStateVector(dS_dt, i, rhs);
-   } // End cell iterator
-   chrono_state.Stop();
-
-   /* Lastly, delete allocated memory */
-   if (e_source)
-   {
-      delete e_source;
-      e_source = nullptr;
-   }
-   // cout << "end hydro\n";
- }
+      Vector subv(dim);
+      rhs.GetSubVector(subv_dofs, subv);
+      loc_v_rhs.SetRow(dof_it, subv);
+      loc_e_rhs[dof_it] = rhs[dim+1]; 
+   } // End l2 dof iterator
+}
 
 
 /**

@@ -2,7 +2,6 @@
 #define LAGLOS_SOLVER
 
 #include "mfem.hpp"
-// #include "initial_vals.hpp"
 #include "test_problems_include.h"
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
@@ -124,11 +123,14 @@ protected:
    Table dof_h1_dof_l2; // Table to relate H1 and L2 dofs
    void BuildDofH1DofL2Table();
    mutable QuadratureData qdata; // Data associated with each quadrature point in the mesh
-   const int l2dofs_cnt;
+   const int l2dofs_cnt, l2vdofs_cnt;
    void ComputeMassConservativeDensity(ParGridFunction &rho) const;
    Vector initial_masses, initial_volumes;
    void MassesAndVolumesAtPosition(const ParGridFunction &u, const GridFunction &x,
                                    Vector &el_mass, Vector &el_vol) const;
+   mutable DenseTensor Me, Me_inv; // Energy mass matrix and its inverse
+   MassIntegrator * mi; // Mass integrator for mass matrix
+   void ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
@@ -199,8 +201,10 @@ public:
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
+                        Coefficient &rho0_coeff,
                         const ParGridFunction &rho0_gf,
                         ParLinearForm *m,
+                        const IntegrationRule &_ir,
                         ProblemBase *_pb,
                         Array<int> offset,
                         bool use_viscosity,

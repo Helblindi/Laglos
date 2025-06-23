@@ -28,7 +28,7 @@
 
 
 ## Mass Error Calculation
-All calculations related to the local mass error are calculated in the function LagrangianLOOperator::CheckMassConservation.
+All calculations related to the local mass error are calculated in the function LagrangianLOOperator::ValidateMassConservation.
 The mass error is a relative quantity and is defined as 
 $$ \text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho}}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}} $$ 
 where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the measure of the cell at time $t^n$, and $T_c^n$ is the specific volume of a cell at time $t^n$.
@@ -212,12 +212,13 @@ and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
 Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
 that can be used are
 
-> - 0 - Free boundary condition
-> - 1 - Used to enforce $v_x = 0$.
-> - 2 - Used to enforce $v_y = 0$.
-> - 3 - Used to enforce $v_z = 0$.
-> - 4 - Used to enforce $v_r = 0$, or in other words 0 radial movement.
-> - 5 - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+> - 0  - Free boundary condition
+> - 1  - Used to enforce $v_x = 0$.
+> - 2  - Used to enforce $v_y = 0$.
+> - 3  - Used to enforce $v_z = 0$.
+> - 4  - Used to enforce $v_r = 0$, or in other words 0 radial movement.
+> - 5  - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+> - 99 - Off limits as this is used in BdrVertexIndexingArray to indicate corner vertices that should not move at all.
 
 If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
 the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs

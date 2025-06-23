@@ -34,13 +34,13 @@ def gather_vals():
             'n_refinements': [],
             'n_Dofs': [],
             'h': [],
-            # rho
-            'rho_L1_Error': [],
-            'rho_L1_Rates': [],
-            'rho_L2_Error': [],
-            'rho_L2_Rates': [],
-            'rho_Linf_Error': [],
-            'rho_Linf_Rates': [],
+            # sv
+            'sv_L1_Error': [],
+            'sv_L1_Rates': [],
+            'sv_L2_Error': [],
+            'sv_L2_Rates': [],
+            'sv_Linf_Error': [],
+            'sv_Linf_Rates': [],
             # vel 
             'vel_L1_Error': [],
             'vel_L1_Rates': [],
@@ -81,42 +81,42 @@ def compute_rates(vals):
     table = []
     for i in range(len(vals['h'])):
         if i == 0:
-            table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], "{---}", vals['rho_L2_Error'][i], "{---}",
-                          vals['rho_Linf_Error'][i], "{---}"])
+            table.append([vals['n_Dofs'][i], vals['sv_L1_Error'][i], "{---}", vals['sv_L2_Error'][i], "{---}",
+                          vals['sv_Linf_Error'][i], "{---}"])
         else:
-            if (vals['rho_L1_Error'][i-1] != 0):
-                L1_rate = np.around(np.log(vals['rho_L1_Error'][i]/vals['rho_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if (vals['sv_L1_Error'][i-1] != 0):
+                L1_rate = np.around(np.log(vals['sv_L1_Error'][i]/vals['sv_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
             else:
                 L1_rate = "---"
-            if (vals['rho_L2_Error'][i-1] != 0):
-                L2_rate = np.around(np.log(vals['rho_L2_Error'][i]/vals['rho_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if (vals['sv_L2_Error'][i-1] != 0):
+                L2_rate = np.around(np.log(vals['sv_L2_Error'][i]/vals['sv_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
             else:
                 L2_rate = "---"
-            if (vals['rho_Linf_Error'][i-1] != 0):
-                Linf_rate = np.around(np.log(vals['rho_Linf_Error'][i]/vals['rho_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            if (vals['sv_Linf_Error'][i-1] != 0):
+                Linf_rate = np.around(np.log(vals['sv_Linf_Error'][i]/vals['sv_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
             else:
                 Linf_rate = "---"
-            # if vals['rho_L1_Error'][i-1] != 0:
-            #    L1_rate = np.around(np.log(vals['rho_L1_Error'][i]/vals['rho_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
-            # if vals['rho_L2_Error'][i-1] != 0:
-            #    L2_rate = np.around(np.log(vals['rho_L2_Error'][i]/vals['rho_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
-            # if vals['rho_Linf_Error'][i-1] != 0:
-            #    Linf_rate = np.around(np.log(vals['rho_Linf_Error'][i]/vals['rho_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            # if vals['sv_L1_Error'][i-1] != 0:
+            #    L1_rate = np.around(np.log(vals['sv_L1_Error'][i]/vals['sv_L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            # if vals['sv_L2_Error'][i-1] != 0:
+            #    L2_rate = np.around(np.log(vals['sv_L2_Error'][i]/vals['sv_L2_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
+            # if vals['sv_Linf_Error'][i-1] != 0:
+            #    Linf_rate = np.around(np.log(vals['sv_Linf_Error'][i]/vals['sv_Linf_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
             # if vals['mass_loss'][i-1] > pow(10,-14):
             #     mass_loss_rate = np.around(np.log(vals['mass_loss'][i]/vals['mass_loss'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
-            table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], L1_rate,
-                     vals['rho_L2_Error'][i], L2_rate,
-                     vals['rho_Linf_Error'][i], Linf_rate])
+            table.append([vals['n_Dofs'][i], vals['sv_L1_Error'][i], L1_rate,
+                     vals['sv_L2_Error'][i], L2_rate,
+                     vals['sv_Linf_Error'][i], Linf_rate])
             # else:
-            #     table.append([vals['n_Dofs'][i], vals['rho_L1_Error'][i], L1_rate,
-            #               vals['rho_L2_Error'][i], L2_rate,
-            #               vals['rho_Linf_Error'][i], Linf_rate,
+            #     table.append([vals['n_Dofs'][i], vals['sv_L1_Error'][i], L1_rate,
+            #               vals['sv_L2_Error'][i], L2_rate,
+            #               vals['sv_Linf_Error'][i], Linf_rate,
             #               vals['mass_loss'][i], "{---}"])
             
 
     s_table = tabulate(table,
-                       headers=["# dof", "rho L1 Error", "Rate", "rho L2 Error",
-                                "Rate", "rho L-Inf Error", "Rate"],
+                       headers=["# dof", "sv L1 Error", "Rate", "sv L2 Error",
+                                "Rate", "sv L-Inf Error", "Rate"],
                        tablefmt="latex")
 
     # Output table to console
@@ -217,7 +217,8 @@ def compute_rates(vals):
         if i == 0:
             table.append([vals['n_Dofs'][i], vals['L1_Error'][i], "{---}", 
                         #   vals['L2_Error'][i], "{---}", vals['Linf_Error'][i], "{---}", 
-                          vals['mass_loss'][i], "{---}"])
+                          vals['mass_loss'][i], "{---}"
+                          ])
         else:
             if (vals['L1_Error'][i-1] != 0):
                 L1_rate = np.around(np.log(vals['L1_Error'][i]/vals['L1_Error'][i-1]) / np.log(vals['h'][i]/vals['h'][i-1]), decimals=rate_precision)
@@ -239,18 +240,21 @@ def compute_rates(vals):
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
                         #   vals['L2_Error'][i], L2_rate,
                         #   vals['Linf_Error'][i], Linf_rate,
-                          vals['mass_loss'][i], mass_loss_rate])
+                          vals['mass_loss'][i], mass_loss_rate
+                          ])
             else:
                 table.append([vals['n_Dofs'][i], vals['L1_Error'][i], L1_rate,
                         #   vals['L2_Error'][i], L2_rate,
                         #   vals['Linf_Error'][i], Linf_rate,
-                          vals['mass_loss'][i], "{---}"])
+                          vals['mass_loss'][i], "{---}"
+                          ])
             
 
     s_table = tabulate(table,
                        headers=["# dof", "L1 Error", "Rate", 
                               #   "L2 Error", "Rate", "L-Inf Error", "Rate", 
-                                "Mass Loss", "Rate"],
+                                "Mass Loss", "Rate"
+                                ],
                        tablefmt="latex")
 
     # Output table to console

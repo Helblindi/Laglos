@@ -212,7 +212,7 @@ public:
       {
          want_iter = true; // No iter
          // cout << "inul: " << in_ul << ", inur: " << in_ur << endl;
-         MFEM_ABORT("Need to incorporate b_covolume and p_inf");
+         // MFEM_ABORT("Need to incorporate b_covolume and p_inf");
          __arbitrary_eos_lagrangian_greedy_lambda_module_MOD_greedy_lambda_arbitrary_eos(
             &in_rhol,&in_ul,&in_el,&in_pl,&in_rhor,&in_ur,&in_er,&in_pr,&in_tol,
             &want_iter,&lambda_max, &pstar,&k);

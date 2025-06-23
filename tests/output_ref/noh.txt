@@ -9,6 +9,8 @@
 Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/noh.mesh
    --output-flag default
+   --order-thermo 0
+   --order-kinetic 1
    --refine-serial 0
    --refine-parallel 0
    --problem 10
@@ -32,12 +34,11 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
    --mesh-motion-consistency-coefficient-on-cells 0
-   --optimize-timestep
    --CFL 0.5
    --no-set-dt-to-h
    --timestep 0.001
@@ -49,16 +50,16 @@ done with parallel refinement
 dim: 2, spacedim: 2
 Zones min/max: 900 900
 global_vSize: 900
-N dofs: 3721
+N dofs: 961
 Num Scalar Vertex DoFs: 961
-Num Scalar edge-interior DoFs: 1860
+Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 1860
 dim: 2
-Number of kinematic (position, mesh velocity) dofs: 7442
-Corresponding NDofs: 3721
+Number of kinematic (position, mesh velocity) dofs: 1922
+Corresponding NDofs: 961
 Corresponding VDim: 2
-Corresponding Vsize: 7442
+Corresponding Vsize: 1922
 Number of specific internal energy dofs: 900
 Corresponding NDofs: 900
 Corresponding VDim: 1
@@ -73,26 +74,26 @@ num total faces: 1860
 num boundary elements: 120
 num elements: 900
 Geometric::Non-default constructor
-NDofs_H1: 3721
+NDofs_H1: 961
 dim: 2
 Instantiating hydro op
-block offsets: 0 7442 8342 10142
-11042
+block offsets: 0 1922 2822 4622
+5522
 Constructing BdrElementIndexingArray:
-Vsize_H1: 7442
+Vsize_H1: 1922
 Vsize_H1L: 1922
-TVSize_H1: 7442
-GTVSize_H1: 7442
-NDofs_H1: 3721
+TVSize_H1: 1922
+GTVSize_H1: 1922
+NDofs_H1: 961
 NVDofs_H1: 961
 NDofs_H1L: 961
 NDofs_L2: 900
 NDofs_L2V: 900
 Vsize_L2V: 1800
-num_elements: 900
+NE: 900
 num_faces: 1860
 num_vertices: 961
-num_edges: 1860
+smesh_num_faces: 1860
 Entering time loop
 step     5,	t = 0.044788,	dt = 0.00646655,	|e| = 1.5000555965e+01
 step    10,	t = 0.071679,	dt = 0.00487720,	|e| = 1.5002205873e+01
@@ -130,14 +131,14 @@ step   165,	t = 0.573659,	dt = 0.00297586,	|e| = 1.5102038501e+01
 step   170,	t = 0.588521,	dt = 0.00297019,	|e| = 1.5105049510e+01
 step   174,	t = 0.600000,	dt = 0.00257502,	|e| = 1.5107391892e+01
 [Noh] Projecting zero on the boundary cells.
-Program took 3.6250870833e+00s.
-This amounts to 2.3016425926e-05 s per timestep per gridpoint.
+Program took 3.7454904167e+00s.
+This amounts to 2.3780891534e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    3.625e+00 | 2.302e-05
-  Dij calculation:               7.282e-01 | 4.624e-06
-  Mesh Motion calculation:       1.251e+00 | 7.940e-06
+  Total time:                    3.745e+00 | 2.378e-05
+  Dij calculation:               1.842e+00 | 1.170e-05
+  Mesh Motion calculation:       7.387e-01 | 4.690e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.340e+00 | 8.507e-06
+  State Update calculation:      9.412e-01 | 5.976e-06
 ===========================================================

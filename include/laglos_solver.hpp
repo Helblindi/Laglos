@@ -2,11 +2,11 @@
 #define LAGLOS_SOLVER
 
 #include "mfem.hpp"
-// #include "initial_vals.hpp"
 #include "test_problems_include.h"
 #include "geometry.hpp" // Mesh information
 #include "lagrange_multiplier.hpp"
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
+#include "laglos_assembly.hpp"
 #include "elastic.hpp" //NF//MS
 #include <iostream>
 #include <fstream>
@@ -67,9 +67,11 @@ protected:
    // Stores mesh velocities from the previous iteration 
    Vector lambda_max_vec; // TODO: remove, just for temp plotting
    ParGridFunction v_geo_gf; // 5.11
-   ParMesh *pmesh;
+   ParMesh *pmesh, *smesh;
    ParLinearForm *m_lf;
    HypreParVector *m_hpv;
+
+   mutable HypreParVector *k_hpv;
 
    // Problem specific
    ProblemBase * pb;
@@ -78,7 +80,14 @@ protected:
    Geometric geom;
 
    // Matrix to hold max wavespeed values dij
+   Array<int> dij_I, dij_J;
+   Array<double> dij_data;
    SparseMatrix * dij_sparse;
+
+   // Matrices to hold geometric vectors cij
+   SparseMatrix * cij_sparse_x;
+   SparseMatrix * cij_sparse_y;
+   SparseMatrix * cij_sparse_z;
 
    // FE spaces local and global sizes
    const int dim;
@@ -94,6 +103,7 @@ protected:
    const int TVSize_L2;
    const HYPRE_Int GTVSize_L2;
    const int NDofs_L2;
+   const int order_t;
 
    const int Vsize_L2V;
    const int TVSize_L2V;
@@ -101,13 +111,26 @@ protected:
    const int NDofs_L2V;
 
    // Mesh information
-   const int NE, NBE;
+   const int NE, smesh_NBE;
    IntegrationRule RT_ir;
    const int RT_ir_order = 2;
 
    // Elasticity //NF//MS
    bool use_elasticity = false;
    const IntegrationRule ir;
+
+   // HO
+   Table dof_h1_dof_l2; // Table to relate H1 and L2 dofs
+   void BuildDofH1DofL2Table();
+   mutable QuadratureData qdata; // Data associated with each quadrature point in the mesh
+   const int l2dofs_cnt, l2vdofs_cnt;
+   void ComputeMassConservativeDensity(ParGridFunction &rho) const;
+   Vector initial_masses, initial_volumes;
+   void MassesAndVolumesAtPosition(const ParGridFunction &u, const GridFunction &x,
+                                   Vector &el_mass, Vector &el_vol) const;
+   mutable DenseTensor Me, Me_inv; // Energy mass matrix and its inverse
+   MassIntegrator * mi; // Mass integrator for mass matrix
+   void ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
@@ -116,12 +139,18 @@ protected:
    Table * vertex_element;
    Table * face_element;
    Table * edge_vertex;
+
+   Table * smesh_vertex_element;
+   Table * smesh_face_element;
+   Table * smesh_edge_vertex;
+   Table smesh_vertex_edge;
    Array<int> block_offsets;
-   Array<int> BdrElementIndexingArray; // Array to identify boundary faces
-   Array<int> BdrVertexIndexingArray;  // Array to identify boundary vertices
+   Array<int> smesh_BdrElementIndexingArray; // Array to identify boundary faces
+   Array<int> smesh_BdrVertexIndexingArray;  // Array to identify boundary vertices
 
    int el_num_faces;
-   const int num_elements, num_vertices, num_faces, num_edges;
+   const int num_vertices, num_faces;
+   const int smesh_num_faces;
 
    double CFL;
    double timestep = 0.001;
@@ -147,6 +176,10 @@ protected:
    Array<int> HiopDGradIArr, HiopDGradJArr;
    Array<double> HiopDGradData;
 
+   bool is_L2_connectivity_built = false;
+   int L2ConnectivitySize = 0;
+   Table L2Connectivity;
+
    int ess_tdofs_cart_size;
    Array<int> ess_bdr, dofs_list, ess_tdofs;
    mutable Array<double> bdr_vals;
@@ -154,7 +187,7 @@ protected:
    mutable Array<double> add_bdr_vals;
 
    /* Time series data */
-   Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_ppd_pct_cells, ts_ppd_rel_mag, ts_min_detJ, ts_min_detJ_cell;
+   Array<double> ts_timestep, ts_t, ts_dijmax, ts_dijavg, ts_min_detJ, ts_min_detJ_cell;
    Array<double> ts_kidder_avg_rad_ext, ts_kidder_avg_rad_int, ts_kidder_avg_density, ts_kidder_avg_entropy;
 
 public:
@@ -168,8 +201,10 @@ public:
                         ParFiniteElementSpace &l2,
                         ParFiniteElementSpace &l2v,
                         ParFiniteElementSpace &cr,
+                        Coefficient &rho0_coeff,
                         const ParGridFunction &rho0_gf,
                         ParLinearForm *m,
+                        const IntegrationRule &_ir,
                         ProblemBase *_pb,
                         Array<int> offset,
                         bool use_viscosity,
@@ -180,12 +215,15 @@ public:
 
    virtual void Mult(const Vector &S, Vector &dS_dt) const;
 
+   const Array<int> &GetBlockOffsets() const { return block_offsets; }
+
    double GetCFL() { return this->CFL; }
    double GetTimestep() const { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
    void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
+   bool GetDensityPP() const { return this->post_process_density; }
    void SetViscOption(const bool _use_greedy_viscosity) { this->use_greedy_viscosity = _use_greedy_viscosity; }
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -194,7 +232,7 @@ public:
    void FillCellBdrFlag();
    void GetCellBdrFlagGF(ParGridFunction &_cell_bdr_flag_gf) { _cell_bdr_flag_gf = this->cell_bdr_flag_gf; }
 
-   bool IsBdrVertex(const int & node) { return (BdrVertexIndexingArray[node] == 1); }
+   bool IsBdrVertex(const int & node) { return (smesh_BdrVertexIndexingArray[node] == 1); }
 
    void SolveHydro(const Vector &S, Vector &dS_dt) const;
    void EnforceL2BC(Vector &S, const double &t, const double &dt);
@@ -203,10 +241,14 @@ public:
    void BuildDijMatrix(const Vector &S);
    void CalculateTimestep(const Vector &S);
 
-   void GetCellStateVector(const Vector &S, const int cell, Vector &U) const;
-   void SetCellStateVector(Vector &S_new, const int cell, const Vector &U) const;
+   void GetStateVector(const Vector &S, const int &index, Vector &U) const;
+   void SetStateVector(Vector &S_new, const int &index, const Vector &U) const;
 
    /* cij comp */
+   void BuildCijMatrices();
+   void GetLocalCij(const int &i, const int &j, Vector &cij) const;
+   void BuildL2ConnectivityTable();
+   void GetL2ConnectivityTable(Table &_L2Connectivity) const;
    void CalcOutwardNormalInt(const Vector &S, const int cell, const int face, Vector & res) const;
 
    /* System timing */
@@ -237,7 +279,9 @@ public:
    void SetCorrectedFaceVelocity(const int & face, const Vector & vel); 
    void GetCorrectedFaceVelocity(const int & face, Vector & vel);       
    void SetCorrectedFaceFlux(const int & face, const Vector &   ); 
-   void GetCorrectedFaceFlux(const int & face, Vector & flux);       
+   void GetCorrectedFaceFlux(const int & face, Vector & flux);   
+   // HO
+   void ComputeMVHOfirst(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    void SetViGeo(const int &node, const Vector &vel);
    void GetViGeo(const int & node, Vector & vel);
@@ -261,7 +305,7 @@ public:
 
    // Normal vector mesh motion
    void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
-   void ComputeGeoVNormal(const Vector &S, ParGridFunction &mv_gf_l) const;
+   void ComputeGeoVNormal(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)
    void ComputeGeoVNormalDistributedViscosity(Vector &S);
@@ -340,12 +384,12 @@ public:
                              const double &dt, Vector & state_val);
 
    // Enforce Mass Conservation
-   void SetMassConservativeDensity(Vector &S, double &pct_corrected, double &rel_mass_corrected);
+   void SetMassConservativeDensity(Vector &S);
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
-   double CalcMassLoss(const Vector &S);
-   void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
+   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf, double &mass_loss) const;
+   void SetInitialMassesAndVolumes(const Vector &S);
 
    // Compute various time series data
    void ComputeMinDetJ(int &cell, double &minDetJ);
@@ -359,6 +403,36 @@ public:
    // Kidder specific function
    void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);
    void ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy);
+};
+
+class HydroODESolver : public ODESolver
+{
+protected:
+   LagrangianLOOperator *hydro_oper;
+   BlockVector dS_dt, S0;
+public:
+   HydroODESolver() : hydro_oper(NULL) { }
+   virtual void Init(TimeDependentOperator&);
+   virtual void Step(Vector&, double&, double&)
+   { MFEM_ABORT("Time stepping is undefined."); }
+};
+
+class RK2AvgSolver : public HydroODESolver
+{
+public:
+   RK2AvgSolver() { }
+   virtual void Init(TimeDependentOperator &_f);
+   virtual void Step(Vector &S, double &t, double &dt);
+};
+
+class HydroRK3SSPSolver : public HydroODESolver
+{
+protected:
+   BlockVector k, y;
+public:
+   HydroRK3SSPSolver() { }
+   virtual void Init(TimeDependentOperator &_f);
+   virtual void Step(Vector &S, double &t, double &dt);
 };
 
 } // end ns hydroLO

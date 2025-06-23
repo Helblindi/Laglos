@@ -19,7 +19,7 @@
 * Example run time parameters:
 *
 * ----- 1D -----
-* ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6       ## Smooth
+* ./Laglos -m ../data/ref-segment.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6                    ## Smooth
 * ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 8                   ## Sod
 * ./Laglos -m ../data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8                   ## Lax
 # ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 42 -tf 0.667 -cfl 0.2 -rs  5    ## Leblanc
@@ -48,7 +48,7 @@
 * ----- Untested -----
 * ./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4                     ## ICF [Untested]
 * ./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0               ## Kidder ball [Untested]
-* ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.75 -cfl 0.5 -rs 4                      ## Taylor-Green [Untested]
+* ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 4                      ## Taylor-Green [Untested]
 *
 * ----- vdw -----
 * ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis               ## Vdw2 
@@ -155,8 +155,8 @@ int main(int argc, char *argv[]) {
    int problem = 0;
    int rs_levels = 0;
    int rp_levels = 0;
-   int order_mv = 2;  // Order of mesh movement approximation space
-   int order_u = 0;
+   int order_k = 1;  // Order of mesh movement approximation space
+   int order_t = 0;
    int ode_solver_type = 1;
    double t_init = 0.0;
    double t_final = 0.6;
@@ -180,11 +180,10 @@ int main(int argc, char *argv[]) {
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;
    bool do_mv_linearization = false;
-   int fv_option = 2;
+   int fv_option = 0;
    int mv_it_option = 0;
    int mv_n_iterations = 0;
    double mm_visc_face = 0., mm_cell = 0.;
-   bool optimize_timestep = true;
    bool convergence_testing = false;
    bool suppress_output = false;
    double CFL = 0.5;
@@ -198,6 +197,10 @@ int main(int argc, char *argv[]) {
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
    args.AddOption(&output_flag, "-of", "--output-flag", 
                   "Directory that output files should be placed");
+   args.AddOption(&order_t, "-ot", "--order-thermo",
+                  "Order (degree) of the thermodynamic finite element space.");
+   args.AddOption(&order_k, "-ok", "--order-kinetic",
+                  "Order (degree) of the mesh velocity finite element space.");
    args.AddOption(&rs_levels, "-rs", "--refine-serial",
                   "Number of times to refine the mesh uniformly in serial.");
    args.AddOption(&rp_levels, "-rp", "--refine-parallel",
@@ -274,9 +277,6 @@ int main(int argc, char *argv[]) {
                   "Set the amount of viscosity to add to the mesh motion iteration on the faces.");
    args.AddOption(&mm_cell, "-mmcc", "--mesh-motion-consistency-coefficient-on-cells",
                   "Set the coefficient for the consistency term defined on the adjacent cells.");
-   args.AddOption(&optimize_timestep, "-ot", "--optimize-timestep", "-no-ot",
-                  "--no-optimize-timestep",
-                  "Enable or disable timestep optimization using CFL.");
    args.AddOption(&CFL, "-cfl", "--CFL",
                   "CFL value to use.");
    args.AddOption(&convergence_testing, "-ct", "--set-dt-to-h", "-no-ct", 
@@ -297,12 +297,21 @@ int main(int argc, char *argv[]) {
    }
    if (Mpi::Root()) { args.PrintOptions(cout); }
 
-   // Check that convergence testing and optimizing the timestep are not both set to true
-   if (optimize_timestep && convergence_testing)
+   /***** Arg checks *****/
+   if (elastic_eos > 0 && order_t > 0)
    {
-      cout << "Cannot both optimize the timestep and set the timestep for convergence testing.\n";
-      return -1;
+      MFEM_ABORT("Elasticity cannot be used with order_t > 0. "
+                 "Set order_t = 0 to use elasticity.");
    }
+   // if (order_t > 0 && order_k != order_t)
+   // {
+   //    MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");
+   // }
+   if (fv_option > 0 && order_k != order_t + 2)
+   {
+      MFEM_ABORT("If a different face velocity is to be used, the mesh velocity order must be equal to the thermodynamic order + 2.");
+   }
+   /**** End arg checks *****/
 
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
@@ -426,6 +435,7 @@ int main(int argc, char *argv[]) {
    // parallel mesh is defined, the serial mesh can be deleted.
    ParMesh *pmesh = new ParMesh(MPI_COMM_WORLD, *mesh);
    ParMesh *pmesh0 = new ParMesh(MPI_COMM_WORLD, *mesh);
+   ParMesh *smesh = new ParMesh(ParMesh::MakeRefined(*pmesh, order_t+1, BasisType::ClosedUniform));;
    delete mesh;
    for (int lev = 0; lev < rp_levels; lev++)
    {
@@ -567,12 +577,13 @@ int main(int argc, char *argv[]) {
    }
 
    // Define the parallel finite element spaces. We use:
-   // - H1 (Q2, continuous) for mesh movement.
-   // - L2 (Q0, discontinuous) for state variables
-   // - CR/RT for mesh reconstruction at nodes
-   H1_FECollection H1FEC(order_mv, dim);
+   // - H1 (continuous) for mesh movement. (Q1 / order_k)
+   // - L2 (discontinuous) for state variables (Q0 / order_t)
+   // - CR/RT for mesh velocity reconstruction at nodes
+   H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_u, dim, BasisType::Positive);
+   L2_FECollection L2FEC(order_t, dim, BasisType::Positive);
+   L2_FECollection L20FEC(0, dim, BasisType::Positive);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -588,14 +599,17 @@ int main(int argc, char *argv[]) {
    /* Finite element space solely constructed for continuous representation of density field */
    ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
+   ParFiniteElementSpace L20FESpace(pmesh, &L20FEC);
    ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
-   ParFiniteElementSpace CRFESpace(pmesh, CRFEC, dim);
+   ParFiniteElementSpace CRFESpace(smesh, CRFEC, dim);
 
    // Define the explicit ODE solver used for time integration.
    ODESolver *ode_solver = NULL;
    switch (ode_solver_type)
    {
       case 1: ode_solver = new ForwardEulerSolver; break;
+      case 2: ode_solver = new RK2AvgSolver; break;
+      case 3: ode_solver = new HydroRK3SSPSolver; break;
       // case 2: ode_solver = new RK2Solver(0.5); break;
       // case 3: ode_solver = new RK3SSPSolver; break;
       // case 4: ode_solver = new RK4Solver; break;
@@ -741,76 +755,6 @@ int main(int argc, char *argv[]) {
       }
       } // switch
 
-      // Adjust all face nodes to be averages of their adjacent corners
-      mfem::Mesh::FaceInformation FI;
-      for (int face = 0; face < pmesh->GetNumFaces(); face++)
-      {
-         FI = pmesh->GetFaceInformation(face);
-         Array<int> face_dof_row;
-         H1FESpace.GetFaceDofs(face, face_dof_row);
-
-         int face_dof = face_dof_row[2];
-         int index0 = face_dof_row[0];
-         int index1 = face_dof_row[1];
-         for (int i = 0; i < dim; i++)
-         {
-            int face_dof_index = face_dof + i * H1FESpace.GetNDofs();
-            int node0_index = index0 + i * H1FESpace.GetNDofs();
-            int node1_index = index1 + i * H1FESpace.GetNDofs();
-            x_gf[face_dof_index] = 0.5 * (x_gf[node0_index] + x_gf[node1_index]);
-         }
-      }
-
-      // Adjust all cell center to be averages of corners
-      Vector cell_x(dim);
-      Array<int> verts;
-      for (int ci = 0; ci < L2FESpace.GetNDofs(); ci++)
-      {
-         int cell_vdof;
-         cell_x = 0.;
-         // Get center node dof, average, and update
-         switch (dim)
-         {
-         case 1:
-         {
-            cell_vdof = L2FESpace.GetNF() + ci;
-
-            pmesh->GetElementVertices(ci, verts);
-
-            for (int j = 0; j < verts.Size(); j++)
-            {
-               cell_x[0] += x_gf[verts[j]];
-            }
-            cell_x /= verts.Size();
-            x_gf[cell_vdof] = cell_x[0];
-            break;
-         }
-         case 2:
-         {
-            cell_vdof = H1FESpace.GetNVDofs() + L2FESpace.GetNF() + ci;
-
-            pmesh->GetElementVertices(ci, verts);
-
-            for (int j = 0; j < verts.Size(); j++)
-            {
-               cell_x[0] += x_gf[verts[j]];
-               int index = verts[j] + H1FESpace.GetNDofs();
-               cell_x[1] += x_gf[index];
-            }
-            cell_x /= verts.Size();
-
-            x_gf[cell_vdof] = cell_x[0];
-            int index = cell_vdof + H1FESpace.GetNDofs();
-            x_gf[index] = cell_x[1];
-            break;
-         }
-         default:
-         {
-            MFEM_ABORT("Incorrect dim value provided.\n");
-         }
-         }
-      } // end cell center average
-
       // Update pmesh reference grid function
       pmesh->NewNodes(x_gf, false);
       cout << "Mesh distorted\n";
@@ -862,8 +806,9 @@ int main(int argc, char *argv[]) {
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff,&ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
@@ -873,7 +818,8 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_gf, m, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */
    hydro.SetMVOption(mv_option);
@@ -923,7 +869,7 @@ int main(int argc, char *argv[]) {
    int  visport   = 19916;
 
    ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
-   ParGridFunction mc_gf(&L2FESpace); // Gridfunction to show mass conservation
+   ParGridFunction mc_gf(&L20FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
 
    /* Gridfunctions used in Triple Point */
@@ -950,7 +896,7 @@ int main(int argc, char *argv[]) {
       Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
       {
-         hydro.GetCellStateVector(S, i, U);
+         hydro.GetStateVector(S, i, U);
          double _rho = 1. / U[0];
          double _esheer = 0.;
          if (elastic_eos)
@@ -958,9 +904,10 @@ int main(int argc, char *argv[]) {
             _esheer = hydro.elastic->e_sheer(i);
          }
          double _sie = problem_class->specific_internal_energy(U, _esheer);
-         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(i));
+         int el_i = L2FESpace.GetElementForDof(i);
+         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
          press_gf[i] = pressure;
-         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+         gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(el_i));
       }
    }
 
@@ -1144,12 +1091,17 @@ int main(int argc, char *argv[]) {
    // Print initialized mesh and gridfunctions
    // Can be visualized with glvis -np # -m *.mesh
    //                        glvis -m *.mesh -g *.gf
-   std::ostringstream mesh_name, rho_name, v_name, ste_name, mv_name;
+   std::ostringstream smesh_name, mesh_name, rho_name, v_name, ste_name, mv_name;
    mesh_name << gfprint_path 
                << setfill('0') 
                << setw(6)
                << 0
                << ".mesh";
+   smesh_name << gfprint_path 
+               << setfill('0') 
+               << setw(6)
+               << 0
+               << ".smesh";
    rho_name  << gfprint_path 
                << setfill('0') 
                << setw(6)
@@ -1175,6 +1127,11 @@ int main(int argc, char *argv[]) {
    mesh_ofs.precision(8);
    pmesh->PrintAsOne(mesh_ofs);
    mesh_ofs.close();
+
+   std::ofstream smesh_ofs(smesh_name.str().c_str());
+   smesh_ofs.precision(8);
+   smesh->PrintAsOne(smesh_ofs);
+   smesh_ofs.close();
 
    std::ofstream rho_ofs(rho_name.str().c_str());
    rho_ofs.precision(8);
@@ -1231,7 +1188,7 @@ int main(int argc, char *argv[]) {
    visit_dc.Save();
 
    ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   paraview_dc.SetLevelsOfDetail(order_mv);
+   paraview_dc.SetLevelsOfDetail(order_k);
    paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
    paraview_dc.RegisterField("Specific Volume", &sv_gf);
    paraview_dc.RegisterField("Density", &rho_gf);
@@ -1287,6 +1244,7 @@ int main(int argc, char *argv[]) {
          hydro.SetViscOption(greedy);
       }
       hydro.chrono_dij.Start();
+      hydro.BuildCijMatrices();
       hydro.BuildDijMatrix(S);
       hydro.chrono_dij.Stop();
       /* Check if we need to change CFL */
@@ -1297,12 +1255,16 @@ int main(int argc, char *argv[]) {
          hydro.SetCFL(CFL_new);
       }
 
-      if (optimize_timestep)
+      if (ti == 1 && greedy)
+      {
+         dt = 1.E-4;
+      }
+      else
       {
          hydro.CalculateTimestep(S);
          dt = hydro.GetTimestep();
       }
-
+      
       if (t + dt >= t_final)
       {
          dt = t_final - t;
@@ -1325,8 +1287,7 @@ int main(int argc, char *argv[]) {
       // Optionally, post process the density
       if (post_process_density)
       {
-         double pct_corrected, rel_mass_corrected;
-         hydro.SetMassConservativeDensity(S, pct_corrected, rel_mass_corrected);
+         hydro.SetMassConservativeDensity(S);
       }
 
       isCollapsed = hydro.ComputeTimeSeriesData(S,t,dt);
@@ -1375,7 +1336,8 @@ int main(int argc, char *argv[]) {
                  << endl;
          }
          // Fill grid function with mass information
-         hydro.CheckMassConservation(S, mc_gf);
+         double mass_loss;
+         hydro.ValidateMassConservation(S, mc_gf, mass_loss);
 
          // Turn back on suppression
          if (suppress_output)
@@ -1418,7 +1380,7 @@ int main(int argc, char *argv[]) {
                Vector U(dim+2);
                for (int i = 0; i < press_gf.Size(); i++)
                {
-                  hydro.GetCellStateVector(S, i, U);
+                  hydro.GetStateVector(S, i, U);
                   double _rho = 1. / U[0];
                   double _esheer = 0.;
                   if (elastic_eos)
@@ -1426,8 +1388,8 @@ int main(int argc, char *argv[]) {
                      _esheer = hydro.elastic->e_sheer(i);
                   }
                   double _sie = problem_class->specific_internal_energy(U, _esheer);
-                  int cell_attr = pmesh->GetAttribute(i);
-                  double pressure = problem_class->pressure(_rho, _sie, cell_attr);
+                  int el_i = L2FESpace.GetElementForDof(i);
+                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
                   press_gf[i] = pressure;
                }
                Wx += offx;
@@ -1442,7 +1404,8 @@ int main(int argc, char *argv[]) {
                ParGridFunction gamma_gf(&L2FESpace);
                for (int i = 0; i < gamma_gf.Size(); i++)
                {
-                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(i));
+                  int el_i = L2FESpace.GetElementForDof(i);
+                  gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(el_i));
                }
                // gamma
                Wx += offx;
@@ -1975,6 +1938,10 @@ int main(int argc, char *argv[]) {
    const double L2_error = (sv_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
    const double Max_error = (sv_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
 
+   /* Calculate mass loss */
+   double mass_loss;
+   hydro.ValidateMassConservation(S, mc_gf, mass_loss);
+
    /* In either case, write convergence file. */
    if (Mpi::Root())
    {
@@ -2012,7 +1979,7 @@ int main(int argc, char *argv[]) {
                         << "L1_Error " << L1_error << "\n"
                         << "L2_Error " << L2_error << "\n"
                         << "Linf_Error " << Max_error << "\n"
-                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                        << "mass_loss " << mass_loss << "\n"
                         << "dt " << dt << "\n"
                         << "Endtime " << t << "\n";
                   
@@ -2073,6 +2040,7 @@ int main(int argc, char *argv[]) {
         << "===========================================================\n";
    
    delete pmesh;
+   delete smesh;
    delete pmesh0;
    delete CRFEC;
    delete problem_class;

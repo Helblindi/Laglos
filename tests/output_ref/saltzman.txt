@@ -9,6 +9,8 @@
 Options used:
    --mesh /Users/madisonsheridan/Workspace/Laglos/data/rectangle_saltzmann.mesh
    --output-flag default
+   --order-thermo 0
+   --order-kinetic 1
    --refine-serial 0
    --refine-parallel 0
    --problem 11
@@ -32,12 +34,11 @@ Options used:
    --mesh-velocity-option 2
    --mv-target-viscosity-coeff 0
    --no-mesh-velocity-linearization
-   --face-velocity-option 2
+   --face-velocity-option 0
    --mv-it-op 0
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
    --mesh-motion-consistency-coefficient-on-cells 0
-   --optimize-timestep
    --CFL 0.01
    --no-set-dt-to-h
    --timestep 0.001
@@ -49,16 +50,16 @@ done with parallel refinement
 dim: 2, spacedim: 2
 Zones min/max: 250 250
 global_vSize: 250
-N dofs: 1111
+N dofs: 306
 Num Scalar Vertex DoFs: 306
-Num Scalar edge-interior DoFs: 555
+Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
 Num faces: 555
 dim: 2
-Number of kinematic (position, mesh velocity) dofs: 2222
-Corresponding NDofs: 1111
+Number of kinematic (position, mesh velocity) dofs: 612
+Corresponding NDofs: 306
 Corresponding VDim: 2
-Corresponding Vsize: 2222
+Corresponding Vsize: 612
 Number of specific internal energy dofs: 250
 Corresponding NDofs: 250
 Corresponding VDim: 1
@@ -75,34 +76,27 @@ num elements: 250
 distort mesh.
 Mesh distorted
 Geometric::Non-default constructor
-NDofs_H1: 1111
+NDofs_H1: 306
 dim: 2
 Instantiating hydro op
-block offsets: 0 2222 2472 2972
-3222
-Constructing BdrElementIndexingArray:
-
-
-MFEM Warning: May need to enforce additional BCs.
-
- ... in function: mfem::hydroLO::LagrangianLOOperator::LagrangianLOOperator(const int &, const int, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, ParFiniteElementSpace &, const ParGridFunction &, ParLinearForm *, ProblemBase *, Array<int>, bool, int, bool, double)
- ... in file: /Users/madisonsheridan/Workspace/Laglos/src/laglos_solver.cpp:228
-
+block offsets: 0 612 862 1362
+1612
 saltzman::get_additional_BCs
-Vsize_H1: 2222
+Constructing BdrElementIndexingArray:
+Vsize_H1: 612
 Vsize_H1L: 612
-TVSize_H1: 2222
-GTVSize_H1: 2222
-NDofs_H1: 1111
+TVSize_H1: 612
+GTVSize_H1: 612
+NDofs_H1: 306
 NVDofs_H1: 306
 NDofs_H1L: 306
 NDofs_L2: 250
 NDofs_L2V: 250
 Vsize_L2V: 500
-num_elements: 250
+NE: 250
 num_faces: 555
 num_vertices: 306
-num_edges: 555
+smesh_num_faces: 555
 Entering time loop
 Changing CFL for Saltzman at time = 0.0120598
 step     5,	t = 0.030154,	dt = 0.00401852,	|e| = 1.6800550276e+00
@@ -194,14 +188,14 @@ step   430,	t = 0.588046,	dt = 0.00113844,	|e| = 1.3155831560e+01
 step   435,	t = 0.593734,	dt = 0.00113746,	|e| = 1.3234464694e+01
 step   440,	t = 0.599425,	dt = 0.00113831,	|e| = 1.3313007952e+01
 step   441,	t = 0.600000,	dt = 0.00057461,	|e| = 1.3320860967e+01
-Program took 2.5638872500e+00s.
-This amounts to 2.3202599548e-05 s per timestep per gridpoint.
+Program took 2.6306042500e+00s.
+This amounts to 2.3806373303e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.564e+00 | 2.320e-05
-  Dij calculation:               4.683e-01 | 4.238e-06
-  Mesh Motion calculation:       9.304e-01 | 8.420e-06
+  Total time:                    2.631e+00 | 2.381e-05
+  Dij calculation:               1.246e+00 | 1.127e-05
+  Mesh Motion calculation:       5.489e-01 | 4.967e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      9.083e-01 | 8.220e-06
+  State Update calculation:      6.304e-01 | 5.705e-06
 ===========================================================

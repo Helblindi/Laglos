@@ -26,6 +26,10 @@ include_directories(${TEST_SRC_DIR}/src
 # target_link_libraries(TestMM PRIVATE "${MFEM_LIBRARIES}" comp_lambda_lagrangian comp_lambda_eulerian vdw_fortran)
 # add_test(NAME TestMM COMMAND TestMM)
 
+add_executable(TestCij EXCLUDE_FROM_ALL test_cij_construction.cpp)
+target_link_libraries(TestCij PRIVATE Laglos)
+add_test(NAME TestCij COMMAND TestCij)
+
 # Validate Fortran Max Wave Speed calculations
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
@@ -161,6 +165,20 @@ add_test(NAME CompareIV
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+# Taylor Green Vortex
+file(COPY test_tg.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_tg.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestTG
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_tg.sh ${PROJECT_SOURCE_DIR} "tg_output.txt"
+)
+add_test(NAME CompareTG
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/tg_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/tg.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 # Kidder shell
 file(COPY test_kidder.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_kidder.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
@@ -175,6 +193,21 @@ add_test(NAME CompareKidder
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+### High order tests ###
+## Sod 1D
+file(COPY test_sod_1d_HO.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d_HO.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestSod1DHO
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_sod_1d_HO.sh ${PROJECT_SOURCE_DIR} "HOsod1d.txt"
+)
+add_test(NAME CompareSod1DHO
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/HOsod1d.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/HOsod1d.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 #### Test elastic functions ####
 ## Elastic Impact
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -182,6 +215,12 @@ file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh PERMISSIONS OWNER_
 add_test(
     NAME TestElasticImpact
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh ${PROJECT_SOURCE_DIR} "elastic_impact_output.txt"
+)
+add_test(NAME CompareElasticImpact
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/elastic_impact_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_impact.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
 )
 
 ## Elastic Shocktube
@@ -191,7 +230,7 @@ add_test(
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS)
+add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestCij)
 
 # Custom target to clean tmp testing directory
 add_custom_target(clean_tests

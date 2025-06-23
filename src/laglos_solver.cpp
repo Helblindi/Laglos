@@ -2971,43 +2971,6 @@ void LagrangianLOOperator::GetCorrectedFaceFlux(const int & face, Vector & flux)
 }
 
 
-/****************************************************************************************************
-* Function: CalcMassLoss
-* Parameters:
-*  S - BlockVector corresponding to nth timestep that stores mesh information, mesh velocity, 
-*      and state variables.
-*
-* Purpose:
-*  This function is used when computing values for the convergence tables.  It does this by computing
-*  the sum of the local mass loss at each element.
-****************************************************************************************************/
-double LagrangianLOOperator::CalcMassLoss(const Vector &S)
-{
-   // cout << "=======================================\n"
-   //      << "             CalcMassLoss              \n"
-   //      << "=======================================\n";
-   Vector U_i(dim + 2);
-
-   double num = 0., denom = 0.;
-
-   for (int l2_dof_it = 0; l2_dof_it < NDofs_L2; l2_dof_it++)
-   {
-      if ((pb->get_indicator() == "ElasticNoh" || pb->get_indicator() == "Noh") && cell_bdr_flag_gf[l2_dof_it] != -1)
-      {
-         // Skip boundary cells
-         continue;
-      }
-      const double m = m_hpv->Elem(l2_dof_it);
-      const double k = k_hpv->Elem(l2_dof_it);
-      GetStateVector(S, l2_dof_it, U_i);
-      num += abs((k / U_i[0]) - m);
-      denom += abs(m);
-   }
-
-   return num / denom;
-}
-
-
 /**
  * @brief Computes the element-wise masses and volumes at the current positions.
  *
@@ -3092,12 +3055,12 @@ void LagrangianLOOperator::SetInitialMassesAndVolumes(const Vector &S)
 * Purpose:
 *  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
-void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunction &mc_gf) const
+void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunction &mc_gf, double &mass_loss) const
 {
    // cout << "=======================================\n"
    //      << "         ValidateMassConservation      \n"
    //      << "=======================================\n";
-   assert(mc_gf.Size() == NE);
+   mc_gf.SetSize(NE);
    UpdateMesh(S);
    Vector *sptr = const_cast<Vector*>(&S);
    ParGridFunction x_gf, sv_gf, rho_gf(&L2);
@@ -3130,6 +3093,9 @@ void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunc
            << ", Current mass sum: " << el_masses.Sum() << endl
            << "--------------------------------------\n";
    }
+
+   /* Compute mass loss */
+   mass_loss = mc_gf.Norml1() / initial_masses.Sum();
 }
 
 
@@ -9539,6 +9505,107 @@ void LagrangianLOOperator::ComputeGeoVRaviart2(const Vector &S)
       const int nz = zones_per_dof[i];
       if (nz) { v_geo_gf(i) /= nz; }
    }
+}
+
+void HydroODESolver::Init(TimeDependentOperator &tdop)
+{
+   ODESolver::Init(tdop);
+   hydro_oper = dynamic_cast<hydroLO::LagrangianLOOperator *>(f);
+   MFEM_VERIFY(hydro_oper, "HydroSolvers expect LagrangianLOOperator.");
+}
+
+void RK2AvgSolver::Init(TimeDependentOperator &tdop)
+{
+   HydroODESolver::Init(tdop);
+   const Array<int> &block_offsets = hydro_oper->GetBlockOffsets();
+   dS_dt.Update(block_offsets, mem_type);
+   dS_dt = 0.0;
+   S0.Update(block_offsets, mem_type);
+}
+
+void RK2AvgSolver::Step(Vector &S, double &t, double &dt)
+{
+   // The monolithic BlockVector stores the unknown fields as follows:
+   // (Position, Specific Volume, Velocity, Specific Total Energy).
+   S0.Vector::operator=(S);
+
+   // In each sub-step:
+   // - Update the global state Vector S.
+   // - Update the mesh
+   // - Post-process the density
+
+   // -- 1.
+   // S is S0.
+   hydro_oper->Mult(S, dS_dt);
+   // S = S0 + 0.5 * dt * dS_dt;
+   add(S0, 0.5 * dt, dS_dt, S);
+   hydro_oper->UpdateMesh(S);
+   if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
+
+   // -- 2.
+   hydro_oper->Mult(S, dS_dt);
+   // S = S0 + dt * dS_dt.
+   add(S0, dt, dS_dt, S);
+   hydro_oper->UpdateMesh(S);
+   if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
+   t += dt;
+}
+
+void HydroRK3SSPSolver::Init(TimeDependentOperator &tdop)
+{
+   HydroODESolver::Init(tdop);
+   const Array<int> &block_offsets = hydro_oper->GetBlockOffsets();
+   k.Update(block_offsets, mem_type);
+   k = 0.0;
+   y.Update(block_offsets, mem_type);
+   y = 0.0;
+   dS_dt.Update(block_offsets, mem_type);
+   dS_dt = 0.0;
+   S0.Update(block_offsets, mem_type);
+}
+
+void HydroRK3SSPSolver::Step(Vector &S, double &t, double &dt)
+{
+   // The monolithic BlockVector stores the unknown fields as follows:
+   // (Position, Specific Volume, Velocity, Specific Total Energy).
+   double mass_loss;
+   S0.Vector::operator=(S);
+   ParGridFunction mc_gf;
+
+   // In each sub-step:
+   // - Update the global state Vector S.
+   // - Update the mesh
+   // - Post-process the density
+
+   // x0 = x, t0 = t, k0 = dt*f(t0, x0)
+   hydro_oper->SetTime(t);
+   hydro_oper->Mult(S0, k);
+
+   // x1 = x + k0, t1 = t + dt, k1 = dt*f(t1, x1)
+   add(S0, dt, k, y);
+   hydro_oper->UpdateMesh(y);
+   if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(y); }
+   hydro_oper->ValidateMassConservation(y, mc_gf, mass_loss);
+   hydro_oper->SetTime(t + dt);
+   hydro_oper->Mult(y, k);
+
+   // x2 = 3/4*x + 1/4*(x1 + k1), t2 = t + 1/2*dt, k2 = dt*f(t2, x2)
+   y.Add(dt, k);
+   add(3./4, S0, 1./4, y, y);
+   hydro_oper->UpdateMesh(y);
+   if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(y); }
+   hydro_oper->ValidateMassConservation(y, mc_gf, mass_loss);
+   hydro_oper->SetTime(t + dt/2);
+   hydro_oper->Mult(y, k);
+
+   // x3 = 1/3*x + 2/3*(x2 + k2), t3 = t + dt
+   y.Add(dt, k);
+   add(1./3, S0, 2./3, y, S);
+   hydro_oper->UpdateMesh(S);
+   if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
+   hydro_oper->ValidateMassConservation(S, mc_gf, mass_loss);
+   t += dt;
+
 }
 
 } // end ns hydroLO

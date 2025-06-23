@@ -605,10 +605,12 @@ int main(int argc, char *argv[]) {
    switch (ode_solver_type)
    {
       case 1: ode_solver = new ForwardEulerSolver; break;
-      case 2: ode_solver = new RK2Solver(0.5); break;
-      case 3: ode_solver = new RK3SSPSolver; break;
-      case 4: ode_solver = new RK4Solver; break;
-      case 6: ode_solver = new RK6Solver; break;
+      case 2: ode_solver = new RK2AvgSolver; break;
+      case 3: ode_solver = new HydroRK3SSPSolver; break;
+      // case 2: ode_solver = new RK2Solver(0.5); break;
+      // case 3: ode_solver = new RK3SSPSolver; break;
+      // case 4: ode_solver = new RK4Solver; break;
+      // case 6: ode_solver = new RK6Solver; break;
       // case 7: ode_solver = new RK2AvgSolver; break;
       default:
          MFEM_ABORT("ode_solver_type not implemented\n");
@@ -1331,7 +1333,8 @@ int main(int argc, char *argv[]) {
                  << endl;
          }
          // Fill grid function with mass information
-         hydro.ValidateMassConservation(S, mc_gf);
+         double mass_loss;
+         hydro.ValidateMassConservation(S, mc_gf, mass_loss);
 
          // Turn back on suppression
          if (suppress_output)
@@ -1932,6 +1935,10 @@ int main(int argc, char *argv[]) {
    const double L2_error = (sv_L2_error_n + vel_L2_error_n + ste_L2_error_n) / 3.;
    const double Max_error = (sv_Max_error_n + vel_Max_error_n + ste_Max_error_n) / 3.;
 
+   /* Calculate mass loss */
+   double mass_loss;
+   hydro.ValidateMassConservation(S, mc_gf, mass_loss);
+
    /* In either case, write convergence file. */
    if (Mpi::Root())
    {
@@ -1969,7 +1976,7 @@ int main(int argc, char *argv[]) {
                         << "L1_Error " << L1_error << "\n"
                         << "L2_Error " << L2_error << "\n"
                         << "Linf_Error " << Max_error << "\n"
-                        << "mass_loss " << hydro.CalcMassLoss(S) << "\n"
+                        << "mass_loss " << mass_loss << "\n"
                         << "dt " << dt << "\n"
                         << "Endtime " << t << "\n";
                   

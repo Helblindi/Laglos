@@ -215,12 +215,15 @@ public:
 
    virtual void Mult(const Vector &S, Vector &dS_dt) const;
 
+   const Array<int> &GetBlockOffsets() const { return block_offsets; }
+
    double GetCFL() { return this->CFL; }
    double GetTimestep() const { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }
 
    void SetProblem(const int _problem) { this->problem = _problem; }
    void SetDensityPP(const bool _post_process_density) { this->post_process_density = _post_process_density; }
+   bool GetDensityPP() const { return this->post_process_density; }
    void SetViscOption(const bool _use_greedy_viscosity) { this->use_greedy_viscosity = _use_greedy_viscosity; }
    void GetEntityDof(const int GDof, DofEntity & entity, int & EDof);
 
@@ -385,9 +388,7 @@ public:
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
-   double CalcMassLoss(const Vector &S);
-   void CheckMassConservation(const Vector &S, ParGridFunction & mc_gf);
-   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf) const;
+   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf, double &mass_loss) const;
    void SetInitialMassesAndVolumes(const Vector &S);
 
    // Compute various time series data
@@ -402,6 +403,36 @@ public:
    // Kidder specific function
    void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);
    void ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy);
+};
+
+class HydroODESolver : public ODESolver
+{
+protected:
+   LagrangianLOOperator *hydro_oper;
+   BlockVector dS_dt, S0;
+public:
+   HydroODESolver() : hydro_oper(NULL) { }
+   virtual void Init(TimeDependentOperator&);
+   virtual void Step(Vector&, double&, double&)
+   { MFEM_ABORT("Time stepping is undefined."); }
+};
+
+class RK2AvgSolver : public HydroODESolver
+{
+public:
+   RK2AvgSolver() { }
+   virtual void Init(TimeDependentOperator &_f);
+   virtual void Step(Vector &S, double &t, double &dt);
+};
+
+class HydroRK3SSPSolver : public HydroODESolver
+{
+protected:
+   BlockVector k, y;
+public:
+   HydroRK3SSPSolver() { }
+   virtual void Init(TimeDependentOperator &_f);
+   virtual void Step(Vector &S, double &t, double &dt);
 };
 
 } // end ns hydroLO

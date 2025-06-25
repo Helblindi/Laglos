@@ -217,6 +217,11 @@ public:
 
    const Array<int> &GetBlockOffsets() const { return block_offsets; }
 
+   /* Limiter */
+   ParFiniteElementSpace & GetL2FE() { return L2; }
+   ParFiniteElementSpace & GetL2VFE() { return L2V; }
+   ParFiniteElementSpace & GetH1FE() { return H1; }
+
    double GetCFL() { return this->CFL; }
    double GetTimestep() const { return timestep; }
    void SetCFL(const double &_CFL) { this->CFL = _CFL; }

@@ -699,7 +699,6 @@ int main(int argc, char *argv[]) {
    // volume, velocity, and specific internal energy. At each step, each of 
    // these values will be updated.
    ParGridFunction x_gf, sv_gf, v_gf, ste_gf;
-   ParGridFunction rho0_gf(&L2FESpace);
    x_gf.MakeRef(&H1FESpace, S, offset[0]);
    sv_gf.MakeRef(&L2FESpace, S, offset[1]);
    v_gf.MakeRef(&L2VFESpace, S, offset[2]);
@@ -777,14 +776,19 @@ int main(int argc, char *argv[]) {
    std::function<double(const Vector &,const double)> p0_static = 
       std::bind(&ProblemBase::p0, problem_class, std::placeholders::_1, std::placeholders::_2);
 
-   // Initialize specific volume, velocity, and specific total energy
-   FunctionCoefficient sv_coeff(sv0_static);
-   sv_coeff.SetTime(t_init);
-   sv_gf.ProjectCoefficient(sv_coeff);
-
+   // Initialize velocity normally
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
    v_gf.ProjectCoefficient(v_coeff);
+   v_gf.SyncAliasMemory(S);
+
+   /* Energy and specific volume initialization */
+   // Similar to Laghos, we interpolate in a non-positive basis to get
+   // the correct values at the dofs. Then we do an L2 projection to 
+   // the positive basis in which we actually compute.
+   L2_FECollection l2_fec(order_t, pmesh->Dimension());
+   ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
+   ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes);
 
    // While the ste_coeff is not used for initialization in the Sedov case,
    // it is necessary for plotting the exact solution
@@ -796,29 +800,44 @@ int main(int argc, char *argv[]) {
       double blast_position[] = {0.0, 0.0, 0.0};
       DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
                                blast_position[2], blast_energy);
-      ste_gf.ProjectCoefficient(e_coeff);
+      l2_ste.ProjectCoefficient(e_coeff);
    }
    else
    {
-      ste_gf.ProjectCoefficient(ste_coeff);
+      l2_ste.ProjectCoefficient(ste_coeff);
    }
+   ste_gf.ProjectGridFunction(l2_ste);
+   ste_gf.SyncAliasMemory(S);
+
+   /* Initialize sv by same projection process */
+   FunctionCoefficient sv_coeff(sv0_static);
+   sv_coeff.SetTime(t_init);
+   l2_sv.ProjectCoefficient(sv_coeff);
+   sv_gf.ProjectGridFunction(l2_sv);
+   // sv_gf.ProjectCoefficient(sv_coeff);
+   sv_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
-   FunctionCoefficient rho_coeff(rho0_static); 
-   rho_coeff.SetTime(t_init);
-   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
+   FunctionCoefficient rho0_coeff(rho0_static), rho_coeff(rho0_static);
+   rho0_coeff.SetTime(t_init);
+   int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
-   m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff,&ir));
+   m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff,&ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
-   rho0_gf.ProjectCoefficient(rho_coeff);
+   ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
+   ParGridFunction rho0_gf(&L2FESpace);
+   l2_rho0.ProjectCoefficient(rho0_coeff);
+   rho0_gf.ProjectGridFunction(l2_rho0);
+   // rho0_gf.ProjectCoefficient(rho0_coeff);
 
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
    hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */
@@ -1034,10 +1053,15 @@ int main(int argc, char *argv[]) {
 
             // Compute errors
             ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
-            rho_ex_gf.ProjectCoefficient(rho_coeff);
             vel_ex_gf.ProjectCoefficient(v_coeff);
-            ste_ex_gf.ProjectCoefficient(ste_coeff);
-            p_ex_gf.ProjectCoefficient(p_coeff);
+
+            l2_rho.ProjectCoefficient(rho_coeff);
+            rho_ex_gf.ProjectGridFunction(l2_rho);
+            l2_ste.ProjectCoefficient(ste_coeff);
+            ste_ex_gf.ProjectGridFunction(l2_ste);
+            ParGridFunction l2_p(&l2_fes);
+            l2_p.ProjectCoefficient(p_coeff);
+            p_ex_gf.ProjectGridFunction(l2_p);
 
             rho_err -= rho_ex_gf;
             vel_err -= vel_ex_gf;
@@ -1282,6 +1306,7 @@ int main(int argc, char *argv[]) {
       // Make sure that the mesh corresponds to the new solution state. This is
       // needed, because some time integrators use different S-type vectors
       // and the oper object might have redirected the mesh positions to those.
+      x_gf.SyncAliasMemory(S);
       pmesh->NewNodes(x_gf, false);
       
       // Optionally, post process the density
@@ -1306,7 +1331,6 @@ int main(int argc, char *argv[]) {
       // Ensure the sub-vectors x_gf, v_gf, and e_gf know the location of the
       // data in S. This operation simply updates the Memory validity flags of
       // the sub-vectors to match those of S.
-      x_gf.SyncAliasMemory(S);
       sv_gf.SyncAliasMemory(S);
       v_gf.SyncAliasMemory(S);
       ste_gf.SyncAliasMemory(S);
@@ -1839,10 +1863,14 @@ int main(int argc, char *argv[]) {
          }
          // Compute errors
          ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
-         rho_ex_gf.ProjectCoefficient(rho_coeff);
          vel_ex_gf.ProjectCoefficient(v_coeff);
-         ste_ex_gf.ProjectCoefficient(ste_coeff);
-         sv_ex_gf.ProjectCoefficient(sv_coeff);
+
+         l2_rho.ProjectCoefficient(rho_coeff);
+         rho_ex_gf.ProjectGridFunction(l2_rho);
+         l2_ste.ProjectCoefficient(ste_coeff);
+         ste_ex_gf.ProjectGridFunction(l2_ste);
+         l2_sv.ProjectCoefficient(sv_coeff);
+         sv_ex_gf.ProjectGridFunction(l2_sv);
 
          // In the case of the Noh Problem, project 0 on the boundary of approx and exact
          if ((problem_class->get_indicator() == "ElasticNoh" || problem_class->get_indicator() == "Noh"))

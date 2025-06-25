@@ -250,7 +250,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    // when order_t, this is cell volume
    ParLinearForm * k_lf = new ParLinearForm(&L2);
    ConstantCoefficient one_coeff(1.0);
-   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff));
+   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
    k_lf->Assemble();
    k_hpv = k_lf->ParallelAssemble();
    delete k_lf;
@@ -1630,13 +1630,13 @@ void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 
    Array<int> row;
    Vector U_i(dim+2), U_j(dim+2);
-   double d = 0., temp_sum = 0., mi = 0.;
+   double d = 0., temp_sum = 0., _mi = 0.;
 
    for (int i = 0; i < NDofs_L2; i++)
    {
       temp_sum = 0.;
       GetStateVector(S, i, U_i);
-      mi = m_hpv->Elem(i);
+      _mi = m_hpv->Elem(i);
       L2Connectivity.GetRow(i, row);
 
       for (int j_it = 0; j_it < row.Size(); j_it++)
@@ -1651,7 +1651,7 @@ void LagrangianLOOperator::CalculateTimestep(const Vector &S)
 
       if (temp_sum > 1.e-12)
       {
-         dt_gf[i] = 0.5 * ((CFL * mi) / temp_sum);
+         dt_gf[i] = 0.5 * ((CFL * _mi) / temp_sum);
       }
       else
       {
@@ -2197,8 +2197,6 @@ void LagrangianLOOperator::SetMassConservativeDensity(Vector &S)
    {
       sv_gf.Elem(l2_dof_it) = 1. / rho_gf.Elem(l2_dof_it);
    }
-
-   sv_gf.SyncAliasMemory(S);
 }
 
 
@@ -2353,9 +2351,15 @@ void LagrangianLOOperator::BuildCijMatrices()
    Vector row_sums_x(NDofs_L2), row_sums_y(NDofs_L2);
 
    /* x */
-   Cxbf.AddDomainIntegrator(new DerivativeIntegrator(one, 0));
-   Cxbf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 0));
-   Cxbf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 0));
+   DerivativeIntegrator *deriv_x = new DerivativeIntegrator(one, 0);
+   deriv_x->SetIntRule(&ir);
+   Cxbf.AddDomainIntegrator(deriv_x);
+   DGNormalIntegrator *dg_normal_xInt = new DGNormalIntegrator(-1., 0);
+   dg_normal_xInt->SetIntRule(&ir);
+   DGNormalIntegrator *dg_normal_xBdr = new DGNormalIntegrator(-1., 0);
+   dg_normal_xBdr->SetIntRule(&ir);
+   Cxbf.AddInteriorFaceIntegrator(dg_normal_xInt);
+   Cxbf.AddBdrFaceIntegrator(dg_normal_xBdr);
    Cxbf.Assemble();
    Cxbf.Finalize();
    HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
@@ -2366,9 +2370,15 @@ void LagrangianLOOperator::BuildCijMatrices()
    /* y */
    if (dim > 1)
    {
-      Cybf.AddDomainIntegrator(new DerivativeIntegrator(one, 1));
-      Cybf.AddInteriorFaceIntegrator(new DGNormalIntegrator(-1., 1));
-      Cybf.AddBdrFaceIntegrator(new DGNormalIntegrator(-1., 1));
+      DerivativeIntegrator *deriv_y = new DerivativeIntegrator(one, 1);
+      deriv_y->SetIntRule(&ir);
+      Cybf.AddDomainIntegrator(deriv_y);
+      DGNormalIntegrator *dg_normal_yInt = new DGNormalIntegrator(-1., 1);
+      dg_normal_yInt->SetIntRule(&ir);
+      DGNormalIntegrator *dg_normal_yBdr = new DGNormalIntegrator(-1., 1);
+      dg_normal_yBdr->SetIntRule(&ir);
+      Cybf.AddInteriorFaceIntegrator(dg_normal_yInt);
+      Cybf.AddBdrFaceIntegrator(dg_normal_yBdr);
       Cybf.Assemble();
       Cybf.Finalize();
       HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
@@ -3082,7 +3092,7 @@ void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunc
       int num_broken = 0;
       for (int i = 0; i < NE; i++)
       {
-         if (mc_gf.Elem(i) > 1e-10)
+         if (abs(mc_gf.Elem(i)) > 1e-10)
          {
             num_broken++;
          }
@@ -3913,23 +3923,16 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    Vector* sptr = const_cast<Vector*>(&S);
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    H1.GetMesh()->NewNodes(x_gf, false);
-   L2.GetMesh()->NewNodes(x_gf, false);
    pmesh->NewNodes(x_gf, false);
    smesh->NewNodes(x_gf, false);
 
    /* Update volumes at L2 dofs */
    ParLinearForm * k_lf = new ParLinearForm(&L2);
    ConstantCoefficient one_coeff(1.0);
-   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff));
+   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
    k_lf->Assemble();
    k_hpv = k_lf->ParallelAssemble();
    delete k_lf;
-
-   // cout << "Update mesh k_hpv:\n";
-   // for (int i = 0; i < NDofs_L2; i++)
-   // {
-   //    cout << "k_hpv[" << i << "] = " << k_hpv->Elem(i) << endl;
-   // }
 }
 
 
@@ -8671,7 +8674,7 @@ void LagrangianLOOperator::ComputeVelocityLumpedMass(Vector & row_sums)
    row_sums.SetSize(H1Lc.GetNDofs());
    BilinearForm pbl(&H1Lc);
    Coefficient *sigma = new ConstantCoefficient(1.0);
-   pbl.AddDomainIntegrator(new MassIntegrator());
+   pbl.AddDomainIntegrator(new MassIntegrator(&ir));
    pbl.Assemble();
    SparseMatrix mass;
    pbl.FormSystemMatrix(mfem::Array<int>(), mass);
@@ -9540,6 +9543,7 @@ void RK2AvgSolver::Step(Vector &S, double &t, double &dt)
    // S = S0 + 0.5 * dt * dS_dt;
    add(S0, 0.5 * dt, dS_dt, S);
    hydro_oper->UpdateMesh(S);
+   hydro_oper->EnforceL2BC(S, t, dt);
    if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
 
    // -- 2.
@@ -9547,6 +9551,7 @@ void RK2AvgSolver::Step(Vector &S, double &t, double &dt)
    // S = S0 + dt * dS_dt.
    add(S0, dt, dS_dt, S);
    hydro_oper->UpdateMesh(S);
+   hydro_oper->EnforceL2BC(S, t, dt);
    if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
    t += dt;
 }

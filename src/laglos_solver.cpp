@@ -549,7 +549,20 @@ void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const
 
 void LagrangianLOOperator::LimitMult(const Vector &S, Vector &dS_dt) const
 {
-   MFEM_ABORT("LagrangianLOOperator::LimitMult is not implemented yet.");
+   // MFEM_ABORT("LagrangianLOOperator::LimitMult is not implemented yet.");
+   Vector STemp(S.Size());
+   add(S, dt, dS_dt, STemp);
+   SetMassConservativeDensity(STemp);
+
+   ParGridFunction dsv_dt, sv_corrected, sv;
+   Vector *sptr = const_cast<Vector*>(&S);
+   sv.MakeRef(&L2, *sptr, block_offsets[1]);
+   dsv_dt.MakeRef(&L2, dS_dt, block_offsets[1]);
+   sv_corrected.MakeRef(&L2, STemp, block_offsets[1]);
+
+   subtract(sv_corrected, sv, dsv_dt);
+   dsv_dt *= (1.0 / dt);
+   dsv_dt.SyncAliasMemory(dS_dt);
 }
 
 
@@ -2197,7 +2210,7 @@ void LagrangianLOOperator::EnforceExactBCOnCell(const Vector &S, const int & cel
 *  Postprocess the density to be exactly mass conservative.  This function must be called
 *  after the mesh motion has been calculated.
 ****************************************************************************************************/
-void LagrangianLOOperator::SetMassConservativeDensity(Vector &S)
+void LagrangianLOOperator::SetMassConservativeDensity(Vector &S) const
 {
    // cout << "========================================\n"
    //      << "       SetMassConservativeDensity       \n"

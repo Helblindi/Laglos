@@ -392,7 +392,7 @@ public:
                              const double &dt, Vector & state_val);
 
    // Enforce Mass Conservation
-   void SetMassConservativeDensity(Vector &S);
+   void SetMassConservativeDensity(Vector &S) const;
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation

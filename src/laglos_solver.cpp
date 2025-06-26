@@ -9587,9 +9587,7 @@ void HydroRK3SSPSolver::Step(Vector &S, double &t, double &dt)
 {
    // The monolithic BlockVector stores the unknown fields as follows:
    // (Position, Specific Volume, Velocity, Specific Total Energy).
-   double mass_loss;
    S0.Vector::operator=(S);
-   ParGridFunction mc_gf;
 
    // In each sub-step:
    // - Update the global state Vector S.
@@ -9604,7 +9602,6 @@ void HydroRK3SSPSolver::Step(Vector &S, double &t, double &dt)
    add(S0, dt, k, y);
    hydro_oper->UpdateMesh(y);
    if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(y); }
-   hydro_oper->ValidateMassConservation(y, mc_gf, mass_loss);
    hydro_oper->SetTime(t + dt);
    hydro_oper->Mult(y, k);
 
@@ -9613,7 +9610,6 @@ void HydroRK3SSPSolver::Step(Vector &S, double &t, double &dt)
    add(3./4, S0, 1./4, y, y);
    hydro_oper->UpdateMesh(y);
    if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(y); }
-   hydro_oper->ValidateMassConservation(y, mc_gf, mass_loss);
    hydro_oper->SetTime(t + dt/2);
    hydro_oper->Mult(y, k);
 
@@ -9622,7 +9618,6 @@ void HydroRK3SSPSolver::Step(Vector &S, double &t, double &dt)
    add(1./3, S0, 2./3, y, S);
    hydro_oper->UpdateMesh(S);
    if (hydro_oper->GetDensityPP()) { hydro_oper->SetMassConservativeDensity(S); }
-   hydro_oper->ValidateMassConservation(S, mc_gf, mass_loss);
    t += dt;
 
 }

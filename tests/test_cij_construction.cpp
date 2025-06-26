@@ -157,17 +157,19 @@ int CompareCijComputation()
    FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(t_init);
    sv_gf.ProjectCoefficient(sv_coeff);
+   sv_gf.SyncAliasMemory(S);
 
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
    v_gf.ProjectCoefficient(v_coeff);
+   v_gf.SyncAliasMemory(S);
 
    // While the ste_coeff is not used for initialization in the Sedov case,
    // it is necessary for plotting the exact solution
    FunctionCoefficient ste_coeff(ste0_static);
    ste_coeff.SetTime(t_init);
    ste_gf.ProjectCoefficient(ste_coeff);
-
+   ste_gf.SyncAliasMemory(S);
 
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 

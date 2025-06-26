@@ -780,7 +780,7 @@ int main(int argc, char *argv[]) {
    // Similar to Laghos, we interpolate in a non-positive basis to get
    // the correct values at the dofs. Then we do an L2 projection to 
    // the positive basis in which we actually compute.
-   L2_FECollection l2_fec(order_t, pmesh->Dimension());
+   L2_FECollection l2_fec(order_t, pmesh->Dimension(), BasisType::GaussLobatto);
    ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
    ParFiniteElementSpace l2_vfes(pmesh, &l2_fec, dim);
    ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes), l2_v(&l2_vfes);

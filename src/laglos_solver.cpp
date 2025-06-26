@@ -3014,7 +3014,6 @@ void LagrangianLOOperator::MassesAndVolumesAtPosition(
    Vector &el_mass, Vector &el_vol) const
 {
    // Only the order of the transformation matters.
-   auto *Tr = x.FESpace()->GetMesh()->GetElementTransformation(0);
    const FiniteElement *fe = rho_gf.ParFESpace()->GetFE(0);
    const int nqp = ir.GetNPoints();
    const int NE = x.FESpace()->GetNE();

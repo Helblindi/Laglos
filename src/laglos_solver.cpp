@@ -248,13 +248,13 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
 
    // Build dof volume vector to compute current mass
    // when order_t, this is cell volume
-   ParLinearForm * k_lf = new ParLinearForm(&L2);
+   // ParLinearForm * k_lf = new ParLinearForm(&L2);
    ConstantCoefficient one_coeff(1.0);
-   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
-   k_lf->Assemble();
-   if (k_hpv) { delete k_hpv; }
-   k_hpv = k_lf->ParallelAssemble();
-   delete k_lf;
+   // k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
+   // k_lf->Assemble();
+   // if (k_hpv) { delete k_hpv; }
+   // k_hpv = k_lf->ParallelAssemble();
+   // delete k_lf;
 
    // resize v_CR_gf to correspond to the number of faces
    if (dim == 1)
@@ -3939,13 +3939,13 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    smesh->NewNodes(x_gf, false);
 
    /* Update volumes at L2 dofs */
-   ParLinearForm * k_lf = new ParLinearForm(&L2);
-   ConstantCoefficient one_coeff(1.0);
-   k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
-   k_lf->Assemble();
-   if (k_hpv) { delete k_hpv; }
-   k_hpv = k_lf->ParallelAssemble();
-   delete k_lf;
+   // ParLinearForm * k_lf = new ParLinearForm(&L2);
+   // ConstantCoefficient one_coeff(1.0);
+   // k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
+   // k_lf->Assemble();
+   // if (k_hpv) { delete k_hpv; }
+   // k_hpv = k_lf->ParallelAssemble();
+   // delete k_lf;
 }
 
 

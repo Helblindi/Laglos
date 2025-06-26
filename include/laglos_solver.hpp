@@ -82,12 +82,12 @@ protected:
    // Matrix to hold max wavespeed values dij
    Array<int> dij_I, dij_J;
    Array<double> dij_data;
-   SparseMatrix * dij_sparse;
+   SparseMatrix * dij_sparse = NULL;
 
    // Matrices to hold geometric vectors cij
-   SparseMatrix * cij_sparse_x;
-   SparseMatrix * cij_sparse_y;
-   SparseMatrix * cij_sparse_z;
+   SparseMatrix * cij_sparse_x = NULL;
+   SparseMatrix * cij_sparse_y = NULL;
+   SparseMatrix * cij_sparse_z = NULL;
    void FreeCij();
 
    // FE spaces local and global sizes

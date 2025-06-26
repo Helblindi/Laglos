@@ -88,6 +88,7 @@ protected:
    SparseMatrix * cij_sparse_x;
    SparseMatrix * cij_sparse_y;
    SparseMatrix * cij_sparse_z;
+   void FreeCij();
 
    // FE spaces local and global sizes
    const int dim;

@@ -252,6 +252,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    ConstantCoefficient one_coeff(1.0);
    k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
    k_lf->Assemble();
+   if (k_hpv) { delete k_hpv; }
    k_hpv = k_lf->ParallelAssemble();
    delete k_lf;
 
@@ -353,19 +354,8 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    cout << "smesh_num_faces: " << smesh_num_faces << endl;
 }
 
-LagrangianLOOperator::~LagrangianLOOperator()
+void LagrangianLOOperator::FreeCij()
 {
-   if (dij_sparse)
-   {
-      delete dij_sparse;
-      dij_sparse = nullptr;
-   }
-   if (use_elasticity)
-   {
-      delete elastic;
-      elastic = nullptr;
-   }
-
    /* Free memory for Cij matrices */
    if (cij_sparse_x)
    {
@@ -382,6 +372,23 @@ LagrangianLOOperator::~LagrangianLOOperator()
       delete cij_sparse_z;
       cij_sparse_z = nullptr;
    }
+}
+
+LagrangianLOOperator::~LagrangianLOOperator()
+{
+   if (dij_sparse)
+   {
+      delete dij_sparse;
+      dij_sparse = nullptr;
+   }
+   if (use_elasticity)
+   {
+      delete elastic;
+      elastic = nullptr;
+   }
+
+   /* Free memory for Cij matrices */
+   FreeCij();
 }
 
 
@@ -619,6 +626,7 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
    dsv_gf.SyncAliasMemory(dS_dt);
    dv_gf.SyncAliasMemory(dS_dt);
    dste_gf.SyncAliasMemory(dS_dt);
+   delete e_source;
 }
 
 void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const
@@ -2346,6 +2354,9 @@ void LagrangianLOOperator::BuildCijMatrices()
    // cout << "=======================================\n"
    //      << "         Building Cij Matrices         \n"
    //      << "=======================================\n";
+   /* Free memory held at cij */
+   FreeCij();
+
    ConstantCoefficient one(1.0);
    ParBilinearForm Cxbf(&L2), Cybf(&L2);
    Vector row_sums_x(NDofs_L2), row_sums_y(NDofs_L2);
@@ -2366,6 +2377,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    cij_sparse_x = new SparseMatrix(NDofs_L2, NDofs_L2);
    Cx_hpm->MergeDiagAndOffd(*cij_sparse_x);
    cij_sparse_x->GetRowSums(row_sums_x);
+   delete Cx_hpm;
 
    /* y */
    if (dim > 1)
@@ -2385,6 +2397,7 @@ void LagrangianLOOperator::BuildCijMatrices()
       cij_sparse_y = new SparseMatrix(NDofs_L2, NDofs_L2);
       Cy_hpm->MergeDiagAndOffd(*cij_sparse_y);
       cij_sparse_y->GetRowSums(row_sums_y);
+      delete Cy_hpm;
    }
    
    if (dim > 2)
@@ -3931,6 +3944,7 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    ConstantCoefficient one_coeff(1.0);
    k_lf->AddDomainIntegrator(new DomainLFIntegrator(one_coeff, &ir));
    k_lf->Assemble();
+   if (k_hpv) { delete k_hpv; }
    k_hpv = k_lf->ParallelAssemble();
    delete k_lf;
 }

@@ -101,7 +101,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
                                            bool mm, 
                                            double CFL) :
    dim(_dim),
-   TimeDependentOperator(size),
+   LimitedTimeDependentOperator(size),
    H1(h1),
    H1_L(h1_l),
    H1Lc(H1_L.GetParMesh(), H1_L.FEColl(), 1),
@@ -516,7 +516,7 @@ void LagrangianLOOperator::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
 
 
 /* This Mult method is not mass conservative by itself */
-void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
+void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const
 {
    // Make sure that the mesh positions correspond to the ones in S. This is
    // needed only because some mfem time integrators don't update the solution
@@ -545,6 +545,11 @@ void LagrangianLOOperator::Mult(const Vector &S, Vector &dS_dt) const
       dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
       dxdt_gf = this->mv_gf;
    }
+}
+
+void LagrangianLOOperator::LimitMult(const Vector &S, Vector &dS_dt) const
+{
+   MFEM_ABORT("LagrangianLOOperator::LimitMult is not implemented yet.");
 }
 
 

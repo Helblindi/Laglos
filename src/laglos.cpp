@@ -111,6 +111,7 @@
 #include "compile_time_vals.h"
 #include "laglos_solver.hpp"
 #include "test_problems_include.h"
+#include "laglos_tools.hpp"
 #include "riemann1D.hpp"
 #include <iostream>
 #include <fstream>

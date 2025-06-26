@@ -12,6 +12,7 @@ list(APPEND HDRS
    limiter.h
    eos.h
    elastic.hpp
+   laglos_tools.hpp
    # "${PROJECT_SOURCE_DIR}/../mfem/build/mfem.hpp"
    )
 

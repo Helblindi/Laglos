@@ -8,6 +8,7 @@
 #include "lagrange_multiplier_dense.hpp" // TODO: Remove
 #include "laglos_assembly.hpp"
 #include "elastic.hpp" //NF//MS
+#include "laglos_tools.hpp"
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -50,7 +51,7 @@ struct TimingData
 };
 
 
-class LagrangianLOOperator : public TimeDependentOperator
+class LagrangianLOOperator : public LimitedTimeDependentOperator
 {
 protected:
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
@@ -214,7 +215,8 @@ public:
                         double CFL);
    ~LagrangianLOOperator();
 
-   virtual void Mult(const Vector &S, Vector &dS_dt) const;
+   virtual void MultUnlimited(const Vector &S, Vector &dS_dt) const;
+   virtual void LimitMult(const Vector &S, Vector &dS_dt) const;
 
    const Array<int> &GetBlockOffsets() const { return block_offsets; }
 

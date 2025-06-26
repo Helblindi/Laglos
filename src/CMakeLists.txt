@@ -3,6 +3,7 @@ list(APPEND SRCS
    laglos_solver.cpp
    laglos_assembly.cpp
    sedov_exact.cpp
+   laglos_tools.cpp
    # lagrange_multiplier.cpp
    geometry.cpp)
 

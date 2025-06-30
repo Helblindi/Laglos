@@ -131,6 +131,8 @@ IDPLimiter(ParFiniteElementSpace & l2, ParFiniteElementSpace & H1FESpace_proj_LO
 
    vert_elem->MergeDiagAndOffd(_spm);
    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
+
+   ComputeLumpedMass();
 }
 
 ~IDPLimiter() 
@@ -715,6 +717,10 @@ bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
       M += mi * gf_ho[i];
       M_max += mi * x_max[i];
       M_min += mi * x_min[i];
+      cout << "i: " << i << ", mi: " << mi  
+           << ", x_min[i]: " << x_min[i] 
+           << ", gf_ho[i]: " << gf_ho[i]
+           << ", x_max[i]: " << x_max[i] << endl;
    }
    if (less_than_or_equal(M_min, M) && less_than_or_equal(M, M_max))
    {
@@ -740,17 +746,30 @@ void ComputeVolume(const ParGridFunction &gf_ho)
    }
 }
 
-void ComputeLumpedMasses(const ParGridFunction &gf_ho)
+void ComputeLumpedMass()
 {
+   cout << "IDPLimiter::ComputeLumpedMass\n";
    ParLinearForm _lf(&L2);
    ConstantCoefficient one(1.0);
-   DomainLFIntegrator *one_int = new DomainLFIntegrator(one);
-   one_int->SetIntRule(&ir);
-   _lf.AddDomainIntegrator(one_int);
+   // one_int->SetIntRule(&ir);
+   _lf.AddDomainIntegrator(new DomainLFIntegrator(one, &ir));
    _lf.Assemble();
    HypreParVector &_hpv = *_lf.ParallelAssemble();
-
    mass_lumped = _hpv;
+   cout << "Lumped mass vector: ";
+   mass_lumped.Print(cout);
+
+   ParBilinearForm _bform(&L2);
+   _bform.AddDomainIntegrator(new LumpedIntegrator(new MassIntegrator(one, &ir)));
+   _bform.Assemble();
+   _bform.Finalize();
+   Vector diagonal;
+   _bform.SpMat().GetDiag(diagonal);
+   cout << "Lumped mass diagonal: ";
+   diagonal.Print(cout);
+
+   /* THESE ARE THE SAME */
+   assert(false);
 }
 
 void ComputeCellMasses(const ParGridFunction &x)
@@ -814,10 +833,11 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== IDPLimiter::Limit =====\n";
    ComputeRhoMinMax(gf_lo);
-   ComputeLumpedMasses(gf_ho);
    // ComputeCellMasses(gf_ho);
 
    bool satisfies_estimate = CheckEstimate(mass_lumped, gf_ho);
+   cout << "gf_lo: \n";
+   gf_lo.Print(cout);
    if (!satisfies_estimate)
    {
       MFEM_ABORT("Bounding estimate not satisfied");
@@ -959,6 +979,13 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
    /* Project local adjacent max to continuous gf */
    LO_proj_max.ProjectDiscCoefficientMax(LO_rho_gf_coeff);
    LO_proj_min.ProjectDiscCoefficientMin(LO_rho_gf_coeff);
+   // cout << "gf_lo: \n";
+   // gf_lo.Print(cout);
+   // cout << "LO_proj_min: \n";
+   // LO_proj_min.Print(cout);
+   // cout << "LO_proj_max: \n";
+   // LO_proj_max.Print(cout);
+   // assert(false);
    
    /* 
    Convert continuous space to high order dg space 
@@ -967,7 +994,14 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
    */
    vert_elem->Mult(LO_proj_max, x_max);
    vert_elem->Mult(LO_proj_min, x_min);
-   
+
+   cout << "LO_proj_max: \n";
+   LO_proj_max.Print(cout);
+   cout << "xmax: \n";
+   x_max.Print(cout);
+   cout << "vert_elem: \n";
+   _spm.Print(cout);
+
    /* Optionally, relax the bounds */
    if (relaxation_option > 0)
    {

@@ -303,8 +303,9 @@ public:
       }
       DenseMatrix result(dim+2, dim);
 
-      Vector v; velocity(U, v);
-      // const double rho = 1. / U[0];
+      Vector v(dim); 
+      // velocity(U, v);
+      this->v0(x, t, v); // Use initial velocity function
       // const double sie = specific_internal_energy(U, 0.);
       const double p = p0(x,t);
 

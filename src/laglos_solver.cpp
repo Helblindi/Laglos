@@ -167,7 +167,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    initial_volumes(NE),
    Me(l2dofs_cnt, l2dofs_cnt, NE),
    Me_inv(l2dofs_cnt, l2dofs_cnt, NE),
-   _l2x_gf(&l2)
+   _l2x_gf(&L2V)
 {
    if (Mpi::Root())
    {

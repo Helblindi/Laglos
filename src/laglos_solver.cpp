@@ -166,7 +166,8 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    initial_masses(NE),
    initial_volumes(NE),
    Me(l2dofs_cnt, l2dofs_cnt, NE),
-   Me_inv(l2dofs_cnt, l2dofs_cnt, NE)
+   Me_inv(l2dofs_cnt, l2dofs_cnt, NE),
+   _l2x_gf(&l2)
 {
    if (Mpi::Root())
    {
@@ -522,6 +523,7 @@ void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const
    // needed only because some mfem time integrators don't update the solution
    // vector at every intermediate stage (hence they don't change the mesh).
    UpdateMesh(S);
+   SetL2DofX();
 
    dS_dt = 0.0;
 
@@ -563,6 +565,9 @@ void LagrangianLOOperator::LimitMult(const Vector &S, Vector &dS_dt) const
    subtract(sv_corrected, sv, dsv_dt);
    dsv_dt *= (1.0 / dt);
    dsv_dt.SyncAliasMemory(dS_dt);
+
+   // Reset flag that x_gf is set
+   l2_dof_x_set = false;
 }
 
 
@@ -684,7 +689,10 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       }
       else
       {
-         F_i = pb->flux(U_i, attr_i);
+         Vector _tx(dim);
+         GetL2DofX(i, _tx);
+         F_i = pb->flux_ex_p(U_i, _tx, this->GetTime(), attr_i);
+         // F_i = pb->flux(U_i, attr_i);
       }
       int bdr_ind = cell_bdr_flag_gf[i];
       L2Connectivity.GetRow(i, row);
@@ -858,7 +866,10 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             }
             else
             {
-               dm = pb->flux(U_j, attr_j);
+               // dm = pb->flux(U_j, attr_j);
+               Vector _tx(dim);
+               GetL2DofX(j, _tx);
+               dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
             }
             dm.Mult(cij, y);
             rhs -= y;
@@ -9538,6 +9549,16 @@ void LagrangianLOOperator::ComputeGeoVRaviart2(const Vector &S)
    {
       const int nz = zones_per_dof[i];
       if (nz) { v_geo_gf(i) /= nz; }
+   }
+}
+
+void LagrangianLOOperator::GetL2DofX(const int &dof, Vector &x) const
+{
+   assert(l2_dof_x_set);
+   x.SetSize(dim);
+   for (int i = 0; i < dim; i++)
+   {
+      x(i) = _l2x_gf(dof + i * NDofs_L2);
    }
 }
 

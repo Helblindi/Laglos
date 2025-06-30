@@ -411,6 +411,16 @@ public:
    // Kidder specific function
    void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);
    void ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy);
+
+   // Debugging
+   mutable bool l2_dof_x_set = false;
+   mutable ParGridFunction _l2x_gf;
+   void SetL2DofX() const
+   {
+      pmesh->GetNodes(_l2x_gf);
+      l2_dof_x_set = true;
+   }
+   void GetL2DofX(const int &dof, Vector &x) const;
 };
 
 class HydroODESolver : public ODESolver

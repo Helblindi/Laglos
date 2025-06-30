@@ -616,6 +616,11 @@ int main(int argc, char *argv[]) {
       // case 4: ode_solver = new RK4Solver; break;
       // case 6: ode_solver = new RK6Solver; break;
       // case 7: ode_solver = new RK2AvgSolver; break;
+      case 11: ode_solver = new ForwardEulerIDPSolver; break;
+      case 12: ode_solver = new RK2IDPSolver; break;
+      case 13: ode_solver = new RK3IDPSolver; break;
+      case 14: ode_solver = new RK4IDPSolver; break;
+      case 16: ode_solver = new RK6IDPSolver; break;
       default:
          MFEM_ABORT("ode_solver_type not implemented\n");
          // if (myid == 0)

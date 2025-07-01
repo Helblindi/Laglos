@@ -583,8 +583,8 @@ int main(int argc, char *argv[]) {
    // - CR/RT for mesh velocity reconstruction at nodes
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_t, dim, BasisType::Positive);
-   L2_FECollection L20FEC(0, dim, BasisType::Positive);
+   L2_FECollection L2FEC(order_t, dim);
+   L2_FECollection L20FEC(0, dim);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -794,16 +794,17 @@ int main(int argc, char *argv[]) {
    /* sv */
    FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(t_init);
-   l2_sv.ProjectCoefficient(sv_coeff);
-   sv_gf.ProjectGridFunction(l2_sv);
-   // sv_gf.ProjectCoefficient(sv_coeff);
+   // l2_sv.ProjectCoefficient(sv_coeff);
+   // sv_gf.ProjectGridFunction(l2_sv);
+   sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
    /* v */
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
-   l2_v.ProjectCoefficient(v_coeff);
-   v_gf.ProjectGridFunction(l2_v);
+   // l2_v.ProjectCoefficient(v_coeff);
+   // v_gf.ProjectGridFunction(l2_v);
+   v_gf.ProjectCoefficient(v_coeff);
    v_gf.SyncAliasMemory(S);
 
    /* ste */
@@ -823,7 +824,8 @@ int main(int argc, char *argv[]) {
    {
       l2_ste.ProjectCoefficient(ste_coeff);
    }
-   ste_gf.ProjectGridFunction(l2_ste);
+   // ste_gf.ProjectGridFunction(l2_ste);
+   ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
 
    
@@ -840,9 +842,9 @@ int main(int argc, char *argv[]) {
    /* Initialize rho0_gf */
    ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
    ParGridFunction rho0_gf(&L2FESpace);
-   l2_rho0.ProjectCoefficient(rho0_coeff);
-   rho0_gf.ProjectGridFunction(l2_rho0);
-   // rho0_gf.ProjectCoefficient(rho0_coeff);
+   // l2_rho0.ProjectCoefficient(rho0_coeff);
+   // rho0_gf.ProjectGridFunction(l2_rho0);
+   rho0_gf.ProjectCoefficient(rho0_coeff);
 
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
@@ -1065,18 +1067,22 @@ int main(int argc, char *argv[]) {
             // Compute errors
             ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
             /* rho */
-            l2_rho.ProjectCoefficient(rho_coeff);
-            rho_ex_gf.ProjectGridFunction(l2_rho);
+            // l2_rho.ProjectCoefficient(rho_coeff);
+            // rho_ex_gf.ProjectGridFunction(l2_rho);
+            rho_ex_gf.ProjectCoefficient(rho_coeff);
             /* v */
-            l2_v.ProjectCoefficient(v_coeff);
-            vel_ex_gf.ProjectGridFunction(l2_v);
+            // l2_v.ProjectCoefficient(v_coeff);
+            // vel_ex_gf.ProjectGridFunction(l2_v);
+            vel_ex_gf.ProjectCoefficient(v_coeff);
             /* ste */
-            l2_ste.ProjectCoefficient(ste_coeff);
-            ste_ex_gf.ProjectGridFunction(l2_ste);
+            // l2_ste.ProjectCoefficient(ste_coeff);
+            // ste_ex_gf.ProjectGridFunction(l2_ste);
+            ste_ex_gf.ProjectCoefficient(ste_coeff);
             /* pressure */
-            ParGridFunction l2_p(&l2_fes);
-            l2_p.ProjectCoefficient(p_coeff);
-            p_ex_gf.ProjectGridFunction(l2_p);
+            // ParGridFunction l2_p(&l2_fes);
+            // l2_p.ProjectCoefficient(p_coeff);
+            // p_ex_gf.ProjectGridFunction(l2_p);
+            p_ex_gf.ProjectCoefficient(p_coeff);
 
             rho_err -= rho_ex_gf;
             vel_err -= vel_ex_gf;
@@ -1533,19 +1539,23 @@ int main(int argc, char *argv[]) {
 
                   ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
                   /* rho */
-                  l2_rho.ProjectCoefficient(rho_coeff);
-                  rho_ex_gf.ProjectGridFunction(l2_rho);
+                  // l2_rho.ProjectCoefficient(rho_coeff);
+                  // rho_ex_gf.ProjectGridFunction(l2_rho);
+                  rho_ex_gf.ProjectCoefficient(rho_coeff);
                   // rho_ex_gf[0] = rho_gf[0];
                   /* v */
-                  l2_v.ProjectCoefficient(v_coeff);
-                  vel_ex_gf.ProjectGridFunction(l2_v);
+                  // l2_v.ProjectCoefficient(v_coeff);
+                  // vel_ex_gf.ProjectGridFunction(l2_v);
+                  vel_ex_gf.ProjectCoefficient(v_coeff);
                   /* ste */
-                  l2_ste.ProjectCoefficient(ste_coeff);
-                  ste_ex_gf.ProjectGridFunction(l2_ste);
+                  // l2_ste.ProjectCoefficient(ste_coeff);
+                  // ste_ex_gf.ProjectGridFunction(l2_ste);
+                  ste_ex_gf.ProjectCoefficient(ste_coeff);
                   /* pressure */
-                  ParGridFunction l2_p(&l2_fes);
-                  l2_p.ProjectCoefficient(p_coeff);
-                  p_ex_gf.ProjectGridFunction(l2_p);
+                  // ParGridFunction l2_p(&l2_fes);
+                  // l2_p.ProjectCoefficient(p_coeff);
+                  // p_ex_gf.ProjectGridFunction(l2_p);
+                  p_ex_gf.ProjectCoefficient(p_coeff);
 
                   rho_err -= rho_ex_gf;
                   vel_err -= vel_ex_gf;
@@ -1816,14 +1826,17 @@ int main(int argc, char *argv[]) {
       ste_coeff.SetTime(t);
 
       /* sv */
-      l2_sv.ProjectCoefficient(sv_coeff);
-      sv_ex_gf.ProjectGridFunction(l2_sv);
+      // l2_sv.ProjectCoefficient(sv_coeff);
+      // sv_ex_gf.ProjectGridFunction(l2_sv);
+      sv_ex_gf.ProjectCoefficient(sv_coeff);
       /* v */
-      l2_v.ProjectCoefficient(v_coeff);
-      vel_ex_gf.ProjectGridFunction(l2_v);
+      // l2_v.ProjectCoefficient(v_coeff);
+      // vel_ex_gf.ProjectGridFunction(l2_v);
+      vel_ex_gf.ProjectCoefficient(v_coeff);
       /* ste */
-      l2_ste.ProjectCoefficient(ste_coeff);
-      ste_ex_gf.ProjectGridFunction(l2_ste);
+      // l2_ste.ProjectCoefficient(ste_coeff);
+      // ste_ex_gf.ProjectGridFunction(l2_ste);
+      ste_ex_gf.ProjectCoefficient(ste_coeff);
 
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;
@@ -1894,17 +1907,21 @@ int main(int argc, char *argv[]) {
          // Compute errors
          ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
          /* sv */
-         l2_sv.ProjectCoefficient(sv_coeff);
-         sv_ex_gf.ProjectGridFunction(l2_sv);
+         // l2_sv.ProjectCoefficient(sv_coeff);
+         // sv_ex_gf.ProjectGridFunction(l2_sv);
+         sv_ex_gf.ProjectCoefficient(sv_coeff);
          /* rho */
-         l2_rho.ProjectCoefficient(rho_coeff);
-         rho_ex_gf.ProjectGridFunction(l2_rho);
+         // l2_rho.ProjectCoefficient(rho_coeff);
+         // rho_ex_gf.ProjectGridFunction(l2_rho);
+         rho_ex_gf.ProjectCoefficient(rho_coeff);
          /* v */
-         l2_v.ProjectCoefficient(v_coeff);
-         vel_ex_gf.ProjectGridFunction(l2_v);
+         // l2_v.ProjectCoefficient(v_coeff);
+         // vel_ex_gf.ProjectGridFunction(l2_v);
+         vel_ex_gf.ProjectCoefficient(v_coeff);
          /* ste */
-         l2_ste.ProjectCoefficient(ste_coeff);
-         ste_ex_gf.ProjectGridFunction(l2_ste);
+         // l2_ste.ProjectCoefficient(ste_coeff);
+         // ste_ex_gf.ProjectGridFunction(l2_ste);
+         ste_ex_gf.ProjectCoefficient(ste_coeff);
 
          // In the case of the Noh Problem, project 0 on the boundary of approx and exact
          if ((problem_class->get_indicator() == "ElasticNoh" || problem_class->get_indicator() == "Noh"))

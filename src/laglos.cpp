@@ -583,7 +583,7 @@ int main(int argc, char *argv[]) {
    // - CR/RT for mesh velocity reconstruction at nodes
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_t, dim);
+   L2_FECollection L2FEC(order_t, dim, BasisType::GaussLobatto);
    L2_FECollection L20FEC(0, dim);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
@@ -786,10 +786,10 @@ int main(int argc, char *argv[]) {
    // Similar to Laghos, we interpolate in a non-positive basis to get
    // the correct values at the dofs. Then we do an L2 projection to 
    // the positive basis in which we actually compute.
-   L2_FECollection l2_fec(order_t, pmesh->Dimension());
-   ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
-   ParFiniteElementSpace l2_vfes(pmesh, &l2_fec, dim);
-   ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes), l2_v(&l2_vfes);
+   // L2_FECollection l2_fec(order_t, pmesh->Dimension(), BasisType::GaussLegendre);
+   // ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
+   // ParFiniteElementSpace l2_vfes(pmesh, &l2_fec, dim);
+   // ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes), l2_v(&l2_vfes);
 
    /* sv */
    FunctionCoefficient sv_coeff(sv0_static);
@@ -818,29 +818,29 @@ int main(int argc, char *argv[]) {
       double blast_position[] = {0.0, 0.0, 0.0};
       DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
                                blast_position[2], blast_energy);
-      l2_ste.ProjectCoefficient(e_coeff);
+      // l2_ste.ProjectCoefficient(e_coeff);
+      ste_gf.ProjectCoefficient(e_coeff);
    }
    else
    {
-      l2_ste.ProjectCoefficient(ste_coeff);
+      // l2_ste.ProjectCoefficient(ste_coeff);
+      ste_gf.ProjectCoefficient(ste_coeff);
    }
    // ste_gf.ProjectGridFunction(l2_ste);
-   ste_gf.ProjectCoefficient(ste_coeff);
    ste_gf.SyncAliasMemory(S);
-
-   
 
    // PLF to build mass vector
    FunctionCoefficient rho0_coeff(rho0_static), rho_coeff(rho0_static);
    rho0_coeff.SetTime(t_init);
    int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
+   // IntegrationRules _IntRules(0, Quadrature1D::GaussLobatto);
    IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff,&ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
-   ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
+   // ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
    ParGridFunction rho0_gf(&L2FESpace);
    // l2_rho0.ProjectCoefficient(rho0_coeff);
    // rho0_gf.ProjectGridFunction(l2_rho0);
@@ -1079,7 +1079,7 @@ int main(int argc, char *argv[]) {
             // ste_ex_gf.ProjectGridFunction(l2_ste);
             ste_ex_gf.ProjectCoefficient(ste_coeff);
             /* pressure */
-            ParGridFunction l2_p(&l2_fes);
+            // ParGridFunction l2_p(&l2_fes);
             // l2_p.ProjectCoefficient(p_coeff);
             // p_ex_gf.ProjectGridFunction(l2_p);
             p_ex_gf.ProjectCoefficient(p_coeff);

@@ -560,20 +560,23 @@ void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const
 void LagrangianLOOperator::LimitMult(const Vector &S, Vector &dS_dt) const
 {
    // MFEM_ABORT("LagrangianLOOperator::LimitMult is not implemented yet.");
-   Vector STemp(S.Size());
-   add(S, dt, dS_dt, STemp);
-   SetMassConservativeDensity(STemp);
+   if (this->post_process_density)
+   {
+      Vector STemp(S.Size());
+      add(S, dt, dS_dt, STemp);
+      SetMassConservativeDensity(STemp);
 
-   ParGridFunction dsv_dt, sv_corrected, sv;
-   Vector *sptr = const_cast<Vector*>(&S);
-   sv.MakeRef(&L2, *sptr, block_offsets[1]);
-   dsv_dt.MakeRef(&L2, dS_dt, block_offsets[1]);
-   sv_corrected.MakeRef(&L2, STemp, block_offsets[1]);
+      ParGridFunction dsv_dt, sv_corrected, sv;
+      Vector *sptr = const_cast<Vector*>(&S);
+      sv.MakeRef(&L2, *sptr, block_offsets[1]);
+      dsv_dt.MakeRef(&L2, dS_dt, block_offsets[1]);
+      sv_corrected.MakeRef(&L2, STemp, block_offsets[1]);
 
-   subtract(sv_corrected, sv, dsv_dt);
-   dsv_dt *= (1.0 / dt);
-   dsv_dt.SyncAliasMemory(dS_dt);
-
+      subtract(sv_corrected, sv, dsv_dt);
+      dsv_dt *= (1.0 / dt);
+      dsv_dt.SyncAliasMemory(dS_dt);
+   }
+   
    // Reset flag that x_gf is set
    l2_dof_x_set = false;
 }

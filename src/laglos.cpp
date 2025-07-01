@@ -584,6 +584,7 @@ int main(int argc, char *argv[]) {
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
    L2_FECollection L2FEC(order_t, dim);
+   L2_FECollection L2FEC_GL(order_t, dim, BasisType::GaussLobatto);
    L2_FECollection L20FEC(0, dim);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
@@ -601,7 +602,7 @@ int main(int argc, char *argv[]) {
    ParFiniteElementSpace H1cFESpace(pmesh, &H1FEC, 1);
    ParFiniteElementSpace L2FESpace(pmesh, &L2FEC);
    ParFiniteElementSpace L20FESpace(pmesh, &L20FEC);
-   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC, dim);
+   ParFiniteElementSpace L2VFESpace(pmesh, &L2FEC_GL, dim);
    ParFiniteElementSpace CRFESpace(smesh, CRFEC, dim);
 
    // Define the explicit ODE solver used for time integration.

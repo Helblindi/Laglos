@@ -88,26 +88,27 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
       else
       {
          CalcOrtho(Trans.Jacobian(), nor);
+         // nor /= nor.Norml2();
       }
 
       if (xi > dim)
       {
          MFEM_ABORT("Component of normal should not exceed dimension of problem.\n");
       }
-      w = 0.5 * coeff * ip.weight * nor[xi];
+      w = coeff * ip.weight * nor[xi];
 
       if (w != 0.0)
       {
          for (int i = 0; i < nd1; i++)
          {
             // Diagonal entry
-            elmat(i, i) += w * shape1(i) * shape1(i);
+            elmat(i, i) -= w * shape1(i) * shape1(i);
             for (int j = i+1; j < nd1; j++)
             {
                // symmetric, see (4.17) 
                // must accomodate '-'
-               elmat(i, j) += w * shape1(i) * shape1(j);
-               elmat(j, i) += w * shape1(i) * shape1(j);
+               elmat(i, j) -= w * shape1(i) * shape1(j);
+               elmat(j, i) -= w * shape1(i) * shape1(j);
             }
          }
 
@@ -118,12 +119,12 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
             /* diagonal, el2 */
             for (int i = 0; i < nd2; i++)
             {
-               elmat(nd1+i,nd1+i) -= w * shape2(i) * shape2(i);
+               elmat(nd1+i,nd1+i) += w * shape2(i) * shape2(i);
                for (int j = i+1; j < nd2; j++)
                {
                   /* subtract here to flip the orientation of the normal */
-                  elmat(nd1+i, nd1+j) -= w * shape2(i) * shape2(j);
-                  elmat(nd1+j, nd1+i) -= w * shape2(i) * shape2(j);
+                  elmat(nd1+i, nd1+j) += w * shape2(i) * shape2(j);
+                  elmat(nd1+j, nd1+i) += w * shape2(i) * shape2(j);
                }
             }
             
@@ -131,25 +132,29 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
             for (int i = 0; i < nd1; i++)
                for (int j = 0; j < nd2; j++)
                {
-                  elmat(i, nd1+j) -= w * shape1(i) * shape2(j);
+                  elmat(i, nd1+j) += w * shape1(i) * shape2(j);
                }
 
             /* lower triangular */
             for (int i = 0; i < nd2; i++)
                for (int j = 0; j < nd1; j++)
                {
-                  elmat(nd1+i, j) += w * shape2(i) * shape1(j);
+                  elmat(nd1+i, j) -= w * shape2(i) * shape1(j);
                }
 
          }
       }      
 
       // /* Set diagonal entries accordingly */
-      // Vector diag;
+      // Vector diag, row_sums;
       // elmat.GetDiag(diag);
+      // // elmat.GetRowSums(row_sums);
+      // // cout << "diag: ";
+      // // diag.Print(cout);
+      // // cout << "row_sums: ";
+      // // row_sums.Print(cout);
       // if (w != 0.0 && diag.Norml2() < 1E-12)
       // {
-      //    Vector row_sums;
       //    elmat.GetRowSums(row_sums);
       //    for (int i = 0; i < elmat.Height(); i++)
       //    {

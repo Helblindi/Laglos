@@ -713,6 +713,26 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       {
          int j = row[j_it];
          GetLocalCij(i, j, cij);
+         Vector cji(dim);
+         GetLocalCij(j, i, cji);
+         Vector _t(dim);
+         add(cij, cji, _t);
+         // if (i == j)
+         // {
+         //    cout << "diag at i(" << i << "): ";
+         //    cij.Print(cout);
+         // }
+         // else if (_t.Norml2() > 1e-4)
+         if (_t.Norml2() > 1e-10 and i != j)
+         {
+            cout << "i: " << i << ", j: " << j << ", cij: ";
+            cij.Print(cout);
+            cout << "cji: ";
+            cji.Print(cout);
+            cout << "l \n";
+            MFEM_ABORT("NOT SKEW SYMMETRIC\n");
+            continue;
+         }
          GetStateVector(S, j, U_j);
 
          DenseMatrix dm(dim+2, dim);
@@ -2404,10 +2424,10 @@ void LagrangianLOOperator::BuildCijMatrices()
    /* x */
    DerivativeIntegrator *deriv_x = new DerivativeIntegrator(one, 0);
    deriv_x->SetIntRule(&ir);
-   Cxbf.AddDomainIntegrator(deriv_x);
-   DGNormalIntegrator *dg_normal_xInt = new DGNormalIntegrator(-1., 0);
+   Cxbf.AddDomainIntegrator(new TransposeIntegrator(deriv_x));
+   DGNormalIntegrator *dg_normal_xInt = new DGNormalIntegrator(1./2., 0);
    dg_normal_xInt->SetIntRule(&ir);
-   DGNormalIntegrator *dg_normal_xBdr = new DGNormalIntegrator(-1., 0);
+   DGNormalIntegrator *dg_normal_xBdr = new DGNormalIntegrator(1./2., 0);
    dg_normal_xBdr->SetIntRule(&ir);
    Cxbf.AddInteriorFaceIntegrator(dg_normal_xInt);
    Cxbf.AddBdrFaceIntegrator(dg_normal_xBdr);
@@ -2424,10 +2444,10 @@ void LagrangianLOOperator::BuildCijMatrices()
    {
       DerivativeIntegrator *deriv_y = new DerivativeIntegrator(one, 1);
       deriv_y->SetIntRule(&ir);
-      Cybf.AddDomainIntegrator(deriv_y);
-      DGNormalIntegrator *dg_normal_yInt = new DGNormalIntegrator(-1., 1);
+      Cybf.AddDomainIntegrator(new TransposeIntegrator(deriv_y));
+      DGNormalIntegrator *dg_normal_yInt = new DGNormalIntegrator(1./2., 1);
       dg_normal_yInt->SetIntRule(&ir);
-      DGNormalIntegrator *dg_normal_yBdr = new DGNormalIntegrator(-1., 1);
+      DGNormalIntegrator *dg_normal_yBdr = new DGNormalIntegrator(1./2., 1);
       dg_normal_yBdr->SetIntRule(&ir);
       Cybf.AddInteriorFaceIntegrator(dg_normal_yInt);
       Cybf.AddBdrFaceIntegrator(dg_normal_yBdr);
@@ -2446,23 +2466,28 @@ void LagrangianLOOperator::BuildCijMatrices()
    }
 
    /* Ensure row sums are 0 by setting the diagonal entries accordingly */
-   for (int i = 0; i < NDofs_L2; i++)
-   {
-      cij_sparse_x->Elem(i,i) = -row_sums_x[i];
-
-      if (dim > 1)
-      {
-         cij_sparse_y->Elem(i,i) = -row_sums_y[i];
-      }
-   }
-
-   // cout << "cij_x: ";
-   // cij_sparse_x->Print(cout);
-   // if (dim > 1)
+   // for (int i = 0; i < NDofs_L2; i++)
    // {
-   //    cout << "cij_y: ";
-   //    cij_sparse_y->Print(cout);
+   //    cij_sparse_x->Elem(i,i) = -row_sums_x[i];
+
+   //    if (dim > 1)
+   //    {
+   //       cij_sparse_y->Elem(i,i) = -row_sums_y[i];
+   //    }
    // }
+   cout << "row sums x:\n";
+   row_sums_x.Print(cout);
+   cout << "row sums y:\n";
+   row_sums_y.Print(cout);
+
+   cout << "cij_x: ";
+   cij_sparse_x->Print(cout);
+   if (dim > 1)
+   {
+      cout << "cij_y: ";
+      cij_sparse_y->Print(cout);
+   }
+   assert(false);
 
    if (!is_L2_connectivity_built)
    {

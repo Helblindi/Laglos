@@ -424,7 +424,7 @@ int ValidateCijComputationOrder1()
    // - CR/RT for mesh reconstruction at nodes
    H1_FECollection H1FEC(1, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(1, dim, BasisType::Positive);
+   L2_FECollection L2FEC(1, dim, BasisType::GaussLobatto);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -509,7 +509,16 @@ int ValidateCijComputationOrder1()
    // PLF to build mass vector
    FunctionCoefficient rho_coeff(rho0_static); 
    rho_coeff.SetTime(t_init);
-   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1);
+   int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
+   // ir_order = 0;
+   IntegrationRules _IntRules(0, Quadrature1D::GaussLobatto);
+   IntegrationRule ir = _IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
+   // for (int p = 0; p < ir.GetNPoints(); p++)
+   // {
+   //    const IntegrationPoint &ip = ir.IntPoint(p);
+   //    cout << "ip.x: " << ip.x << ", ip.y: " << ip.y << "\n";
+   // }
+   // assert(false);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho_coeff, &ir));
    m->Assemble();
@@ -529,7 +538,7 @@ int ValidateCijComputationOrder1()
    Vector cij(dim), cji(dim), _t(dim), sum(dim);;
    for (int i = 0; i < NDofs_L2; i++)
    {
-      MFEM_WARNING("May want to check row sums for interior dofs.");
+      // MFEM_WARNING("May want to check row sums for interior dofs.");
       /*
       I have manually checked that row sums for interior dofs is 0
       for smaller meshes.
@@ -552,6 +561,11 @@ int ValidateCijComputationOrder1()
       {
          hydro.GetLocalCij(i, j, cij);
          hydro.GetLocalCij(j,i,cji);
+         cout << "i: " << i << ", j: " << j << endl;
+         cout << "cij: ";
+         cij.Print(cout);
+         cout << "cji: ";
+         cji.Print(cout);
          add(cij, cji, _t);
          if (_t.Norml2() > 1.e-10)
          {

@@ -101,14 +101,11 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
       {
          for (int i = 0; i < nd1; i++)
          {
-            // Diagonal entry
-            elmat(i, i) -= w * shape1(i) * shape1(i);
-            for (int j = i+1; j < nd1; j++)
+            for (int j = 0; j < nd1; j++)
             {
                // symmetric, see (4.17) 
                // must accomodate '-'
                elmat(i, j) -= w * shape1(i) * shape1(j);
-               elmat(j, i) -= w * shape1(i) * shape1(j);
             }
          }
 
@@ -119,12 +116,10 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
             /* diagonal, el2 */
             for (int i = 0; i < nd2; i++)
             {
-               elmat(nd1+i,nd1+i) += w * shape2(i) * shape2(i);
-               for (int j = i+1; j < nd2; j++)
+               for (int j = 0; j < nd2; j++)
                {
-                  /* subtract here to flip the orientation of the normal */
+                  /* Need to negate to flip orientation of normal */
                   elmat(nd1+i, nd1+j) += w * shape2(i) * shape2(j);
-                  elmat(nd1+j, nd1+i) += w * shape2(i) * shape2(j);
                }
             }
             
@@ -139,6 +134,7 @@ void DGNormalIntegrator::AssembleFaceMatrix(const FiniteElement &el1,
             for (int i = 0; i < nd2; i++)
                for (int j = 0; j < nd1; j++)
                {
+                  /* Need to negate to flip orientation of normal */
                   elmat(nd1+i, j) -= w * shape2(i) * shape1(j);
                }
 

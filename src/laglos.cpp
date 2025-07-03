@@ -833,8 +833,8 @@ int main(int argc, char *argv[]) {
    FunctionCoefficient rho0_coeff(rho0_static), rho_coeff(rho0_static);
    rho0_coeff.SetTime(t_init);
    int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
-   // IntegrationRules _IntRules(0, Quadrature1D::GaussLobatto);
-   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
+   IntegrationRules _IntRules(0, Quadrature1D::GaussLobatto);
+   IntegrationRule ir = _IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff,&ir));
    m->Assemble();
@@ -1709,9 +1709,13 @@ int main(int argc, char *argv[]) {
 
    switch (ode_solver_type)
    {
+      case 12:
       case 2: steps *= 2; break;
+      case 13:
       case 3: steps *= 3; break;
+      case 14:
       case 4: steps *= 4; break;
+      case 16:
       case 6: steps *= 6; break;
       case 7: steps *= 2;
    }

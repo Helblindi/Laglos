@@ -663,6 +663,42 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
    delete e_source;
 }
 
+void LagrangianLOOperator::CheckSkewSymmetry() const
+{
+   cout << "========================================\n"
+        << "          CheckSkewSymmetry             \n"
+        << "========================================\n";
+   int num_ss_broken = 0;
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      Array<int> row;
+      L2Connectivity.GetRow(i, row);
+      for (int j_it = 0; j_it < row.Size(); j_it++) // Adjacent dof iterator
+      {
+         int j = row[j_it];
+         if (i == j) { continue; } // Skip diagonal
+
+         Vector cij(dim), cji(dim);
+         GetLocalCij(i, j, cij);
+         GetLocalCij(j, i, cji);
+         Vector _t(dim);
+         add(cij, cji, _t);
+
+         if (_t.Norml2() > 1e-10 and i != j)
+         {
+            cout << "!!!skew symmetry broken!!!\n";
+            cout << "i: " << i << ", j: " << j << ", cij: ";
+            cij.Print(cout);
+            cout << "cji: ";
+            cji.Print(cout);
+            num_ss_broken++;
+         }
+      }
+   }
+   
+   cout << "total times skew symmetry broken: " << num_ss_broken << endl;
+}
+
 void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const
 {
    // cout << "========================================\n"
@@ -702,6 +738,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       {
          Vector _tx(dim);
          GetL2DofX(i, _tx);
+         // cout << "_tx: (" << _tx[0] << ", " << _tx[1] << ")\n";
          F_i = pb->flux_ex_p(U_i, _tx, this->GetTime(), attr_i);
          // F_i = pb->flux(U_i, attr_i);
       }
@@ -714,6 +751,8 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
          int j = row[j_it];
          GetLocalCij(i, j, cij);
          Vector cji(dim);
+         // cout << "i: " << i << ", j: " << j << ", cij: ";
+         // cij.Print(cout);
          GetLocalCij(j, i, cji);
          Vector _t(dim);
          add(cij, cji, _t);
@@ -723,22 +762,15 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
          //    cij.Print(cout);
          // }
          // else if (_t.Norml2() > 1e-4)
-         if (_t.Norml2() > 1e-10 and i != j)
-         {
-            cout << "i: " << i << ", j: " << j << ", cij: ";
-            cij.Print(cout);
-            cout << "cji: ";
-            cji.Print(cout);
-            cout << "l \n";
-            MFEM_ABORT("NOT SKEW SYMMETRIC\n");
-            continue;
-         }
+         
          GetStateVector(S, j, U_j);
 
          DenseMatrix dm(dim+2, dim);
          Vector y(dim+2);
          F_i.Mult(cij, y);
 
+         // cout << "fi*cij: ";
+         // y.Print(cout);
          rhs -= y;
 
          // Should I put Fi contribution into dm before?
@@ -785,6 +817,8 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                   F_i_bdry.SetRow(dim+1, _vp);
 
                   F_i_bdry.Mult(cF, yd);
+                  // cout << "yd: ";
+                  // yd.Print(cout);
                   rhs -= yd;
                   break;
                }
@@ -794,6 +828,8 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                   CalcOutwardNormalInt(S, i, fid, cF);
                   cF /= 2.; 
                   dm.Mult(cF, yb);
+                  // cout << "yb: ";
+                  // yb.Print(cout);
                   rhs -= yb;
                   break;
                }
@@ -865,6 +901,8 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                   CalcOutwardNormalInt(S, i, fid, cF);
                   cF /= 2.; 
                   F_i_bdry.Mult(cF, y);
+                  // cout << "y: ";
+                  // y.Print(cout);
                   rhs -= y;
                   break;
                }
@@ -903,6 +941,8 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
             }
             dm.Mult(cij, y);
+            // cout << "fj*cij: ";
+            // y.Print(cout);
             rhs -= y;
          }
 
@@ -913,10 +953,14 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
 
             Vector z = U_j;
             z -= U_i;
+            // cout << "z: ";
+            // z.Print(cout);
             rhs.Add(d, z);
          }   
       } // End adjacent dof iterator
 
+      // cout << "rhs: ";
+      // rhs.Print(cout);
       /* Set ith row of loc_tau, loc_v, and loc_e */
       loc_tau_rhs[dof_it] = rhs[0];
       Array<int> subv_dofs(dim);
@@ -2424,13 +2468,16 @@ void LagrangianLOOperator::BuildCijMatrices()
    /* x */
    DerivativeIntegrator *deriv_x = new DerivativeIntegrator(one, 0);
    deriv_x->SetIntRule(&ir);
-   Cxbf.AddDomainIntegrator(new TransposeIntegrator(deriv_x));
+   // TransposeIntegrator *transpose_deriv_x = new TransposeIntegrator(deriv_x);
+   // transpose_deriv_x->SetIntRule(&ir);
+   // Cxbf.AddDomainIntegrator(transpose_deriv_x);
+   Cxbf.AddDomainIntegrator(deriv_x);
    DGNormalIntegrator *dg_normal_xInt = new DGNormalIntegrator(1./2., 0);
    dg_normal_xInt->SetIntRule(&ir);
    DGNormalIntegrator *dg_normal_xBdr = new DGNormalIntegrator(1./2., 0);
    dg_normal_xBdr->SetIntRule(&ir);
    Cxbf.AddInteriorFaceIntegrator(dg_normal_xInt);
-   Cxbf.AddBdrFaceIntegrator(dg_normal_xBdr);
+   // Cxbf.AddBdrFaceIntegrator(dg_normal_xBdr);
    Cxbf.Assemble();
    Cxbf.Finalize();
    HypreParMatrix * Cx_hpm = Cxbf.ParallelAssemble();
@@ -2444,13 +2491,16 @@ void LagrangianLOOperator::BuildCijMatrices()
    {
       DerivativeIntegrator *deriv_y = new DerivativeIntegrator(one, 1);
       deriv_y->SetIntRule(&ir);
-      Cybf.AddDomainIntegrator(new TransposeIntegrator(deriv_y));
+      // TransposeIntegrator * transpose_deriv_y = new TransposeIntegrator(deriv_y);
+      // transpose_deriv_y->SetIntRule(&ir);
+      // Cybf.AddDomainIntegrator(transpose_deriv_y);
+      Cybf.AddDomainIntegrator(deriv_y);
       DGNormalIntegrator *dg_normal_yInt = new DGNormalIntegrator(1./2., 1);
       dg_normal_yInt->SetIntRule(&ir);
       DGNormalIntegrator *dg_normal_yBdr = new DGNormalIntegrator(1./2., 1);
       dg_normal_yBdr->SetIntRule(&ir);
       Cybf.AddInteriorFaceIntegrator(dg_normal_yInt);
-      Cybf.AddBdrFaceIntegrator(dg_normal_yBdr);
+      // Cybf.AddBdrFaceIntegrator(dg_normal_yBdr);
       Cybf.Assemble();
       Cybf.Finalize();
       HypreParMatrix * Cy_hpm = Cybf.ParallelAssemble();
@@ -2475,19 +2525,24 @@ void LagrangianLOOperator::BuildCijMatrices()
    //       cij_sparse_y->Elem(i,i) = -row_sums_y[i];
    //    }
    // }
-   cout << "row sums x:\n";
-   row_sums_x.Print(cout);
-   cout << "row sums y:\n";
-   row_sums_y.Print(cout);
+   // cout << "row sums x:\n";
+   // row_sums_x.Print(cout);
+   // cout << "row sums y:\n";
+   // row_sums_y.Print(cout);
 
-   cout << "cij_x: ";
-   cij_sparse_x->Print(cout);
-   if (dim > 1)
-   {
-      cout << "cij_y: ";
-      cij_sparse_y->Print(cout);
-   }
-   assert(false);
+   // ParGridFunction _dofs_x(&L2V);
+   // pmesh->GetNodes(_dofs_x);
+   // cout << "L2 node locations: \n";
+   // _dofs_x.Print(cout);
+
+   // cout << "cij_x: ";
+   // cij_sparse_x->Print(cout);
+   // if (dim > 1)
+   // {
+   //    cout << "cij_y: ";
+   //    cij_sparse_y->Print(cout);
+   // }
+   // assert(false);
 
    if (!is_L2_connectivity_built)
    {
@@ -2500,6 +2555,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    }
 
    // cout << "done with Cij\n";
+   // CheckSkewSymmetry();
 }
 
 

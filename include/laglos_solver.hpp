@@ -253,6 +253,7 @@ public:
    void SetStateVector(Vector &S_new, const int &index, const Vector &U) const;
 
    /* cij comp */
+   void CheckSkewSymmetry() const;
    void BuildCijMatrices();
    void GetLocalCij(const int &i, const int &j, Vector &cij) const;
    void BuildL2ConnectivityTable();

@@ -133,6 +133,7 @@ protected:
    mutable DenseTensor Me, Me_inv; // Energy mass matrix and its inverse
    MassIntegrator * mi; // Mass integrator for mass matrix
    void ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const;
+   int FindFaceIndex(const int &el1, const int &el2) const;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/

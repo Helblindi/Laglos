@@ -749,6 +749,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       for (int j_it = 0; j_it < row.Size(); j_it++) // Adjacent dof iterator
       {
          int j = row[j_it];
+         int el_j = L2.GetElementForDof(j);
          GetLocalCij(i, j, cij);
          Vector cji(dim);
          // cout << "i: " << i << ", j: " << j << ", cij: ";
@@ -919,7 +920,6 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             // flux contribution
             
             //NF//MS
-            int el_j = L2.GetElementForDof(j);
             int attr_j = pmesh->GetAttribute(el_j);
             if (use_elasticity && attr_j == 50)
             {
@@ -947,15 +947,55 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
          }
 
          /* viscosity contribution */
-         if (use_viscosity)
+         if (use_viscosity && i != j)
          {
-            double d = dij_sparse->Elem(i,j); 
+            /* only add graph viscosity for binder elements */
+            Vector _txi(dim), _txj(dim), _tt(dim);
+            GetL2DofX(i, _txi);
+            GetL2DofX(j, _txj);
+            subtract(_txi, _txj, _tt);
+            // Only look at dofs that share the same coordinate location
+            if (_tt.Norml2() < 1e-10)
+            {
+               // Same x location, binder pair
+               double d = dij_sparse->Elem(i,j); 
 
-            Vector z = U_j;
-            z -= U_i;
-            // cout << "z: ";
-            // z.Print(cout);
-            rhs.Add(d, z);
+               const int f_index = FindFaceIndex(el_i, el_j);
+               // cout << "binder pair: (" << i << ", " << j << "), face_index: " << f_index << endl;
+               Vector n_int(dim);
+               CalcOutwardNormalInt(S, el_i, f_index, n_int);
+               double F = n_int.Norml2();
+               // double omega = 4. * (order_t + 1) * (order_t + dim) / dim;
+               // omega /= 300.; // Fix the cfl issue?
+               // cout << "F: " << F << ", omega: " << omega << endl;
+               double omega = .5;
+               /* need to walk back cnorm */
+               double c_norm = cij.Norml2();
+               d /= c_norm;
+
+               d *= F;
+               d *= omega;
+
+               // cout << "i: " << i <<", j: "<< j << ", d: " << d << endl;
+               // cout << "U_j: ";
+               // U_j.Print(cout);
+               // cout << "U_i: ";
+               // U_i.Print(cout);
+               Vector z = U_j;
+               z -= U_i;
+               if (z.Norml2() > 1e-10)
+               // {
+               //    cout << "rhs: ";
+               //    rhs.Print(cout);
+               //    cout << "d: " << d << ", ";
+               //    cout << "z: ";
+               //    z.Print(cout);
+               // }
+               
+               rhs.Add(d, z);
+            }
+
+            
          }   
       } // End adjacent dof iterator
 
@@ -973,6 +1013,23 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       loc_v_rhs.SetRow(dof_it, subv);
       loc_e_rhs[dof_it] = rhs[dim+1]; 
    } // End l2 dof iterator
+}
+
+int LagrangianLOOperator::FindFaceIndex(const int &el1, const int &el2) const
+{
+   Array<int> elem_faces, ori;
+   pmesh->GetElementEdges(el1, elem_faces, ori);
+   for (auto f : elem_faces)
+   {
+      Array<int> row;
+      face_element->GetRow(f, row);
+      if (row.Find(el2) != -1)
+      {
+         // cout << "el1: " << el1 << ", el2: " << el2 << ", face: " << f << endl;
+         return f; // Found the face index
+      }
+   }
+   return -1; // Face not found
 }
 
 

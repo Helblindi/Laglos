@@ -554,6 +554,7 @@ void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const
    //    ParGridFunction dxdt_gf;
    //    dxdt_gf.MakeRef(&H1, dS_dt, block_offsets[0]);
    //    dxdt_gf = this->mv_gf;
+   //    dxdt_gf.SyncAliasMemory(dS_dt);
    // }
 }
 
@@ -736,11 +737,10 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       }
       else
       {
-         Vector _tx(dim);
-         GetL2DofX(i, _tx);
-         // cout << "_tx: (" << _tx[0] << ", " << _tx[1] << ")\n";
-         F_i = pb->flux_ex_p(U_i, _tx, this->GetTime(), attr_i);
-         // F_i = pb->flux(U_i, attr_i);
+         // Vector _tx(dim);
+         // GetL2DofX(i, _tx);
+         // F_i = pb->flux_ex_p(U_i, _tx, this->GetTime(), attr_i);
+         F_i = pb->flux(U_i, attr_i);
       }
       int bdr_ind = cell_bdr_flag_gf[i];
       L2Connectivity.GetRow(i, row);
@@ -935,10 +935,10 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             }
             else
             {
-               // dm = pb->flux(U_j, attr_j);
-               Vector _tx(dim);
-               GetL2DofX(j, _tx);
-               dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
+               dm = pb->flux(U_j, attr_j);
+               // Vector _tx(dim);
+               // GetL2DofX(j, _tx);
+               // dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
             }
             dm.Mult(cij, y);
             // cout << "fj*cij: ";

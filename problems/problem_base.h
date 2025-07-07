@@ -297,6 +297,7 @@ public:
 
    inline DenseMatrix flux_ex_p(const Vector &U, const Vector &x, const double &t, const int &cell_attr=0)
    {
+      MFEM_ABORT("This function is deprecated. Use flux instead.\n");
       if (cell_attr == 50)
       {
          MFEM_ABORT("Cell attr 50 is reserved for elastic.\n");

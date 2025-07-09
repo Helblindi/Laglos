@@ -974,6 +974,30 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                break;
             }
             case 4: // Seamstress viscosity
+            {
+               if (el_i != el_j)
+               {
+                  const int f_index = FindFaceIndex(el_i, el_j);
+
+                  Vector nor(dim);
+                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                  // Evaluate the Jacobian at the center of the face:
+                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                  CalcOrtho(T->Jacobian(), nor);
+                  double F = nor.Norml2();
+                  double omega = .25;
+                  /* need to walk back cnorm */
+                  double c_norm = cij.Norml2();
+                  d /= c_norm;
+
+                  d *= F;
+                  d *= omega;
+               }
+               /* There should be no viscosity added intra cell */
+               else { d = 0.; } // If the two dofs are not in different cells, set d to 0.
+
+               break;
+            }
             default:
                MFEM_ABORT("Invalid visc value provided.\n");
             } // End viscosity switch
@@ -2933,6 +2957,31 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                break;
             }
             case 4: // Seamstress viscosity
+            {
+               int el_i = L2.GetElementForDof(c);
+               int el_j = L2.GetElementForDof(cp);
+               if (el_i != el_j)
+               {
+                  const int f_index = FindFaceIndex(el_i, el_j);
+
+                  Vector nor(dim);
+                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                  // Evaluate the Jacobian at the center of the face:
+                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                  CalcOrtho(T->Jacobian(), nor);
+                  pmesh_F = nor.Norml2();
+                  double omega = .25;
+                  
+                  /* correct d */
+                  d /= cij.Norml2();
+                  d *= pmesh_F;
+                  d *= omega;
+               }
+               /* There should be no viscosity added intra cell */
+               else { d = 0.; } // If the two dofs are not in different cells, set d to 0.
+
+               break;
+            }
             default:
                MFEM_ABORT("Invalid visc value provided.\n");
             } // End viscosity switch

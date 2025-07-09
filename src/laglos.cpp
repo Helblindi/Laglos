@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    bool mc = false;
-   bool use_viscosity = true;
+   int visc = 1; // Default to GMS-GV
    bool greedy = false;
    int gmv_to_greedy_steps = 0;
    bool mm = true;
@@ -230,9 +230,13 @@ int main(int argc, char *argv[]) {
                   "Enable or disable result output (files in mfem format).");
    args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
                   "Enable or disable mass correction.");
-   args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
-                  "--no-viscosity",
-                  "Enable or disable the use of artificial viscosity.");
+   args.AddOption(&visc, "-visc", "--viscosity",
+                  "Type of viscosity to use:"
+                  "\n\t 0 - No viscosity,"
+                  "\n\t 1 - GMS-GV (Guaranteed Maximum Speed Graph Viscosity),"
+                  "\n\t 2 - Greedy Viscosity,"
+                  "\n\t 3 - Artificial graph viscosity for HO (Binder),"
+                  "\n\t 4 - Artificial graph viscosity for HO (Non-binder),");
    args.AddOption(&greedy, "-greedy", "--use-greedy-viscosity", "-no-greedy", "--no-greedy-viscosity",
                   "Enable or disable greedy viscosity computation.");
    args.AddOption(&gmv_to_greedy_steps, "-ggn", "--gmv-to-greedy-num-steps",
@@ -303,6 +307,17 @@ int main(int argc, char *argv[]) {
    {
       MFEM_ABORT("Elasticity cannot be used with order_t > 0. "
                  "Set order_t = 0 to use elasticity.");
+   }
+   if (visc == 2)
+   {
+      if (!greedy)
+      {
+         MFEM_ABORT("Greedy viscosity must be enabled if visc = 2.");
+      }
+   }
+   if (greedy && visc != 2)
+   {
+      MFEM_ABORT("Greedy viscosity can only be used if visc = 2.");
    }
    // if (order_t > 0 && order_k != order_t)
    // {
@@ -850,7 +865,7 @@ int main(int argc, char *argv[]) {
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_coeff, rho0_gf, m, ir, problem_class, offset, visc, elastic_eos, mm, CFL);
    hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */

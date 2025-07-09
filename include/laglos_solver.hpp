@@ -9,6 +9,7 @@
 #include "laglos_assembly.hpp"
 #include "elastic.hpp" //NF//MS
 #include "laglos_tools.hpp"
+#include "mfem/linalg/dtensor.hpp" // For Reshape
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -159,7 +160,7 @@ protected:
    double timestep = 0.001;
    mutable double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
 
-   bool use_viscosity;
+   int visc;
    bool mm;
    bool compute_mv = true;
    bool use_greedy_viscosity;
@@ -210,7 +211,7 @@ public:
                         const IntegrationRule &_ir,
                         ProblemBase *_pb,
                         Array<int> offset,
-                        bool use_viscosity,
+                        int visc,
                         int elastic_eos,
                         bool mm,
                         double CFL);

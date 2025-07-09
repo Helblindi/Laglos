@@ -77,7 +77,7 @@ void VisualizeField(socketstream &sock, const char *vishost, int visport,
 *                  initial cell mass, which is guaranteed to be conserved locally.
 *  _pb           - ProblemBase class containing problem specific functions and quantities.
 * Options:
-*  use_viscosity - Boolean for the optional addition of viscosity to ensure our method is IDP.
+*  visc          - Integer for the optional addition of viscosity to ensure our method is IDP.
 *  mm            - Boolean to allow for mesh motion to guarantee local conservation of mass.
 *  CFL           - Double representing our time step restriction.
 *
@@ -96,7 +96,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
                                            const IntegrationRule &_ir,
                                            ProblemBase *_pb,
                                            Array<int> offset,
-                                           bool use_viscosity,
+                                           int visc,
                                            int elastic_eos,
                                            bool mm, 
                                            double CFL) :
@@ -155,7 +155,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    smesh_edge_vertex(smesh->GetEdgeVertexTable()),
    ess_bdr(pmesh->bdr_attributes.Max()),
    // Options
-   use_viscosity(use_viscosity),
+   visc(visc),
    use_elasticity(elastic_eos),
    mm(mm),
    CFL(CFL),
@@ -750,28 +750,13 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       {
          int j = row[j_it];
          int el_j = L2.GetElementForDof(j);
-         GetLocalCij(i, j, cij);
-         Vector cji(dim);
-         // cout << "i: " << i << ", j: " << j << ", cij: ";
-         // cij.Print(cout);
-         GetLocalCij(j, i, cji);
-         Vector _t(dim);
-         add(cij, cji, _t);
-         // if (i == j)
-         // {
-         //    cout << "diag at i(" << i << "): ";
-         //    cij.Print(cout);
-         // }
-         // else if (_t.Norml2() > 1e-4)
-         
+         GetLocalCij(i, j, cij);         
          GetStateVector(S, j, U_j);
 
          DenseMatrix dm(dim+2, dim);
          Vector y(dim+2);
          F_i.Mult(cij, y);
 
-         // cout << "fi*cij: ";
-         // y.Print(cout);
          rhs -= y;
 
          // Should I put Fi contribution into dm before?
@@ -941,62 +926,63 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                // dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
             }
             dm.Mult(cij, y);
-            // cout << "fj*cij: ";
-            // y.Print(cout);
             rhs -= y;
          }
 
          /* viscosity contribution */
-         if (use_viscosity && i != j)
+         if (visc && i != j)
          {
-            /* only add graph viscosity for binder elements */
-            Vector _txi(dim), _txj(dim), _tt(dim);
-            GetL2DofX(i, _txi);
-            GetL2DofX(j, _txj);
-            subtract(_txi, _txj, _tt);
-            // Only look at dofs that share the same coordinate location
-            if (_tt.Norml2() < 1e-10)
+            double d = dij_sparse->Elem(i,j); 
+            switch (visc)
             {
-               // Same x location, binder pair
-               double d = dij_sparse->Elem(i,j); 
+            case 1:
+            case 2:
+               break; // d is already set
+            case 3: // Binder viscosity
+            {
+               /* only add graph viscosity for binder elements */
+               Vector _txi(dim), _txj(dim), _tt(dim);
+               GetL2DofX(i, _txi);
+               GetL2DofX(j, _txj);
+               subtract(_txi, _txj, _tt);
+               // Only look at dofs that share the same coordinate location
+               if (_tt.Norml2() < 1e-10)
+               {
+                  const int f_index = FindFaceIndex(el_i, el_j);
+                  // cout << "binder pair: (" << i << ", " << j << "), face_index: " << f_index << endl;
+                  // Vector n_int(dim);
+                  // CalcOutwardNormalInt(S, el_i, f_index, n_int);
+                  // double F = n_int.Norml2();
+                  // double omega = 4. * (order_t + 1) * (order_t + dim) / dim;
+                  // omega /= 300.; // Fix the cfl issue?
+                  // cout << "F: " << F << ", omega: " << omega << endl;
+                  Vector nor(dim);
+                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                  // Evaluate the Jacobian at the center of the face:
+                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                  CalcOrtho(T->Jacobian(), nor);
+                  double F = nor.Norml2();
+                  double omega = .25;
+                  /* need to walk back cnorm */
+                  double c_norm = cij.Norml2();
+                  d /= c_norm;
 
-               const int f_index = FindFaceIndex(el_i, el_j);
-               // cout << "binder pair: (" << i << ", " << j << "), face_index: " << f_index << endl;
-               Vector n_int(dim);
-               CalcOutwardNormalInt(S, el_i, f_index, n_int);
-               double F = n_int.Norml2();
-               // double omega = 4. * (order_t + 1) * (order_t + dim) / dim;
-               // omega /= 300.; // Fix the cfl issue?
-               // cout << "F: " << F << ", omega: " << omega << endl;
-               double omega = .5;
-               /* need to walk back cnorm */
-               double c_norm = cij.Norml2();
-               d /= c_norm;
-
-               d *= F;
-               d *= omega;
-
-               // cout << "i: " << i <<", j: "<< j << ", d: " << d << endl;
-               // cout << "U_j: ";
-               // U_j.Print(cout);
-               // cout << "U_i: ";
-               // U_i.Print(cout);
-               Vector z = U_j;
-               z -= U_i;
-               if (z.Norml2() > 1e-10)
-               // {
-               //    cout << "rhs: ";
-               //    rhs.Print(cout);
-               //    cout << "d: " << d << ", ";
-               //    cout << "z: ";
-               //    z.Print(cout);
-               // }
-               
-               rhs.Add(d, z);
+                  d *= F;
+                  d *= omega;
+               }
+               else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               break;
             }
-
+            case 4: // Seamstress viscosity
+            default:
+               MFEM_ABORT("Invalid visc value provided.\n");
+            } // End viscosity switch
             
-         }   
+            Vector z = U_j;
+            z -= U_i;
+            
+            rhs.Add(d, z);
+         } // End viscosity contribution
       } // End adjacent dof iterator
 
       // cout << "rhs: ";
@@ -1296,7 +1282,7 @@ void LagrangianLOOperator::ComputeMVHOfirst(const Vector &S, ParGridFunction &dx
             Vector vcp; pb->velocity(U_j, vcp);
             Vf.Add(1., vcp);
             Vf *= 0.5;
-            if (use_viscosity)
+            if (visc)
             {
                double coeff = d * (U_i[0] - U_j[0]) / F; // This is how 5.7b is defined.
                Vf.Add(coeff, n_vec);
@@ -1406,7 +1392,7 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
       }
       case -1:
       {
-         /* Project disc vel field without visc */
+         /* Project disc vel field without viscosity */
          ParGridFunction v_gf;
          Vector* sptr = const_cast<Vector*>(&S);
          v_gf.MakeRef(&L2V, *sptr, block_offsets[2]);
@@ -2882,10 +2868,8 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
 
       // Get normal, d, and |F|
       GetLocalCij(c, cp, cij);
-      // cout << "cij: ";
-      // cij.Print(cout);
-      cij *= 2.;
       n_vec = cij;
+      n_vec *= 2.;
       F = n_vec.Norml2();
       n_vec /= F;
       if (1. - n_vec.Norml2() > 1e-12)
@@ -2899,17 +2883,61 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       {
          GetStateVector(S, cp, Ucp);
 
-         // Get max wave speed
-         d = dij_sparse->Elem(c, cp);
-
          // Compute intermediate face velocity
          pb->velocity(Uc, Vf);
          Vector vcp; pb->velocity(Ucp, vcp);
          Vf.Add(1., vcp);
          Vf *= 0.5;
-         if (use_viscosity)
+         if (visc)
          {
-            double coeff = d * (Ucp[0] - Uc[0]) / F; // This is how 5.7b is defined.
+            double pmesh_F = 1.;
+            // Get max wave speed
+            d = dij_sparse->Elem(c, cp);
+
+            /* Optionally, modify viscosity value d */
+            switch (visc)
+            {
+            case 0:
+               d = 0.;
+               break;
+            case 1:
+            case 2:
+               break; // d is already set
+            case 3: // Binder viscosity
+            {
+               /* only add graph viscosity for binder elements */
+               Vector _txi(dim), _txj(dim), _tt(dim);
+               GetL2DofX(c, _txi);
+               GetL2DofX(cp, _txj);
+               subtract(_txi, _txj, _tt);
+               // Only look at dofs that share the same coordinate location
+               if (_tt.Norml2() < 1e-10)
+               {
+                  int el_i = L2.GetElementForDof(c);
+                  int el_j = L2.GetElementForDof(cp);
+                  int f_index = FindFaceIndex(el_i, el_j);
+                  Vector nor(dim);
+                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                  // Evaluate the Jacobian at the center of the face:
+                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                  CalcOrtho(T->Jacobian(), nor);
+                  pmesh_F = nor.Norml2();
+                  double omega = 0.25;
+
+                  /* Correct d */
+                  d /= cij.Norml2();
+                  d *= pmesh_F;
+                  d *= omega;
+               }
+               else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               break;
+            }
+            case 4: // Seamstress viscosity
+            default:
+               MFEM_ABORT("Invalid visc value provided.\n");
+            } // End viscosity switch
+            
+            double coeff = d * (Ucp[0] - Uc[0]) / pmesh_F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
          }
       }
@@ -7686,7 +7714,7 @@ void LagrangianLOOperator::IterativeCornerVelocityLSCellVolumeMv2FaceVisc(Vector
          geom.GetNodePositionFromBV(S, node, anode_n);
          geom.GetNodeVelocity(S, node, Vnode_n);
 
-         /* Get mv2 velocity if needed in cell visc contribution */
+         /* Get mv2 velocity if needed in cell viscosity contribution */
          geom.GetNodeVelocity(mv2_gf, node, Vnode_mv2);
 
          /* Iterate over adjacent cells */ 

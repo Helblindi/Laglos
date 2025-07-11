@@ -24,7 +24,7 @@ Options used:
    --no-visit
    --no-print
    --no-mass-correct
-   --use-viscosity
+   --viscosity 1
    --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
@@ -188,14 +188,14 @@ step   430,	t = 0.588046,	dt = 0.00113844,	|e| = 1.3155831560e+01
 step   435,	t = 0.593734,	dt = 0.00113746,	|e| = 1.3234464694e+01
 step   440,	t = 0.599425,	dt = 0.00113831,	|e| = 1.3313007952e+01
 step   441,	t = 0.600000,	dt = 0.00057461,	|e| = 1.3320860967e+01
-Program took 2.6306042500e+00s.
-This amounts to 2.3806373303e-05 s per timestep per gridpoint.
+Program took 2.3251505833e+00s.
+This amounts to 2.1042086727e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.631e+00 | 2.381e-05
-  Dij calculation:               1.246e+00 | 1.127e-05
-  Mesh Motion calculation:       5.489e-01 | 4.967e-06
+  Total time:                    2.325e+00 | 2.104e-05
+  Dij calculation:               9.848e-01 | 8.912e-06
+  Mesh Motion calculation:       5.245e-01 | 4.747e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      6.304e-01 | 5.705e-06
+  State Update calculation:      2.332e+00 | 2.111e-05
 ===========================================================

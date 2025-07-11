@@ -2926,6 +2926,8 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                break;
             case 1:
             case 2:
+               // Ensure the correct face measure is used
+               pmesh_F = F;
                break; // d is already set
             case 3: // Binder viscosity
             {

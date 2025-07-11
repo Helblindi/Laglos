@@ -949,19 +949,18 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                if (_tt.Norml2() < 1e-10)
                {
                   const int f_index = FindFaceIndex(el_i, el_j);
-                  // cout << "binder pair: (" << i << ", " << j << "), face_index: " << f_index << endl;
-                  // Vector n_int(dim);
-                  // CalcOutwardNormalInt(S, el_i, f_index, n_int);
-                  // double F = n_int.Norml2();
-                  // double omega = 4. * (order_t + 1) * (order_t + dim) / dim;
-                  // omega /= 300.; // Fix the cfl issue?
-                  // cout << "F: " << F << ", omega: " << omega << endl;
-                  Vector nor(dim);
-                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
-                  // Evaluate the Jacobian at the center of the face:
-                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
-                  CalcOrtho(T->Jacobian(), nor);
-                  double F = nor.Norml2();
+                  double F = 1.;
+
+                  if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
+                  {
+                     Vector nor(dim);
+                     ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                     // Evaluate the Jacobian at the center of the face:
+                     T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                     CalcOrtho(T->Jacobian(), nor);
+                     double F = nor.Norml2();
+                  }
+
                   double omega = .25;
                   /* need to walk back cnorm */
                   double c_norm = cij.Norml2();
@@ -1028,7 +1027,15 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
 int LagrangianLOOperator::FindFaceIndex(const int &el1, const int &el2) const
 {
    Array<int> elem_faces, ori;
-   pmesh->GetElementEdges(el1, elem_faces, ori);
+   if (dim == 1)
+   {
+      pmesh->GetElementVertices(el1, elem_faces);
+   }
+   else
+   {
+      pmesh->GetElementEdges(el1, elem_faces, ori);
+   }
+   
    for (auto f : elem_faces)
    {
       Array<int> row;
@@ -2942,12 +2949,16 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                   int el_i = L2.GetElementForDof(c);
                   int el_j = L2.GetElementForDof(cp);
                   int f_index = FindFaceIndex(el_i, el_j);
-                  Vector nor(dim);
-                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
-                  // Evaluate the Jacobian at the center of the face:
-                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
-                  CalcOrtho(T->Jacobian(), nor);
-                  pmesh_F = nor.Norml2();
+
+                  if (dim > 1)// if dim == 1, there is no notion of the measure of a vertex location
+                  {
+                     Vector nor(dim);
+                     ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                     // Evaluate the Jacobian at the center of the face:
+                     T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                     CalcOrtho(T->Jacobian(), nor);
+                     pmesh_F = nor.Norml2();
+                  }
                   double omega = 0.25;
 
                   /* Correct d */
@@ -2966,12 +2977,15 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                {
                   const int f_index = FindFaceIndex(el_i, el_j);
 
-                  Vector nor(dim);
-                  ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
-                  // Evaluate the Jacobian at the center of the face:
-                  T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
-                  CalcOrtho(T->Jacobian(), nor);
-                  pmesh_F = nor.Norml2();
+                  if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
+                  {
+                     Vector nor(dim);
+                     ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                     // Evaluate the Jacobian at the center of the face:
+                     T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                     CalcOrtho(T->Jacobian(), nor);
+                     pmesh_F = nor.Norml2();
+                  }
                   double omega = .25;
                   
                   /* correct d */

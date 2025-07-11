@@ -11,10 +11,10 @@ Options used:
    --output-flag default
    --order-thermo 1
    --order-kinetic 2
-   --refine-serial 3
+   --refine-serial 5
    --refine-parallel 0
    --problem 2
-   --ode-solver 1
+   --ode-solver 13
    --t-init 0
    --t-final 0.225
    --max-steps -1
@@ -24,8 +24,8 @@ Options used:
    --no-visit
    --no-print
    --no-mass-correct
-   --use-viscosity
-   --use-greedy-viscosity
+   --viscosity 3
+   --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
    --check-mesh
@@ -39,7 +39,7 @@ Options used:
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
    --mesh-motion-consistency-coefficient-on-cells 0
-   --CFL 0.1
+   --CFL 0.5
    --no-set-dt-to-h
    --timestep 0.001
    --no-suppress-output
@@ -48,80 +48,94 @@ Meshing done
 done with serial refinement
 done with parallel refinement
 dim: 1, spacedim: 1
-Zones min/max: 8 8
-global_vSize: 16
-N dofs: 17
-Num Scalar Vertex DoFs: 9
+Zones min/max: 32 32
+global_vSize: 64
+N dofs: 65
+Num Scalar Vertex DoFs: 33
 Num Scalar edge-interior DoFs: 0
 Num Scalar face-interior DoFs: 0
-Num faces: 9
+Num faces: 33
 dim: 1
-Number of kinematic (position, mesh velocity) dofs: 17
-Corresponding NDofs: 17
+Number of kinematic (position, mesh velocity) dofs: 65
+Corresponding NDofs: 65
 Corresponding VDim: 1
-Corresponding Vsize: 17
-Number of specific internal energy dofs: 16
-Corresponding NDofs: 16
+Corresponding Vsize: 65
+Number of specific internal energy dofs: 64
+Corresponding NDofs: 64
 Corresponding VDim: 1
-Corresponding Vsize: 16
-Number of velocity dofs: 16
-Corresponding NDofs: 16
+Corresponding Vsize: 64
+Number of velocity dofs: 64
+Corresponding NDofs: 64
 Corresponding VDim: 1
-Corresponding Vsize: 16
-num interior faces: 7
+Corresponding Vsize: 64
+num interior faces: 31
 num boundary faces: 2
-num total faces: 9
+num total faces: 33
 num boundary elements: 2
-num elements: 8
+num elements: 32
 Geometric::Non-default constructor
-NDofs_H1: 17
+NDofs_H1: 65
 dim: 1
 Instantiating hydro op
-block offsets: 0 17 33 49
-65
+block offsets: 0 65 129 193
+257
 Constructing BdrElementIndexingArray:
-Vsize_H1: 17
-Vsize_H1L: 9
-TVSize_H1: 17
-GTVSize_H1: 17
-NDofs_H1: 17
-NVDofs_H1: 9
-NDofs_H1L: 9
-NDofs_L2: 16
-NDofs_L2V: 16
-Vsize_L2V: 16
-NE: 8
-num_faces: 9
-num_vertices: 9
-smesh_num_faces: 17
+Vsize_H1: 65
+Vsize_H1L: 33
+TVSize_H1: 65
+GTVSize_H1: 65
+NDofs_H1: 65
+NVDofs_H1: 33
+NDofs_H1L: 33
+NDofs_L2: 64
+NDofs_L2V: 64
+Vsize_L2V: 64
+NE: 32
+num_faces: 33
+num_vertices: 33
+smesh_num_faces: 65
 Entering time loop
-step     5,	t = 0.018549,	dt = 0.00273750,	|e| = 8.9298687757e+00
-step    10,	t = 0.032350,	dt = 0.00275314,	|e| = 8.9394604429e+00
-step    15,	t = 0.046242,	dt = 0.00282085,	|e| = 8.9559028121e+00
-step    20,	t = 0.060472,	dt = 0.00280725,	|e| = 8.9786313434e+00
-step    25,	t = 0.074575,	dt = 0.00282743,	|e| = 9.0064808062e+00
-step    30,	t = 0.088552,	dt = 0.00271876,	|e| = 9.0392160397e+00
-step    35,	t = 0.101553,	dt = 0.00253027,	|e| = 9.0742544303e+00
-step    40,	t = 0.113767,	dt = 0.00238968,	|e| = 9.1111459160e+00
-step    45,	t = 0.125382,	dt = 0.00228209,	|e| = 9.1497299200e+00
-step    50,	t = 0.136532,	dt = 0.00219784,	|e| = 9.1899112020e+00
-step    55,	t = 0.147313,	dt = 0.00213050,	|e| = 9.2316180059e+00
-step    60,	t = 0.157798,	dt = 0.00207643,	|e| = 9.2748075140e+00
-step    65,	t = 0.168050,	dt = 0.00203439,	|e| = 9.3194858562e+00
-step    70,	t = 0.178119,	dt = 0.00200105,	|e| = 9.3656069841e+00
-step    75,	t = 0.188043,	dt = 0.00197468,	|e| = 9.4131537431e+00
-step    80,	t = 0.197852,	dt = 0.00195378,	|e| = 9.4621166466e+00
-step    85,	t = 0.207570,	dt = 0.00193752,	|e| = 9.5124922274e+00
-step    90,	t = 0.217219,	dt = 0.00192499,	|e| = 9.5642767590e+00
-step    95,	t = 0.225000,	dt = 0.00010237,	|e| = 9.6072645598e+00
-Program took 1.3402875000e-02s.
-This amounts to 1.7451660156e-05 s per timestep per gridpoint.
+step     5,	t = 0.015848,	dt = 0.00286731,	|e| = 1.8060729810e+01
+step    10,	t = 0.027437,	dt = 0.00202914,	|e| = 1.8107768331e+01
+step    15,	t = 0.036078,	dt = 0.00158175,	|e| = 1.8173182890e+01
+step    20,	t = 0.043521,	dt = 0.00145457,	|e| = 1.8254984562e+01
+step    25,	t = 0.050743,	dt = 0.00144088,	|e| = 1.8348630846e+01
+step    30,	t = 0.057843,	dt = 0.00139806,	|e| = 1.8443433184e+01
+step    35,	t = 0.064613,	dt = 0.00132601,	|e| = 1.8545554775e+01
+step    40,	t = 0.071123,	dt = 0.00129346,	|e| = 1.8648080358e+01
+step    45,	t = 0.077619,	dt = 0.00130747,	|e| = 1.8748376011e+01
+step    50,	t = 0.084234,	dt = 0.00133125,	|e| = 1.8865148642e+01
+step    55,	t = 0.090857,	dt = 0.00131220,	|e| = 1.8980381869e+01
+step    60,	t = 0.097312,	dt = 0.00127543,	|e| = 1.9083074552e+01
+step    65,	t = 0.103613,	dt = 0.00125638,	|e| = 1.9200290651e+01
+step    70,	t = 0.109967,	dt = 0.00128523,	|e| = 1.9313459276e+01
+step    75,	t = 0.116346,	dt = 0.00125059,	|e| = 1.9415561969e+01
+step    80,	t = 0.122799,	dt = 0.00129659,	|e| = 1.9540093403e+01
+step    85,	t = 0.129192,	dt = 0.00126425,	|e| = 1.9650669458e+01
+step    90,	t = 0.135355,	dt = 0.00121408,	|e| = 1.9745155675e+01
+step    95,	t = 0.141722,	dt = 0.00130161,	|e| = 1.9869777130e+01
+step   100,	t = 0.148316,	dt = 0.00131867,	|e| = 1.9981093055e+01
+step   105,	t = 0.154351,	dt = 0.00119617,	|e| = 2.0072437724e+01
+step   110,	t = 0.160644,	dt = 0.00126575,	|e| = 2.0194517750e+01
+step   115,	t = 0.166982,	dt = 0.00127625,	|e| = 2.0295151693e+01
+step   120,	t = 0.172912,	dt = 0.00118621,	|e| = 2.0384422801e+01
+step   125,	t = 0.179320,	dt = 0.00131785,	|e| = 2.0509772292e+01
+step   130,	t = 0.185782,	dt = 0.00124048,	|e| = 2.0606760754e+01
+step   135,	t = 0.191634,	dt = 0.00118750,	|e| = 2.0693984697e+01
+step   140,	t = 0.197972,	dt = 0.00129025,	|e| = 2.0816531097e+01
+step   145,	t = 0.204364,	dt = 0.00120273,	|e| = 2.0908699142e+01
+step   150,	t = 0.210170,	dt = 0.00119166,	|e| = 2.0997515336e+01
+step   155,	t = 0.216568,	dt = 0.00129294,	|e| = 2.1119181600e+01
+step   160,	t = 0.222823,	dt = 0.00117414,	|e| = 2.1203487640e+01
+step   162,	t = 0.225000,	dt = 0.00103243,	|e| = 2.1232965102e+01
+Program took 2.0272520833e-01s.
+This amounts to 3.8866029205e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    1.340e-02 | 1.745e-05
-  Dij calculation:               4.317e-03 | 5.622e-06
-  Mesh Motion calculation:       1.322e-03 | 1.722e-06
+  Total time:                    2.027e-01 | 3.887e-05
+  Dij calculation:               2.907e-02 | 5.574e-06
+  Mesh Motion calculation:       3.166e-02 | 6.070e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      1.641e-02 | 2.136e-05
+  State Update calculation:      2.078e-01 | 3.983e-05
 ===========================================================

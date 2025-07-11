@@ -55,11 +55,15 @@ struct TimingData
 class LagrangianLOOperator : public LimitedTimeDependentOperator
 {
 protected:
+   const int dim;
+   
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
+   ParFiniteElementSpace smesh_H1L;
    ParFiniteElementSpace H1Lc;
    const ParGridFunction &rho0_gf;
    mutable ParGridFunction x_gf;
+   mutable ParGridFunction smesh_x_gf;
    mutable ParGridFunction mv_gf;
    mutable ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
@@ -93,7 +97,6 @@ protected:
    void FreeCij();
 
    // FE spaces local and global sizes
-   const int dim;
    const int Vsize_H1;
    const int TVSize_H1;
    const HYPRE_Int GTVSize_H1;

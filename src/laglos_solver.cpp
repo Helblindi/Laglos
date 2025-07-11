@@ -104,6 +104,8 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    LimitedTimeDependentOperator(size),
    H1(h1),
    H1_L(h1_l),
+   smesh_H1L(cr.GetParMesh(), H1_L.FEColl(), dim),
+   smesh_x_gf(&smesh_H1L),
    H1Lc(H1_L.GetParMesh(), H1_L.FEColl(), 1),
    L2(l2),
    L2V(l2v),
@@ -958,7 +960,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                      // Evaluate the Jacobian at the center of the face:
                      T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
                      CalcOrtho(T->Jacobian(), nor);
-                     double F = nor.Norml2();
+                     F = nor.Norml2();
                   }
 
                   double omega = .25;
@@ -2910,6 +2912,20 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
          MFEM_ABORT("Invalid normal vector.\n");
       }
 
+      /* Get actual smesh F */
+      double smesh_F = 1.;
+      if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
+      {
+         Vector nor(dim);
+         ElementTransformation *T = smesh->GetFaceTransformation(face);
+         // Evaluate the Jacobian at the center of the face:
+         T->SetIntPoint(&Geometries.GetCenter(smesh->GetFaceGeometry(face)));
+         CalcOrtho(T->Jacobian(), nor);
+         smesh_F = nor.Norml2();
+      }
+      // cout << "F: " << F << "< smesh_F: " << smesh_F << endl;
+      F = smesh_F;
+
       if (FI.IsInterior())
       {
          GetStateVector(S, cp, Ucp);
@@ -2959,6 +2975,11 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                      CalcOrtho(T->Jacobian(), nor);
                      pmesh_F = nor.Norml2();
                   }
+                  // cout << "smesh face: " << face << ", l2 dof i: " << c
+                  //      << ", l2 dof j: " << cp << ", smesh F: " << F
+                  //      << ", element i: " << el_i << ", element j: " 
+                  //      << el_j << ", face index: " << f_index << "pmesh F: " << pmesh_F
+                  //      << endl;
                   double omega = 0.25;
 
                   /* Correct d */
@@ -4207,7 +4228,8 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    H1.GetMesh()->NewNodes(x_gf, false);
    pmesh->NewNodes(x_gf, false);
-   smesh->NewNodes(x_gf, false);
+   smesh_x_gf = x_gf;
+   smesh->NewNodes(smesh_x_gf, false);
 
    /* Update volumes at L2 dofs */
    // ParLinearForm * k_lf = new ParLinearForm(&L2);

@@ -1766,9 +1766,11 @@ int main(int argc, char *argv[]) {
    // In all cases, print the final grid functions
    {
       // Save mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
+      std::ostringstream mesh_name, smesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
       mesh_name << gfprint_path 
                 << "final.mesh";
+      smesh_name << gfprint_path 
+                 << "final.smesh";
       rho_name  << gfprint_path 
                 << "rho_final.gf";
       v_name << gfprint_path 
@@ -1784,6 +1786,11 @@ int main(int argc, char *argv[]) {
       mesh_ofs.precision(8);
       pmesh->PrintAsOne(mesh_ofs);
       mesh_ofs.close();
+
+      std::ofstream smesh_ofs(smesh_name.str().c_str());
+      smesh_ofs.precision(8);
+      smesh->PrintAsOne(smesh_ofs);
+      smesh_ofs.close();
 
       std::ofstream rho_ofs(rho_name.str().c_str());
       rho_ofs.precision(8);

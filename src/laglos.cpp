@@ -848,8 +848,12 @@ int main(int argc, char *argv[]) {
    FunctionCoefficient rho0_coeff(rho0_static), rho_coeff(rho0_static);
    rho0_coeff.SetTime(t_init);
    int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
-   IntegrationRules _IntRules(0, Quadrature1D::GaussLobatto);
-   IntegrationRule ir = _IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
+   /* 
+   Use default IntRules object, which uses Gauss-Legendre basis 
+   For some reason, using Gauss-Lobatto for this basis prohibits
+   the Sedov problem from running to completion.
+   */
+   IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff,&ir));
    m->Assemble();

@@ -2881,8 +2881,8 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
    //      << "=======================================\n";
    
    mfem::Mesh::FaceInformation FI;
-   int c, cp;
-   Vector Uc(dim+2), Ucp(dim+2), cij(dim), Vf(dim); 
+   int i, j;
+   Vector Ui(dim+2), Uj(dim+2), cij(dim), Vf(dim); 
    Vector n_vec(dim);
    double d, c_norm, F;
 
@@ -2893,14 +2893,14 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       // cout << "face: " << face << endl;
       Vf = 0.;
       FI = smesh->GetFaceInformation(face);
-      c = FI.element[0].index;
-      cp = FI.element[1].index;
+      i = FI.element[0].index;
+      j = FI.element[1].index;
       // cout << "c: " << c << ", cp: " << cp << endl;
 
-      GetStateVector(S, c, Uc);
+      GetStateVector(S, i, Ui);
 
       // Get normal, d, and |F|
-      GetLocalCij(c, cp, cij);
+      GetLocalCij(i, j, cij);
       n_vec = cij;
       n_vec *= 2.;
       F = n_vec.Norml2();
@@ -2928,18 +2928,18 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
 
       if (FI.IsInterior())
       {
-         GetStateVector(S, cp, Ucp);
+         GetStateVector(S, j, Uj);
 
          // Compute intermediate face velocity
-         pb->velocity(Uc, Vf);
-         Vector vcp; pb->velocity(Ucp, vcp);
-         Vf.Add(1., vcp);
+         pb->velocity(Ui, Vf);
+         Vector vj; pb->velocity(Uj, vj);
+         Vf.Add(1., vj);
          Vf *= 0.5;
          if (visc)
          {
             double pmesh_F = 1.;
             // Get max wave speed
-            d = dij_sparse->Elem(c, cp);
+            d = dij_sparse->Elem(i, j);
 
             /* Optionally, modify viscosity value d */
             switch (visc)
@@ -2956,14 +2956,14 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
             {
                /* only add graph viscosity for binder elements */
                Vector _txi(dim), _txj(dim), _tt(dim);
-               GetL2DofX(c, _txi);
-               GetL2DofX(cp, _txj);
+               GetL2DofX(i, _txi);
+               GetL2DofX(j, _txj);
                subtract(_txi, _txj, _tt);
                // Only look at dofs that share the same coordinate location
                if (_tt.Norml2() < 1e-10)
                {
-                  int el_i = L2.GetElementForDof(c);
-                  int el_j = L2.GetElementForDof(cp);
+                  int el_i = L2.GetElementForDof(i);
+                  int el_j = L2.GetElementForDof(j);
                   int f_index = FindFaceIndex(el_i, el_j);
 
                   if (dim > 1)// if dim == 1, there is no notion of the measure of a vertex location
@@ -2992,8 +2992,8 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
             }
             case 4: // Seamstress viscosity
             {
-               int el_i = L2.GetElementForDof(c);
-               int el_j = L2.GetElementForDof(cp);
+               int el_i = L2.GetElementForDof(i);
+               int el_j = L2.GetElementForDof(j);
                if (el_i != el_j)
                {
                   const int f_index = FindFaceIndex(el_i, el_j);
@@ -3023,7 +3023,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                MFEM_ABORT("Invalid visc value provided.\n");
             } // End viscosity switch
             
-            double coeff = d * (Ucp[0] - Uc[0]) / pmesh_F; // This is how 5.7b is defined.
+            double coeff = d * (Uj[0] - Ui[0]) / pmesh_F; // This is how 5.7b is defined.
             Vf.Add(coeff, n_vec);
          }
       }
@@ -3031,14 +3031,14 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       else 
       {
          assert(FI.IsBoundary());
-         pb->velocity(Uc, Vf);             
+         pb->velocity(Ui, Vf);             
       }
 
       // Put face velocity into object (for state var update)
-      for (int i = 0; i < dim; i++)
+      for (int it = 0; it < dim; it++)
       {
-         int index = face + i * smesh_num_faces;
-         v_CR_gf[index] = Vf[i];
+         int index = face + it * smesh_num_faces;
+         v_CR_gf[index] = Vf[it];
       }
    } // End face iterator
 }

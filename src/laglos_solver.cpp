@@ -2792,7 +2792,7 @@ void LagrangianLOOperator::CalcOutwardNormalInt(const Vector &S, const int cell,
    // cout << "=======================================\n"
    //      << "  Calculating outward normal integral  \n"
    //      << "=======================================\n";
-   MFEM_ASSERT(order_t == 0, "This function is only implemented for order_t = 0.\n");
+   // MFEM_ASSERT(order_t == 0, "This function is only implemented for order_t = 0.\n");
    res = 0.;
 
    mfem::Mesh::FaceInformation FI;
@@ -2808,9 +2808,7 @@ void LagrangianLOOperator::CalcOutwardNormalInt(const Vector &S, const int cell,
       case 1:
       {
          Vector cell_center_x(dim), face_x(dim);
-
-         int cell_gdof = cell + num_faces;
-         geom.GetNodePositionFromBV(S, cell_gdof, cell_center_x);
+         pmesh->GetElementCenter(cell, cell_center_x);
          geom.GetNodePositionFromBV(S, face, face_x);
 
          subtract(face_x, cell_center_x, res);

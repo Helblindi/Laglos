@@ -958,7 +958,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                   // Only look at dofs that share the same coordinate location
                   if (_tt.Norml2() < 1e-10)
                   {
-                     const int f_index = FindFaceIndex(el_i, el_j);
+                     const int f_index = FindFaceIndexPmesh(el_i, el_j);
                      double F = 1.;
 
                      if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
@@ -986,7 +986,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             {
                if (el_i != el_j)
                {
-                  const int f_index = FindFaceIndex(el_i, el_j);
+                  const int f_index = FindFaceIndexPmesh(el_i, el_j);
 
                   Vector nor(dim);
                   ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
@@ -1034,8 +1034,9 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
    } // End l2 dof iterator
 }
 
-int LagrangianLOOperator::FindFaceIndex(const int &el1, const int &el2) const
+int LagrangianLOOperator::FindFaceIndexPmesh(const int &el1, const int &el2) const
 {
+   assert(el1 < pmesh->GetNE() && el2 < pmesh->GetNE());
    Array<int> elem_faces, ori;
    if (dim == 1)
    {
@@ -1056,6 +1057,35 @@ int LagrangianLOOperator::FindFaceIndex(const int &el1, const int &el2) const
          return f; // Found the face index
       }
    }
+   MFEM_ABORT("Face not found in pmesh connectivity.\n");
+   return -1; // Face not found
+}
+
+
+int LagrangianLOOperator::FindFaceIndexSmesh(const int &el1, const int &el2) const
+{
+   assert(el1 < smesh->GetNE() && el2 < smesh->GetNE());
+   Array<int> elem_faces, ori;
+   if (dim == 1)
+   {
+      smesh->GetElementVertices(el1, elem_faces);
+   }
+   else
+   {
+      smesh->GetElementEdges(el1, elem_faces, ori);
+   }
+   
+   for (auto f : elem_faces)
+   {
+      Array<int> row;
+      smesh_face_element->GetRow(f, row);
+      if (row.Find(el2) != -1)
+      {
+         // cout << "el1: " << el1 << ", el2: " << el2 << ", face: " << f << endl;
+         return f; // Found the face index
+      }
+   }
+   MFEM_ABORT("Face not found in smesh connectivity.\n");
    return -1; // Face not found
 }
 
@@ -2935,6 +2965,11 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
 
       if (FI.IsInterior())
       {
+         // int f = FindFaceIndexSmesh(i, j);
+         // if (f != face)
+         // {
+         //    MFEM_ABORT("Face index does not match the one found in the connectivity table.\n");
+         // }
          int el_j = L2.GetElementForDof(j);
          GetStateVector(S, j, Uj);
 
@@ -2983,7 +3018,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                   {
                      int el_i = L2.GetElementForDof(i);
                      int el_j = L2.GetElementForDof(j);
-                     int f_index = FindFaceIndex(el_i, el_j);
+                     int f_index = FindFaceIndexPmesh(el_i, el_j);
 
                      if (dim > 1)// if dim == 1, there is no notion of the measure of a vertex location
                      {
@@ -3016,7 +3051,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                int el_j = L2.GetElementForDof(j);
                if (el_i != el_j)
                {
-                  const int f_index = FindFaceIndex(el_i, el_j);
+                  const int f_index = FindFaceIndexPmesh(el_i, el_j);
 
                   if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
                   {

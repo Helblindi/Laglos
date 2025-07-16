@@ -942,36 +942,44 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                break; // d is already set
             case 3: // Binder viscosity
             {
-               /* only add graph viscosity for binder elements */
-               Vector _txi(dim), _txj(dim), _tt(dim);
-               GetL2DofX(i, _txi);
-               GetL2DofX(j, _txj);
-               subtract(_txi, _txj, _tt);
-               // Only look at dofs that share the same coordinate location
-               if (_tt.Norml2() < 1e-10)
+               double omega = 0.25;
+               if (el_i == el_j)
                {
-                  const int f_index = FindFaceIndex(el_i, el_j);
-                  double F = 1.;
-
-                  if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
-                  {
-                     Vector nor(dim);
-                     ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
-                     // Evaluate the Jacobian at the center of the face:
-                     T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
-                     CalcOrtho(T->Jacobian(), nor);
-                     F = nor.Norml2();
-                  }
-
-                  double omega = .25;
-                  /* need to walk back cnorm */
-                  double c_norm = cij.Norml2();
-                  d /= c_norm;
-
-                  d *= F;
-                  d *= omega;
+                  /* Do nothing with d */
+                  d = 0.;
                }
-               else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               else /* el_i != el_j */
+               {
+                  /* only add graph viscosity for binder elements */
+                  Vector _txi(dim), _txj(dim), _tt(dim);
+                  GetL2DofX(i, _txi);
+                  GetL2DofX(j, _txj);
+                  subtract(_txi, _txj, _tt);
+                  // Only look at dofs that share the same coordinate location
+                  if (_tt.Norml2() < 1e-10)
+                  {
+                     const int f_index = FindFaceIndex(el_i, el_j);
+                     double F = 1.;
+
+                     if (dim > 1) // if dim == 1, there is no notion of the measure of a vertex location
+                     {
+                        Vector nor(dim);
+                        ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                        // Evaluate the Jacobian at the center of the face:
+                        T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                        CalcOrtho(T->Jacobian(), nor);
+                        F = nor.Norml2();
+                     }
+
+                     /* need to walk back cnorm */
+                     double c_norm = cij.Norml2();
+                     d /= c_norm;
+
+                     d *= F;
+                     d *= omega;
+                  }
+                  else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               }
                break;
             }
             case 4: // Seamstress viscosity
@@ -2892,6 +2900,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
       Vf = 0.;
       FI = smesh->GetFaceInformation(face);
       i = FI.element[0].index;
+      int el_i = L2.GetElementForDof(i);
       j = FI.element[1].index;
       // cout << "c: " << c << ", cp: " << cp << endl;
 
@@ -2926,6 +2935,7 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
 
       if (FI.IsInterior())
       {
+         int el_j = L2.GetElementForDof(j);
          GetStateVector(S, j, Uj);
 
          // Compute intermediate face velocity
@@ -2952,40 +2962,52 @@ void LagrangianLOOperator::ComputeIntermediateFaceVelocities(const Vector &S) co
                break; // d is already set
             case 3: // Binder viscosity
             {
-               /* only add graph viscosity for binder elements */
-               Vector _txi(dim), _txj(dim), _tt(dim);
-               GetL2DofX(i, _txi);
-               GetL2DofX(j, _txj);
-               subtract(_txi, _txj, _tt);
-               // Only look at dofs that share the same coordinate location
-               if (_tt.Norml2() < 1e-10)
+               double omega = 0.25;
+               if (el_i == el_j)
                {
-                  int el_i = L2.GetElementForDof(i);
-                  int el_j = L2.GetElementForDof(j);
-                  int f_index = FindFaceIndex(el_i, el_j);
-
-                  if (dim > 1)// if dim == 1, there is no notion of the measure of a vertex location
-                  {
-                     Vector nor(dim);
-                     ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
-                     // Evaluate the Jacobian at the center of the face:
-                     T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
-                     CalcOrtho(T->Jacobian(), nor);
-                     pmesh_F = nor.Norml2();
-                  }
-                  // cout << "smesh face: " << face << ", l2 dof i: " << c
-                  //      << ", l2 dof j: " << cp << ", smesh F: " << F
-                  //      << ", element i: " << el_i << ", element j: " 
-                  //      << el_j << ", face index: " << f_index << "pmesh F: " << pmesh_F
-                  //      << endl;
-                  double omega = 0.25;
-
-                  /* Correct d */
-                  d /= cij.Norml2();
-                  d *= pmesh_F;
-                  d *= omega;
+                  // pmesh_F = F;
+                  d = 0.;
+                  // d *= cij.Norml2();
+                  // d *= F;
+                  // d *= omega;
                }
-               else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               else
+               {
+                  /* only add graph viscosity for binder elements */
+                  Vector _txi(dim), _txj(dim), _tt(dim);
+                  GetL2DofX(i, _txi);
+                  GetL2DofX(j, _txj);
+                  subtract(_txi, _txj, _tt);
+                  // Only look at dofs that share the same coordinate location
+                  if (_tt.Norml2() < 1e-10)
+                  {
+                     int el_i = L2.GetElementForDof(i);
+                     int el_j = L2.GetElementForDof(j);
+                     int f_index = FindFaceIndex(el_i, el_j);
+
+                     if (dim > 1)// if dim == 1, there is no notion of the measure of a vertex location
+                     {
+                        Vector nor(dim);
+                        ElementTransformation *T = pmesh->GetFaceTransformation(f_index);
+                        // Evaluate the Jacobian at the center of the face:
+                        T->SetIntPoint(&Geometries.GetCenter(pmesh->GetFaceGeometry(f_index)));
+                        CalcOrtho(T->Jacobian(), nor);
+                        pmesh_F = nor.Norml2();
+                     }
+                     // cout << "smesh face: " << face << ", l2 dof i: " << c
+                     //      << ", l2 dof j: " << cp << ", smesh F: " << F
+                     //      << ", element i: " << el_i << ", element j: " 
+                     //      << el_j << ", face index: " << f_index << "pmesh F: " << pmesh_F
+                     //      << endl;
+
+                     /* Correct d */
+                     d /= cij.Norml2();
+                     d *= pmesh_F;
+                     d *= omega;
+                  }
+                  else { d = 0.; } // If the two dofs are not at the same location, set d to 0.
+               }
+               
                break;
             }
             case 4: // Seamstress viscosity

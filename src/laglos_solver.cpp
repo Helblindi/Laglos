@@ -1677,6 +1677,7 @@ void LagrangianLOOperator::SolveMeshVelocities(const Vector &S, Vector &dS_dt) c
    } // End dim > 1
 
    dxdt_gf.SyncAliasMemory(dS_dt);
+   mv_gf = dxdt_gf;
    chrono_mm.Stop();
 }
 

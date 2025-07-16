@@ -193,6 +193,9 @@ int main(int argc, char *argv[]) {
    string ts_output_prefix;
    string output_path;
 
+   // Debug options
+   bool debug_mesh_velocity = false;
+
    OptionsParser args(argc, argv);
 
    args.AddOption(&mesh_file_location, "-m", "--mesh", "Mesh file to use.");
@@ -293,6 +296,9 @@ int main(int argc, char *argv[]) {
                   "Enable or disable output during runtime.");
    args.AddOption(&dm_val, "-dm", "--distort-mesh",
                   "Mesh distortion parameter.");
+   args.AddOption(&debug_mesh_velocity, "-dmv", "--debug-mesh-velocity", "-no-dmv",
+                  "--no-debug-mesh-velocity",
+                  "Enable or disable debug mesh velocity visualization in glvis.");
 
    args.Parse();
    if (!args.Good())
@@ -916,6 +922,8 @@ int main(int argc, char *argv[]) {
    socketstream vis_sig, vis_f, vis_frho, vis_esheer;
    socketstream vis_rho_ex, vis_v_ex, vis_ste_ex, vis_p_ex;
    socketstream vis_rho_err, vis_v_err, vis_ste_err, vis_p_err;
+   /* debug */
+   socketstream vis_mv;
    char vishost[] = "localhost";
    int  visport   = 19916;
 
@@ -992,6 +1000,9 @@ int main(int argc, char *argv[]) {
       vis_frho.precision(8);
       vis_esheer.precision(8);
 
+      /* Debug */
+      vis_mv.precision(8);
+
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
       int offx = Ww+10, offy = Wh+45;; // window offsets
@@ -1017,6 +1028,15 @@ int main(int argc, char *argv[]) {
          VisualizeField(vis_gamma, vishost, visport, gamma_gf,
                         "Gamma", Wx, Wy, Ww, Wh);
       }
+      if (debug_mesh_velocity)
+      {
+         ParGridFunction mv_gf(&H1FESpace);
+         hydro.GetMV(mv_gf);
+         Wx += offx;
+         VisualizeField(vis_mv, vishost, visport, mv_gf,
+                        "Mesh Velocity", Wx, Wy, Ww, Wh);
+      }
+
       //NF//MS
       if (elastic_eos)
       {
@@ -1475,6 +1495,15 @@ int main(int argc, char *argv[]) {
                Wx += offx;
                VisualizeField(vis_gamma, vishost, visport, gamma_gf,
                               "Gamma", Wx, Wy, Ww, Wh);
+            }
+
+            if (debug_mesh_velocity)
+            {
+               ParGridFunction mv_gf(&H1FESpace);
+               hydro.GetMV(mv_gf);
+               Wx += offx;
+               VisualizeField(vis_mv, vishost, visport, mv_gf,
+                              "Mesh Velocity", Wx, Wy, Ww, Wh);
             }
 
             Wx += offx;

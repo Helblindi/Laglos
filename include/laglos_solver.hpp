@@ -284,6 +284,7 @@ public:
    void SetMVOption(const int & option);
    void SetComputeMV(const bool & option) { this->compute_mv = option; }
    void SetMV(const ParGridFunction &_mv) { this->mv_gf = _mv; }
+   void GetMV(ParGridFunction & _mv) const { _mv = this->mv_gf; }
    void SetMVLinOption(const bool & option) { this->do_mv_linearization = option; }
    void SetFVOption(const int & option);
    void SetMVIterationOption(const int &option);

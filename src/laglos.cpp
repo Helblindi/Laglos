@@ -314,17 +314,17 @@ int main(int argc, char *argv[]) {
       MFEM_ABORT("Elasticity cannot be used with order_t > 0. "
                  "Set order_t = 0 to use elasticity.");
    }
-   if (visc == 2)
-   {
-      if (!greedy)
-      {
-         MFEM_ABORT("Greedy viscosity must be enabled if visc = 2.");
-      }
-   }
-   if (greedy && visc != 2)
-   {
-      MFEM_ABORT("Greedy viscosity can only be used if visc = 2.");
-   }
+   // if (visc == 2)
+   // {
+   //    if (!greedy)
+   //    {
+   //       MFEM_ABORT("Greedy viscosity must be enabled if visc = 2.");
+   //    }
+   // }
+   // if (greedy && visc != 2)
+   // {
+   //    MFEM_ABORT("Greedy viscosity can only be used if visc = 2.");
+   // }
    // if (order_t > 0 && order_k != order_t)
    // {
    //    MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");

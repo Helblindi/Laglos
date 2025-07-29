@@ -104,8 +104,8 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    LimitedTimeDependentOperator(size),
    H1(h1),
    H1_L(h1_l),
-   smesh_H1L(cr.GetParMesh(), H1_L.FEColl(), dim),
-   smesh_x_gf(&smesh_H1L),
+   smesh_H1L(new ParFiniteElementSpace(cr.GetParMesh(), H1_L.FEColl(), dim)),
+   smesh_x_gf(smesh_H1L),
    H1Lc(H1_L.GetParMesh(), H1_L.FEColl(), 1),
    L2(l2),
    L2V(l2v),
@@ -274,6 +274,9 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    // assert(v_CR_gf.Size() == dim * num_faces);
    // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
+   /* Set GridTransfer object that aids in mapping to smesh */
+   smesh_gt = new InterpolationGridTransfer(H1, *smesh_H1L);
+
    // Initialize Cij and Dij sparse matrices
    BuildCijMatrices();
    InitializeDijMatrix();  
@@ -388,6 +391,18 @@ LagrangianLOOperator::~LagrangianLOOperator()
    {
       delete elastic;
       elastic = nullptr;
+   }
+
+   if (smesh_H1L)
+   {
+      delete smesh_H1L;
+      smesh_H1L = nullptr;
+   }
+
+   if (smesh_gt)
+   {
+      delete smesh_gt;
+      smesh_gt = nullptr;
    }
 
    /* Free memory for Cij matrices */
@@ -4284,7 +4299,8 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    H1.GetMesh()->NewNodes(x_gf, false);
    pmesh->NewNodes(x_gf, false);
-   smesh_x_gf = x_gf;
+   const Operator &P = smesh_gt->ForwardOperator();
+   P.Mult(x_gf, smesh_x_gf);
    smesh->NewNodes(smesh_x_gf, false);
 
    /* Update volumes at L2 dofs */

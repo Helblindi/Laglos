@@ -59,8 +59,9 @@ protected:
    
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
-   ParFiniteElementSpace smesh_H1L;
+   ParFiniteElementSpace *smesh_H1L;
    ParFiniteElementSpace H1Lc;
+   GridTransfer *smesh_gt;
    const ParGridFunction &rho0_gf;
    mutable ParGridFunction x_gf;
    mutable ParGridFunction smesh_x_gf;

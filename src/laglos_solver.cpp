@@ -681,28 +681,44 @@ void LagrangianLOOperator::SolveHydro(const Vector &S, Vector &dS_dt) const
    delete e_source;
 }
 
-void LagrangianLOOperator::CheckSkewSymmetry() const
+/**
+ * @brief Checks whether the Lagrangian local operator is skew-symmetric.
+ *
+ * This function iterates over all interior faces of the mesh and verifies the skew-symmetry property
+ * for the local operator coefficients between element pairs. For each interior face, it computes the
+ * local coefficients `cij` and `cji` for the two adjacent elements and checks if their sum's norm is
+ * below a specified tolerance (1e-12). If the skew-symmetry is violated (i.e., the norm exceeds the
+ * tolerance and the elements are distinct), it logs the details and increments a counter.
+ *
+ * @note The scheme is not skew-symmetric on boundary faces.
+ * @return true if the skew-symmetry property holds for all interior faces; false otherwise.
+ */
+bool LagrangianLOOperator::IsSkewSymmetric() const
 {
    cout << "========================================\n"
-        << "          CheckSkewSymmetry             \n"
+        << "  LagrangianLOOperator::IsSkewSymmetric \n"
         << "========================================\n";
    int num_ss_broken = 0;
-   for (int i = 0; i < NDofs_L2; i++)
-   {
-      Array<int> row;
-      L2Connectivity.GetRow(i, row);
-      for (int j_it = 0; j_it < row.Size(); j_it++) // Adjacent dof iterator
-      {
-         int j = row[j_it];
-         if (i == j) { continue; } // Skip diagonal
+   mfem::Mesh::FaceInformation FI;
+   Vector cij(dim), cji(dim), _t(dim);
+   int i, j;
 
-         Vector cij(dim), cji(dim);
+   for (int face = 0; face < smesh_num_faces; face++) // face iterator
+   {
+      FI = smesh->GetFaceInformation(face);
+
+      /* Only check interior faces for skew symmetry */
+      if (FI.IsInterior())
+      {
+         i = FI.element[0].index;
+         j = FI.element[1].index;
+
+         // Get normal, d, and |F|
          GetLocalCij(i, j, cij);
          GetLocalCij(j, i, cji);
-         Vector _t(dim);
          add(cij, cji, _t);
 
-         if (_t.Norml2() > 1e-10 and i != j)
+         if (_t.Norml2() > 1e-12 and i != j)
          {
             cout << "!!!skew symmetry broken!!!\n";
             cout << "i: " << i << ", j: " << j << ", cij: ";
@@ -715,6 +731,7 @@ void LagrangianLOOperator::CheckSkewSymmetry() const
    }
    
    cout << "total times skew symmetry broken: " << num_ss_broken << endl;
+   return (num_ss_broken == 0);
 }
 
 void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const
@@ -2685,7 +2702,7 @@ void LagrangianLOOperator::BuildCijMatrices()
    }
 
    // cout << "done with Cij\n";
-   // CheckSkewSymmetry();
+   // bool val = IsSkewSymmetric();
 }
 
 

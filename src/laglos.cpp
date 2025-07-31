@@ -26,7 +26,7 @@
 *
 * ----- vdw -----
 * ./Laglos -m ../data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis            ## Vdw1
-* ./Laglos -m ../data/segment-nhalf-1-extrapolated.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 4  ## Vdw2 
+* ./Laglos -m ../data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 5 -ppd          ## Vdw2 
 * ./Laglos -m ../data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis           ## Vdw3 
 * ./Laglos -m ../data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 4               ## Vdw4
 *

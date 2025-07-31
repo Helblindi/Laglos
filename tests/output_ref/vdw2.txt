@@ -1,0 +1,122 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/segment-nhalf-1.mesh
+   --output-flag default
+   --order-thermo 0
+   --order-kinetic 1
+   --refine-serial 5
+   --refine-parallel 0
+   --problem 13
+   --ode-solver 1
+   --t-init 0
+   --t-final 1.25
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-visit
+   --no-print
+   --no-mass-correct
+   --viscosity 1
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --post-process-density
+   --use-elasticity 0
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 0
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --CFL 0.5
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+   --no-debug-mesh-velocity
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 1, spacedim: 1
+Zones min/max: 32 32
+global_vSize: 32
+N dofs: 33
+Num Scalar Vertex DoFs: 33
+Num Scalar edge-interior DoFs: 0
+Num Scalar face-interior DoFs: 0
+Num faces: 33
+dim: 1
+Number of kinematic (position, mesh velocity) dofs: 33
+Corresponding NDofs: 33
+Corresponding VDim: 1
+Corresponding Vsize: 33
+Number of specific internal energy dofs: 32
+Corresponding NDofs: 32
+Corresponding VDim: 1
+Corresponding Vsize: 32
+Number of velocity dofs: 32
+Corresponding NDofs: 32
+Corresponding VDim: 1
+Corresponding Vsize: 32
+num interior faces: 31
+num boundary faces: 2
+num total faces: 33
+num boundary elements: 2
+num elements: 32
+Geometric::Non-default constructor
+NDofs_H1: 33
+dim: 1
+Instantiating hydro op
+block offsets: 0 33 65 97
+129
+Constructing BdrElementIndexingArray:
+Vsize_H1: 33
+Vsize_H1L: 33
+TVSize_H1: 33
+GTVSize_H1: 33
+NDofs_H1: 33
+NVDofs_H1: 33
+NDofs_H1L: 33
+NDofs_L2: 32
+NDofs_L2V: 32
+Vsize_L2V: 32
+NE: 32
+num_faces: 33
+num_vertices: 33
+smesh_num_faces: 33
+Entering time loop
+step     5,	t = 0.095520,	dt = 0.01916295,	|e| = 7.3294455125e+01
+step    10,	t = 0.191643,	dt = 0.01928079,	|e| = 7.3309154182e+01
+step    15,	t = 0.288542,	dt = 0.01944657,	|e| = 7.3321442114e+01
+step    20,	t = 0.386260,	dt = 0.01960670,	|e| = 7.3332524052e+01
+step    25,	t = 0.484737,	dt = 0.01975250,	|e| = 7.3342852913e+01
+step    30,	t = 0.583896,	dt = 0.01988247,	|e| = 7.3352658564e+01
+step    35,	t = 0.683658,	dt = 0.01999706,	|e| = 7.3362074320e+01
+step    40,	t = 0.783950,	dt = 0.02009745,	|e| = 7.3371184595e+01
+step    45,	t = 0.884654,	dt = 0.02016079,	|e| = 7.3380042458e+01
+step    50,	t = 0.985570,	dt = 0.02018288,	|e| = 7.3388680418e+01
+step    55,	t = 1.086180,	dt = 0.02008028,	|e| = 7.3397093812e+01
+step    60,	t = 1.186281,	dt = 0.01998469,	|e| = 7.3405298817e+01
+step    64,	t = 1.250000,	dt = 0.00387039,	|e| = 7.3410449195e+01
+Program took 1.7549333333e-02s.
+This amounts to 8.4371794872e-06 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+                                total time | t / (dof*ts) 
+  Total time:                    1.755e-02 | 8.437e-06
+  Dij calculation:               5.759e-03 | 2.769e-06
+  Mesh Motion calculation:       1.646e-03 | 7.915e-07
+    Hiop calculation (if used):  0.000e+00 | 0.000e+00
+  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
+  State Update calculation:      2.015e-02 | 9.689e-06
+===========================================================

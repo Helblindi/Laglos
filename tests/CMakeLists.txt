@@ -193,7 +193,21 @@ add_test(NAME CompareKidder
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
-# VDW 4
+# VDW
+# 2
+file(COPY test_vdw2.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_vdw2.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestVdw2
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_vdw2.sh ${PROJECT_SOURCE_DIR} "vdw2_output.txt"
+)
+add_test(NAME CompareVdw2
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/vdw2_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/vdw2.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+# 4
 file(COPY test_vdw4.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_vdw4.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 add_test(

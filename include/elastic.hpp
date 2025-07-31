@@ -51,7 +51,7 @@ private:
       m = (cos(phi), sin(phi), 0) 
    */
    double phi = M_PI/4.; // angle of fiber direction
-   Vector mi;
+   Vector mi_vec;
    DenseMatrix Gi;
    // double A1 = 771.8, B1 = 21.2, D1 = 3.8, w1 = 0.4971;
    // double A1 = 771.8, B1 = 21.2E-6, A2 = 1., B2 = 1., D1 = 3.8, w1 = 0.;
@@ -112,13 +112,13 @@ public:
             shear_eos = ShearEOS::AORTIC;
 
             /* Invariants */
-            mi.SetSize(3);
+            mi_vec.SetSize(3);
             Gi.SetSize(3);
             /* Set fiber direction */
-            mi(0) = cos(phi);
-            mi(1) = sin(phi);
-            mi(2) = 0.;
-            tensor(mi, mi, Gi);
+            mi_vec(0) = cos(phi);
+            mi_vec(1) = sin(phi);
+            mi_vec(2) = 0.;
+            tensor(mi_vec, mi_vec, Gi);
             break;
          }
          default:
@@ -149,9 +149,9 @@ public:
       {
          cout << "@ -- Aortic parameters -- " << std::setw(18) << std::right << "@" << "\n"
               << "@ \tphi         : " << std::setw(21) << std::left << phi << "@" << "\n"
-              << "@ \tm(0)        : " << std::setw(21) << std::left << mi(0) << "@" << "\n"
-              << "@ \tm(1)        : " << std::setw(21) << std::left << mi(1) << "@" << "\n"
-              << "@ \tm(2)        : " << std::setw(21) << std::left << mi(2) << "@" << "\n";
+              << "@ \tm(0)        : " << std::setw(21) << std::left << mi_vec(0) << "@" << "\n"
+              << "@ \tm(1)        : " << std::setw(21) << std::left << mi_vec(1) << "@" << "\n"
+              << "@ \tm(2)        : " << std::setw(21) << std::left << mi_vec(2) << "@" << "\n";
       }
 
       

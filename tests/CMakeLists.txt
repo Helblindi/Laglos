@@ -236,6 +236,34 @@ add_test(NAME CompareSod1DHO
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+## Isentropic Vortex ot1
+file(COPY test_ot1_iv.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_iv.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestOT1IV
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_iv.sh ${PROJECT_SOURCE_DIR} "ot1_iv_output.txt"
+)
+add_test(NAME CompareOT1IV
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/ot1_iv_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/ot1_iv.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+## Taylor Green Vortex ot1
+file(COPY test_ot1_tg.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_tg.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestOT1TG
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_tg.sh ${PROJECT_SOURCE_DIR} "ot1_tg_output.txt"
+)
+add_test(NAME CompareOT1TG
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/ot1_tg_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/ot1_tg.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 #### Test elastic functions ####
 ## Elastic Impact
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

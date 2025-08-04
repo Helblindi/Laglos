@@ -275,7 +275,11 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    // cout << "v_CR_gf.Size after: " << v_CR_gf.Size() << endl;
 
    /* Set GridTransfer object that aids in mapping to smesh */
-   smesh_gt = new InterpolationGridTransfer(H1, *smesh_H1L);
+   if (order_t > 0)
+   {
+      // If high order, use interpolation grid transfer
+      smesh_gt = new InterpolationGridTransfer(H1, *smesh_H1L);
+   }
 
    // Initialize Cij and Dij sparse matrices
    BuildCijMatrices();
@@ -399,7 +403,7 @@ LagrangianLOOperator::~LagrangianLOOperator()
       smesh_H1L = nullptr;
    }
 
-   if (smesh_gt)
+   if (smesh_gt && order_t > 0)
    {
       delete smesh_gt;
       smesh_gt = nullptr;
@@ -4316,9 +4320,19 @@ void LagrangianLOOperator::UpdateMesh(const Vector & S) const
    x_gf.MakeRef(&H1, *sptr, block_offsets[0]);
    H1.GetMesh()->NewNodes(x_gf, false);
    pmesh->NewNodes(x_gf, false);
-   const Operator &P = smesh_gt->ForwardOperator();
-   P.Mult(x_gf, smesh_x_gf);
-   smesh->NewNodes(smesh_x_gf, false);
+   
+   /* IDP issue is here! */
+   if (order_t > 0)
+   {
+      const Operator &P = smesh_gt->ForwardOperator();
+      P.Mult(x_gf, smesh_x_gf);
+      smesh->NewNodes(smesh_x_gf, false);
+   }
+   else
+   {
+      smesh->NewNodes(x_gf, false);
+   }
+   
 
    /* Update volumes at L2 dofs */
    // ParLinearForm * k_lf = new ParLinearForm(&L2);

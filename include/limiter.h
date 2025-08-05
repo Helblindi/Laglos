@@ -129,7 +129,6 @@ IDPLimiter(ParFiniteElementSpace & l2, ParFiniteElementSpace & H1FESpace_proj_LO
    vert_elem->MergeDiagAndOffd(_spm);
    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
 
-   // ComputeLumpedMass();
    // cout << "mass vec: ";
    // mass_vec->Print(cout);
 }
@@ -157,42 +156,10 @@ void GetRhoMaxMin(int i, double &x_max_i, double &x_min_i) const
    }
 }
 
-bool CheckLocalMassConservation(const Vector &x, const Vector &y) const
-{
-   // cout << "IDPLimiter::CheckLocalMassConservation\n";
-   Array<int> adj_dofs;
-   double sum = 0.;
-   bool is_locally_conservative = true;
-   for (int i = 0; i < NDofs; i++)
-   {
-      /* check that _mi(yi-xi) + SIGMA_j mj(yj-xj) = 0 */
-      // cout << "checking local mass at dof: " << i << endl;
-      sum = mass_vec->Elem(i) * (y[i] - x[i]);
-      GetAdjacency(i, adj_dofs);
-      // cout << "adj dofs: ";
-      // adj_dofs.Print(cout);
-      for (int adj_it = 0; adj_it < adj_dofs.Size(); adj_it++)
-      {
-         int j = adj_dofs[adj_it];
-         sum += mass_vec->Elem(j) * (y[j] - x[j]);
-      }
 
-      if (abs(sum) > 1.e-12)
-      {
-         cout << "local mass not conserved at dof: " << i << ", sum: " << sum << endl;
-         cout << "adj dofs: ";
-         adj_dofs.Print(cout);
-         is_locally_conservative = false;
-         // cout << "Not locally conservative at dof: " << i << ", val: " << sum << endl;
-         // break; // Break out of loop as there is not point looking at other dofs
-      }
-   }
-   return is_locally_conservative;
-}
-
-bool CheckLocalCellMassConservation(const Vector &x_old, const Vector &x_new)
+bool CheckCellMassConservation(const Vector &_mi_vec, const Vector &x_old, const Vector &x_new)
 {
-   MFEM_ABORT("Function requires updated volume to work.");
+   // cout << "IDPLimiter::CheckCellMassConservation\n";
    bool is_cell_mass_conserved = true;
    for (int i = 0; i < L2.GetNE(); i++)
    {
@@ -202,8 +169,8 @@ bool CheckLocalCellMassConservation(const Vector &x_old, const Vector &x_new)
       for (int dof_it = 0; dof_it < dofs.Size(); dof_it++)
       {
          int dof = dofs[dof_it];
-         old_mass += mass_vec->Elem(dof) * x_old[dof];
-         new_mass += mass_vec->Elem(dof) * x_new[dof];
+         old_mass += _mi_vec.Elem(dof) * x_old[dof];
+         new_mass += _mi_vec.Elem(dof) * x_new[dof];
       }
       double t_val = abs(old_mass - new_mass);
       if (t_val > 1.e-12)
@@ -216,7 +183,8 @@ bool CheckLocalCellMassConservation(const Vector &x_old, const Vector &x_new)
    return is_cell_mass_conserved;
 }
 
-bool CheckGlobalMassConservation(const Vector &x, const Vector &y) const
+
+bool CheckGlobalMassConservation(const Vector &_mi_vec, const Vector &x, const Vector &y) const
 {
    // cout << "IDPLimiter::CheckGlobalMassConservation\n";
    bool is_globally_conservative = true;
@@ -224,8 +192,8 @@ bool CheckGlobalMassConservation(const Vector &x, const Vector &y) const
    for (int i = 0; i < NDofs; i++)
    {
       /* Check if mass has been preserved */
-      sum_old += mass_vec->Elem(i) * x[i];
-      sum_new += mass_vec->Elem(i) * y[i];
+      sum_old += _mi_vec.Elem(i) * x[i];
+      sum_new += _mi_vec.Elem(i) * y[i];
    }
    double t_val = abs(sum_old - sum_new) / sum_old;
    if (t_val > 1.e-12)
@@ -255,9 +223,10 @@ bool CheckGlobalMassConservation(const Vector &x, const Vector &y) const
  *
  * @note Jacobi method
  */
-void LocalConservativeLimitJacobi(ParGridFunction &x)
+void LocalConservativeLimitJacobi(const Vector &_mi_vec, ParGridFunction &x)
 {
    // cout << "IDPLimiter::LocalConservativeLimitJacobi\n";
+   MFEM_ABORT("Change adjacency to use cell dofs.\n");
    int num_max_lim_old, num_min_lim_old;
    int num_max_lim = 0, num_min_lim = 0;
    int num_it = 0;
@@ -277,7 +246,7 @@ void LocalConservativeLimitJacobi(ParGridFunction &x)
       dx = 0.;
       for (int dof_it = 0; dof_it < NDofs; dof_it++)
       {
-         double _mi = mass_vec->Elem(dof_it);
+         double _mi = _mi_vec.Elem(dof_it);
          double xi_max = x_max[dof_it], xi_min = x_min[dof_it];
          double xi = y[dof_it];
          GetAdjacency(dof_it, adj_dofs);
@@ -291,7 +260,7 @@ void LocalConservativeLimitJacobi(ParGridFunction &x)
             for (int j = 0; j < adj_dofs.Size(); j++)
             {
                int dof_j = adj_dofs[j];
-               aip += mass_vec->Elem(dof_j)*fmax(0., x_max[dof_j] - y[dof_j]);
+               aip += _mi_vec.Elem(dof_j)*fmax(0., x_max[dof_j] - y[dof_j]);
             }
             if (aip > 0.)
             {
@@ -317,7 +286,7 @@ void LocalConservativeLimitJacobi(ParGridFunction &x)
             for (int j = 0; j < adj_dofs.Size(); j++)
             {
                int dof_j = adj_dofs[j];
-               aim += mass_vec->Elem(dof_j)*fmax(0., y[dof_j] - x_min[dof_j]);
+               aim += _mi_vec.Elem(dof_j)*fmax(0., y[dof_j] - x_min[dof_j]);
             }
 
             if (aim > 0.)
@@ -363,25 +332,21 @@ void LocalConservativeLimitJacobi(ParGridFunction &x)
 
       /* Check conservation */
       y.Add(1., dx);
-      // cout << "checking local mass conservation\n";
-      bool is_locally_conservative = CheckLocalMassConservation(x, y);
-      if (!is_locally_conservative && !suppress_warnings)
-      {
-         MFEM_WARNING("Gauss-Seidel limiter not locally conservative.\n");
-      }
-      // cout << "checkout local cell mass conservation\n";
-      // bool is_cell_mass_conserved = CheckLocalCellMassConservation(x, y);
-      // if (!is_cell_mass_conserved && !suppress_warnings)
-      // {
-      //    MFEM_WARNING("Gauss-Seidel limiter not locally conservative on cell.\n");
-      // }
-      // cout << "checking global mass conservation\n";
-      bool is_globally_conservative = CheckGlobalMassConservation(x, y);
-      if (!is_globally_conservative && !suppress_warnings)
-      {
-         MFEM_WARNING("Gauss-Seidel limiter not globally conservative.\n");
-      }
+      bool is_cell_mass_conserved = CheckCellMassConservation(_mi_vec, x, y);
+      bool is_globally_conservative = CheckGlobalMassConservation(_mi_vec, x, y);
 
+      /* Output warning */
+      if (!suppress_warnings)
+      {
+         if (!is_cell_mass_conserved)
+         {
+            MFEM_WARNING("Jacobi limiter not cellwise conservative.\n");
+         }
+         if (!is_globally_conservative)
+         {
+            MFEM_WARNING("Jacobi limiter not globally conservative.\n");
+         }
+      }
       x = y;
    } // IDP iteration
 }
@@ -405,7 +370,7 @@ void LocalConservativeLimitJacobi(ParGridFunction &x)
  *
  * @note Gauss-Seidel method
  */
-void LocalConservativeLimitGS(ParGridFunction &x)
+void LocalConservativeLimitGS(const Vector &_mi_vec, ParGridFunction &x)
 {
    // cout << "IDPLimiter::LocalConservativeLimitGS\n";
 
@@ -430,11 +395,13 @@ void LocalConservativeLimitGS(ParGridFunction &x)
 
       for (int dof_it = 0; dof_it < NDofs; dof_it++)
       {
-         real_t _mi = mass_vec->Elem(dof_it);
+         real_t _mi = _mi_vec.Elem(dof_it);
          real_t x_max_i = x_max[dof_it], x_min_i = x_min[dof_it];
          real_t x_i = x[dof_it];
          // cout << "dof_it: " << dof_it << ", x_i: " << x_i << ", x_max_i: " << x_max_i << ", x_min_i: " << x_min_i << endl;
-         GetAdjacency(dof_it, adj_dofs);
+         // GetAdjacency(dof_it, adj_dofs);
+         int el = L2.GetElementForDof(dof_it);
+         L2.GetElementDofs(el, adj_dofs);
          
          if (_mi < 1.E-12) { 
             cout << "lumped mass is 0\n";
@@ -448,7 +415,7 @@ void LocalConservativeLimitGS(ParGridFunction &x)
             for (int j = 0; j < adj_dofs.Size(); j++)
             {
                int dof_j = adj_dofs[j];
-               aip += mass_vec->Elem(dof_j)*fmax(0., x_max[dof_j] - x[dof_j]);
+               aip += _mi_vec.Elem(dof_j)*fmax(0., x_max[dof_j] - x[dof_j]);
             }
 
             if (aip > 0.)
@@ -471,7 +438,7 @@ void LocalConservativeLimitGS(ParGridFunction &x)
                   int dof_j = adj_dofs[j];
                   double _old_val = x[dof_j];
                   double _new_val = _old_val + lip * fmax(0., x_max[dof_j] - _old_val);
-                  mass_delta += mass_vec->Elem(dof_j) * (_new_val - _old_val);
+                  mass_delta += _mi_vec.Elem(dof_j) * (_new_val - _old_val);
                   x[dof_j] = _new_val;
                }
                if (abs(mass_delta) > 1.e-12)
@@ -491,7 +458,7 @@ void LocalConservativeLimitGS(ParGridFunction &x)
             for (int j = 0; j < adj_dofs.Size(); j++)
             {
                int dof_j = adj_dofs[j];
-               aim += mass_vec->Elem(dof_j)*fmax(0., x[dof_j] - x_min[dof_j]);
+               aim += _mi_vec.Elem(dof_j)*fmax(0., x[dof_j] - x_min[dof_j]);
             }
 
             if (aim > 0.)
@@ -518,7 +485,7 @@ void LocalConservativeLimitGS(ParGridFunction &x)
                   int dof_j = adj_dofs[j];
                   double _old_val = x[dof_j];
                   double _new_val = _old_val + lim * fmax(0., x[dof_j] - x_min[dof_j]);
-                  mass_delta += mass_vec->Elem(dof_j) * (_new_val - _old_val);
+                  mass_delta += _mi_vec.Elem(dof_j) * (_new_val - _old_val);
                   x[dof_j] = _new_val;
                }
 
@@ -528,10 +495,6 @@ void LocalConservativeLimitGS(ParGridFunction &x)
                }
             }
          }
-         // else 
-         // {
-            // cout << "---nothing---\n";
-         // }
       }
 
       /* End actual limit procedure */
@@ -558,23 +521,20 @@ void LocalConservativeLimitGS(ParGridFunction &x)
       }
 
       /* Check conservation */
-      // cout << "checking local mass conservation\n";
-      bool is_locally_conservative = CheckLocalMassConservation(x_old, x);
-      if (!is_locally_conservative && !suppress_warnings)
+      bool is_cell_mass_conserved = CheckCellMassConservation(_mi_vec, x_old, x);
+      bool is_globally_conservative = CheckGlobalMassConservation(_mi_vec, x_old, x);
+
+      /* Output warning */
+      if (!suppress_warnings)
       {
-         MFEM_WARNING("Gauss-Seidel limiter not locally conservative.\n");
-      }
-      // cout << "checking local cell mass conservation\n";
-      // bool is_cell_mass_conserved = CheckLocalCellMassConservation(x_old, x);
-      // if (!is_cell_mass_conserved && !suppress_warnings)
-      // {
-      //    MFEM_WARNING("Gauss-Seidel limiter not locally conservative on cell.\n");
-      // }
-      // cout << "checking global mass conservation\n";
-      bool is_globally_conservative = CheckGlobalMassConservation(x_old, x);
-      if (!is_globally_conservative && !suppress_warnings)
-      {
-         MFEM_WARNING("Gauss-Seidel limiter not globally conservative.\n");
+         if (!is_cell_mass_conserved)
+         {
+            MFEM_WARNING("Gauss-Seidel limiter not cellwise conservative.\n");
+         }
+         if (!is_globally_conservative)
+         {
+            MFEM_WARNING("Gauss-Seidel limiter not globally conservative.\n");
+         }
       }
    }
 }
@@ -617,7 +577,7 @@ void LocalConservativeLimitGS(ParGridFunction &x)
  * @throws An assertion failure if the final values of `gf_ho` are not 
  *         within the range [glob_x_min, glob_x_max].
  */
-void GlobalConservativeLimit(ParGridFunction &gf_ho)
+void GlobalConservativeLimit(const Vector &_mi_vec, ParGridFunction &gf_ho)
 {
    cout << "===== Limiter::GlobalConservativeLimit =====\n";
    MFEM_ABORT("Not validated");
@@ -634,7 +594,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    double x_max_i, x_min_i;
    for (int i = 0; i < NDofs; i++)
    {
-      M += mass_vec->Elem(i) * gf_ho[i]; 
+      M += _mi_vec.Elem(i) * gf_ho[i]; 
    }
    if (!suppress_output)
    {
@@ -655,7 +615,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    for (int i = 0; i < NDofs; i++)
    {
       GetRhoMaxMin(i, x_max_i, x_min_i);
-      double _m = mass_vec->Elem(i);
+      double _m = _mi_vec.Elem(i);
       _sum_my += _m * y[i];
       _denom_max += _m * (x_max_i - y[i]);
       _denom_min += _m * (x_min_i - y[i]);
@@ -677,7 +637,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    }
 
    /* Checks */
-   bool is_globally_conservative = CheckGlobalMassConservation(gf_ho, z);
+   bool is_globally_conservative = CheckGlobalMassConservation(_mi_vec, gf_ho, z);
    if (!is_globally_conservative && !suppress_warnings)
    {
       MFEM_WARNING("Global limiter not locally conservative.\n");
@@ -686,7 +646,7 @@ void GlobalConservativeLimit(ParGridFunction &gf_ho)
    MFEM_VERIFY(less_than_or_equal(gf_ho.Max(), glob_x_max) && less_than_or_equal(glob_x_min, gf_ho.Min()), "Global limiting failed.\n");
 
    MFEM_WARNING("Global limiter is not locally mass conservative.");
-   // bool is_locally_conservative = CheckLocalMassConservation(gf_ho, z);
+   // bool is_locally_conservative = CheckLocalMassConservation(_mi_vec, gf_ho, z);
    // if (!is_locally_conservative)
    // {
    //    MFEM_ABORT("Global limiter is not locally conservative.");
@@ -707,13 +667,13 @@ bool greater_than_or_equal(double a, double b) {
    return a > b || std::abs(a - b) < eps * std::max({1.0, std::abs(a), std::abs(b)});
 }
 
-bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
+bool CheckEstimate(const Vector &_mi_vec, const ParGridFunction &gf_ho)
 {
    // cout << "IDPLimiter::CheckEstimate\n";
    double M_max = 0., M_min = 0., M = 0.;
    for (int i = 0; i < NDofs; i++)
    {
-      double _mi = _lumped_mass_vec[i];
+      double _mi = _mi_vec[i];
       M += _mi * gf_ho[i];
       M_max += _mi * x_max[i];
       M_min += _mi * x_min[i];
@@ -735,45 +695,19 @@ bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
    }
 }
 
-void ComputeVolume(const ParGridFunction &gf_ho)
+void ComputeVolume(Vector &volumes)
 {
    // cout << "IDPLimiter::ComputeVolume\n";
-   // MFEM_ABORT("Need to compute volume based on quadrature");
-   vol_vec = 0.;
-   for (int i = 0; i < NDofs; i++)
-   {
-      vol_vec[i] = mass_vec->Elem(i) / gf_ho[i];
-   }
+   volumes.SetSize(NDofs);
+   ParLinearForm _lf(&L2);
+   ConstantCoefficient one(1.0);
+   _lf.AddDomainIntegrator(new DomainLFIntegrator(one, &ir));
+   _lf.Assemble();
+   HypreParVector *_hpv = _lf.ParallelAssemble();
+   volumes = *_hpv;
 }
 
-void ComputeLumpedMass()
-{
-   MFEM_ABORT("Why do we have this function?")
-   // cout << "IDPLimiter::ComputeLumpedMass\n";
-   // ParLinearForm _lf(&L2);
-   // ConstantCoefficient one(1.0);
-   // // one_int->SetIntRule(&ir);
-   // _lf.AddDomainIntegrator(new DomainLFIntegrator(one, &ir));
-   // _lf.Assemble();
-   // HypreParVector &_hpv = *_lf.ParallelAssemble();
-   // mass_lumped = _hpv;
-   // cout << "Lumped mass vector: ";
-   // mass_lumped.Print(cout);
-
-   // ParBilinearForm _bform(&L2);
-   // _bform.AddDomainIntegrator(new LumpedIntegrator(new MassIntegrator(one, &ir)));
-   // _bform.Assemble();
-   // _bform.Finalize();
-   // Vector diagonal;
-   // _bform.SpMat().GetDiag(diagonal);
-   // cout << "Lumped mass diagonal: ";
-   // diagonal.Print(cout);
-
-   // /* THESE ARE THE SAME */
-   // assert(false);
-}
-
-void ComputeCellMasses(const ParGridFunction &x)
+void ComputeCellMasses(const Vector &_mi_vec, const ParGridFunction &x)
 {
    for (int e = 0; e < L2.GetParMesh()->GetNE(); e++)
    {
@@ -786,8 +720,8 @@ void ComputeCellMasses(const ParGridFunction &x)
       {
          int dof = dofs[i];
          cout << setprecision(6) << x[dof] << ", ";
-         el_mass += mass_vec->Elem(dof) * x[dof];
-         el_vol += mass_vec->Elem(dof);
+         el_mass += _mi_vec.Elem(dof) * x[dof];
+         el_vol += _mi_vec.Elem(dof);
       }
       cout << setprecision(15) << "mass: " << el_mass << ", vol: " << el_vol << endl;
    }
@@ -834,9 +768,10 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== IDPLimiter::Limit =====\n";
    ComputeRhoMinMax(gf_lo);
-   // ComputeCellMasses(gf_ho);
+   Vector mi_vec;
+   ComputeVolume(mi_vec);
 
-   bool satisfies_estimate = CheckEstimate(*mass_vec, gf_ho);
+   bool satisfies_estimate = CheckEstimate(mi_vec, gf_ho);
    if (!satisfies_estimate)
    {
       cout << "gf_lo: \n";
@@ -847,12 +782,12 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
    switch(iter_method)
    {
       case JACOBI:
-         LocalConservativeLimitJacobi(gf_ho);
-         // GlobalConservativeLimit(gf_ho);
+         LocalConservativeLimitJacobi(mi_vec, gf_ho);
+         // GlobalConservativeLimit(mi_vec, gf_ho);
          break;
       case GAUSS_SEIDEL:
-         LocalConservativeLimitGS(gf_ho);
-         // GlobalConservativeLimit(gf_ho);
+         LocalConservativeLimitGS(mi_vec, gf_ho);
+         // GlobalConservativeLimit(mi_vec, gf_ho);
          break;
       default:
          MFEM_ABORT("Unknown iteration method.\n");
@@ -863,6 +798,7 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 void RelaxBoundsMin(const ParGridFunction &x_min_in, ParGridFunction &x_min_out)
 {
    // cout << "IDPLimiter::RelaxBoundsMin\n";
+   MFEM_ABORT("Check mass_vec");
    Array<int> adj_dofs;
    Vector x_min_2nd(NDofs);
    x_min_2nd = 0.;
@@ -914,6 +850,7 @@ void RelaxBoundsMin(const ParGridFunction &x_min_in, ParGridFunction &x_min_out)
 
 void RelaxBoundsMax(const ParGridFunction &x_max_in, ParGridFunction &x_max_out)
 {
+   MFEM_ABORT("Check mass_vec");
    // cout << "IDPLimiter::RelaxBoundsMax\n";
    Array<int> adj_dofs;
    Vector x_max_2nd(NDofs);

@@ -416,6 +416,7 @@ public:
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
    void SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix);
+   void PrintOptions() const;
 
    // Kidder specific function
    void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);

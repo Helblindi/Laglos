@@ -4503,6 +4503,24 @@ void LagrangianLOOperator::SaveTimeSeriesArraysToFile(const string &output_file_
 }
 
 
+void LagrangianLOOperator::PrintOptions() const
+{
+   cout << "LagrangianLOOperator Options:\n";
+   cout << "  dim: " << dim << "\n";
+   cout << "  order_t: " << order_t << "\n";
+   cout << "  visc option: " << visc << "\n";
+   cout << "  greedy: " << use_greedy_viscosity << "\n";
+   cout << "  mv option: " << mv_option << "\n";
+   cout << "  fv option: " << fv_option << "\n";
+   cout << "  CFL: " << CFL << "\n";
+   cout << "  use_elasticity: " << use_elasticity << "\n";
+   cout << "  post_process_density: " << post_process_density << "\n";
+   // cout << "  use_distributed_viscosity: " << use_distributed_viscosity << "\n";
+   // cout << "  use_corrective_face_velocities: " << use_corrective_face_velocities << "\n";
+   // cout << "  use_corrective_face_fluxes: " << use_corrective_face_fluxes << "\n";
+}
+
+
 /****************************************************************************************************
 * Function: Normal direction based Velocity Functions
 ****************************************************************************************************/

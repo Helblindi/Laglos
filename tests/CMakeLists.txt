@@ -30,6 +30,10 @@ add_executable(TestCij EXCLUDE_FROM_ALL test_cij_construction.cpp)
 target_link_libraries(TestCij PRIVATE Laglos)
 add_test(NAME TestCij COMMAND TestCij)
 
+add_executable(TestLimiter EXCLUDE_FROM_ALL test_limiter.cpp)
+target_link_libraries(TestLimiter PRIVATE Laglos)
+add_test(NAME TestLimiter COMMAND TestLimiter)
+
 # Validate Fortran Max Wave Speed calculations
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
@@ -286,7 +290,7 @@ add_test(NAME CompareElasticImpact
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestCij)
+add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestCij TestLimiter)
 
 # Custom target to clean tmp testing directory
 add_custom_target(clean_tests

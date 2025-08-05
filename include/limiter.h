@@ -130,6 +130,8 @@ IDPLimiter(ParFiniteElementSpace & l2, ParFiniteElementSpace & H1FESpace_proj_LO
    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
 
    // ComputeLumpedMass();
+   // cout << "mass vec: ";
+   // mass_vec->Print(cout);
 }
 
 ~IDPLimiter() 
@@ -178,11 +180,11 @@ bool CheckLocalMassConservation(const Vector &x, const Vector &y) const
       if (abs(sum) > 1.e-12)
       {
          cout << "local mass not conserved at dof: " << i << ", sum: " << sum << endl;
-         // cout << "adj dofs: ";
-         // adj_dofs.Print(cout);
+         cout << "adj dofs: ";
+         adj_dofs.Print(cout);
          is_locally_conservative = false;
          // cout << "Not locally conservative at dof: " << i << ", val: " << sum << endl;
-         break; // Break out of loop as there is not point looking at other dofs
+         // break; // Break out of loop as there is not point looking at other dofs
       }
    }
    return is_locally_conservative;
@@ -617,7 +619,8 @@ void LocalConservativeLimitGS(ParGridFunction &x)
  */
 void GlobalConservativeLimit(ParGridFunction &gf_ho)
 {
-   // cout << "===== Limiter::GlobalConservativeLimit =====\n";
+   cout << "===== Limiter::GlobalConservativeLimit =====\n";
+   MFEM_ABORT("Not validated");
    assert(gf_ho.Size() == NDofs);
    
    if (!less_than_or_equal(0, glob_x_min) || !less_than_or_equal(glob_x_min, glob_x_max))
@@ -714,10 +717,10 @@ bool CheckEstimate(const Vector &_lumped_mass_vec, const ParGridFunction &gf_ho)
       M += _mi * gf_ho[i];
       M_max += _mi * x_max[i];
       M_min += _mi * x_min[i];
-      cout << "i: " << i << ", _mi: " << _mi  
-           << ", x_min[i]: " << x_min[i] 
-           << ", gf_ho[i]: " << gf_ho[i]
-           << ", x_max[i]: " << x_max[i] << endl;
+      // cout << "i: " << i << ", _mi: " << _mi  
+      //      << ", x_min[i]: " << x_min[i] 
+      //      << ", gf_ho[i]: " << gf_ho[i]
+      //      << ", x_max[i]: " << x_max[i] << endl;
    }
    if (less_than_or_equal(M_min, M) && less_than_or_equal(M, M_max))
    {
@@ -968,97 +971,26 @@ void RelaxBoundsMax(const ParGridFunction &x_max_in, ParGridFunction &x_max_out)
  *
  * @param rho_gf_lo the invariant-domain-preserving low order update
  */
-// void ComputeRhoMinMax(const ParGridFunction &gf_lo)
-// {
-//    // cout << "IDPLimiter::ComputeRhoMinMax\n";
-//    // Continuous projection
-//    GridFunctionCoefficient LO_rho_gf_coeff(&gf_lo);
-
-//    /* Project local adjacent max to continuous gf */
-//    LO_proj_max.ProjectDiscCoefficientMax(LO_rho_gf_coeff);
-//    LO_proj_min.ProjectDiscCoefficientMin(LO_rho_gf_coeff);
-//    cout << "gf_lo: \n";
-//    gf_lo.Print(cout);
-//    cout << "LO_proj_min: \n";
-//    LO_proj_min.Print(cout);
-//    cout << "LO_proj_max: \n";
-//    LO_proj_max.Print(cout);
-//    // assert(false);
-   
-//    /* 
-//    Convert continuous space to high order dg space 
-//    The use of this operator assumes that the dofs in 
-//    the H1_LO space and H1_HO space are the same
-//    */
-//    vert_elem->Mult(LO_proj_max, x_max);
-//    vert_elem->Mult(LO_proj_min, x_min);
-
-//    cout << "xmax: \n";
-//    x_max.Print(cout);
-//    cout << "vert_elem: \n";
-//    _spm.Print(cout);
-
-//    /* Optionally, relax the bounds */
-//    if (relaxation_option > 0)
-//    {
-//       RelaxBoundsMin(x_min, x_min_relaxed);
-//       RelaxBoundsMax(x_max, x_max_relaxed);
-
-//       /* compare bounds to relaxed bounds */
-//       // for (int i = 0; i < NDofs; i++)
-//       // {
-//       //    cout << "i: " << i << ", x_min: " << x_min[i] << ", x_min_relaxed: " << x_min_relaxed[i] << endl;
-//       //    cout << "x_max: " << x_max[i] << ", x_max_relaxed: " << x_max_relaxed[i] << endl;
-//       // }
-
-//       x_min = x_min_relaxed;
-//       x_max = x_max_relaxed;
-//    }
-
-//    /* Global bounds necessary for global conservative limiting, see Remark 2.4 */
-//    glob_x_max = x_max.Max();
-//    glob_x_min = x_min.Min();
-// }
-
 void ComputeRhoMinMax(const ParGridFunction &gf_lo)
 {
-   cout << "Limiter::ComputeRhoMinMax\n";
+   // cout << "Limiter::ComputeRhoMinMax\n";
    Array<int> adj_dofs;
    Vector sub_vec;
    for (int l2_dof_it = 0; l2_dof_it < NDofs; l2_dof_it++)
    {
       GetAdjacency(l2_dof_it, adj_dofs);
-      // cout << "l2_dof_it: " << l2_dof_it << ", adj_dofs: ";
-      // adj_dofs.Print(cout);
       gf_lo.GetSubVector(adj_dofs, sub_vec);
       double x_min_i = sub_vec.Min();
       double x_max_i = sub_vec.Max();
-      // cout << "xmin_i: " << x_min_i << ", xmax_i: " << x_max_i << endl;
-      // cout << "l2_dof_it: " << l2_dof_it << ", x_min_i: " << x_min_i << ", x_max_i: " << x_max_i << endl;
       x_min[l2_dof_it] = x_min_i;
       x_max[l2_dof_it] = x_max_i;
    }
-
-   // cout << "gf_lo: \n";
-   // gf_lo.Print(cout);
-   // cout << "x_min: \n";
-   // x_min.Print(cout);
-   // cout << "x_max: \n";
-   // x_max.Print(cout);
-   // assert(false);
 
    /* Optionally, relax the bounds */
    if (relaxation_option > 0)
    {
       RelaxBoundsMin(x_min, x_min_relaxed);
       RelaxBoundsMax(x_max, x_max_relaxed);
-
-      /* compare bounds to relaxed bounds */
-      // for (int i = 0; i < NDofs; i++)
-      // {
-      //    cout << "i: " << i << ", x_min: " << x_min[i] << ", x_min_relaxed: " << x_min_relaxed[i] << endl;
-      //    cout << "x_max: " << x_max[i] << ", x_max_relaxed: " << x_max_relaxed[i] << endl;
-      // }
 
       x_min = x_min_relaxed;
       x_max = x_max_relaxed;
@@ -1103,10 +1035,10 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
 void GetAdjacency(const int dof, Array<int> &adj_dofs) const
 {
    // cout << "----------IDPLimiter::GetAdjacency----------\n";
-   if (L2.GetOrder(0) > 1)
-   {
-      MFEM_ABORT("May have issues with GetAdjacency with higher order L2 space.\n");
-   }
+   // if (L2.GetOrder(0) > 1)
+   // {
+   //    MFEM_ABORT("May have issues with GetAdjacency with higher order L2 space.\n");
+   // }
    /* first retrieve HO L2 dofs that share the same H1 adj dof */
    Vector LO_vals, adj_vals; // vector isn't used
    Array<int> LO_verts;
@@ -1125,7 +1057,7 @@ void GetAdjacency(const int dof, Array<int> &adj_dofs) const
 
    /* Remove dof from adj_dofs */
    adj_dofs.DeleteFirst(dof);
-   adj_dofs.DeleteFirst(dof);
+   // adj_dofs.DeleteFirst(dof);
 }
 
    

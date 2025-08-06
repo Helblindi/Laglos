@@ -121,6 +121,9 @@ private:
    bool suppress_output = true;
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL
 
+   mutable bool local_bounds_computed = false;
+   mutable bool glob_bounds_computed = false;
+
 public:
 IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFiniteElementSpace & H1FESpace_proj_LO,
            ParFiniteElementSpace & H1FESpace_proj_HO, Vector &_mass_vec, const int &oq) :
@@ -272,6 +275,7 @@ bool CheckGlobalMassConservation(const Vector &_mi_vec, const Vector &x, const V
 void LocalConservativeLimitJacobi(const Vector &_mi_vec, ParGridFunction &x)
 {
    // cout << "IDPLimiter::LocalConservativeLimitJacobi\n";
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before applying local conservative limit.");
    MFEM_ABORT("Change adjacency to use cell dofs.\n");
    int num_max_lim_old, num_min_lim_old;
    int num_max_lim = 0, num_min_lim = 0;
@@ -419,6 +423,7 @@ void LocalConservativeLimitJacobi(const Vector &_mi_vec, ParGridFunction &x)
 void LocalConservativeLimitGS(const Vector &_mi_vec, ParGridFunction &x)
 {
    // cout << "IDPLimiter::LocalConservativeLimitGS\n";
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before applying local conservative limit.");
 
    int num_max_lim_old, num_min_lim_old;
    int num_max_lim = 0, num_min_lim = 0;
@@ -618,6 +623,11 @@ void GlobalConservativeLimit(const Vector &_mi_vec, ParGridFunction &gf_ho)
    // cout << "===== Limiter::GlobalConservativeLimit =====\n";
    double x_max_i, x_min_i;
    assert(gf_ho.Size() == NDofs);
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before applying global conservative limit.");
+   if (GL_use_global_bounds)
+   {
+      MFEM_ASSERT(glob_bounds_computed, "Global bounds must be computed before applying global conservative limit.");
+   }
    
    if (!less_than_or_equal(0, glob_x_min) || !less_than_or_equal(glob_x_min, glob_x_max))
    {
@@ -722,6 +732,7 @@ bool greater_than_or_equal(double a, double b) {
 bool CheckEstimate(const Vector &_mi_vec, const ParGridFunction &gf_ho)
 {
    // cout << "IDPLimiter::CheckEstimate\n";
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before checking estimate.");
    double M_max = 0., M_min = 0., M = 0.;
    for (int i = 0; i < NDofs; i++)
    {
@@ -760,6 +771,7 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== IDPLimiter::Limit =====\n";
    ComputeLocalBounds(gf_lo);
+   ComputeGlobalBounds();
    Vector mi_vec;
    ComputeVolume(mi_vec);
 
@@ -791,11 +803,16 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
          MFEM_ABORT("Unknown iteration method.\n");
          break;
    }
+
+   /* Reset flags */
+   local_bounds_computed = false;
+   glob_bounds_computed = false;
 }
 
 void RelaxBoundsMin(const ParGridFunction &x_min_in, ParGridFunction &x_min_out)
 {
    // cout << "IDPLimiter::RelaxBoundsMin\n";
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
    MFEM_ABORT("Check mass_vec");
    Array<int> adj_dofs;
    Vector x_min_2nd(NDofs);
@@ -847,6 +864,7 @@ void RelaxBoundsMin(const ParGridFunction &x_min_in, ParGridFunction &x_min_out)
 
 void RelaxBoundsMax(const ParGridFunction &x_max_in, ParGridFunction &x_max_out)
 {
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
    MFEM_ABORT("Check mass_vec");
    // cout << "IDPLimiter::RelaxBoundsMax\n";
    Array<int> adj_dofs;
@@ -920,6 +938,9 @@ void ComputeLocalBounds(const ParGridFunction &gf_lo)
       x_max[l2_dof_it] = x_max_i;
    }
 
+   /* Set flag */
+   local_bounds_computed = true;
+
    /* Optionally, relax the bounds */
    if (relaxation_option > 0)
    {
@@ -929,12 +950,16 @@ void ComputeLocalBounds(const ParGridFunction &gf_lo)
       x_min = x_min_relaxed;
       x_max = x_max_relaxed;
    }
+}
 
-   /* Global bounds necessary for global conservative limiting, see Remark 2.4 */
-   // glob_x_max = x_max.Max();
-   MFEM_WARNING("Use separate function to determine global bounds.\n");
-   glob_x_max = 1.;
+void ComputeGlobalBounds()
+{
+   // cout << "Limiter::ComputeGlobalBounds\n";
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before computing global bounds.");
+
    glob_x_min = x_min.Min();
+   glob_x_max = x_max.Max();
+   glob_bounds_computed = true;
 }
 
 

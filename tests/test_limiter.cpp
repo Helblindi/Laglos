@@ -19,8 +19,8 @@ static int myid = -1;
 /* ---------------- End Parameters ---------------- */
 
 /* Forward declarations */
-int TestComputeRhoMinMaxOT1OK2();
-int TestComputeRhoMinMaxOT2OK3();
+int TestComputeLocalBoundsOT1OK2();
+int TestComputeLocalBoundsOT2OK3();
 
 int main(int argc, char *argv[])
 {
@@ -30,14 +30,14 @@ int main(int argc, char *argv[])
    myid = Mpi::WorldRank();
 
    int d = 0;
-   d += TestComputeRhoMinMaxOT1OK2();
-   d += TestComputeRhoMinMaxOT2OK3();
+   d += TestComputeLocalBoundsOT1OK2();
+   d += TestComputeLocalBoundsOT2OK3();
 
    return d;
 }
 
 /**
- * @brief Unit test for the IDPLimiter::ComputeRhoMinMax method with order_t = 1 and order_k = 2.
+ * @brief Unit test for the IDPLimiter::ComputeLocalBounds method with order_t = 1 and order_k = 2.
  *
  * This test sets up a finite element mesh and associated spaces, constructs a low-order grid function,
  * and uses the IDPLimiter to compute the minimum and maximum values of the grid function over the mesh.
@@ -66,10 +66,10 @@ int main(int argc, char *argv[])
  *
  * @return int Returns 0 if the test passes, 1 if any min/max errors are detected.
  */
-int TestComputeRhoMinMaxOT1OK2()
+int TestComputeLocalBoundsOT1OK2()
 {
    cout << "========================================================================\n"
-        << "\tTestComputeRhoMinMaxOT1OK2\n";
+        << "\tTestComputeLocalBoundsOT1OK2\n";
 
    /* Test specific parameters */
    int order_t = 1, order_k = 2;
@@ -117,7 +117,7 @@ int TestComputeRhoMinMaxOT1OK2()
    {
       rho_gf_LO(i) = (double)i; // Initialize with some value
    }
-   idpl->ComputeRhoMinMax(rho_gf_LO);
+   idpl->ComputeLocalBounds(rho_gf_LO);
    
    /* Set exact min and max */
    // Take all neighbors
@@ -154,7 +154,7 @@ int TestComputeRhoMinMaxOT1OK2()
 
    if (num_min_error > 0 || num_max_error > 0)
    {
-      cout << "TestComputeRhoMinMaxOT1OK2 failed with " 
+      cout << "TestComputeLocalBoundsOT1OK2 failed with " 
            << num_min_error << " min errors and "
            << num_max_error << " max errors." << endl
            << "========================================================================\n\n";
@@ -162,17 +162,17 @@ int TestComputeRhoMinMaxOT1OK2()
    }
    else
    {
-      cout << "TestComputeRhoMinMaxOT1OK2 passed!" << endl
+      cout << "TestComputeLocalBoundsOT1OK2 passed!" << endl
            << "========================================================================\n\n";
    }
         
    return 0;
 }
 
-int TestComputeRhoMinMaxOT2OK3()
+int TestComputeLocalBoundsOT2OK3()
 {
    cout << "========================================================================\n"
-        << "\tTestComputeRhoMinMaxOT2OK3\n";
+        << "\tTestComputeLocalBoundsOT2OK3\n";
 
    /* Test specific parameters */
    int order_t = 2, order_k = 3;
@@ -220,7 +220,7 @@ int TestComputeRhoMinMaxOT2OK3()
    {
       rho_gf_LO(i) = (double)i; // Initialize with some value
    }
-   idpl->ComputeRhoMinMax(rho_gf_LO);
+   idpl->ComputeLocalBounds(rho_gf_LO);
    
    /* Set exact min and max */
    // Full adjacency, not using cell adjacency
@@ -257,7 +257,7 @@ int TestComputeRhoMinMaxOT2OK3()
 
    if (num_min_error > 0 || num_max_error > 0)
    {
-      cout << "TestComputeRhoMinMaxOT1OK2 failed with " 
+      cout << "TestComputeLocalBoundsOT1OK2 failed with " 
            << num_min_error << " min errors and "
            << num_max_error << " max errors." << endl
            << "========================================================================\n\n";
@@ -265,7 +265,7 @@ int TestComputeRhoMinMaxOT2OK3()
    }
    else
    {
-      cout << "TestComputeRhoMinMaxOT1OK2 passed!" << endl
+      cout << "TestComputeLocalBoundsOT1OK2 passed!" << endl
            << "========================================================================\n\n";
    }
         

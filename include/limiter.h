@@ -759,7 +759,7 @@ void ComputeVolume(Vector &volumes)
 void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== IDPLimiter::Limit =====\n";
-   ComputeRhoMinMax(gf_lo);
+   ComputeLocalBounds(gf_lo);
    Vector mi_vec;
    ComputeVolume(mi_vec);
 
@@ -905,9 +905,9 @@ void RelaxBoundsMax(const ParGridFunction &x_max_in, ParGridFunction &x_max_out)
  *
  * @param rho_gf_lo the invariant-domain-preserving low order update
  */
-void ComputeRhoMinMax(const ParGridFunction &gf_lo)
+void ComputeLocalBounds(const ParGridFunction &gf_lo)
 {
-   // cout << "Limiter::ComputeRhoMinMax\n";
+   // cout << "Limiter::ComputeLocalBounds\n";
    Array<int> adj_dofs;
    Vector sub_vec;
    for (int l2_dof_it = 0; l2_dof_it < NDofs; l2_dof_it++)

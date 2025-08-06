@@ -23,39 +23,68 @@ using namespace std;
 namespace mfem
 {
 
-class IdentityInterpolatorMax : public IdentityInterpolator
+/**
+ * @brief Interpolator used to find adjacency information between finite element spaces.
+ *
+ * The AdjacencyInterpolator class inherits from DiscreteInterpolator and overrides
+ * the AssembleElementMatrix2 method to create a dense matrix where every entry is 1.0.
+ * This can be used for adjacency-based interpolation or as a placeholder for more
+ * complex interpolation schemes.
+ *
+ * Source: https://github.com/mfem/mfem/issues/436
+ *
+ * How to define operator:
+ *    ParMesh *pmesh;
+ *    // define pmesh ...
+ *    L2_FECollection elem_fec(0, pmesh->Dimension());
+ *    H1_FECollection vert_fec(1, pmesh->Dimension());
+ *    ParFiniteElementSpace elem_fes(pmesh, &elem_fec);
+ *    ParFiniteElementSpace vert_fes(pmesh, &vert_fec);
+ *    ParDiscreteLinearOperator vert_elem_oper(&vert_fes, &elem_fes); // maps vert_fes to elem_fes
+ *    vert_elem_oper.AddDomainInterpolator(new AdjacencyInterpolator);
+ *    vert_elem_oper.Assemble();
+ *    HypreParMatrix *vert_elem = vert_elem_oper.ParallelAssemble();
+ *    // use vert_elem ...
+ *    delete vert_elem;
+ *
+ * Example usage:
+ *    Vector elem_marker(elem_fes.GetTrueVSize());
+ *    elem_marker = 0.0;
+ *    // set elem_marker(i) to 1.0 if element i is an element whose neighbors you want to find
+ *    Vector vert_marker(vert_fes.GetTrueVSize());
+ *    vert_elem->MultTranspose(elem_marker, vert_marker);
+ *    vert_elem->Mult(vert_marker, elem_marker);
+ *    // if elem_marker(j) is > 0.0 then j is a neighbor of an element you marked above, or
+ *    // j itself was marked above
+ *
+ * Matrix usage:
+ *   This operator can also be used to build an el adjacency matrix, as is done in the Limiter
+ *   class, as follows:
+ *
+ *    vert_elem_oper.AddDomainInterpolator(new AdjacencyInterpolator);
+ *    vert_elem_oper.Assemble();
+ *    vert_elem_oper.Finalize();
+ *    vert_elem = vert_elem_oper.ParallelAssemble();
+ *    vert_elem_trans = vert_elem->Transpose();
+ *    vert_elem->MergeDiagAndOffd(_spm);
+ *    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
+ *    el_adj_mat = Mult(_spm, _spm_trans);
+ *
+ * @note
+ * The returned elem_marker vector will contain:
+ * - 1.0 for elements that are diagonal neighbors of the marked element
+ * - 2.0 for elements that are face neighbords of the marked element
+ * - 4.0 elements that were marked in the first place
+ * - 0.0 for all other elements
+ */
+class AdjacencyInterpolator : public DiscreteInterpolator
 {
+public:
    virtual void AssembleElementMatrix2(const FiniteElement &dom_fe,
-      const FiniteElement &ran_fe,
-      ElementTransformation &Trans,
-      DenseMatrix &elmat) 
-{ 
-   dom_fe.Project(ran_fe, Trans, elmat); 
-   Vector row;
-   /* Threshold by row */
-   for (int row_it = 0; row_it < elmat.NumRows(); row_it++)
-   {
-      elmat.GetRow(row_it, row);
-      double _threshold = row.Max();
-      if (_threshold < 0.)
-      {
-         MFEM_ABORT("Negative numbers not handled properly.\n");
-      }
-
-      for (int i = 0; i < row.Size(); i++)
-      {
-         if (std::abs(row.Elem(i)) < _threshold)
-         {
-            row.Elem(i) = 0.0;
-         }
-         else
-         {
-            row.Elem(i) = 1.;
-         }
-      }
-      elmat.SetRow(row_it, row);
-   }
-}
+                                       const FiniteElement &ran_fe,
+                                       ElementTransformation &Trans,
+                                       DenseMatrix &elmat)
+   { elmat.SetSize(ran_fe.GetDof(), dom_fe.GetDof()); elmat = 1.0; }
 };
 
 enum IterationMethod {
@@ -67,7 +96,7 @@ enum IterationMethod {
 class IDPLimiter
 {
 private:
-   ParFiniteElementSpace &L2;
+   ParFiniteElementSpace &L2_HO, &L2_LO;
    Vector *mass_vec;
    const int NDofs;
    ParGridFunction vol_vec;
@@ -79,7 +108,7 @@ private:
    ParGridFunction LO_proj_max, LO_proj_min;
    ParDiscreteLinearOperator vert_elem_oper; 
    HypreParMatrix *vert_elem, *vert_elem_trans;
-   SparseMatrix _spm, _spm_trans;
+   SparseMatrix _spm, _spm_trans, *el_adj_mat;
    const IntegrationRule &ir;
 
    /* Misc options */
@@ -92,24 +121,25 @@ private:
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL
 
 public:
-IDPLimiter(ParFiniteElementSpace & l2, ParFiniteElementSpace & H1FESpace_proj_LO,
+IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFiniteElementSpace & H1FESpace_proj_LO,
            ParFiniteElementSpace & H1FESpace_proj_HO, Vector &_mass_vec, const int &oq) :
-   L2(l2),
+   L2_HO(l2_ho),
+   L2_LO(l2_lo),
    mass_vec(&_mass_vec),
    NDofs(mass_vec->Size()),
-   vol_vec(&l2),
-   x_min(&l2),
-   x_max(&l2),
-   x_min_relaxed(&l2),
-   x_max_relaxed(&l2),
+   vol_vec(&l2_ho),
+   x_min(&l2_ho),
+   x_max(&l2_ho),
+   x_min_relaxed(&l2_ho),
+   x_max_relaxed(&l2_ho),
    H1_LO(H1FESpace_proj_LO),
    H1_HO(H1FESpace_proj_HO),
    LO_proj_max(&H1_LO),
    LO_proj_min(&H1_LO),
-   vert_elem_oper(&H1FESpace_proj_HO, &l2),
-   ir(IntRules.Get(L2.GetParMesh()->GetElementBaseGeometry(0),
-                   (oq > 0) ? oq : 3 * H1_HO.GetOrder(0) + L2.GetOrder(0) - 1)),
-   dim(L2.GetParMesh()->Dimension())
+   vert_elem_oper(&H1FESpace_proj_LO, &L2_LO),
+   ir(IntRules.Get(L2_HO.GetParMesh()->GetElementBaseGeometry(0),
+                   (oq > 0) ? oq : 3 * H1_HO.GetOrder(0) + L2_HO.GetOrder(0) - 1)),
+   dim(L2_HO.GetParMesh()->Dimension())
 {
    vol_vec = 0.;
    /* Verify that #DOFS are equal across LO and HO H1 spaces */
@@ -118,16 +148,16 @@ IDPLimiter(ParFiniteElementSpace & l2, ParFiniteElementSpace & H1FESpace_proj_LO
       MFEM_ABORT("Continuous approximation spaces are not compatible.\n");
    }
 
-   // Try @ https://github.com/mfem/mfem/issues/436
-   // _spm & _spm_trans will be used to determine adjacency
-   vert_elem_oper.AddDomainInterpolator(new IdentityInterpolatorMax);
+   /* Construct adjacency operator */
+   vert_elem_oper.AddDomainInterpolator(new AdjacencyInterpolator);
    vert_elem_oper.Assemble();
    vert_elem_oper.Finalize();
    vert_elem = vert_elem_oper.ParallelAssemble();
    vert_elem_trans = vert_elem->Transpose();
-
    vert_elem->MergeDiagAndOffd(_spm);
    vert_elem_trans->MergeDiagAndOffd(_spm_trans);
+   el_adj_mat = Mult(_spm, _spm_trans);
+   /* Can further use SparseMatrix::Threshold to select which neighbors would like to keep */
 
    // cout << "mass vec: ";
    // mass_vec->Print(cout);
@@ -161,11 +191,11 @@ bool CheckCellMassConservation(const Vector &_mi_vec, const Vector &x_old, const
 {
    // cout << "IDPLimiter::CheckCellMassConservation\n";
    bool is_cell_mass_conserved = true;
-   for (int i = 0; i < L2.GetNE(); i++)
+   for (int i = 0; i < L2_HO.GetNE(); i++)
    {
       double old_mass = 0., new_mass = 0.;
       Array<int> dofs;
-      L2.GetElementDofs(i, dofs);
+      L2_HO.GetElementDofs(i, dofs);
       for (int dof_it = 0; dof_it < dofs.Size(); dof_it++)
       {
          int dof = dofs[dof_it];
@@ -400,8 +430,8 @@ void LocalConservativeLimitGS(const Vector &_mi_vec, ParGridFunction &x)
          real_t x_i = x[dof_it];
          // cout << "dof_it: " << dof_it << ", x_i: " << x_i << ", x_max_i: " << x_max_i << ", x_min_i: " << x_min_i << endl;
          // GetAdjacency(dof_it, adj_dofs);
-         int el = L2.GetElementForDof(dof_it);
-         L2.GetElementDofs(el, adj_dofs);
+         int el = L2_HO.GetElementForDof(dof_it);
+         L2_HO.GetElementDofs(el, adj_dofs);
          
          if (_mi < 1.E-12) { 
             cout << "lumped mass is 0\n";
@@ -699,7 +729,7 @@ void ComputeVolume(Vector &volumes)
 {
    // cout << "IDPLimiter::ComputeVolume\n";
    volumes.SetSize(NDofs);
-   ParLinearForm _lf(&L2);
+   ParLinearForm _lf(&L2_HO);
    ConstantCoefficient one(1.0);
    _lf.AddDomainIntegrator(new DomainLFIntegrator(one, &ir));
    _lf.Assemble();
@@ -709,10 +739,10 @@ void ComputeVolume(Vector &volumes)
 
 void ComputeCellMasses(const Vector &_mi_vec, const ParGridFunction &x)
 {
-   for (int e = 0; e < L2.GetParMesh()->GetNE(); e++)
+   for (int e = 0; e < L2_HO.GetParMesh()->GetNE(); e++)
    {
       Array<int> dofs;
-      L2.GetElementDofs(e, dofs);
+      L2_HO.GetElementDofs(e, dofs);
       double el_mass = 0.;
       double el_vol = 0.;
       cout << "el: " << e << ", densities: ";
@@ -731,9 +761,9 @@ void ComputeCellMassesAndVolumesQUAD(const ParGridFunction &x, const ParGridFunc
 {
    // cout << "IDPLimiter::ComputeCellMassesQUAD\n";
    // MFEM_ABORT("Need to compute volume based on quadrature");
-   auto qi_u = L2.GetQuadratureInterpolator(ir);
+   auto qi_u = L2_HO.GetQuadratureInterpolator(ir);
    const int nqp = ir.GetNPoints();
-   const int NE = L2.GetNE();
+   const int NE = L2_HO.GetNE();
    Vector u_qvals(nqp * NE);
    // mass_lumped_qvals(nqp * NE);
    qi_u->Values(gf_ho, u_qvals);
@@ -972,28 +1002,21 @@ void ComputeRhoMinMax(const ParGridFunction &gf_lo)
 void GetAdjacency(const int dof, Array<int> &adj_dofs) const
 {
    // cout << "----------IDPLimiter::GetAdjacency----------\n";
-   // if (L2.GetOrder(0) > 1)
-   // {
-   //    MFEM_ABORT("May have issues with GetAdjacency with higher order L2 space.\n");
-   // }
-   /* first retrieve HO L2 dofs that share the same H1 adj dof */
-   Vector LO_vals, adj_vals; // vector isn't used
-   Array<int> LO_verts;
-   _spm.GetRow(dof, LO_verts, LO_vals); // val isn't used
-   assert(LO_verts.Size() == 1); // Each HO dof should only correspond to one LO H1 dof
-   _spm_trans.GetRow(LO_verts[0], adj_dofs, adj_vals);
-   assert((adj_dofs.Size() <= 4) && "Cannot have more than 4 values sharing a vertex.");
-
+   Vector adj_dof_vals;
+   el_adj_mat->GetRow(dof,adj_dofs,adj_dof_vals);
+   adj_dofs.Sort();
+   // cout << "dof: " << dof << ", adj_dofs: ";
+   // adj_dofs.Print(cout);
 
    /* Next, append HO dofs that are in the same mesh element */
-   int el_index = L2.GetElementForDof(dof);
-   Array<int> el_dofs;
-   L2.GetElementDofs(el_index, el_dofs);
-   adj_dofs.Append(el_dofs);
+   // int el_index = L2_HO.GetElementForDof(dof);
+   // Array<int> el_dofs;
+   // L2_HO.GetElementDofs(el_index, el_dofs);
+   // adj_dofs.Append(el_dofs);
    // adj_dofs = el_dofs;
 
    /* Remove dof from adj_dofs */
-   adj_dofs.DeleteFirst(dof);
+   // adj_dofs.DeleteFirst(dof);
    // adj_dofs.DeleteFirst(dof);
 }
 

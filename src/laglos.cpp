@@ -1242,6 +1242,10 @@ int main(int argc, char *argv[]) {
    {
       paraview_dc = new ParaViewDataCollection("ParaView", pmesh);
       paraview_dc->SetLevelsOfDetail(order_k);
+      if (order_t > 0)
+      {
+         paraview_dc->SetHighOrderOutput(true);
+      }
       paraview_dc->SetDataFormat(VTKFormat::BINARY);
       paraview_dc->SetPrefixPath(_refinement_path);
       paraview_dc->RegisterField("Specific Volume", &sv_gf);

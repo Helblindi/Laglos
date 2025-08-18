@@ -166,7 +166,6 @@ int main(int argc, char *argv[]) {
    bool visualization = false;
    int vis_steps = 5;
    bool pview = false;
-   bool visit = false;
    bool gfprint = false;
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
@@ -227,8 +226,6 @@ int main(int argc, char *argv[]) {
                   "Visualize every n-th timestep.");
    args.AddOption(&pview, "-pview", "--paraview", "-no-pview", "--no-paraview",
                   "Enable or disable ParaView visualization.");
-   args.AddOption(&visit, "-visit", "--visit", "-no-visit", "--no-visit",
-                  "Enable or disable VisIt visualization.");
    args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
                   "Enable or disable result output (files in mfem format).");
    args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
@@ -358,8 +355,6 @@ int main(int argc, char *argv[]) {
    string _convergence = output_path + "convergence";
    string _temp_output = _convergence + "/temp_output";
    string _state_vectors = output_path + "state_vectors";
-   string _visit = _refinement_path + "VisIt/";
-   string _pview = _refinement_path + "ParaView/";
    string gfprint_path = _refinement_path + "gfs/";
 
    const char* path = output_path.c_str();
@@ -391,20 +386,6 @@ int main(int argc, char *argv[]) {
    path = gfprint_path.c_str();
    boost::filesystem::path gfprint_output_dir(path);
    boost::filesystem::create_directory(gfprint_output_dir);
-
-   const char* _visit_basename = _visit.c_str();
-   if (visit)
-   {
-      boost::filesystem::path visit_output_dir(_visit_basename);
-      boost::filesystem::create_directory(visit_output_dir);
-   }
-
-   const char* _pview_basename = _pview.c_str();
-   if (pview)
-   {
-      boost::filesystem::path pview_output_dir(_pview_basename);
-      boost::filesystem::create_directory(pview_output_dir);
-   }
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
@@ -938,7 +919,7 @@ int main(int argc, char *argv[]) {
    ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
 
    // Compute the density if we need to visualize it
-   if (visualization || gfprint || visit || pview)
+   if (visualization || gfprint || pview)
    {
       // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
@@ -1256,37 +1237,27 @@ int main(int argc, char *argv[]) {
       gamma_ofs.close();
    }
 
-   VisItDataCollection visit_dc(_visit_basename, pmesh);
-   visit_dc.RegisterField("Specific Volume", &sv_gf);
-   visit_dc.RegisterField("Density", &rho_gf);
-   visit_dc.RegisterField("Density c", &rho_cont_gf);
-   visit_dc.RegisterField("Velocity", &v_gf);
-   visit_dc.RegisterField("Specific Total Energy", &ste_gf);
-   visit_dc.RegisterField("Mass Loss", &mc_gf);
-   visit_dc.RegisterField("Pressure", &press_gf);
-   visit_dc.RegisterField("Gamma", &gamma_gf);
-   visit_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
-   visit_dc.RegisterField("e sheer", &e_sheer_gf);
-   visit_dc.SetCycle(0);
-   visit_dc.SetTime(0.0);
-   visit_dc.Save();
-
-   ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   paraview_dc.SetLevelsOfDetail(order_k);
-   paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
-   paraview_dc.RegisterField("Specific Volume", &sv_gf);
-   paraview_dc.RegisterField("Density", &rho_gf);
-   paraview_dc.RegisterField("Density c", &rho_cont_gf);
-   paraview_dc.RegisterField("Velocity", &v_gf);
-   paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
-   paraview_dc.RegisterField("Mass Loss", &mc_gf);
-   paraview_dc.RegisterField("Pressure", &press_gf);
-   paraview_dc.RegisterField("Gamma", &gamma_gf);
-   paraview_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
-   paraview_dc.RegisterField("e sheer", &e_sheer_gf);
-   paraview_dc.SetCycle(0);
-   paraview_dc.SetTime(0.0); 
-   paraview_dc.Save();
+   ParaViewDataCollection * paraview_dc;
+   if (pview)
+   {
+      paraview_dc = new ParaViewDataCollection("ParaView", pmesh);
+      paraview_dc->SetLevelsOfDetail(order_k);
+      paraview_dc->SetDataFormat(VTKFormat::BINARY);
+      paraview_dc->SetPrefixPath(_refinement_path);
+      paraview_dc->RegisterField("Specific Volume", &sv_gf);
+      paraview_dc->RegisterField("Density", &rho_gf);
+      paraview_dc->RegisterField("Density c", &rho_cont_gf);
+      paraview_dc->RegisterField("Velocity", &v_gf);
+      paraview_dc->RegisterField("Specific Total Energy", &ste_gf);
+      paraview_dc->RegisterField("Mass Loss", &mc_gf);
+      paraview_dc->RegisterField("Pressure", &press_gf);
+      paraview_dc->RegisterField("Gamma", &gamma_gf);
+      paraview_dc->RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+      paraview_dc->RegisterField("e sheer", &e_sheer_gf);
+      paraview_dc->SetCycle(0);
+      paraview_dc->SetTime(0.0);
+      paraview_dc->Save();
+   }
 
    // Perform time-integration (looping over the time iterations, ti, with a
    // time-step dt). The object oper is of type LagrangianLOOperator that
@@ -1431,7 +1402,7 @@ int main(int argc, char *argv[]) {
          }
 
          // Compute the density if we need to visualize it
-         if (visualization || gfprint || visit || pview)
+         if (visualization || gfprint || pview)
          {
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
@@ -1734,23 +1705,14 @@ int main(int argc, char *argv[]) {
             std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
             rho_cont_ofs.precision(8);
             rho_cont_gf.SaveAsOne(rho_cont_ofs);
-            rho_cont_ofs.close();    
-
-
-            if (visit)
-            {
-               visit_dc.SetCycle(ti);
-               visit_dc.SetTime(t);
-               visit_dc.Save();
-            }
-
-            if (pview)
-            {
-               paraview_dc.SetCycle(ti);
-               paraview_dc.SetTime(t);
-               paraview_dc.Save();
-            }     
-         }
+            rho_cont_ofs.close();       
+         } // gfprint
+         if (pview)
+         {
+            paraview_dc->SetCycle(ti);
+            paraview_dc->SetTime(t);
+            paraview_dc->Save();
+         } // pview  
       }
    } // End time step iteration
    chrono.Stop();
@@ -1851,16 +1813,6 @@ int main(int argc, char *argv[]) {
       rho_cont_ofs.precision(8);
       rho_cont_gf.SaveAsOne(rho_cont_ofs);
       rho_cont_ofs.close();
-
-      /* Always save last VisIt files */
-      visit_dc.SetCycle(ti);
-      visit_dc.SetTime(t);
-      visit_dc.Save();
-
-      /* Always save last ParaView files */
-      paraview_dc.SetCycle(ti);
-      paraview_dc.SetTime(t);
-      paraview_dc.Save();
    } // End print final grid functions
 
    if (problem_class->has_exact_solution())
@@ -2183,6 +2135,7 @@ int main(int argc, char *argv[]) {
    delete CRFEC;
    delete problem_class;
    delete m;
+   delete paraview_dc;
 
    return 0;
 }

@@ -21,7 +21,6 @@ Options used:
    --no-visualization
    --visualization-steps 5
    --no-paraview
-   --no-visit
    --no-print
    --no-mass-correct
    --viscosity 1
@@ -110,14 +109,14 @@ step    55,	t = 0.535926,	dt = 0.00979249,	|e| = 2.2813213314e+01
 step    60,	t = 0.584943,	dt = 0.00981044,	|e| = 2.2811983179e+01
 step    62,	t = 0.600000,	dt = 0.00524336,	|e| = 2.2811640059e+01
 projecting zero on cells with attr 99
-Program took 4.9702958333e-02s.
-This amounts to 1.3148930776e-05 s per timestep per gridpoint.
+Program took 3.0158791667e-02s.
+This amounts to 7.9785163139e-06 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    4.970e-02 | 1.315e-05
-  Dij calculation:               1.478e-02 | 3.909e-06
-  Mesh Motion calculation:       3.836e-03 | 1.015e-06
+  Total time:                    3.016e-02 | 7.979e-06
+  Dij calculation:               9.919e-03 | 2.624e-06
+  Mesh Motion calculation:       2.920e-03 | 7.724e-07
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      5.462e-02 | 1.445e-05
+  State Update calculation:      3.170e-02 | 8.386e-06
 ===========================================================

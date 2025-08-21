@@ -21,7 +21,6 @@ Options used:
    --no-visualization
    --visualization-steps 5
    --no-paraview
-   --no-visit
    --no-print
    --no-mass-correct
    --viscosity 3
@@ -98,14 +97,14 @@ smesh_num_faces: 2112
 Entering time loop
 step     5,	t = 0.155338,	dt = 0.03109345,	|e| = 8.0269177001e+01
 step     9,	t = 0.250000,	dt = 0.00121681,	|e| = 8.0269429496e+01
-Program took 7.6486725000e-01s.
-This amounts to 2.9877626953e-04 s per timestep per gridpoint.
+Program took 6.6279216667e-01s.
+This amounts to 2.5890319010e-04 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    7.649e-01 | 2.988e-04
-  Dij calculation:               1.742e-01 | 6.806e-05
-  Mesh Motion calculation:       1.990e-01 | 7.773e-05
+  Total time:                    6.628e-01 | 2.589e-04
+  Dij calculation:               1.648e-01 | 6.439e-05
+  Mesh Motion calculation:       1.671e-01 | 6.529e-05
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      7.851e-01 | 3.067e-04
+  State Update calculation:      6.672e-01 | 2.606e-04
 ===========================================================

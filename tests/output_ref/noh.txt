@@ -21,7 +21,6 @@ Options used:
    --no-visualization
    --visualization-steps 5
    --no-paraview
-   --no-visit
    --no-print
    --no-mass-correct
    --viscosity 1
@@ -132,14 +131,14 @@ step   165,	t = 0.573659,	dt = 0.00297586,	|e| = 1.5102038501e+01
 step   170,	t = 0.588521,	dt = 0.00297019,	|e| = 1.5105049510e+01
 step   174,	t = 0.600000,	dt = 0.00257502,	|e| = 1.5107391892e+01
 [Noh] Projecting zero on the boundary cells.
-Program took 5.2094326667e+00s.
-This amounts to 3.3075762963e-05 s per timestep per gridpoint.
+Program took 3.3729969167e+00s.
+This amounts to 2.1415853439e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    5.209e+00 | 3.308e-05
-  Dij calculation:               2.165e+00 | 1.375e-05
-  Mesh Motion calculation:       1.170e+00 | 7.431e-06
+  Total time:                    3.373e+00 | 2.142e-05
+  Dij calculation:               1.422e+00 | 9.031e-06
+  Mesh Motion calculation:       8.015e-01 | 5.089e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      5.260e+00 | 3.340e-05
+  State Update calculation:      3.391e+00 | 2.153e-05
 ===========================================================

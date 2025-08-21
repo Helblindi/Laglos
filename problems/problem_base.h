@@ -295,6 +295,39 @@ public:
       return result;
    }
 
+   inline DenseMatrix flux_ex_p(const Vector &U, const Vector &x, const double &t, const int &cell_attr=0)
+   {
+      MFEM_ABORT("This function is deprecated. Use flux instead.\n");
+      if (cell_attr == 50)
+      {
+         MFEM_ABORT("Cell attr 50 is reserved for elastic.\n");
+      }
+      DenseMatrix result(dim+2, dim);
+
+      Vector v(dim); 
+      // velocity(U, v);
+      this->v0(x, t, v); // Use initial velocity function
+      // const double sie = specific_internal_energy(U, 0.);
+      const double p = p0(x,t);
+
+      // * is not overridden for Vector class, but *= is
+      Vector v_neg = v, vp = v;
+      v_neg *= -1.;
+      vp *= p;
+
+      // Set f(U) according to (2.1c)
+      result.SetRow(0,v_neg);
+
+      for (int i = 0; i < dim; i++)
+      {
+         result(i+1, i) = p;
+      }
+
+      result.SetRow(dim+1, vp);
+
+      return result;
+   }
+
    //NF//MS add a compute sigma routine here you have to compute the F tensor in each points and its average
    // on the cell. then compute C then sigma, you will need the pressure in that subroutine
    // this as to be compute 

@@ -7,7 +7,7 @@
                /____/                       
 
 Options used:
-   --mesh ../data/ref-square.mesh
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-square.mesh
    --output-flag default
    --order-thermo 0
    --order-kinetic 1
@@ -21,10 +21,9 @@ Options used:
    --no-visualization
    --visualization-steps 5
    --no-paraview
-   --no-visit
    --no-print
    --no-mass-correct
-   --use-viscosity
+   --viscosity 1
    --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
@@ -44,6 +43,7 @@ Options used:
    --timestep 0.001
    --no-suppress-output
    --distort-mesh 0
+   --no-debug-mesh-velocity
 Meshing done
 done with serial refinement
 done with parallel refinement
@@ -121,14 +121,14 @@ step   115,	t = 0.463114,	dt = 0.00289208,	|e| = 3.0102776894e+01
 step   120,	t = 0.477351,	dt = 0.00281807,	|e| = 3.0208759249e+01
 step   125,	t = 0.491227,	dt = 0.00274716,	|e| = 3.0312956927e+01
 step   129,	t = 0.500000,	dt = 0.00061335,	|e| = 3.0379264809e+01
-Program took 7.4400395833e-01s.
-This amounts to 2.2355888171e-05 s per timestep per gridpoint.
+Program took 7.5014812500e-01s.
+This amounts to 2.2540508564e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    7.440e-01 | 2.236e-05
-  Dij calculation:               2.768e-01 | 8.316e-06
-  Mesh Motion calculation:       1.594e-01 | 4.790e-06
+  Total time:                    7.501e-01 | 2.254e-05
+  Dij calculation:               3.002e-01 | 9.021e-06
+  Mesh Motion calculation:       1.740e-01 | 5.227e-06
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      2.313e-01 | 6.951e-06
+  State Update calculation:      7.562e-01 | 2.272e-05
 ===========================================================

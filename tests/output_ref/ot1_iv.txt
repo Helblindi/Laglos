@@ -7,23 +7,23 @@
                /____/                       
 
 Options used:
-   --mesh /Users/madisonsheridan/Workspace/Laglos/data/square-vortex.mesh
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/square-vortex-small.mesh
    --output-flag default
-   --order-thermo 0
-   --order-kinetic 1
-   --refine-serial 1
+   --order-thermo 1
+   --order-kinetic 2
+   --refine-serial 3
    --refine-parallel 0
    --problem 9
-   --ode-solver 1
+   --ode-solver 13
    --t-init 0
-   --t-final 2
+   --t-final 0.25
    --max-steps -1
    --no-visualization
    --visualization-steps 5
    --no-paraview
    --no-print
    --no-mass-correct
-   --viscosity 1
+   --viscosity 3
    --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
@@ -49,67 +49,62 @@ done with serial refinement
 done with parallel refinement
 dim: 2, spacedim: 2
 Zones min/max: 256 256
-global_vSize: 256
-N dofs: 289
+global_vSize: 1024
+N dofs: 1089
 Num Scalar Vertex DoFs: 289
-Num Scalar edge-interior DoFs: 0
+Num Scalar edge-interior DoFs: 544
 Num Scalar face-interior DoFs: 0
 Num faces: 544
 dim: 2
-Number of kinematic (position, mesh velocity) dofs: 578
-Corresponding NDofs: 289
+Number of kinematic (position, mesh velocity) dofs: 2178
+Corresponding NDofs: 1089
 Corresponding VDim: 2
-Corresponding Vsize: 578
-Number of specific internal energy dofs: 256
-Corresponding NDofs: 256
+Corresponding Vsize: 2178
+Number of specific internal energy dofs: 1024
+Corresponding NDofs: 1024
 Corresponding VDim: 1
-Corresponding Vsize: 256
-Number of velocity dofs: 512
-Corresponding NDofs: 256
+Corresponding Vsize: 1024
+Number of velocity dofs: 2048
+Corresponding NDofs: 1024
 Corresponding VDim: 2
-Corresponding Vsize: 512
+Corresponding Vsize: 2048
 num interior faces: 480
 num boundary faces: 64
 num total faces: 544
 num boundary elements: 64
 num elements: 256
 Geometric::Non-default constructor
-NDofs_H1: 289
+NDofs_H1: 1089
 dim: 2
 Instantiating hydro op
-block offsets: 0 578 834 1346
-1602
+block offsets: 0 2178 3202 5250
+6274
 Constructing BdrElementIndexingArray:
-Vsize_H1: 578
+Vsize_H1: 2178
 Vsize_H1L: 578
-TVSize_H1: 578
-GTVSize_H1: 578
-NDofs_H1: 289
+TVSize_H1: 2178
+GTVSize_H1: 2178
+NDofs_H1: 1089
 NVDofs_H1: 289
 NDofs_H1L: 289
-NDofs_L2: 256
-NDofs_L2V: 256
-Vsize_L2V: 512
+NDofs_L2: 1024
+NDofs_L2V: 1024
+Vsize_L2V: 2048
 NE: 256
 num_faces: 544
 num_vertices: 289
-smesh_num_faces: 544
+smesh_num_faces: 2112
 Entering time loop
-step     5,	t = 0.308890,	dt = 0.06148567,	|e| = 4.0141975259e+01
-step    10,	t = 0.612232,	dt = 0.06006488,	|e| = 4.0148704634e+01
-step    15,	t = 0.907790,	dt = 0.05848147,	|e| = 4.0154678285e+01
-step    20,	t = 1.195724,	dt = 0.05701196,	|e| = 4.0160497016e+01
-step    25,	t = 1.476834,	dt = 0.05572015,	|e| = 4.0166061864e+01
-step    30,	t = 1.752041,	dt = 0.05461320,	|e| = 4.0171075905e+01
-step    35,	t = 2.000000,	dt = 0.03143396,	|e| = 4.0174976891e+01
-Program took 1.9978441667e-01s.
-This amounts to 2.1677996600e-05 s per timestep per gridpoint.
+step     5,	t = 0.155338,	dt = 0.03109345,	|e| = 8.0269177001e+01
+step     9,	t = 0.250000,	dt = 0.00121681,	|e| = 8.0269429496e+01
+Program took 6.6279216667e-01s.
+This amounts to 2.5890319010e-04 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    1.998e-01 | 2.168e-05
-  Dij calculation:               8.212e-02 | 8.911e-06
-  Mesh Motion calculation:       4.754e-02 | 5.159e-06
+  Total time:                    6.628e-01 | 2.589e-04
+  Dij calculation:               1.648e-01 | 6.439e-05
+  Mesh Motion calculation:       1.671e-01 | 6.529e-05
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      2.062e-01 | 2.238e-05
+  State Update calculation:      6.672e-01 | 2.606e-04
 ===========================================================

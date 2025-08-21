@@ -21,10 +21,9 @@ Options used:
    --no-visualization
    --visualization-steps 5
    --no-paraview
-   --no-visit
    --no-print
    --no-mass-correct
-   --use-viscosity
+   --viscosity 1
    --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
@@ -44,6 +43,7 @@ Options used:
    --timestep 0.001
    --no-suppress-output
    --distort-mesh 0
+   --no-debug-mesh-velocity
 Meshing done
 done with serial refinement
 done with parallel refinement
@@ -173,14 +173,14 @@ step 320  ,	t = 0.000048,	dt = 0.00000015,	|e| = 1.8057408027e+08
 step 325  ,	t = 0.000049,	dt = 0.00000015,	|e| = 1.8057408037e+08
 step 330  ,	t = 0.000050,	dt = 0.00000015,	|e| = 1.8057408046e+08
 step 332  ,	t = 0.000050,	dt = 0.00000014,	|e| = 1.8057408049e+08
-Program took 2.1482788333e+00s.
-This amounts to 2.5200342921e-05 s per timestep per gridpoint.
+Program took 1.5509235833e+00s.
+This amounts to 1.8193078821e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 2.148e+00                    | 2.520e-05
-  Dij calculation: 8.863e-01               | 1.040e-05
-  Mesh Motion calculation: 6.704e-02       | 7.864e-07
+                                 Total time: 1.551e+00                    | 1.819e-05
+  Dij calculation: 3.736e-01               | 4.383e-06
+  Mesh Motion calculation: 6.648e-02       | 7.799e-07
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 1.132e+00      | 1.328e-05
+  State Update calculation: 1.554e+00      | 1.823e-05
 ===========================================================

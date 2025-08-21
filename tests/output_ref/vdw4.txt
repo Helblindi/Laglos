@@ -7,16 +7,16 @@
                /____/                       
 
 Options used:
-   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-segment.mesh
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/segment-n1p7-1.mesh
    --output-flag default
    --order-thermo 0
    --order-kinetic 1
    --refine-serial 5
    --refine-parallel 0
-   --problem 2
+   --problem 15
    --ode-solver 1
    --t-init 0
-   --t-final 0.225
+   --t-final 0.005
    --max-steps -1
    --no-visualization
    --visualization-steps 5
@@ -38,7 +38,7 @@ Options used:
    --mv-num-iterations 0
    --mesh-motion-viscosity-coefficient-on-face 0
    --mesh-motion-consistency-coefficient-on-cells 0
-   --CFL 0.5
+   --CFL 1.3
    --no-set-dt-to-h
    --timestep 0.001
    --no-suppress-output
@@ -95,34 +95,31 @@ num_faces: 33
 num_vertices: 33
 smesh_num_faces: 33
 Entering time loop
-step     5,	t = 0.008697,	dt = 0.00187472,	|e| = 1.2865848224e+01
-step    10,	t = 0.018306,	dt = 0.00195275,	|e| = 1.2920589499e+01
-step    15,	t = 0.028303,	dt = 0.00202923,	|e| = 1.2984284649e+01
-step    20,	t = 0.038653,	dt = 0.00209617,	|e| = 1.3057087131e+01
-step    25,	t = 0.049315,	dt = 0.00215569,	|e| = 1.3138478595e+01
-step    30,	t = 0.060256,	dt = 0.00220877,	|e| = 1.3227558658e+01
-step    35,	t = 0.071442,	dt = 0.00225548,	|e| = 1.3323364954e+01
-step    40,	t = 0.082844,	dt = 0.00229602,	|e| = 1.3424952022e+01
-step    45,	t = 0.094430,	dt = 0.00233083,	|e| = 1.3531434449e+01
-step    50,	t = 0.106175,	dt = 0.00236049,	|e| = 1.3642012357e+01
-step    55,	t = 0.118055,	dt = 0.00238566,	|e| = 1.3755979047e+01
-step    60,	t = 0.130049,	dt = 0.00240694,	|e| = 1.3872719418e+01
-step    65,	t = 0.142138,	dt = 0.00242491,	|e| = 1.3991702891e+01
-step    70,	t = 0.154309,	dt = 0.00244006,	|e| = 1.4112474290e+01
-step    75,	t = 0.166549,	dt = 0.00245281,	|e| = 1.4234644787e+01
-step    80,	t = 0.178846,	dt = 0.00246354,	|e| = 1.4357883319e+01
-step    85,	t = 0.191191,	dt = 0.00247255,	|e| = 1.4481909324e+01
-step    90,	t = 0.203577,	dt = 0.00248011,	|e| = 1.4606488957e+01
-step    95,	t = 0.215997,	dt = 0.00248644,	|e| = 1.4731441141e+01
-step    99,	t = 0.225000,	dt = 0.00153683,	|e| = 1.4821973463e+01
-Program took 2.5080208333e-02s.
-This amounts to 7.8375651042e-06 s per timestep per gridpoint.
+step     5,	t = 0.001624,	dt = 0.00022784,	|e| = 4.3216681862e+01
+step    10,	t = 0.001931,	dt = 0.00004275,	|e| = 4.3168040376e+01
+step    15,	t = 0.002137,	dt = 0.00004209,	|e| = 4.3142962806e+01
+step    20,	t = 0.002353,	dt = 0.00004276,	|e| = 4.3128732827e+01
+step    25,	t = 0.002578,	dt = 0.00004694,	|e| = 4.3125865787e+01
+step    30,	t = 0.002805,	dt = 0.00004581,	|e| = 4.3132418122e+01
+step    35,	t = 0.003033,	dt = 0.00004356,	|e| = 4.3147002131e+01
+step    40,	t = 0.003247,	dt = 0.00004271,	|e| = 4.3169585047e+01
+step    45,	t = 0.003449,	dt = 0.00003915,	|e| = 4.3198900474e+01
+step    50,	t = 0.003651,	dt = 0.00004089,	|e| = 4.3234756225e+01
+step    55,	t = 0.003850,	dt = 0.00004037,	|e| = 4.3275799187e+01
+step    60,	t = 0.004056,	dt = 0.00004023,	|e| = 4.3323311255e+01
+step    65,	t = 0.004256,	dt = 0.00004059,	|e| = 4.3375531200e+01
+step    70,	t = 0.004453,	dt = 0.00003787,	|e| = 4.3431668657e+01
+step    75,	t = 0.004642,	dt = 0.00003795,	|e| = 4.3491352369e+01
+step    80,	t = 0.004826,	dt = 0.00003600,	|e| = 4.3553632925e+01
+step    85,	t = 0.005000,	dt = 0.00002641,	|e| = 4.3616949529e+01
+Program took 2.1467166667e-02s.
+This amounts to 7.8005692829e-06 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    2.508e-02 | 7.838e-06
-  Dij calculation:               8.733e-03 | 2.729e-06
-  Mesh Motion calculation:       2.541e-03 | 7.941e-07
+  Total time:                    2.147e-02 | 7.801e-06
+  Dij calculation:               7.609e-03 | 2.765e-06
+  Mesh Motion calculation:       2.182e-03 | 7.930e-07
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      2.708e-02 | 8.462e-06
+  State Update calculation:      2.227e-02 | 8.093e-06
 ===========================================================

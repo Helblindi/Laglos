@@ -9,6 +9,7 @@
 #include "laglos_assembly.hpp"
 #include "elastic.hpp" //NF//MS
 #include "laglos_tools.hpp"
+#include "mfem/linalg/dtensor.hpp" // For Reshape
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -54,11 +55,16 @@ struct TimingData
 class LagrangianLOOperator : public LimitedTimeDependentOperator
 {
 protected:
+   const int dim;
+   
    ParFiniteElementSpace &H1, &L2, &L2V, &CR, CRc;
    ParFiniteElementSpace &H1_L;
+   ParFiniteElementSpace *smesh_H1L;
    ParFiniteElementSpace H1Lc;
+   GridTransfer *smesh_gt;
    const ParGridFunction &rho0_gf;
    mutable ParGridFunction x_gf;
+   mutable ParGridFunction smesh_x_gf;
    mutable ParGridFunction mv_gf;
    mutable ParGridFunction v_CR_gf; // 5.7(b)
    ParGridFunction v_CR_gf_corrected; // Iteratively updated
@@ -92,7 +98,6 @@ protected:
    void FreeCij();
 
    // FE spaces local and global sizes
-   const int dim;
    const int Vsize_H1;
    const int TVSize_H1;
    const HYPRE_Int GTVSize_H1;
@@ -133,6 +138,8 @@ protected:
    mutable DenseTensor Me, Me_inv; // Energy mass matrix and its inverse
    MassIntegrator * mi; // Mass integrator for mass matrix
    void ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const;
+   int FindFaceIndexPmesh(const int &el1, const int &el2) const;
+   int FindFaceIndexSmesh(const int &el1, const int &el2) const;
 
    // Tables to relate cell to the contained faces
    // Ref: https://mfem.org/howto/nav-mesh-connectivity/
@@ -158,7 +165,7 @@ protected:
    double timestep = 0.001;
    mutable double timestep_first = 0.; // Set and used for activation function when prescribing left wall dirichlet BCs for Saltzman problem
 
-   bool use_viscosity;
+   int visc;
    bool mm;
    bool compute_mv = true;
    bool use_greedy_viscosity;
@@ -209,7 +216,7 @@ public:
                         const IntegrationRule &_ir,
                         ProblemBase *_pb,
                         Array<int> offset,
-                        bool use_viscosity,
+                        int visc,
                         int elastic_eos,
                         bool mm,
                         double CFL);
@@ -253,6 +260,7 @@ public:
    void SetStateVector(Vector &S_new, const int &index, const Vector &U) const;
 
    /* cij comp */
+   bool IsSkewSymmetric() const;
    void BuildCijMatrices();
    void GetLocalCij(const int &i, const int &j, Vector &cij) const;
    void BuildL2ConnectivityTable();
@@ -277,6 +285,7 @@ public:
    void SetMVOption(const int & option);
    void SetComputeMV(const bool & option) { this->compute_mv = option; }
    void SetMV(const ParGridFunction &_mv) { this->mv_gf = _mv; }
+   void GetMV(ParGridFunction & _mv) const { _mv = this->mv_gf; }
    void SetMVLinOption(const bool & option) { this->do_mv_linearization = option; }
    void SetFVOption(const int & option);
    void SetMVIterationOption(const int &option);
@@ -407,10 +416,21 @@ public:
    // Various print functions
    void SaveStateVecsToFile(const Vector &S, const string &output_file_prefix, const string &output_file_suffix);
    void SaveTimeSeriesArraysToFile(const string &output_file_prefix, const string &output_file_suffix);
+   void PrintOptions() const;
 
    // Kidder specific function
    void ComputeKidderAvgIntExtRadii(const Vector &S, double &avg_rad_int, double &avg_rad_ext);
    void ComputeKidderAvgDensityAndEntropy(const Vector &S, double &avg_density, double &avg_entropy);
+
+   // Debugging
+   mutable bool l2_dof_x_set = false;
+   mutable ParGridFunction _l2x_gf;
+   void SetL2DofX() const
+   {
+      pmesh->GetNodes(_l2x_gf);
+      l2_dof_x_set = true;
+   }
+   void GetL2DofX(const int &dof, Vector &x) const;
 };
 
 class HydroODESolver : public ODESolver

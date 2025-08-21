@@ -8,9 +8,9 @@
 > - -rs - number of serial refinements
 > - -rp - number of parallel refinements (parallel not implemented)
 > - -of - designate the output folder where results should be saved to
-> - -print -
+> - -print
 > - -mm
-> - -visc
+> - -visc - type of viscosity to use
 > - -greedy - Use greedy viscosity described in GMPST2024.
 > - -ggn - Number of GMV steps to take before using Greedy lambda
 > - -ms - maximum steps that the solver should take 

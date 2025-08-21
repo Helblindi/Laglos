@@ -30,6 +30,10 @@ add_executable(TestCij EXCLUDE_FROM_ALL test_cij_construction.cpp)
 target_link_libraries(TestCij PRIVATE Laglos)
 add_test(NAME TestCij COMMAND TestCij)
 
+add_executable(TestLimiter EXCLUDE_FROM_ALL test_limiter.cpp)
+target_link_libraries(TestLimiter PRIVATE Laglos)
+add_test(NAME TestLimiter COMMAND TestLimiter)
+
 # Validate Fortran Max Wave Speed calculations
 add_executable(TestEulerianMWS EXCLUDE_FROM_ALL test_fortran_eulerian_mws.cpp "${MFEM_DIR}")
 target_link_libraries(TestEulerianMWS PRIVATE "${MFEM_LIBRARIES}" comp_lambda_eulerian)
@@ -193,6 +197,34 @@ add_test(NAME CompareKidder
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+# VDW
+# 2
+file(COPY test_vdw2.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_vdw2.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestVdw2
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_vdw2.sh ${PROJECT_SOURCE_DIR} "vdw2_output.txt"
+)
+add_test(NAME CompareVdw2
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/vdw2_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/vdw2.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+# 4
+file(COPY test_vdw4.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_vdw4.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestVdw4
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_vdw4.sh ${PROJECT_SOURCE_DIR} "vdw4_output.txt"
+)
+add_test(NAME CompareVdw4
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/vdw4_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/vdw4.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 ### High order tests ###
 ## Sod 1D
 file(COPY test_sod_1d_HO.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -205,6 +237,34 @@ add_test(NAME CompareSod1DHO
   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
     ${CMAKE_CURRENT_BINARY_DIR}/HOsod1d.txt
     ${PROJECT_SOURCE_DIR}/tests/output_ref/HOsod1d.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+## Isentropic Vortex ot1
+file(COPY test_ot1_iv.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_iv.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestOT1IV
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_iv.sh ${PROJECT_SOURCE_DIR} "ot1_iv_output.txt"
+)
+add_test(NAME CompareOT1IV
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/ot1_iv_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/ot1_iv.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+## Taylor Green Vortex ot1
+file(COPY test_ot1_tg.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_tg.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestOT1TG
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_ot1_tg.sh ${PROJECT_SOURCE_DIR} "ot1_tg_output.txt"
+)
+add_test(NAME CompareOT1TG
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/ot1_tg_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/ot1_tg.txt
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
@@ -230,7 +290,7 @@ add_test(NAME CompareElasticImpact
 add_custom_target(build_tests)
 add_custom_target(run_tests COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(run_tests build_tests)
-add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestCij)
+add_dependencies(build_tests TestEulerianMWS TestLagrangianMWS TestEOS TestCij TestLimiter)
 
 # Custom target to clean tmp testing directory
 add_custom_target(clean_tests

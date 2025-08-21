@@ -7,23 +7,23 @@
                /____/                       
 
 Options used:
-   --mesh /Users/madisonsheridan/Workspace/Laglos/data/square-vortex.mesh
+   --mesh /Users/madisonsheridan/Workspace/Laglos/data/ref-square.mesh
    --output-flag default
-   --order-thermo 0
-   --order-kinetic 1
-   --refine-serial 1
+   --order-thermo 1
+   --order-kinetic 2
+   --refine-serial 3
    --refine-parallel 0
-   --problem 9
-   --ode-solver 1
+   --problem 0
+   --ode-solver 13
    --t-init 0
-   --t-final 2
+   --t-final 0.1
    --max-steps -1
    --no-visualization
    --visualization-steps 5
    --no-paraview
    --no-print
    --no-mass-correct
-   --viscosity 1
+   --viscosity 3
    --no-greedy-viscosity
    --gmv-to-greedy-num-steps 0
    --move-mesh
@@ -48,13 +48,13 @@ Meshing done
 done with serial refinement
 done with parallel refinement
 dim: 2, spacedim: 2
-Zones min/max: 256 256
+Zones min/max: 64 64
 global_vSize: 256
 N dofs: 289
-Num Scalar Vertex DoFs: 289
-Num Scalar edge-interior DoFs: 0
+Num Scalar Vertex DoFs: 81
+Num Scalar edge-interior DoFs: 144
 Num Scalar face-interior DoFs: 0
-Num faces: 544
+Num faces: 144
 dim: 2
 Number of kinematic (position, mesh velocity) dofs: 578
 Corresponding NDofs: 289
@@ -68,11 +68,11 @@ Number of velocity dofs: 512
 Corresponding NDofs: 256
 Corresponding VDim: 2
 Corresponding Vsize: 512
-num interior faces: 480
-num boundary faces: 64
-num total faces: 544
-num boundary elements: 64
-num elements: 256
+num interior faces: 112
+num boundary faces: 32
+num total faces: 144
+num boundary elements: 32
+num elements: 64
 Geometric::Non-default constructor
 NDofs_H1: 289
 dim: 2
@@ -81,35 +81,32 @@ block offsets: 0 578 834 1346
 1602
 Constructing BdrElementIndexingArray:
 Vsize_H1: 578
-Vsize_H1L: 578
+Vsize_H1L: 162
 TVSize_H1: 578
 GTVSize_H1: 578
 NDofs_H1: 289
-NVDofs_H1: 289
-NDofs_H1L: 289
+NVDofs_H1: 81
+NDofs_H1L: 81
 NDofs_L2: 256
 NDofs_L2V: 256
 Vsize_L2V: 512
-NE: 256
-num_faces: 544
-num_vertices: 289
+NE: 64
+num_faces: 144
+num_vertices: 81
 smesh_num_faces: 544
 Entering time loop
-step     5,	t = 0.308890,	dt = 0.06148567,	|e| = 4.0141975259e+01
-step    10,	t = 0.612232,	dt = 0.06006488,	|e| = 4.0148704634e+01
-step    15,	t = 0.907790,	dt = 0.05848147,	|e| = 4.0154678285e+01
-step    20,	t = 1.195724,	dt = 0.05701196,	|e| = 4.0160497016e+01
-step    25,	t = 1.476834,	dt = 0.05572015,	|e| = 4.0166061864e+01
-step    30,	t = 1.752041,	dt = 0.05461320,	|e| = 4.0171075905e+01
-step    35,	t = 2.000000,	dt = 0.03143396,	|e| = 4.0174976891e+01
-Program took 1.9978441667e-01s.
-This amounts to 2.1677996600e-05 s per timestep per gridpoint.
+step     5,	t = 0.026418,	dt = 0.00527195,	|e| = 2.8721745611e+01
+step    10,	t = 0.052639,	dt = 0.00522146,	|e| = 2.8769383130e+01
+step    15,	t = 0.078522,	dt = 0.00514366,	|e| = 2.8841809262e+01
+step    20,	t = 0.100000,	dt = 0.00109319,	|e| = 2.8917183874e+01
+Program took 3.7716179167e-01s.
+This amounts to 2.8062633309e-04 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
                                 total time | t / (dof*ts) 
-  Total time:                    1.998e-01 | 2.168e-05
-  Dij calculation:               8.212e-02 | 8.911e-06
-  Mesh Motion calculation:       4.754e-02 | 5.159e-06
+  Total time:                    3.772e-01 | 2.806e-04
+  Dij calculation:               8.771e-02 | 6.526e-05
+  Mesh Motion calculation:       9.417e-02 | 7.007e-05
     Hiop calculation (if used):  0.000e+00 | 0.000e+00
   Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      2.062e-01 | 2.238e-05
+  State Update calculation:      3.790e-01 | 2.820e-04
 ===========================================================

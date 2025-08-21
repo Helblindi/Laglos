@@ -51,7 +51,7 @@ private:
    bool _distort_mesh = false;
    bool _known_exact_solution = false;
    bool _thbcs = false;
-   bool _mvbcs = true;
+   bool _mvbcs = false;
    string _indicator = "Vdw4";
 
    // Problem specifics

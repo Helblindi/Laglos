@@ -13,21 +13,17 @@ if [[ ! -x "$EXECUTABLE" ]]; then
 fi
 
 # test parameters
-mesh_file="${SOURCE_DIR}/data/ref-segment.mesh"
-problem=2
-final_time=.225
-cfl=0.5
+mesh_file="${SOURCE_DIR}/data/segment-n1p7-1.mesh"
+problem=15
+final_time=.005
+cfl=1.3
 mv_option=2
-ot=1
-ok=2
-visc=3
-solver=13
 refinements_serial=5
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
-options+="-mv ${mv_option} -ot ${ot} -ok ${ok} "
-options+="-rs ${refinements_serial} -ppd -visc ${visc} -s ${solver} "
+options+="-mv ${mv_option} "
+options+="-rs ${refinements_serial} "
 echo $options
 
 # Run the executable with input file (adjust args as needed)

@@ -26,9 +26,9 @@
 *
 * ----- vdw -----
 * ./Laglos -m ../data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis            ## Vdw1
-* ./Laglos -m ../data/segment-nhalf-1-extrapolated.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 4  ## Vdw2 
+* ./Laglos -m ../data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 5 -ppd          ## Vdw2 
 * ./Laglos -m ../data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis           ## Vdw3 
-* ./Laglos -m ../data/segment-n1p7-1-extrapolated.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 4  ## Vdw4
+* ./Laglos -m ../data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 4               ## Vdw4
 *
 * --------------------------------------------------------------
 * ----- 2D -----
@@ -166,12 +166,11 @@ int main(int argc, char *argv[]) {
    bool visualization = false;
    int vis_steps = 5;
    bool pview = false;
-   bool visit = false;
    bool gfprint = false;
    int precision = 12;
    /* This parameter describes how often to compute mass corrective face velocities, 0 indicates to always take the average. */
    bool mc = false;
-   bool use_viscosity = true;
+   int visc = 1; // Default to GMS-GV
    bool greedy = false;
    int gmv_to_greedy_steps = 0;
    bool mm = true;
@@ -192,6 +191,9 @@ int main(int argc, char *argv[]) {
    string sv_output_prefix;
    string ts_output_prefix;
    string output_path;
+
+   // Debug options
+   bool debug_mesh_velocity = false;
 
    OptionsParser args(argc, argv);
 
@@ -224,15 +226,17 @@ int main(int argc, char *argv[]) {
                   "Visualize every n-th timestep.");
    args.AddOption(&pview, "-pview", "--paraview", "-no-pview", "--no-paraview",
                   "Enable or disable ParaView visualization.");
-   args.AddOption(&visit, "-visit", "--visit", "-no-visit", "--no-visit",
-                  "Enable or disable VisIt visualization.");
    args.AddOption(&gfprint, "-print", "--print", "-no-print", "--no-print",
                   "Enable or disable result output (files in mfem format).");
    args.AddOption(&mc, "-mc", "--mass-correct", "-no-mc", "--no-mass-correct",
                   "Enable or disable mass correction.");
-   args.AddOption(&use_viscosity, "-visc", "--use-viscosity", "-no-visc",
-                  "--no-viscosity",
-                  "Enable or disable the use of artificial viscosity.");
+   args.AddOption(&visc, "-visc", "--viscosity",
+                  "Type of viscosity to use:"
+                  "\n\t 0 - No viscosity,"
+                  "\n\t 1 - GMS-GV (Guaranteed Maximum Speed Graph Viscosity),"
+                  "\n\t 2 - Greedy Viscosity,"
+                  "\n\t 3 - Artificial graph viscosity for HO (Binder),"
+                  "\n\t 4 - Artificial graph viscosity for HO (Non-binder),");
    args.AddOption(&greedy, "-greedy", "--use-greedy-viscosity", "-no-greedy", "--no-greedy-viscosity",
                   "Enable or disable greedy viscosity computation.");
    args.AddOption(&gmv_to_greedy_steps, "-ggn", "--gmv-to-greedy-num-steps",
@@ -289,6 +293,9 @@ int main(int argc, char *argv[]) {
                   "Enable or disable output during runtime.");
    args.AddOption(&dm_val, "-dm", "--distort-mesh",
                   "Mesh distortion parameter.");
+   args.AddOption(&debug_mesh_velocity, "-dmv", "--debug-mesh-velocity", "-no-dmv",
+                  "--no-debug-mesh-velocity",
+                  "Enable or disable debug mesh velocity visualization in glvis.");
 
    args.Parse();
    if (!args.Good())
@@ -304,6 +311,17 @@ int main(int argc, char *argv[]) {
       MFEM_ABORT("Elasticity cannot be used with order_t > 0. "
                  "Set order_t = 0 to use elasticity.");
    }
+   // if (visc == 2)
+   // {
+   //    if (!greedy)
+   //    {
+   //       MFEM_ABORT("Greedy viscosity must be enabled if visc = 2.");
+   //    }
+   // }
+   // if (greedy && visc != 2)
+   // {
+   //    MFEM_ABORT("Greedy viscosity can only be used if visc = 2.");
+   // }
    // if (order_t > 0 && order_k != order_t)
    // {
    //    MFEM_ABORT("In the case of higher order approximations, the mesh velocity order must be equal to that of the thermodynamic space.");
@@ -337,8 +355,6 @@ int main(int argc, char *argv[]) {
    string _convergence = output_path + "convergence";
    string _temp_output = _convergence + "/temp_output";
    string _state_vectors = output_path + "state_vectors";
-   string _visit = _refinement_path + "VisIt/";
-   string _pview = _refinement_path + "ParaView/";
    string gfprint_path = _refinement_path + "gfs/";
 
    const char* path = output_path.c_str();
@@ -370,20 +386,6 @@ int main(int argc, char *argv[]) {
    path = gfprint_path.c_str();
    boost::filesystem::path gfprint_output_dir(path);
    boost::filesystem::create_directory(gfprint_output_dir);
-
-   const char* _visit_basename = _visit.c_str();
-   if (visit)
-   {
-      boost::filesystem::path visit_output_dir(_visit_basename);
-      boost::filesystem::create_directory(visit_output_dir);
-   }
-
-   const char* _pview_basename = _pview.c_str();
-   if (pview)
-   {
-      boost::filesystem::path pview_output_dir(_pview_basename);
-      boost::filesystem::create_directory(pview_output_dir);
-   }
 
    // On all processors, use the default builtin 1D/2D/3D mesh or read the
    // serial one given on the command line.
@@ -583,8 +585,8 @@ int main(int argc, char *argv[]) {
    // - CR/RT for mesh velocity reconstruction at nodes
    H1_FECollection H1FEC(order_k, dim);
    H1_FECollection H1FEC_L(1, dim);
-   L2_FECollection L2FEC(order_t, dim, BasisType::Positive);
-   L2_FECollection L20FEC(0, dim, BasisType::Positive);
+   L2_FECollection L2FEC(order_t, dim, BasisType::GaussLobatto);
+   L2_FECollection L20FEC(0, dim);
    FiniteElementCollection * CRFEC;
    if (dim == 1)
    {
@@ -786,24 +788,25 @@ int main(int argc, char *argv[]) {
    // Similar to Laghos, we interpolate in a non-positive basis to get
    // the correct values at the dofs. Then we do an L2 projection to 
    // the positive basis in which we actually compute.
-   L2_FECollection l2_fec(order_t, pmesh->Dimension());
-   ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
-   ParFiniteElementSpace l2_vfes(pmesh, &l2_fec, dim);
-   ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes), l2_v(&l2_vfes);
+   // L2_FECollection l2_fec(order_t, pmesh->Dimension(), BasisType::GaussLegendre);
+   // ParFiniteElementSpace l2_fes(pmesh, &l2_fec);
+   // ParFiniteElementSpace l2_vfes(pmesh, &l2_fec, dim);
+   // ParGridFunction l2_ste(&l2_fes), l2_sv(&l2_fes), l2_v(&l2_vfes);
 
    /* sv */
    FunctionCoefficient sv_coeff(sv0_static);
    sv_coeff.SetTime(t_init);
-   l2_sv.ProjectCoefficient(sv_coeff);
-   sv_gf.ProjectGridFunction(l2_sv);
-   // sv_gf.ProjectCoefficient(sv_coeff);
+   // l2_sv.ProjectCoefficient(sv_coeff);
+   // sv_gf.ProjectGridFunction(l2_sv);
+   sv_gf.ProjectCoefficient(sv_coeff);
    sv_gf.SyncAliasMemory(S);
 
    /* v */
    VectorFunctionCoefficient v_coeff(dim, v0_static);
    v_coeff.SetTime(t_init);
-   l2_v.ProjectCoefficient(v_coeff);
-   v_gf.ProjectGridFunction(l2_v);
+   // l2_v.ProjectCoefficient(v_coeff);
+   // v_gf.ProjectGridFunction(l2_v);
+   v_gf.ProjectCoefficient(v_coeff);
    v_gf.SyncAliasMemory(S);
 
    /* ste */
@@ -817,38 +820,43 @@ int main(int argc, char *argv[]) {
       double blast_position[] = {0.0, 0.0, 0.0};
       DeltaCoefficient e_coeff(blast_position[0], blast_position[1],
                                blast_position[2], blast_energy);
-      l2_ste.ProjectCoefficient(e_coeff);
+      // l2_ste.ProjectCoefficient(e_coeff);
+      ste_gf.ProjectCoefficient(e_coeff);
    }
    else
    {
-      l2_ste.ProjectCoefficient(ste_coeff);
+      // l2_ste.ProjectCoefficient(ste_coeff);
+      ste_gf.ProjectCoefficient(ste_coeff);
    }
-   ste_gf.ProjectGridFunction(l2_ste);
+   // ste_gf.ProjectGridFunction(l2_ste);
    ste_gf.SyncAliasMemory(S);
-
-   
 
    // PLF to build mass vector
    FunctionCoefficient rho0_coeff(rho0_static), rho_coeff(rho0_static);
    rho0_coeff.SetTime(t_init);
    int ir_order = 3 * H1FESpace.GetOrder(0) + L2FESpace.GetOrder(0) - 1;
+   /* 
+   Use default IntRules object, which uses Gauss-Legendre basis 
+   For some reason, using Gauss-Lobatto for this basis prohibits
+   the Sedov problem from running to completion.
+   */
    IntegrationRule ir = IntRules.Get(pmesh->GetElementBaseGeometry(0), ir_order);
    ParLinearForm *m = new ParLinearForm(&L2FESpace);
    m->AddDomainIntegrator(new DomainLFIntegrator(rho0_coeff,&ir));
    m->Assemble();
 
    /* Initialize rho0_gf */
-   ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
+   // ParGridFunction l2_rho0(&l2_fes), l2_rho(&l2_fes);
    ParGridFunction rho0_gf(&L2FESpace);
-   l2_rho0.ProjectCoefficient(rho0_coeff);
-   rho0_gf.ProjectGridFunction(l2_rho0);
-   // rho0_gf.ProjectCoefficient(rho0_coeff);
+   // l2_rho0.ProjectCoefficient(rho0_coeff);
+   // rho0_gf.ProjectGridFunction(l2_rho0);
+   rho0_gf.ProjectCoefficient(rho0_coeff);
 
    FunctionCoefficient p_coeff(p0_static);
    p_coeff.SetTime(t_init);
 
    /* Create Lagrangian Low Order Solver Object */
-   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_coeff, rho0_gf, m, ir, problem_class, offset, use_viscosity, elastic_eos, mm, CFL);
+   LagrangianLOOperator hydro(dim, S.Size(), H1FESpace, H1FESpace_L, L2FESpace, L2VFESpace, CRFESpace, rho0_coeff, rho0_gf, m, ir, problem_class, offset, visc, elastic_eos, mm, CFL);
    hydro.SetInitialMassesAndVolumes(S);
 
    /* Set parameters of the LagrangianLOOperator */
@@ -895,6 +903,8 @@ int main(int argc, char *argv[]) {
    socketstream vis_sig, vis_f, vis_frho, vis_esheer;
    socketstream vis_rho_ex, vis_v_ex, vis_ste_ex, vis_p_ex;
    socketstream vis_rho_err, vis_v_err, vis_ste_err, vis_p_err;
+   /* debug */
+   socketstream vis_mv;
    char vishost[] = "localhost";
    int  visport   = 19916;
 
@@ -909,7 +919,7 @@ int main(int argc, char *argv[]) {
    ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
 
    // Compute the density if we need to visualize it
-   if (visualization || gfprint || visit || pview)
+   if (visualization || gfprint || pview)
    {
       // Compute Density
       for (int i = 0; i < sv_gf.Size(); i++)
@@ -971,6 +981,9 @@ int main(int argc, char *argv[]) {
       vis_frho.precision(8);
       vis_esheer.precision(8);
 
+      /* Debug */
+      vis_mv.precision(8);
+
       int Wx = 0, Wy = 0; // window position
       const int Ww = 350, Wh = 350; // window size
       int offx = Ww+10, offy = Wh+45;; // window offsets
@@ -996,6 +1009,15 @@ int main(int argc, char *argv[]) {
          VisualizeField(vis_gamma, vishost, visport, gamma_gf,
                         "Gamma", Wx, Wy, Ww, Wh);
       }
+      if (debug_mesh_velocity)
+      {
+         ParGridFunction mv_gf(&H1FESpace);
+         hydro.GetMV(mv_gf);
+         Wx += offx;
+         VisualizeField(vis_mv, vishost, visport, mv_gf,
+                        "Mesh Velocity", Wx, Wy, Ww, Wh);
+      }
+
       //NF//MS
       if (elastic_eos)
       {
@@ -1065,18 +1087,22 @@ int main(int argc, char *argv[]) {
             // Compute errors
             ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
             /* rho */
-            l2_rho.ProjectCoefficient(rho_coeff);
-            rho_ex_gf.ProjectGridFunction(l2_rho);
+            // l2_rho.ProjectCoefficient(rho_coeff);
+            // rho_ex_gf.ProjectGridFunction(l2_rho);
+            rho_ex_gf.ProjectCoefficient(rho_coeff);
             /* v */
-            l2_v.ProjectCoefficient(v_coeff);
-            vel_ex_gf.ProjectGridFunction(l2_v);
+            // l2_v.ProjectCoefficient(v_coeff);
+            // vel_ex_gf.ProjectGridFunction(l2_v);
+            vel_ex_gf.ProjectCoefficient(v_coeff);
             /* ste */
-            l2_ste.ProjectCoefficient(ste_coeff);
-            ste_ex_gf.ProjectGridFunction(l2_ste);
+            // l2_ste.ProjectCoefficient(ste_coeff);
+            // ste_ex_gf.ProjectGridFunction(l2_ste);
+            ste_ex_gf.ProjectCoefficient(ste_coeff);
             /* pressure */
-            ParGridFunction l2_p(&l2_fes);
-            l2_p.ProjectCoefficient(p_coeff);
-            p_ex_gf.ProjectGridFunction(l2_p);
+            // ParGridFunction l2_p(&l2_fes);
+            // l2_p.ProjectCoefficient(p_coeff);
+            // p_ex_gf.ProjectGridFunction(l2_p);
+            p_ex_gf.ProjectCoefficient(p_coeff);
 
             rho_err -= rho_ex_gf;
             vel_err -= vel_ex_gf;
@@ -1211,37 +1237,31 @@ int main(int argc, char *argv[]) {
       gamma_ofs.close();
    }
 
-   VisItDataCollection visit_dc(_visit_basename, pmesh);
-   visit_dc.RegisterField("Specific Volume", &sv_gf);
-   visit_dc.RegisterField("Density", &rho_gf);
-   visit_dc.RegisterField("Density c", &rho_cont_gf);
-   visit_dc.RegisterField("Velocity", &v_gf);
-   visit_dc.RegisterField("Specific Total Energy", &ste_gf);
-   visit_dc.RegisterField("Mass Loss", &mc_gf);
-   visit_dc.RegisterField("Pressure", &press_gf);
-   visit_dc.RegisterField("Gamma", &gamma_gf);
-   visit_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
-   visit_dc.RegisterField("e sheer", &e_sheer_gf);
-   visit_dc.SetCycle(0);
-   visit_dc.SetTime(0.0);
-   visit_dc.Save();
-
-   ParaViewDataCollection paraview_dc(_pview_basename, pmesh);
-   paraview_dc.SetLevelsOfDetail(order_k);
-   paraview_dc.SetDataFormat(VTKFormat::ASCII); // BINARY also an option, easier to debug
-   paraview_dc.RegisterField("Specific Volume", &sv_gf);
-   paraview_dc.RegisterField("Density", &rho_gf);
-   paraview_dc.RegisterField("Density c", &rho_cont_gf);
-   paraview_dc.RegisterField("Velocity", &v_gf);
-   paraview_dc.RegisterField("Specific Total Energy", &ste_gf);
-   paraview_dc.RegisterField("Mass Loss", &mc_gf);
-   paraview_dc.RegisterField("Pressure", &press_gf);
-   paraview_dc.RegisterField("Gamma", &gamma_gf);
-   paraview_dc.RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
-   paraview_dc.RegisterField("e sheer", &e_sheer_gf);
-   paraview_dc.SetCycle(0);
-   paraview_dc.SetTime(0.0); 
-   paraview_dc.Save();
+   ParaViewDataCollection * paraview_dc;
+   if (pview)
+   {
+      paraview_dc = new ParaViewDataCollection("ParaView", pmesh);
+      paraview_dc->SetLevelsOfDetail(order_k);
+      if (order_t > 0)
+      {
+         paraview_dc->SetHighOrderOutput(true);
+      }
+      paraview_dc->SetDataFormat(VTKFormat::BINARY);
+      paraview_dc->SetPrefixPath(_refinement_path);
+      paraview_dc->RegisterField("Specific Volume", &sv_gf);
+      paraview_dc->RegisterField("Density", &rho_gf);
+      paraview_dc->RegisterField("Density c", &rho_cont_gf);
+      paraview_dc->RegisterField("Velocity", &v_gf);
+      paraview_dc->RegisterField("Specific Total Energy", &ste_gf);
+      paraview_dc->RegisterField("Mass Loss", &mc_gf);
+      paraview_dc->RegisterField("Pressure", &press_gf);
+      paraview_dc->RegisterField("Gamma", &gamma_gf);
+      paraview_dc->RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
+      paraview_dc->RegisterField("e sheer", &e_sheer_gf);
+      paraview_dc->SetCycle(0);
+      paraview_dc->SetTime(0.0);
+      paraview_dc->Save();
+   }
 
    // Perform time-integration (looping over the time iterations, ti, with a
    // time-step dt). The object oper is of type LagrangianLOOperator that
@@ -1386,7 +1406,7 @@ int main(int argc, char *argv[]) {
          }
 
          // Compute the density if we need to visualize it
-         if (visualization || gfprint || visit || pview)
+         if (visualization || gfprint || pview)
          {
             // Compute Density
             for (int i = 0; i < sv_gf.Size(); i++)
@@ -1450,6 +1470,15 @@ int main(int argc, char *argv[]) {
                Wx += offx;
                VisualizeField(vis_gamma, vishost, visport, gamma_gf,
                               "Gamma", Wx, Wy, Ww, Wh);
+            }
+
+            if (debug_mesh_velocity)
+            {
+               ParGridFunction mv_gf(&H1FESpace);
+               hydro.GetMV(mv_gf);
+               Wx += offx;
+               VisualizeField(vis_mv, vishost, visport, mv_gf,
+                              "Mesh Velocity", Wx, Wy, Ww, Wh);
             }
 
             Wx += offx;
@@ -1533,19 +1562,23 @@ int main(int argc, char *argv[]) {
 
                   ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), p_ex_gf(&L2FESpace);
                   /* rho */
-                  l2_rho.ProjectCoefficient(rho_coeff);
-                  rho_ex_gf.ProjectGridFunction(l2_rho);
+                  // l2_rho.ProjectCoefficient(rho_coeff);
+                  // rho_ex_gf.ProjectGridFunction(l2_rho);
+                  rho_ex_gf.ProjectCoefficient(rho_coeff);
                   // rho_ex_gf[0] = rho_gf[0];
                   /* v */
-                  l2_v.ProjectCoefficient(v_coeff);
-                  vel_ex_gf.ProjectGridFunction(l2_v);
+                  // l2_v.ProjectCoefficient(v_coeff);
+                  // vel_ex_gf.ProjectGridFunction(l2_v);
+                  vel_ex_gf.ProjectCoefficient(v_coeff);
                   /* ste */
-                  l2_ste.ProjectCoefficient(ste_coeff);
-                  ste_ex_gf.ProjectGridFunction(l2_ste);
+                  // l2_ste.ProjectCoefficient(ste_coeff);
+                  // ste_ex_gf.ProjectGridFunction(l2_ste);
+                  ste_ex_gf.ProjectCoefficient(ste_coeff);
                   /* pressure */
-                  ParGridFunction l2_p(&l2_fes);
-                  l2_p.ProjectCoefficient(p_coeff);
-                  p_ex_gf.ProjectGridFunction(l2_p);
+                  // ParGridFunction l2_p(&l2_fes);
+                  // l2_p.ProjectCoefficient(p_coeff);
+                  // p_ex_gf.ProjectGridFunction(l2_p);
+                  p_ex_gf.ProjectCoefficient(p_coeff);
 
                   rho_err -= rho_ex_gf;
                   vel_err -= vel_ex_gf;
@@ -1676,32 +1709,27 @@ int main(int argc, char *argv[]) {
             std::ofstream rho_cont_ofs(rho_cont_name.str().c_str());
             rho_cont_ofs.precision(8);
             rho_cont_gf.SaveAsOne(rho_cont_ofs);
-            rho_cont_ofs.close();    
-
-
-            if (visit)
-            {
-               visit_dc.SetCycle(ti);
-               visit_dc.SetTime(t);
-               visit_dc.Save();
-            }
-
-            if (pview)
-            {
-               paraview_dc.SetCycle(ti);
-               paraview_dc.SetTime(t);
-               paraview_dc.Save();
-            }     
-         }
+            rho_cont_ofs.close();       
+         } // gfprint
+         if (pview)
+         {
+            paraview_dc->SetCycle(ti);
+            paraview_dc->SetTime(t);
+            paraview_dc->Save();
+         } // pview  
       }
    } // End time step iteration
    chrono.Stop();
 
    switch (ode_solver_type)
    {
+      case 12:
       case 2: steps *= 2; break;
+      case 13:
       case 3: steps *= 3; break;
+      case 14:
       case 4: steps *= 4; break;
+      case 16:
       case 6: steps *= 6; break;
       case 7: steps *= 2;
    }
@@ -1733,9 +1761,11 @@ int main(int argc, char *argv[]) {
    // In all cases, print the final grid functions
    {
       // Save mesh and gfs to files
-      std::ostringstream mesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
+      std::ostringstream mesh_name, smesh_name, rho_name, v_name, ste_name, massC_name, mv_name;
       mesh_name << gfprint_path 
                 << "final.mesh";
+      smesh_name << gfprint_path 
+                 << "final.smesh";
       rho_name  << gfprint_path 
                 << "rho_final.gf";
       v_name << gfprint_path 
@@ -1751,6 +1781,11 @@ int main(int argc, char *argv[]) {
       mesh_ofs.precision(8);
       pmesh->PrintAsOne(mesh_ofs);
       mesh_ofs.close();
+
+      std::ofstream smesh_ofs(smesh_name.str().c_str());
+      smesh_ofs.precision(8);
+      smesh->PrintAsOne(smesh_ofs);
+      smesh_ofs.close();
 
       std::ofstream rho_ofs(rho_name.str().c_str());
       rho_ofs.precision(8);
@@ -1782,16 +1817,6 @@ int main(int argc, char *argv[]) {
       rho_cont_ofs.precision(8);
       rho_cont_gf.SaveAsOne(rho_cont_ofs);
       rho_cont_ofs.close();
-
-      /* Always save last VisIt files */
-      visit_dc.SetCycle(ti);
-      visit_dc.SetTime(t);
-      visit_dc.Save();
-
-      /* Always save last ParaView files */
-      paraview_dc.SetCycle(ti);
-      paraview_dc.SetTime(t);
-      paraview_dc.Save();
    } // End print final grid functions
 
    if (problem_class->has_exact_solution())
@@ -1816,14 +1841,17 @@ int main(int argc, char *argv[]) {
       ste_coeff.SetTime(t);
 
       /* sv */
-      l2_sv.ProjectCoefficient(sv_coeff);
-      sv_ex_gf.ProjectGridFunction(l2_sv);
+      // l2_sv.ProjectCoefficient(sv_coeff);
+      // sv_ex_gf.ProjectGridFunction(l2_sv);
+      sv_ex_gf.ProjectCoefficient(sv_coeff);
       /* v */
-      l2_v.ProjectCoefficient(v_coeff);
-      vel_ex_gf.ProjectGridFunction(l2_v);
+      // l2_v.ProjectCoefficient(v_coeff);
+      // vel_ex_gf.ProjectGridFunction(l2_v);
+      vel_ex_gf.ProjectCoefficient(v_coeff);
       /* ste */
-      l2_ste.ProjectCoefficient(ste_coeff);
-      ste_ex_gf.ProjectGridFunction(l2_ste);
+      // l2_ste.ProjectCoefficient(ste_coeff);
+      // ste_ex_gf.ProjectGridFunction(l2_ste);
+      ste_ex_gf.ProjectCoefficient(ste_coeff);
 
       // Print grid functions to files
       ostringstream sv_ex_filename_suffix;
@@ -1894,17 +1922,21 @@ int main(int argc, char *argv[]) {
          // Compute errors
          ParGridFunction rho_ex_gf(&L2FESpace), vel_ex_gf(&L2VFESpace), ste_ex_gf(&L2FESpace), sv_ex_gf(&L2FESpace);
          /* sv */
-         l2_sv.ProjectCoefficient(sv_coeff);
-         sv_ex_gf.ProjectGridFunction(l2_sv);
+         // l2_sv.ProjectCoefficient(sv_coeff);
+         // sv_ex_gf.ProjectGridFunction(l2_sv);
+         sv_ex_gf.ProjectCoefficient(sv_coeff);
          /* rho */
-         l2_rho.ProjectCoefficient(rho_coeff);
-         rho_ex_gf.ProjectGridFunction(l2_rho);
+         // l2_rho.ProjectCoefficient(rho_coeff);
+         // rho_ex_gf.ProjectGridFunction(l2_rho);
+         rho_ex_gf.ProjectCoefficient(rho_coeff);
          /* v */
-         l2_v.ProjectCoefficient(v_coeff);
-         vel_ex_gf.ProjectGridFunction(l2_v);
+         // l2_v.ProjectCoefficient(v_coeff);
+         // vel_ex_gf.ProjectGridFunction(l2_v);
+         vel_ex_gf.ProjectCoefficient(v_coeff);
          /* ste */
-         l2_ste.ProjectCoefficient(ste_coeff);
-         ste_ex_gf.ProjectGridFunction(l2_ste);
+         // l2_ste.ProjectCoefficient(ste_coeff);
+         // ste_ex_gf.ProjectGridFunction(l2_ste);
+         ste_ex_gf.ProjectCoefficient(ste_coeff);
 
          // In the case of the Noh Problem, project 0 on the boundary of approx and exact
          if ((problem_class->get_indicator() == "ElasticNoh" || problem_class->get_indicator() == "Noh"))
@@ -2107,6 +2139,7 @@ int main(int argc, char *argv[]) {
    delete CRFEC;
    delete problem_class;
    delete m;
+   delete paraview_dc;
 
    return 0;
 }

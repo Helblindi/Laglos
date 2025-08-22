@@ -117,10 +117,10 @@ private:
 
    /* Misc options */
    const int dim;
-   const int max_it = 2;
+   const int max_it = 1;
    bool use_global_conservative_limiting = false;
    bool use_global_bounds = true; // use global bounds for limiting
-   const int relaxation_option = 2; // 0: no relaxation, 
+   const int relaxation_option = 1; // 0: no relaxation, 
                                     // 1: relaxation type 1, 
                                     // 2: Guermond-Wang A.3
    bool suppress_warnings = false;
@@ -191,11 +191,13 @@ IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFini
    delete vert_elem;
 
    // stiffness
-   if (stiffness_mat_sp)
+   cout << "Deleting stiffness matrix\n";
+   if (stiffness_mat_sp && relaxation_option == 2)
    {
       delete stiffness_mat_sp;
       stiffness_mat_sp = nullptr;
    }
+   cout << "Deleted stiffness_mat\n";
 }
 
 void GetVolVec(Vector &vol_vec_out) const { vol_vec_out = vol_vec;}
@@ -829,7 +831,6 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
    glob_bounds_computed = false;
 }
 
-// Algorithm A.3 in Guermond, Wang 2025
 void RelaxLocalBounds(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
    switch (relaxation_option)
@@ -840,24 +841,23 @@ void RelaxLocalBounds(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, Pa
       case 1:
       {
          /* Simple relaxation */
-         RelaxBoundsMin(x_min, x_min_relaxed);
-         RelaxBoundsMax(x_max, x_max_relaxed);
-
-         x_min = x_min_relaxed;
-         x_max = x_max_relaxed;
-
+         RelaxBoundsNonStiffness(_gf_ho, _x_min, _x_max);
          return;
       }
       case 2:
+      {
          /* Stiffness-based relaxation */
          RelaxLocalBoundsStiffnessBased(_gf_ho, _x_min, _x_max);
          return;
+      }
       default:
          MFEM_ABORT("Unknown relaxation option.\n");
          break;
    }
 
 }
+
+// Algorithm A.3 in Guermond, Wang 2025
 void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
    MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
@@ -952,91 +952,58 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
    }
 }
 
-void RelaxBoundsMin(const ParGridFunction &x_min_in, ParGridFunction &x_min_out)
+/* Guermond, Nazarov, Popov, Tomas J.S.C. 2018 (4.10) - (4.11)*/
+void RelaxBoundsNonStiffness(const ParGridFunction &_rho_gf, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
    // cout << "IDPLimiter::RelaxBoundsMin\n";
    MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
-   MFEM_ABORT("Check mass_vec");
-   Array<int> adj_dofs;
-   Vector x_min_2nd(NDofs);
-   x_min_2nd = 0.;
+   MFEM_ASSERT(relaxation_option == 1, "Relaxation option must be 1 for non-stiffness based method.");
+   // If using global bounds, ensure that they have been computed
+   if (use_global_bounds)
+   {
+      MFEM_ASSERT(glob_bounds_computed, "Global bounds must be computed before relaxing bounds with global bounds option.");
+   }
 
-   /* Compute 2nd order fromstencil*/
+   Array<int> adj_dofs;
+   Vector d2_rho(NDofs);
+   d2_rho = 0.;
+
+   /* Compute 2nd order from stencil*/
    for (int i = 0; i < NDofs; i++)
    {
-      double x_min_i = x_min_in[i];
+      double rho_i = _rho_gf[i];
       GetAdjacency(i, adj_dofs);
       for (int j = 0; j < adj_dofs.Size(); j++)
       {
          int dof_j = adj_dofs[j];
-         assert(dof_j != i);
-         x_min_2nd[i] += x_min_i - x_min_in[dof_j];
+         if (dof_j == i) { continue; }
+         d2_rho[i] += rho_i - _rho_gf[dof_j];
       }
    }
+
    /* Compute avg 2nd order stencil and relaxed value */
    for (int i = 0; i < NDofs; i++)
    {
-      const double x_min_i = x_min_in[i];
-      const double x_min_2nd_i = x_min_2nd[i];
+      const double d2_rho_i = d2_rho[i];
       GetAdjacency(i, adj_dofs);
       double _avg = 0.;
 
       for (int j = 0; j < adj_dofs.Size(); j++)
       {
          int dof_j = adj_dofs[j];
-         _avg += (0.5*x_min_2nd_i + 0.5*x_min_2nd[dof_j]);
+         if (dof_j == i) { continue; }
+         _avg += 0.5 * (d2_rho_i + d2_rho[dof_j]);
       }
       _avg /= 2. * adj_dofs.Size();
       
-      double _rh = pow(mass_vec->Elem(i), 1.5 / dim);
-      double _val1 = (1. - _rh) * x_min_i;
-      double _val2 = x_min_i - abs(_avg);
-      x_min_out[i] = fmin(_val1, _val2);
-   }
-}
+      _x_min[i] -= fabs(_avg);
+      _x_max[i] += fabs(_avg);
 
-void RelaxBoundsMax(const ParGridFunction &x_max_in, ParGridFunction &x_max_out)
-{
-   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
-   MFEM_ABORT("Check mass_vec");
-   // cout << "IDPLimiter::RelaxBoundsMax\n";
-   Array<int> adj_dofs;
-   Vector x_max_2nd(NDofs);
-   x_max_2nd = 0.;
-
-   /* Compute 2nd order fromstencil*/
-   for (int i = 0; i < NDofs; i++)
-   {
-      double x_max_i = x_max_in[i];
-      GetAdjacency(i, adj_dofs);
-      for (int j = 0; j < adj_dofs.Size(); j++)
+      if (use_global_bounds)
       {
-         int dof_j = adj_dofs[j];
-         assert(dof_j != i);
-         x_max_2nd[i] += x_max_i - x_max_in[dof_j];
+         _x_min[i] = fmax(_x_min[i], glob_x_min);
+         _x_max[i] = fmin(_x_max[i], glob_x_max);
       }
-   }
-   /* Compute avg 2nd order stencil and relaxed value */
-   for (int i = 0; i < NDofs; i++)
-   {
-      const double x_max_i = x_max_in[i];
-      const double x_max_2nd_i = x_max_2nd[i];
-      GetAdjacency(i, adj_dofs);
-      double _avg = 0.;
-
-      for (int j = 0; j < adj_dofs.Size(); j++)
-      {
-         int dof_j = adj_dofs[j];
-         _avg += (0.5*x_max_2nd_i + 0.5*x_max_2nd[dof_j]);
-      }
-      _avg /= 2. * adj_dofs.Size();
-
-
-      double _rh = pow(mass_vec->Elem(i), 1.5 / dim);
-      double _val1 = (1. + _rh) * x_max_i;
-      double _val2 = x_max_i - abs(_avg);
-
-      x_max_out[i] = fmax(_val1, _val2);
    }
 }
 

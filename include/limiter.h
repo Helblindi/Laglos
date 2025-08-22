@@ -119,7 +119,7 @@ private:
    const int dim;
    const int max_it = 1;
    bool use_global_conservative_limiting = false;
-   bool use_global_bounds = true; // use global bounds for limiting
+   bool use_global_bounds = false; // use global bounds for limiting
    const int relaxation_option = 1; // 0: no relaxation, 
                                     // 1: relaxation type 1, 
                                     // 2: Guermond-Wang A.3
@@ -792,8 +792,11 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 {
    // cout << "===== IDPLimiter::Limit =====\n";
    ComputeLocalBounds(gf_lo);
-   ComputeGlobalBounds();
    RelaxLocalBounds(gf_ho, x_min, x_max);
+   if (use_global_bounds)
+   {
+      ComputeGlobalBounds();
+   }
    Vector mi_vec;
    ComputeVolume(mi_vec);
 
@@ -833,6 +836,7 @@ void Limit(const ParGridFunction &gf_lo, ParGridFunction &gf_ho)
 
 void RelaxLocalBounds(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
+   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
    switch (relaxation_option)
    {
       case 0:
@@ -860,14 +864,8 @@ void RelaxLocalBounds(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, Pa
 // Algorithm A.3 in Guermond, Wang 2025
 void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
-   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
    MFEM_ASSERT(relaxation_option == 2, "Relaxation option must be 2 for stiffness based method.");
    MFEM_ASSERT(stiffness_mat_sp != nullptr, "Stiffness matrix must be assembled before relaxing bounds.");
-   // If using global bounds, ensure that they have been computed
-   if (use_global_bounds)
-   {
-      MFEM_ASSERT(glob_bounds_computed, "Global bounds must be computed before relaxing bounds with global bounds option.");
-   }
    // cout << "IDPLimiter::RelaxLocalBoundsStiffnessBased\n";
 
    /* Compute alpha_i for all L2 dofs */
@@ -944,11 +942,11 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
       }
 
       // Ensure relaxed bounds do not exceed global bounds
-      if (use_global_bounds)
-      {
-         _x_min[l2_dof_it] = fmax(_x_min[l2_dof_it], glob_x_min);
-         _x_max[l2_dof_it] = fmin(_x_max[l2_dof_it], glob_x_max);
-      }  
+      // if (use_global_bounds)
+      // {
+      //    _x_min[l2_dof_it] = fmax(_x_min[l2_dof_it], glob_x_min);
+      //    _x_max[l2_dof_it] = fmin(_x_max[l2_dof_it], glob_x_max);
+      // }  
    }
 }
 
@@ -956,13 +954,7 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
 void RelaxBoundsNonStiffness(const ParGridFunction &_rho_gf, ParGridFunction &_x_min, ParGridFunction &_x_max)
 {
    // cout << "IDPLimiter::RelaxBoundsMin\n";
-   MFEM_ASSERT(local_bounds_computed, "Local bounds must be computed before relaxing bounds.");
    MFEM_ASSERT(relaxation_option == 1, "Relaxation option must be 1 for non-stiffness based method.");
-   // If using global bounds, ensure that they have been computed
-   if (use_global_bounds)
-   {
-      MFEM_ASSERT(glob_bounds_computed, "Global bounds must be computed before relaxing bounds with global bounds option.");
-   }
 
    Array<int> adj_dofs;
    Vector d2_rho(NDofs);
@@ -999,11 +991,11 @@ void RelaxBoundsNonStiffness(const ParGridFunction &_rho_gf, ParGridFunction &_x
       _x_min[i] -= fabs(_avg);
       _x_max[i] += fabs(_avg);
 
-      if (use_global_bounds)
-      {
-         _x_min[i] = fmax(_x_min[i], glob_x_min);
-         _x_max[i] = fmin(_x_max[i], glob_x_max);
-      }
+      // if (use_global_bounds)
+      // {
+      //    _x_min[i] = fmax(_x_min[i], glob_x_min);
+      //    _x_max[i] = fmin(_x_max[i], glob_x_max);
+      // }
    }
 }
 

@@ -95,7 +95,7 @@ inline double sedov_rhoeps(double eps)
 
 inline double sedov_rho(double r)
 {
-   if (r > sedov_rs)
+   if (r >= sedov_rs)
    {
       return sedov_rho0;
    }

@@ -98,7 +98,7 @@ class IDPLimiter
 private:
    ParFiniteElementSpace &L2_HO, &L2_LO;
    Vector *mass_vec;
-   const int NDofs;
+   const int NDofs, dim;
    ParGridFunction vol_vec;
    mutable ParGridFunction x_min, x_max;
    mutable ParGridFunction x_min_relaxed, x_max_relaxed;
@@ -112,17 +112,20 @@ private:
    const IntegrationRule &ir;
 
    /* stiffness */
+   H1_FECollection H1_HOFEC_L2order;
+   ParFiniteElementSpace H1_HOFES_L2order;
    HypreParMatrix *stiffness_mat;
    SparseMatrix *stiffness_mat_sp;
+   ParGridFunction L2HO_H1proj_map;
 
    /* Misc options */
-   const int dim;
    const int max_it = 1;
    bool use_global_conservative_limiting = false;
    bool use_global_bounds = false; // use global bounds for limiting
-   const int relaxation_option = 1; // 0: no relaxation, 
+   const int relaxation_option = 2; // 0: no relaxation, 
                                     // 1: relaxation type 1, 
                                     // 2: Guermond-Wang A.3
+   const double relaxation_factor = 10.0; // factor to multiply beta_i by when relaxing bounds
    bool suppress_warnings = false;
    bool suppress_output = true;
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL
@@ -137,6 +140,7 @@ IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFini
    L2_LO(l2_lo),
    mass_vec(&_mass_vec),
    NDofs(mass_vec->Size()),
+   dim(L2_HO.GetParMesh()->Dimension()),
    vol_vec(&l2_ho),
    x_min(&l2_ho),
    x_max(&l2_ho),
@@ -144,12 +148,14 @@ IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFini
    x_max_relaxed(&l2_ho),
    H1_LO(H1FESpace_proj_LO),
    H1_HO(H1FESpace_proj_HO),
+   H1_HOFEC_L2order(l2_ho.GetOrder(0), dim),
+   H1_HOFES_L2order(l2_ho.GetParMesh(), &H1_HOFEC_L2order,1),
+   L2HO_H1proj_map(&L2_HO),
    LO_proj_max(&H1_LO),
    LO_proj_min(&H1_LO),
    vert_elem_oper(&H1FESpace_proj_LO, &L2_LO),
    ir(IntRules.Get(L2_HO.GetParMesh()->GetElementBaseGeometry(0),
-                   (oq > 0) ? oq : 3 * H1_HO.GetOrder(0) + L2_HO.GetOrder(0) - 1)),
-   dim(L2_HO.GetParMesh()->Dimension())
+                   (oq > 0) ? oq : 3 * H1_HO.GetOrder(0) + L2_HO.GetOrder(0) - 1))
 {
    PrintOptions();
    vol_vec = 0.;
@@ -170,10 +176,25 @@ IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFini
    el_adj_mat = Mult(_spm, _spm_trans);
    /* Can further use SparseMatrix::Threshold to select which neighbors would like to keep */
 
-   /* Construct stiffness matrix for relaxation */
+   Array<int> row;
+   Vector row_vals;
+
+   /* Form mapping gf from L2_HO to H1 verts */
+   for (int i = 0; i < H1_HOFES_L2order.GetNDofs(); i++)
+   {
+      _spm_trans.GetRow(i, row, row_vals);
+      // cout << "i: " << i << ", row: ";
+      for (int j = 0; j < row.Size(); j++)
+      {
+         L2HO_H1proj_map(row[j]) = i;
+      }
+   }
+
+   /* Construct stiffness matrix for relaxation
+   Note: This stiffness matrix is defined on the projected continuous space */
    if (relaxation_option == 2)
    {
-      ParBilinearForm stiffness(&L2_HO);
+      ParBilinearForm stiffness(&H1_HOFES_L2order);
       ConstantCoefficient one_coeff(1.0);
       stiffness.AddDomainIntegrator(new DiffusionIntegrator(one_coeff, &ir));
       stiffness.Assemble();
@@ -191,15 +212,18 @@ IDPLimiter(ParFiniteElementSpace & l2_ho, ParFiniteElementSpace & l2_lo, ParFini
    delete vert_elem;
 
    // stiffness
-   cout << "Deleting stiffness matrix\n";
    if (stiffness_mat_sp && relaxation_option == 2)
    {
       delete stiffness_mat_sp;
       stiffness_mat_sp = nullptr;
    }
-   cout << "Deleted stiffness_mat\n";
 }
 
+void GetStiffnessMatrix(SparseMatrix* &smat) const
+{
+   MFEM_ASSERT(stiffness_mat_sp != nullptr, "Stiffness matrix not initialized.");
+   smat = stiffness_mat_sp;
+}
 void GetVolVec(Vector &vol_vec_out) const { vol_vec_out = vol_vec;}
 void GetRhoMax(Vector &x_max_out) const { x_max_out = x_max; }
 void GetRhoMin(Vector &x_min_out) const { x_min_out = x_min; }
@@ -217,6 +241,7 @@ void PrintOptions()
    cout << "  use_global_conservative_limiting: " << use_global_conservative_limiting << endl;
    cout << "  use_global_bounds: " << use_global_bounds << endl;
    cout << "  relaxation_option: " << relaxation_option << endl;
+   cout << "  relaxation_factor: " << relaxation_factor << endl;
    cout << "  suppress_warnings: " << suppress_warnings << endl;
    cout << "  suppress_output: " << suppress_output << endl;
    cout << "  iter_method: ";
@@ -868,22 +893,36 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
    MFEM_ASSERT(stiffness_mat_sp != nullptr, "Stiffness matrix must be assembled before relaxing bounds.");
    // cout << "IDPLimiter::RelaxLocalBoundsStiffnessBased\n";
 
-   /* Compute alpha_i for all L2 dofs */
+   /* Project L2 quantites onto the H1 space */
+   ParGridFunction _gf_ho_h1(&H1_HOFES_L2order);
+   GridFunctionCoefficient _gf_ho_coeff(&_gf_ho);
+   _gf_ho_h1.ProjectDiscCoefficient(_gf_ho_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+
+   ParGridFunction _gf_min_h1(&H1_HOFES_L2order), _gf_max_h1(&H1_HOFES_L2order);
+   GridFunctionCoefficient _gf_min_coeff(&_x_min);
+   GridFunctionCoefficient _gf_max_coeff(&_x_max);
+   _gf_min_h1.ProjectDiscCoefficient(_gf_min_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+   _gf_max_h1.ProjectDiscCoefficient(_gf_max_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+
+   /* Compute alpha_i for all H1 dofs */
+   const int NDofs_h1 = H1_HOFES_L2order.GetNDofs();
    Array<int> cols;
-   Vector row_entries, alpha_vec(NDofs);
-   for (int l2_dof_it = 0; l2_dof_it < NDofs; l2_dof_it++)
+   Vector row_entries, alpha_vec(NDofs_h1);
+   for (int h1_dof_it = 0; h1_dof_it < NDofs_h1; h1_dof_it++)
    {
-      stiffness_mat_sp->GetRow(l2_dof_it, cols, row_entries);
+      // int h1_dof_it = L2HO_H1proj_map[l2_dof_it];
+      // cout << "l2_dof_it: " << l2_dof_it << ", h1_dof_it: " << h1_dof_it << endl;
+      stiffness_mat_sp->GetRow(h1_dof_it, cols, row_entries);
       double alpha_i = 0.;
       /* Get ui */
-      double ui = _gf_ho[l2_dof_it];
+      double ui = _gf_ho_h1[h1_dof_it];
       // cout << "i: " << l2_dof_it << ", ui: " << ui << endl;
       for (int col_it = 0; col_it < cols.Size(); col_it++)
       {
          int j = cols[col_it];
-         if (j == l2_dof_it) { continue; } // skip diagonal entry
+         if (j == h1_dof_it) { continue; } // skip diagonal entry
          /* get uj */
-         double uj = _gf_ho[j];
+         double uj = _gf_ho_h1[j];
          double bij = row_entries[col_it];
          alpha_i += bij * (ui - uj);
 
@@ -891,10 +930,11 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
       }
       /* since bii = - \sum_{j\in I*(i)} bij*/
       // cout << "Denom: " << -row_entries[l2_dof_it] << endl;
-      assert(cols[0] == l2_dof_it);
+      // cout << "l2_dof_it: " << l2_dof_it << ", h1_dof_it: " << h1_dof_it << ", cols[0]: " << cols[0] << endl;
+      assert(cols[0] == h1_dof_it);
       alpha_i /= -row_entries[0];
       // cout << "alpha_i: " << alpha_i << endl;
-      alpha_vec[l2_dof_it] = alpha_i;
+      alpha_vec[h1_dof_it] = alpha_i;
    }
 
    // cout << "alpha_vec: \n";
@@ -902,10 +942,11 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
 
    /* Set relaxed bounds */
    // Iterate over all dofs
-   for (int l2_dof_it = 0; l2_dof_it < NDofs; l2_dof_it++)
+   for (int h1_dof_it = 0; h1_dof_it < NDofs_h1; h1_dof_it++)
    {
-      double beta_i = alpha_vec[l2_dof_it];
-      stiffness_mat_sp->GetRow(l2_dof_it, cols, row_entries);
+      double beta_i = alpha_vec[h1_dof_it];
+      // int l2_dof_it = H1HO_L2proj_map[h1_dof_it];
+      stiffness_mat_sp->GetRow(h1_dof_it, cols, row_entries);
 
       // cout << "i: " << l2_dof_it << ", alpha_i: " << alpha_vec[l2_dof_it] << endl;
       // cout << "neigbor alphas: ";
@@ -913,7 +954,7 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
       // Iterate over neighbors to compute beta_i
       for (int col_it = 0; col_it < cols.Size(); col_it++)
       {
-         if (cols[col_it] == l2_dof_it) { continue; } //
+         if (cols[col_it] == h1_dof_it) { continue; } //
          double alpha_j = alpha_vec[cols[col_it]];
 
          // cout << alpha_j << ", ";
@@ -925,20 +966,20 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
             break;
          }
          // Same curvature, take the smaller value
-         else if (abs(beta_i) > abs(alpha_j))
+         else if (fabs(beta_i) > fabs(alpha_j))
          // if (abs(beta_i) > abs(alpha_j))
          {
             beta_i = alpha_j;
          }
       }
       // cout << endl;
-      // cout << "dof: " << l2_dof_it << ", beta_i: " << beta_i << endl;
+      // cout << "dof: " << h1_dof_it << ", beta_i: " << beta_i << endl;
       if (fabs(beta_i) > 0.)
       {
-         cout << "beta_i: " << beta_i << endl;
-         _x_min[l2_dof_it] -= fabs(beta_i);
-         _x_max[l2_dof_it] += fabs(beta_i);
-         MFEM_ABORT("We have a nonzero beta_i");
+         // cout << "beta_i: " << beta_i << endl;
+         _gf_min_h1[h1_dof_it] -= relaxation_factor * fabs(beta_i);
+         _gf_max_h1[h1_dof_it] += relaxation_factor * fabs(beta_i);
+         // MFEM_ABORT("We have a nonzero beta_i");
       }
 
       // Ensure relaxed bounds do not exceed global bounds
@@ -948,6 +989,10 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
       //    _x_max[l2_dof_it] = fmin(_x_max[l2_dof_it], glob_x_max);
       // }  
    }
+
+   /* Project max/min back onto l2 */
+   _x_min.ProjectGridFunction(_gf_min_h1);
+   _x_max.ProjectGridFunction(_gf_max_h1);
 }
 
 /* Guermond, Nazarov, Popov, Tomas J.S.C. 2018 (4.10) - (4.11)*/

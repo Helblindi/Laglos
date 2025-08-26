@@ -125,7 +125,7 @@ private:
    const int relaxation_option = 2; // 0: no relaxation, 
                                     // 1: relaxation type 1, 
                                     // 2: Guermond-Wang A.3
-   const double relaxation_factor = 10.0; // factor to multiply beta_i by when relaxing bounds
+   const double relaxation_factor = 1.0; // factor to multiply beta_i by when relaxing bounds
    bool suppress_warnings = false;
    bool suppress_output = true;
    IterationMethod iter_method = GAUSS_SEIDEL; // options: JACOBI, GAUSS_SEIDEL

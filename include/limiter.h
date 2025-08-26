@@ -946,32 +946,32 @@ void RelaxLocalBoundsStiffnessBased(const ParGridFunction &_gf_ho, ParGridFuncti
    {
       double beta_i = alpha_vec[h1_dof_it];
       // int l2_dof_it = H1HO_L2proj_map[h1_dof_it];
-      stiffness_mat_sp->GetRow(h1_dof_it, cols, row_entries);
+      // stiffness_mat_sp->GetRow(h1_dof_it, cols, row_entries);
 
-      // cout << "i: " << l2_dof_it << ", alpha_i: " << alpha_vec[l2_dof_it] << endl;
-      // cout << "neigbor alphas: ";
+      // // cout << "i: " << l2_dof_it << ", alpha_i: " << alpha_vec[l2_dof_it] << endl;
+      // // cout << "neigbor alphas: ";
 
-      // Iterate over neighbors to compute beta_i
-      for (int col_it = 0; col_it < cols.Size(); col_it++)
-      {
-         if (cols[col_it] == h1_dof_it) { continue; } //
-         double alpha_j = alpha_vec[cols[col_it]];
+      // // Iterate over neighbors to compute beta_i
+      // for (int col_it = 0; col_it < cols.Size(); col_it++)
+      // {
+      //    if (cols[col_it] == h1_dof_it) { continue; } //
+      //    double alpha_j = alpha_vec[cols[col_it]];
 
-         // cout << alpha_j << ", ";
+      //    // cout << alpha_j << ", ";
 
-         // Opposite curvature, set relaxation to 0 to avoid oscillations
-         if (beta_i * alpha_j <= 0.)
-         {
-            beta_i = 0.;
-            break;
-         }
-         // Same curvature, take the smaller value
-         else if (fabs(beta_i) > fabs(alpha_j))
-         // if (abs(beta_i) > abs(alpha_j))
-         {
-            beta_i = alpha_j;
-         }
-      }
+      //    // Opposite curvature, set relaxation to 0 to avoid oscillations
+      //    if (beta_i * alpha_j <= 0.)
+      //    {
+      //       beta_i = 0.;
+      //       break;
+      //    }
+      //    // Same curvature, take the smaller value
+      //    else if (fabs(beta_i) > fabs(alpha_j))
+      //    // if (abs(beta_i) > abs(alpha_j))
+      //    {
+      //       beta_i = alpha_j;
+      //    }
+      // }
       // cout << endl;
       // cout << "dof: " << h1_dof_it << ", beta_i: " << beta_i << endl;
       if (fabs(beta_i) > 0.)

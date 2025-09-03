@@ -1626,6 +1626,13 @@ int main(int argc, char *argv[]) {
             }
          }
 
+         if (gfprint || pview)
+         {
+            // Compute continuous projection of density
+            GridFunctionCoefficient rho_gf_coeff(&rho_gf);
+            rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+         }
+
          if (gfprint)
          {
             // Save mesh and gfs to files
@@ -1698,8 +1705,6 @@ int main(int argc, char *argv[]) {
             mass_ofs.close();
 
             // Print continuous interpolation of density
-            GridFunctionCoefficient rho_gf_coeff(&rho_gf);
-            rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
             std::ostringstream rho_cont_name;
             rho_cont_name  << gfprint_path 
                            << setfill('0') 

@@ -483,6 +483,16 @@ public:
    virtual double gamma_func(const Vector &x = Vector(), const double &t = 0) const {
       return gamma;
    } // optionally overridden
+
+   /* Vectorized density and energy functions for extrapolated test cases */
+   void rho0_vec(const Vector &x, const double & t, Vector &rho_v) const {
+      rho_v.SetSize(1);
+      rho_v[0] = this->rho0(x,t);
+   }
+   void sie0_vec(const Vector &x, const double & t, Vector &sie_v) const {
+      sie_v.SetSize(1);
+      sie_v[0] = this->sie0(x,t);
+   }
    
 }; // End ProblemBase
 

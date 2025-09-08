@@ -31,7 +31,7 @@ private:
    bool _distort_mesh = false;
    bool _known_exact_solution = true;
    bool _thbcs = false;
-   bool _mvbcs = false; /* For use with extrapolated segment with indicator 99 */
+   bool _mvbcs = true; /* For use with extrapolated segment with indicator 99 */
    string _indicator = "SmoothWave";
 
 public:

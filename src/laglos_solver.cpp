@@ -3461,7 +3461,22 @@ void LagrangianLOOperator::SetInitialMassesAndVolumes(const Vector &S)
 * Purpose:
 *  This function calculates the percentage of cells in the mesh where mass has not been conserved.
 ****************************************************************************************************/
-void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunction &mc_gf, double &mass_loss) const
+/**
+ * @brief Validates mass conservation for the Lagrangian operator.
+ *
+ * This function checks the mass conservation property based on the provided solution vector.
+ * The behavior depends on the configuration mode:
+ * - If `config` is "LO" (default), the function assumes Laglos is running as a standalone
+ *   Low Order (LO) method and checks for strict mass conservation.
+ * - If `config` is "limiter", the function assumes Laglos is running as a limiter. In this mode,
+ *   mass conservation is not guaranteed at the subcell level, but is enforced on the super cell.
+ *
+ * @param[in]  S         The solution vector to validate.
+ * @param[out] mc_gf     The ParGridFunction to store mass conservation diagnostics.
+ * @param[out] mass_loss The computed mass loss (or gain) during the operation.
+ * @param[in]  config    String indicating the configuration mode ("LO" or "limiter").
+ */
+void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunction &mc_gf, double &mass_loss, const string config) const
 {
    // cout << "=======================================\n"
    //      << "         ValidateMassConservation      \n"
@@ -3493,11 +3508,25 @@ void LagrangianLOOperator::ValidateMassConservation(const Vector &S, ParGridFunc
             num_broken++;
          }
       }
-      cout << "--------------------------------------\n"
+      /* Only output mass loss info (if any) in the standalone case */
+      if (config == "LO")
+      {
+         cout << "--------------------------------------\n"
            << "Ratio of cells where mass conservation was broken: " << (double)num_broken / NE << endl
            << "Initial mass sum: " << initial_masses.Sum()
            << ", Current mass sum: " << el_masses.Sum() << endl
            << "--------------------------------------\n";
+      }
+      else if (config == "limiter")
+      {
+         // cout << "--------------------------------------\n"
+         //      << "WARNING: Mass conservation broken in limiter mode.  This is expected at the subcell level,\n"
+         //      << "         but should be enforced on the super cell.\n";
+      }
+      else
+      {
+         MFEM_ABORT("Invalid config option provided.  Must be 'LO' or 'limiter'.\n");
+      }
    }
 
    /* Compute mass loss */

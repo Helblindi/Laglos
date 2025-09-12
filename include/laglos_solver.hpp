@@ -405,7 +405,7 @@ public:
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
-   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf, double &mass_loss) const;
+   void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf, double &mass_loss, const string config="LO") const;
    void SetInitialMassesAndVolumes(const Vector &S);
 
    // Compute various time series data

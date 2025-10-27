@@ -775,15 +775,11 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
       }
       else
       {
-         // Vector _tx(dim);
-         // GetL2DofX(i, _tx);
-         // F_i = pb->flux_ex_p(U_i, _tx, this->GetTime(), attr_i);
          F_i = pb->flux(U_i, attr_i);
       }
       int bdr_ind = cell_bdr_flag_gf[i];
       L2Connectivity.GetRow(i, row);
-      // cout << "i: " << i << ", row: ";
-      // row.Print(cout);
+
       for (int j_it = 0; j_it < row.Size(); j_it++) // Adjacent dof iterator
       {
          int j = row[j_it];
@@ -938,6 +934,42 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                }
             } // End face iterator
          }
+         /* Vacuum conditions enforced by default */
+         else if (i == j && use_elasticity)
+         {
+            DenseMatrix F_i_bdry = F_i;
+            Vector y_bdry(dim+2);
+            /* Negate entire dense matrix besides first row */
+            Vector row1;
+            F_i_bdry.GetRow(0, row1);
+            F_i_bdry *= -1.;
+            F_i_bdry.SetRow(0, row1);
+
+            F_i_bdry.Mult(cij, y_bdry);
+            rhs -= y_bdry;
+
+            
+
+            // cout << "Fi: ";
+            // F_i.Print(cout);
+            // cout << "F_bdry: ";
+            // F_i_bdry.Print(cout);
+            // cout << "cij: ";
+            // cij.Print(cout);
+            // cout << "y: ";
+            // y.Print(cout);
+            // cout << "y_bdry: ";
+            // y_bdry.Print(cout);
+            // Vector val_vec(dim+2);
+            // add(y_bdry, y, val_vec);
+            // if (val_vec.Norml2() > 1e-12)
+            // {
+            //    cout << "Vacuum BC contribution difference detected on dof " << i << ":\n";
+            //    cout << "y_bdry - y: ";
+            //    val_vec.Print(cout);
+            //    MFEM_ABORT("Aborting due to vacuum BC difference.\n");
+            // }
+         }
          else
          {
             // flux contribution
@@ -959,9 +991,6 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             else
             {
                dm = pb->flux(U_j, attr_j);
-               // Vector _tx(dim);
-               // GetL2DofX(j, _tx);
-               // dm = pb->flux_ex_p(U_j, _tx, this->GetTime(), attr_j);
             }
             dm.Mult(cij, y);
             rhs -= y;

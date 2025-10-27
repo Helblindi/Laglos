@@ -564,13 +564,16 @@ int main(int argc, char *argv[]) {
          problem_class = new ElasticImpactShear(dim);
          break;
       case 57: // Elastic 2D, Favrie 2014 section 5.4
-         problem_class = new ElasticTwist(dim);
+         problem_class = new ElasticRotation(dim);
          break;
       case 58: // Elastic noh
          problem_class = new ElasticNoh(dim);
          break;
       case 59: // Elastic projectile impact (vilar-mair-shu 2d)
          problem_class = new ElasticProjectileImpact(dim);
+         break;
+      case 60: // Elastic test
+         problem_class = new ElasticTest(dim);
          break;
       case 100:
          problem_class = new TestBCs(dim);

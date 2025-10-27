@@ -33,7 +33,8 @@
 #include "elastic_isentropic_vortex.h"
 #include "elastic_projectile_plate.h"
 #include "elastic_projectile_impact.h"
-#include "elastic_twist.h"
+#include "elastic_rotation.h"
 #include "elastic_noh.h"
+#include "elastic_test.h"
 
 #endif

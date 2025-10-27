@@ -42,7 +42,7 @@ namespace mfem
 namespace hydroLO
 {
 
-class ElasticTwist: public ProblemBase
+class ElasticRotation: public ProblemBase
 {
 private:
    /*********************************************************
@@ -52,7 +52,7 @@ private:
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
    bool _mvbcs = false; // Indicator for mv boundary conditions
-   string _indicator = "ElasticTwist";
+   string _indicator = "ElasticRotation";
 
    /* Material parameters */
    double rho = 2.7E3, p = 1.E5;
@@ -65,7 +65,7 @@ private:
    const double R2 = R*R;
 
 public:
-   ElasticTwist(const int &_dim) : ProblemBase(_dim)
+   ElasticRotation(const int &_dim) : ProblemBase(_dim)
    {
       if (dim != 2)
       {

@@ -793,182 +793,173 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
 
          rhs -= y;
 
+         // cout << "i: " << i << ", j: " << j << ", cij: ";
+         // cij.Print(cout);
+         // cout << "F_i*cij: ";
+         // y.Print(cout);
+
          // Should I put Fi contribution into dm before?
          /* Optionally enforce BC on PDE */
-         if (i == j && bdr_ind > 3 && pb->get_indicator() == "saltzmann")
+         if (i == j)
          {
-            // cout << "Enforcing saltzmann BC on dof " << i << endl;
-            if (order_t > 0)
+            if (pb->get_indicator() == "saltzmann" && bdr_ind > 3)
             {
-               MFEM_ABORT("Implementation not compatible with order_t > 0.\n");
-            }
-            Array<int> fids;
-            Vector cF(dim);
-            element_face.GetRow(i,fids);
-            for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
-            {
-               int fid = fids[fid_it];
-               int fid_ind = smesh_BdrElementIndexingArray[fid];
-               switch (fid_ind)
+               // cout << "Enforcing saltzmann BC on dof " << i << endl;
+               if (order_t > 0)
                {
-               case -1: // Interior face
-                  // Do nothing, this is an interior face
-                  break;
-               case 5: // Left wall
+                  MFEM_ABORT("Implementation not compatible with order_t > 0.\n");
+               }
+               Array<int> fids;
+               Vector cF(dim);
+               element_face.GetRow(i,fids);
+               for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
                {
-                  CalcOutwardNormalInt(S, i, fid, cF);
-                  cF /= 2.; 
-
-                  double _rho = 3.9992502342988532;
-                  double _p = 1.3334833281256551;
-                  Vector _v(dim), yd(dim+2);
-                  _v = 0.;
-                  _v[0] = 1.; //e_x
-                  Vector _v_neg = _v, _vp = _v;
-                  _v_neg *= -1.;
-                  _vp *= _p;
-
-                  DenseMatrix F_i_bdry(dim+2, dim);
-                  F_i_bdry.SetRow(0, _v_neg);
-                  for (int i = 0; i < dim; i++)
+                  int fid = fids[fid_it];
+                  int fid_ind = smesh_BdrElementIndexingArray[fid];
+                  switch (fid_ind)
                   {
-                     F_i_bdry(i+1, i) = _p;
-                  }
-                  F_i_bdry.SetRow(dim+1, _vp);
-
-                  F_i_bdry.Mult(cF, yd);
-                  // cout << "yd: ";
-                  // yd.Print(cout);
-                  rhs -= yd;
-                  break;
-               }
-               default: // Other boundary faces
-               {
-                  Vector yb(dim+2);
-                  CalcOutwardNormalInt(S, i, fid, cF);
-                  cF /= 2.; 
-                  dm.Mult(cF, yb);
-                  // cout << "yb: ";
-                  // yb.Print(cout);
-                  rhs -= yb;
-                  break;
-               }
-               }
-            }
-         }
-         else if (i == j && bdr_ind > 3 && pb->get_indicator() == "Kidder")
-         {
-            // cout << "Enforcing Kidder BC on dof " << i << endl;
-            if (order_t > 0)
-            {
-               MFEM_ABORT("Implementation not compatible with order_t > 0.\n");
-            }
-            Array<int> fids;
-            Vector cF(dim);
-            element_face.GetRow(i,fids);
-            for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
-            {
-               int fid = fids[fid_it];
-               int fid_ind = smesh_BdrElementIndexingArray[fid];
-               // cout << "el: " << i << ", fid: " << fid << ", fid_ind: " << fid_ind << endl;
-               switch (fid_ind)
-               {
-               case -1: // Interior face
-               {
-                  // Do nothing, this is an interior face
-                  break;
-               }
-               case 5: // outer radius
-               case 4: // inner radius
-               {
-                  // MFEM_ABORT("Never seeing attr 5, only 4. Must be a cell bdr issue.");
-                  // Need face_x for boundary velocity
-                  Vector U_i_bdry(dim+2);
-                  Array<int> face_dofs;
-                  Vector face_x(dim), cell_v(dim), cell_vp(dim);
-                  H1.GetFaceDofs(fid, face_dofs);
-                  int face_dof = face_dofs[2];
-                  geom.GetNodePositionFromBV(S,face_dof, face_x);
-                  /* 
-                  Need boundary state for Kidder
-                  Note that t should have been set using update_additional_BCs
-                  */
-                  pb->GetBoundaryState(face_x, fid_ind, U_i_bdry);
-                  // MFEM_ABORT("Need to replace 't'\n");
-
-                  /* 
-                  * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
-                  * So instead of this call:
-                  *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(el_i));
-                  * We modify just the pressure in the flux F_i
-                  */
-                  DenseMatrix F_i_bdry = F_i;
-                  F_i_bdry.GetRow(0, cell_v);
-                  cell_v *= -1.; // Negate the velocity
-                  double _rho = 1. / U_i_bdry[0];
-                  double _esi = 0.;
-                  if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
-                  double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
-                  double _press = pb->pressure(_rho, _sie, bdr_ind);
-                  for (int i = 0; i < dim; i++)
+                  case -1: // Interior face
+                     // Do nothing, this is an interior face
+                     break;
+                  case 5: // Left wall
                   {
-                     F_i_bdry(i+1, i) = _press;
+                     CalcOutwardNormalInt(S, i, fid, cF);
+                     cF /= 2.; 
+
+                     double _rho = 3.9992502342988532;
+                     double _p = 1.3334833281256551;
+                     Vector _v(dim), yd(dim+2);
+                     _v = 0.;
+                     _v[0] = 1.; //e_x
+                     Vector _v_neg = _v, _vp = _v;
+                     _v_neg *= -1.;
+                     _vp *= _p;
+
+                     DenseMatrix F_i_bdry(dim+2, dim);
+                     F_i_bdry.SetRow(0, _v_neg);
+                     for (int i = 0; i < dim; i++)
+                     {
+                        F_i_bdry(i+1, i) = _p;
+                     }
+                     F_i_bdry.SetRow(dim+1, _vp);
+
+                     F_i_bdry.Mult(cF, yd);
+                     // cout << "yd: ";
+                     // yd.Print(cout);
+                     rhs -= yd;
+                     break;
                   }
-                  cell_vp = cell_v;
-                  cell_vp *= _press;
-                  F_i_bdry.SetRow(dim+1, cell_vp);
-
-                  CalcOutwardNormalInt(S, i, fid, cF);
-                  cF /= 2.; 
-                  F_i_bdry.Mult(cF, y);
-                  // cout << "y: ";
-                  // y.Print(cout);
-                  rhs -= y;
-                  break;
+                  default: // Other boundary faces
+                  {
+                     Vector yb(dim+2);
+                     CalcOutwardNormalInt(S, i, fid, cF);
+                     cF /= 2.; 
+                     dm.Mult(cF, yb);
+                     // cout << "yb: ";
+                     // yb.Print(cout);
+                     rhs -= yb;
+                     break;
+                  }
+                  }
                }
-               default:
+            }
+            else if (pb->get_indicator() == "Kidder" && bdr_ind > 3)
+            {
+               // cout << "Enforcing Kidder BC on dof " << i << endl;
+               if (order_t > 0)
                {
-                  MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
-                  break;
+                  MFEM_ABORT("Implementation not compatible with order_t > 0.\n");
                }
-               }
-            } // End face iterator
-         }
-         /* Vacuum conditions enforced by default */
-         else if (i == j && use_elasticity)
-         {
-            DenseMatrix F_i_bdry = F_i;
-            Vector y_bdry(dim+2);
-            /* Negate entire dense matrix besides first row */
-            Vector row1;
-            F_i_bdry.GetRow(0, row1);
-            F_i_bdry *= -1.;
-            F_i_bdry.SetRow(0, row1);
+               Array<int> fids;
+               Vector cF(dim);
+               element_face.GetRow(i,fids);
+               for (int fid_it = 0; fid_it < fids.Size(); fid_it++)
+               {
+                  int fid = fids[fid_it];
+                  int fid_ind = smesh_BdrElementIndexingArray[fid];
+                  // cout << "el: " << i << ", fid: " << fid << ", fid_ind: " << fid_ind << endl;
+                  switch (fid_ind)
+                  {
+                  case -1: // Interior face
+                  {
+                     // Do nothing, this is an interior face
+                     break;
+                  }
+                  case 5: // outer radius
+                  case 4: // inner radius
+                  {
+                     // MFEM_ABORT("Never seeing attr 5, only 4. Must be a cell bdr issue.");
+                     // Need face_x for boundary velocity
+                     Vector U_i_bdry(dim+2);
+                     Array<int> face_dofs;
+                     Vector face_x(dim), cell_v(dim), cell_vp(dim);
+                     H1.GetFaceDofs(fid, face_dofs);
+                     int face_dof = face_dofs[2];
+                     geom.GetNodePositionFromBV(S,face_dof, face_x);
+                     /* 
+                     Need boundary state for Kidder
+                     Note that t should have been set using update_additional_BCs
+                     */
+                     pb->GetBoundaryState(face_x, fid_ind, U_i_bdry);
+                     // MFEM_ABORT("Need to replace 't'\n");
 
-            F_i_bdry.Mult(cij, y_bdry);
-            rhs -= y_bdry;
+                     /* 
+                     * Instead of calling the flux on the ghost state, we want the flux where only boundary pressure is enforced
+                     * So instead of this call:
+                     *    DenseMatrix F_i_bdry = pb->flux(U_i, pmesh->GetAttribute(el_i));
+                     * We modify just the pressure in the flux F_i
+                     */
+                     DenseMatrix F_i_bdry = F_i;
+                     F_i_bdry.GetRow(0, cell_v);
+                     cell_v *= -1.; // Negate the velocity
+                     double _rho = 1. / U_i_bdry[0];
+                     double _esi = 0.;
+                     if (use_elasticity) { MFEM_WARNING("What is the elastic energy on a ghost cell??\n"); }
+                     double _sie = pb->specific_internal_energy(U_i_bdry, _esi);
+                     double _press = pb->pressure(_rho, _sie, bdr_ind);
+                     for (int i = 0; i < dim; i++)
+                     {
+                        F_i_bdry(i+1, i) = _press;
+                     }
+                     cell_vp = cell_v;
+                     cell_vp *= _press;
+                     F_i_bdry.SetRow(dim+1, cell_vp);
 
-            
+                     CalcOutwardNormalInt(S, i, fid, cF);
+                     cF /= 2.; 
+                     F_i_bdry.Mult(cF, y);
+                     // cout << "y: ";
+                     // y.Print(cout);
+                     rhs -= y;
+                     break;
+                  }
+                  default:
+                  {
+                     MFEM_ABORT("Invalid boundary attribute, only full ring currently implemented.\n");
+                     break;
+                  }
+                  }
+               } // End face iterator
+            }
+            /* Vacuum conditions enforced by default */
+            else if (use_elasticity)
+            {
+               DenseMatrix F_i_bdry = F_i;
+               Vector y_bdry(dim+2);
+               /* Negate entire dense matrix besides first row */
+               Vector row1;
+               F_i_bdry.GetRow(0, row1);
+               F_i_bdry *= -1.;
+               F_i_bdry.SetRow(0, row1);
 
-            // cout << "Fi: ";
-            // F_i.Print(cout);
-            // cout << "F_bdry: ";
-            // F_i_bdry.Print(cout);
-            // cout << "cij: ";
-            // cij.Print(cout);
-            // cout << "y: ";
-            // y.Print(cout);
-            // cout << "y_bdry: ";
-            // y_bdry.Print(cout);
-            // Vector val_vec(dim+2);
-            // add(y_bdry, y, val_vec);
-            // if (val_vec.Norml2() > 1e-12)
-            // {
-            //    cout << "Vacuum BC contribution difference detected on dof " << i << ":\n";
-            //    cout << "y_bdry - y: ";
-            //    val_vec.Print(cout);
-            //    MFEM_ABORT("Aborting due to vacuum BC difference.\n");
-            // }
+               F_i_bdry.Mult(cij, y_bdry);
+               rhs -= y_bdry;
+            }
+            /* Normal treatment of boundary flux */
+            else
+            {
+               rhs -= y;
+            }
          }
          else
          {

@@ -133,8 +133,6 @@ protected:
    const int l2dofs_cnt, l2vdofs_cnt;
    void ComputeMassConservativeDensity(ParGridFunction &rho) const;
    Vector initial_masses, initial_volumes;
-   void MassesAndVolumesAtPosition(const ParGridFunction &u, const GridFunction &x,
-                                   Vector &el_mass, Vector &el_vol) const;
    mutable DenseTensor Me, Me_inv; // Energy mass matrix and its inverse
    MassIntegrator * mi; // Mass integrator for mass matrix
    void ComputeHydroLocRHS(const Vector &S, const int &el, Vector &loc_tau_rhs, Vector &loc_e_rhs, DenseMatrix &loc_v_rhs) const;
@@ -405,6 +403,8 @@ public:
    void ComputeDensity(const Vector &S, ParGridFunction &rho_gf) const;
 
    // Validate mass conservation
+   void MassesAndVolumesAtPosition(const ParGridFunction &u, const GridFunction &x,
+                                   Vector &el_mass, Vector &el_vol) const;
    void ValidateMassConservation(const Vector &S, ParGridFunction & mc_gf, double &mass_loss, const string config="LO") const;
    void SetInitialMassesAndVolumes(const Vector &S);
 

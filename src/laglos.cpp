@@ -914,6 +914,8 @@ int main(int argc, char *argv[]) {
    ParGridFunction rho_gf(&L2FESpace), rho_cont_gf(&H1cFESpace);
    ParGridFunction mc_gf(&L20FESpace); // Gridfunction to show mass conservation
    mc_gf = 0.;  // if a cells value is 0, mass is conserved
+   ParGridFunction mass_gf(&L20FESpace); // Gridfunction to show mass per cell
+   ParGridFunction vol_gf(&L20FESpace); // Gridfunction to show volume per cell
 
    /* Gridfunctions used in Triple Point */
    ParGridFunction press_gf(&L2FESpace), gamma_gf(&L2FESpace);
@@ -932,6 +934,8 @@ int main(int argc, char *argv[]) {
       // Continuous projection
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+
+      hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
    }
 
    if (problem == 1 || problem == 3 || elastic_eos)
@@ -1257,6 +1261,8 @@ int main(int argc, char *argv[]) {
       paraview_dc->RegisterField("Velocity", &v_gf);
       paraview_dc->RegisterField("Specific Total Energy", &ste_gf);
       paraview_dc->RegisterField("Mass Loss", &mc_gf);
+      paraview_dc->RegisterField("Mass per Cell", &mass_gf);
+      paraview_dc->RegisterField("Volume per Cell", &vol_gf);
       paraview_dc->RegisterField("Pressure", &press_gf);
       paraview_dc->RegisterField("Gamma", &gamma_gf);
       paraview_dc->RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
@@ -1400,6 +1406,7 @@ int main(int argc, char *argv[]) {
          // Fill grid function with mass information
          double mass_loss;
          hydro.ValidateMassConservation(S, mc_gf, mass_loss);
+         hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
 
          // Turn back on suppression
          if (suppress_output)
@@ -1416,6 +1423,7 @@ int main(int argc, char *argv[]) {
             {
                rho_gf[i] = 1./sv_gf[i];
             } 
+            hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
          }
 
          /* Visualize at time t */

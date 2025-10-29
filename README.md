@@ -30,7 +30,7 @@
 ## Mass Error Calculation
 All calculations related to the local mass error are calculated in the function LagrangianLOOperator::ValidateMassConservation.
 The mass error is a relative quantity and is defined as 
-$$ \text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho}}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}} $$ 
+$$ \text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho}}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}} $$
 where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the measure of the cell at time $t^n$, and $T_c^n$ is the specific volume of a cell at time $t^n$.
 
 The percentage of cells in which mass loss is broken is simply the number of cells in which $\frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho} > 10^{-12}$ divided by the total number of cells in the mesh.
@@ -278,6 +278,10 @@ To see this implemented, see the execution of the multi-material isentropic vort
 ### Elastic impact + shear
 ```
 ./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+```
+### Elastic 2D Rotation
+```
+./Laglos -m ../data/elastic/ref-square-c0-p15.mesh -p 57 -tf 0.00001 -cfl 0.5 -vis -vs 1 -ue 1 -rs 6 -ppd
 ```
 ### Elastic Isentropic Vortex
 ```

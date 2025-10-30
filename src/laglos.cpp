@@ -552,7 +552,7 @@ int main(int argc, char *argv[]) {
          problem_class = new ElasticShear(dim);
          break;
       case 53: // Elastic isentropic vortex
-         problem_class = new ElasticIsentropicVortex(dim);
+         MFEM_ABORT("Case 53 not implemented\n");
          break;
       case 54: // Elastic projectile plate
          problem_class = new ElasticProjectilePlate(dim);

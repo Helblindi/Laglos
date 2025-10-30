@@ -250,11 +250,6 @@ the cell attribute in the mesh should be set to 50. When the use-elasticity ['-u
 a Laglos execution, the elastic flux and elastic sheer with be computed only if the cell
 attribute value is set to 50. Otherwise, a non-elastic flux will be used.
 
-To see this implemented, see the execution of the multi-material isentropic vortex problem
-```
-./Laglos -m data/elastic/square-vortex-mz.mesh -p 53 -tf 10 -cfl 0.5 -ue 
-```
-
 ## Examples
 
 ### Elastic shocktube
@@ -283,10 +278,7 @@ To see this implemented, see the execution of the multi-material isentropic vort
 ```
 ./Laglos -m ../data/elastic/ref-square-c0-p15.mesh -p 57 -tf 0.00001 -cfl 0.5 -vis -vs 1 -ue 1 -rs 6 -ppd
 ```
-### Elastic Isentropic Vortex
-```
-./Laglos -m ../data/elastic/square-vortex-mz.mesh -p 53 -tf 1 -cfl 0.5 -ue 1 -rs 1
-```
+
 ### Elastic Projectile Plate
 The final time depends on the shear modulus used, which is modified in the problem file.
 The final times reported in the referenced paper corresponding to their shear moduli are as follows

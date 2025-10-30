@@ -923,37 +923,44 @@ int main(int argc, char *argv[]) {
    /* Elasticity gridfunctions */
    ParGridFunction sigma_gf(&L2FESpace), f_gf(&L2FESpace), frho_gf(&L2FESpace), e_sheer_gf(&L2FESpace);
 
-   // Compute the density if we need to visualize it
+   // Compute values for visualization
    if (visualization || gfprint || pview)
    {
-      // Compute Density
+      /* Density */
       for (int i = 0; i < sv_gf.Size(); i++)
       {
          rho_gf[i] = 1./sv_gf[i];
       } 
-      // Continuous projection
+      hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
+
+      /* Continuous density projection */
       GridFunctionCoefficient rho_gf_coeff(&rho_gf);
       rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
 
-      hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
+      /* Pressure */
+      hydro.ComputePressGF(S, press_gf);
+
+      /* Elastic attributes*/
+      if (elastic_eos)
+      {
+         // Compute Sigma and F
+         hydro.ComputeSigmaGF(S, sigma_gf);
+         hydro.ComputeFGF(f_gf);
+         hydro.ComputeESheerGF(e_sheer_gf);
+
+         for (int i = 0; i < L2FESpace.GetNDofs(); i++)
+         {
+            frho_gf[i] = f_gf[i] * rho_gf[i];
+         }
+      }
    }
 
+   /* Gamma */
    if (problem == 1 || problem == 3 || elastic_eos)
    {
-      Vector U(dim+2);
       for (int i = 0; i < press_gf.Size(); i++)
       {
-         hydro.GetStateVector(S, i, U);
-         double _rho = 1. / U[0];
-         double _esheer = 0.;
-         if (elastic_eos)
-         {
-            _esheer = hydro.elastic->e_sheer(i);
-         }
-         double _sie = problem_class->specific_internal_energy(U, _esheer);
          int el_i = L2FESpace.GetElementForDof(i);
-         double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
-         press_gf[i] = pressure;
          gamma_gf[i] = problem_class->get_gamma(pmesh->GetAttribute(el_i));
       }
    }
@@ -1028,16 +1035,6 @@ int main(int argc, char *argv[]) {
       //NF//MS
       if (elastic_eos)
       {
-         // Compute Sigma and F
-         hydro.ComputeSigmaGF(S, sigma_gf);
-         hydro.ComputeFGF(f_gf);
-         hydro.ComputeESheerGF(e_sheer_gf);
-
-         for (int i = 0; i < L2FESpace.GetNDofs(); i++)
-         {
-            frho_gf[i] = f_gf[i] / rho_gf[i];
-         }
-
          // Visualize
          Wx = 0;
          Wy += offy;
@@ -1406,7 +1403,6 @@ int main(int argc, char *argv[]) {
          // Fill grid function with mass information
          double mass_loss;
          hydro.ValidateMassConservation(S, mc_gf, mass_loss);
-         hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
 
          // Turn back on suppression
          if (suppress_output)
@@ -1415,15 +1411,36 @@ int main(int argc, char *argv[]) {
             cout.rdbuf(file.rdbuf());
          }
 
-         // Compute the density if we need to visualize it
+         // Compute values for visualization
          if (visualization || gfprint || pview)
          {
-            // Compute Density
+            /* Density */
             for (int i = 0; i < sv_gf.Size(); i++)
             {
                rho_gf[i] = 1./sv_gf[i];
             } 
             hydro.MassesAndVolumesAtPosition(rho_gf, x_gf, mass_gf, vol_gf);
+
+            /* Continuous density projection */
+            GridFunctionCoefficient rho_gf_coeff(&rho_gf);
+            rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
+
+            /* Pressure */
+            hydro.ComputePressGF(S, press_gf);
+
+            /* Elastic attributes*/
+            if (elastic_eos)
+            {
+               // Compute Sigma and F
+               hydro.ComputeSigmaGF(S, sigma_gf);
+               hydro.ComputeFGF(f_gf);
+               hydro.ComputeESheerGF(e_sheer_gf);
+
+               for (int i = 0; i < L2FESpace.GetNDofs(); i++)
+               {
+                  frho_gf[i] = f_gf[i] * rho_gf[i];
+               }
+            }
          }
 
          /* Visualize at time t */
@@ -1447,21 +1464,6 @@ int main(int argc, char *argv[]) {
 
             if (problem == 1 || problem == 3 || problem == 16 || elastic_eos) // Visualize pressure
             {
-               Vector U(dim+2);
-               for (int i = 0; i < press_gf.Size(); i++)
-               {
-                  hydro.GetStateVector(S, i, U);
-                  double _rho = 1. / U[0];
-                  double _esheer = 0.;
-                  if (elastic_eos)
-                  {
-                     _esheer = hydro.elastic->e_sheer(i);
-                  }
-                  double _sie = problem_class->specific_internal_energy(U, _esheer);
-                  int el_i = L2FESpace.GetElementForDof(i);
-                  double pressure = problem_class->pressure(_rho, _sie, pmesh->GetAttribute(el_i));
-                  press_gf[i] = pressure;
-               }
                Wx += offx;
 
                // Pressure
@@ -1505,16 +1507,6 @@ int main(int argc, char *argv[]) {
             //NF//MS
             if (elastic_eos)
             {
-               // Compute Sigma and F
-               hydro.ComputeSigmaGF(S, sigma_gf);
-               hydro.ComputeFGF(f_gf);
-               hydro.ComputeESheerGF(e_sheer_gf);
-
-               for (int i = 0; i < L2FESpace.GetNDofs(); i++)
-               {
-                  frho_gf[i] = f_gf[i] * rho_gf[i];
-               }
-
                // Visualize
                Wx = 0;
                Wy += offy;
@@ -1635,14 +1627,7 @@ int main(int argc, char *argv[]) {
                }
                
             }
-         }
-
-         if (gfprint || pview)
-         {
-            // Compute continuous projection of density
-            GridFunctionCoefficient rho_gf_coeff(&rho_gf);
-            rho_cont_gf.ProjectDiscCoefficient(rho_gf_coeff, mfem::ParGridFunction::AvgType::ARITHMETIC);
-         }
+         } /* END VIS */
 
          if (gfprint)
          {

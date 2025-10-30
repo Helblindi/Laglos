@@ -274,6 +274,7 @@ public:
    void ComputeSigmaGF(const Vector &S, ParGridFunction &sigma_gf) const;
    void ComputeFGF(ParGridFunction &f_gf) const;
    void ComputeESheerGF(ParGridFunction &e_sheer_gf) const;
+   void ComputePressGF(const Vector &S, ParGridFunction &press_gf) const;
    void SetShearModulus(const double &_mu) { elastic->set_shear_modulus(_mu); }
 
    /* Mesh movement */

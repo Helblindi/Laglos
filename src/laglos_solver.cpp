@@ -536,6 +536,26 @@ void LagrangianLOOperator::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
    }
 }
 
+void LagrangianLOOperator::ComputePressGF(const Vector &S, ParGridFunction &press_gf) const
+{
+   Vector U(dim+2);
+   for (int i = 0; i < NDofs_L2; i++)
+   {
+      GetStateVector(S,i,U);
+      double rho = 1./U[0];
+      double _esheer = 0.;
+      if (use_elasticity)
+      {
+         _esheer = elastic->e_sheer(i);
+      }
+      double sie = pb->specific_internal_energy(U, _esheer);
+      int el_i = L2.GetElementForDof(i);
+      int attr = pmesh->GetAttribute(el_i);
+      double pressure = pb->pressure(rho, sie, attr);
+      press_gf[i] = pressure;
+   }
+}
+
 
 /* This Mult method is not mass conservative by itself */
 void LagrangianLOOperator::MultUnlimited(const Vector &S, Vector &dS_dt) const

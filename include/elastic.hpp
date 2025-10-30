@@ -53,13 +53,14 @@ private:
    double phi = M_PI/4.; // angle of fiber direction
    Vector mi_vec;
    DenseMatrix Gi;
-   // double A1 = 771.8, B1 = 21.2, D1 = 3.8, w1 = 0.4971;
-   // double A1 = 771.8, B1 = 21.2E-6, A2 = 1., B2 = 1., D1 = 3.8, w1 = 0.;
-   // double A1 = 2.41E6, B1 = 2.41E6, A2 = 1., B2 = 1., D1 = 4.81E6, w1 = 0.01;
+   
+   // double A1 = 21.5802, B1 = 9.9007, D1 = 0.8849, w1 = 0.4189; /* PP too squished */
+   // double A1 = 771.8033, B1 = 21.2093, D1 = 3.8068, w1 = 0.4971;
+   // double A2 = 1., B2 = 1.;
+
    /* These params were closer to the Neo Hook results when w1 = 0 */
    double stiffness = 9.63E5;
    double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
-   // double A1 = 2.41E2, B1 = 2.41E2, A2 = 1., B2 = 1., D1 = 4.81E2, w1 = 0.01;
 
 public:
    Elastic(const int &_dim,

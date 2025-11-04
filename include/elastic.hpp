@@ -9,6 +9,7 @@
 #include "mfem.hpp"
 #include "problem_base.h"
 #include "shear_closure.hpp"
+#include "laglos_assembly.hpp"
 
 using namespace std;
 
@@ -46,7 +47,7 @@ private:
 
    // Reference to physical Jacobian for the initial mesh
    // These are computed only at time zero and stored here
-   DenseTensor Jac0inv;
+   const QuadratureData &quad_data;
    double mu = -1.; // Shear modulus
 
    /* 
@@ -69,12 +70,14 @@ private:
 public:
    Elastic(const int &_dim,
            const int &_elastic_eos,
+           QuadratureData &_quad_data,
            ParFiniteElementSpace &h1_fes,
            ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
       dim(_dim),
+      quad_data(_quad_data),
       H1(h1_fes), 
       L2(l2_fes),
       rho0_gf(rho0_gf),
@@ -82,7 +85,6 @@ public:
       NE(H1.GetParMesh()->GetNE()),
       NDofs_L2(L2.GetNDofs()), 
       nqp(ir.GetNPoints()),
-      Jac0inv(dim, dim, NE * nqp),
       shear_method(method)
    {
       if (NDofs_L2 != NE)
@@ -90,19 +92,6 @@ public:
          MFEM_ABORT("Error: Number of L2 dofs must be equal to the number of elements.\n");
       }
 
-      /* Construct initial inverse jacobian transformations*/
-      Jac0inv = 0.;
-      for (int e = 0; e < NE; e++)
-      {
-         ElementTransformation *T = H1.GetElementTransformation(e);
-         for (int q = 0; q < nqp; q++)
-         {
-            const IntegrationPoint &ip = ir.IntPoint(q);
-            T->SetIntPoint(&ip);
-            DenseMatrixInverse Jinv(T->Jacobian());
-            Jinv.GetInverseMatrix(Jac0inv(e*nqp + q));
-         }
-      }
       /* Set equation of state */
       switch(_elastic_eos)
       {
@@ -494,7 +483,7 @@ public:
             we need a mapping from the initial configuration
             of the given element */
          DenseMatrix Ji(dim);
-         mfem::Mult(Jr, Jac0inv(e*nqp + q), Ji);
+         mfem::Mult(Jr, quad_data.Jac0inv(e*nqp + q), Ji);
          F_dim.Add(ip.weight, Ji);
       }
       /* If dim != 3, will need to augment F with 1s on the diagonal */
@@ -553,7 +542,7 @@ public:
             we need a mapping from the initial configuration
             of the given element */
          DenseMatrix Ji(dim);
-         mfem::Mult(Jr, Jac0inv(e*nqp + q), F_dim);
+         mfem::Mult(Jr, quad_data.Jac0inv(e*nqp + q), F_dim);
          if (dim == 3)
          {
             F = F_dim;

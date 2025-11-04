@@ -335,7 +335,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    /* Initialize elasticity object */
    if (use_elasticity)
    {
-      elastic = new Elastic(dim, elastic_eos, H1, L2, rho0_gf, ir);
+      elastic = new Elastic(dim, elastic_eos, qdata, H1, L2, rho0_gf, ir);
       SetShearModulus(pb->get_shear_modulus());
    }
    

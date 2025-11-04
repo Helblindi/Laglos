@@ -1,0 +1,167 @@
+
+       __                __                 
+      / /   ____  ____  / /____  _____   
+     / /   / __ `/ __ `/ / __ \/ ___/ 
+    / /___/ /_/ / /_/ / / /_/ (__  )    
+   /_____/\__,_/\__,_/_/\____/____/  
+               /____/                       
+
+Options used:
+   --mesh ../data/elastic/projectile-plate.mesh
+   --output-flag default
+   --order-thermo 0
+   --order-kinetic 1
+   --refine-serial 1
+   --refine-parallel 0
+   --problem 54
+   --ode-solver 1
+   --t-init 0
+   --t-final 0.000103
+   --max-steps -1
+   --no-visualization
+   --visualization-steps 5
+   --no-paraview
+   --no-print
+   --no-mass-correct
+   --viscosity 1
+   --no-greedy-viscosity
+   --gmv-to-greedy-num-steps 0
+   --move-mesh
+   --check-mesh
+   --post-process-density
+   --use-elasticity 3
+   --mesh-velocity-option 2
+   --mv-target-viscosity-coeff 0
+   --no-mesh-velocity-linearization
+   --face-velocity-option 0
+   --mv-it-op 0
+   --mv-num-iterations 0
+   --mesh-motion-viscosity-coefficient-on-face 0
+   --mesh-motion-consistency-coefficient-on-cells 0
+   --CFL 0.5
+   --no-set-dt-to-h
+   --timestep 0.001
+   --no-suppress-output
+   --distort-mesh 0
+   --no-debug-mesh-velocity
+Meshing done
+done with serial refinement
+done with parallel refinement
+dim: 2, spacedim: 2
+Zones min/max: 24 24
+global_vSize: 24
+N dofs: 39
+Num Scalar Vertex DoFs: 39
+Num Scalar edge-interior DoFs: 0
+Num Scalar face-interior DoFs: 0
+Num faces: 62
+dim: 2
+Number of kinematic (position, mesh velocity) dofs: 78
+Corresponding NDofs: 39
+Corresponding VDim: 2
+Corresponding Vsize: 78
+Number of specific internal energy dofs: 24
+Corresponding NDofs: 24
+Corresponding VDim: 1
+Corresponding Vsize: 24
+Number of velocity dofs: 48
+Corresponding NDofs: 24
+Corresponding VDim: 2
+Corresponding Vsize: 48
+num interior faces: 34
+num boundary faces: 28
+num total faces: 62
+num boundary elements: 28
+num elements: 24
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+sie0
+Geometric::Non-default constructor
+NDofs_H1: 39
+dim: 2
+Instantiating hydro op
+block offsets: 0 78 102 150
+174
+Constructing BdrElementIndexingArray:
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@         Elastic Class Configuration      @
+@------------------------------------------@
+@ shear_eos         : AORTIC               @
+@ -- Aortic parameters --                  @
+@ 	theta         : 0.785398             @
+@ 	m(0)        : 0.707107             @
+@ 	m(1)        : 0.707107             @
+@ 	m(2)        : 0                    @
+@ ShearEnergyMethod : AVERAGE_F            @
+@ nqp               : 4                    @
+@ NDofs_L2          : 24                   @
+@ NE                : 24                   @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+Vsize_H1: 78
+Vsize_H1L: 78
+TVSize_H1: 78
+GTVSize_H1: 78
+NDofs_H1: 39
+NVDofs_H1: 39
+NDofs_H1L: 39
+NDofs_L2: 24
+NDofs_L2V: 24
+Vsize_L2V: 48
+NE: 24
+num_faces: 62
+num_vertices: 39
+smesh_num_faces: 62
+Entering time loop
+step 5    ,	t = 0.000006,	dt = 0.00000109,	|e| = 2.4937657323e+07
+step 10   ,	t = 0.000011,	dt = 0.00000107,	|e| = 2.4936061702e+07
+step 15   ,	t = 0.000016,	dt = 0.00000106,	|e| = 2.4935007944e+07
+step 20   ,	t = 0.000022,	dt = 0.00000106,	|e| = 2.4934372673e+07
+step 25   ,	t = 0.000027,	dt = 0.00000107,	|e| = 2.4933982475e+07
+step 30   ,	t = 0.000032,	dt = 0.00000109,	|e| = 2.4933718254e+07
+step 35   ,	t = 0.000038,	dt = 0.00000111,	|e| = 2.4933514938e+07
+step 40   ,	t = 0.000043,	dt = 0.00000112,	|e| = 2.4933349110e+07
+step 45   ,	t = 0.000049,	dt = 0.00000113,	|e| = 2.4933219368e+07
+step 50   ,	t = 0.000055,	dt = 0.00000114,	|e| = 2.4933126535e+07
+step 55   ,	t = 0.000060,	dt = 0.00000114,	|e| = 2.4933065507e+07
+step 60   ,	t = 0.000066,	dt = 0.00000114,	|e| = 2.4933027269e+07
+step 65   ,	t = 0.000072,	dt = 0.00000115,	|e| = 2.4933003231e+07
+step 70   ,	t = 0.000078,	dt = 0.00000115,	|e| = 2.4932987404e+07
+step 75   ,	t = 0.000083,	dt = 0.00000114,	|e| = 2.4932976379e+07
+step 80   ,	t = 0.000089,	dt = 0.00000114,	|e| = 2.4932968454e+07
+step 85   ,	t = 0.000095,	dt = 0.00000114,	|e| = 2.4932962790e+07
+step 90   ,	t = 0.000100,	dt = 0.00000114,	|e| = 2.4932958904e+07
+step 93   ,	t = 0.000103,	dt = 0.00000028,	|e| = 2.4932957643e+07
+Program took 1.0730558333e-01s.
+This amounts to 4.7564531619e-05 s per timestep per gridpoint.
+==================== Runtime breakdown ====================
+ total time | t / (dof*ts) 
+                                 Total time: 1.073e-01                    | 4.756e-05
+  Dij calculation: 3.587e-02               | 1.590e-05
+  Mesh Motion calculation: 1.402e-02       | 6.213e-06
+    Hiop calculation (if used): 0.000e+00  | 0.000e+00
+  Mesh Motion Linearization: 0.000e+00     | 0.000e+00
+  State Update calculation: 1.089e-01      | 4.825e-05
+===========================================================

@@ -283,6 +283,20 @@ add_test(NAME CompareElasticImpact
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 
+## Elastic projectile plate with Aortic model
+file(COPY test_elastic_pp_aortic.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_pp_aortic.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestElasticPPAortic
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_pp_aortic.sh ${PROJECT_SOURCE_DIR} "elastic_pp_aortic_output.txt"
+)
+add_test(NAME CompareElasticPPAortic
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/elastic_pp_aortic_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_pp_aortic.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 ## Elastic Shocktube
 
 # Create a new target to build and run tests

@@ -8,6 +8,7 @@
 
 #include "mfem.hpp"
 #include "problem_base.h"
+#include "shear_closure.hpp"
 
 using namespace std;
 
@@ -20,7 +21,8 @@ namespace hydroLO
 enum ShearEOS {
    NEO_HOOKEAN,
    MOONEY_RIVLIN,
-   AORTIC         // anisotropic model
+   AORTIC,         // anisotropic model
+   TRANSVERSELY_ISOTROPIC
 };
 
 enum ShearEnergyMethod {
@@ -40,6 +42,8 @@ private:
    const IntegrationRule &ir;
    const int NE, NDofs_L2, nqp;
 
+   ShearClosure *shear_closure_model = nullptr;
+
    // Reference to physical Jacobian for the initial mesh
    // These are computed only at time zero and stored here
    DenseTensor Jac0inv;
@@ -48,9 +52,9 @@ private:
    /* 
    If using the aortic eos, a fiber direction must be defined. 
    This direction is used to compute the invariants:
-      m = (cos(phi), sin(phi), 0) 
+      m = (cos(theta), sin(theta), 0) 
    */
-   double phi = M_PI/4.; // angle of fiber direction
+   double theta = M_PI/4.; // angle of fiber direction
    Vector mi_vec;
    DenseMatrix Gi;
    
@@ -116,10 +120,23 @@ public:
             mi_vec.SetSize(3);
             Gi.SetSize(3);
             /* Set fiber direction */
-            mi_vec(0) = cos(phi);
-            mi_vec(1) = sin(phi);
+            mi_vec(0) = cos(theta);
+            mi_vec(1) = sin(theta);
             mi_vec(2) = 0.;
             tensor(mi_vec, mi_vec, Gi);
+            break;
+         }
+         case 4: // Transversely Isotropic
+         {
+            shear_eos = ShearEOS::TRANSVERSELY_ISOTROPIC;
+            double E = 1.729E6, EA = 1.E6, GA = 4.59E5, nu = 0.4;
+            mi_vec.SetSize(3);
+            /* Set fiber direction */
+            mi_vec(0) = cos(theta);
+            mi_vec(1) = sin(theta);
+            mi_vec(2) = 0.;
+            shear_closure_model = new ShearClosureTransverselyIsotropic(mi_vec, E, EA, GA, nu);
+            
             break;
          }
          default:
@@ -142,6 +159,9 @@ public:
          case AORTIC:
             cout << "AORTIC";
             break;
+         case TRANSVERSELY_ISOTROPIC:
+            cout << "TRANSVERSELY_ISOTROPIC";
+            break;
          default:
             MFEM_ABORT("Invalid value for shear_eos.");
       }
@@ -149,7 +169,7 @@ public:
       if (shear_eos == ShearEOS::AORTIC)
       {
          cout << "@ -- Aortic parameters -- " << std::setw(18) << std::right << "@" << "\n"
-              << "@ \tphi         : " << std::setw(21) << std::left << phi << "@" << "\n"
+              << "@ \ttheta         : " << std::setw(21) << std::left << theta << "@" << "\n"
               << "@ \tm(0)        : " << std::setw(21) << std::left << mi_vec(0) << "@" << "\n"
               << "@ \tm(1)        : " << std::setw(21) << std::left << mi_vec(1) << "@" << "\n"
               << "@ \tm(2)        : " << std::setw(21) << std::left << mi_vec(2) << "@" << "\n";
@@ -200,8 +220,16 @@ public:
 
    double e_sheer(const int &e) const
    {
+      /* Transeversely isotropic case */
+      if (shear_eos == ShearEOS::TRANSVERSELY_ISOTROPIC)
+      {
+         DenseMatrix F(dim);
+         ComputeAvgF(e, F);
+         double _e_shear = shear_closure_model->ComputeShearEnergy(F);
+         return _e_shear;
+      }
+
       DenseMatrix c(3), c2(3);
-      DenseMatrix cF(3), cc(3);
       const double rho0 = rho0_gf(e);
       switch (shear_method) {
          case ShearEnergyMethod::AVERAGE_F:
@@ -287,6 +315,14 @@ public:
 
          return val;
       }
+      case TRANSVERSELY_ISOTROPIC:
+      {
+         MFEM_ABORT("Shouldn't ever be here.");
+         // DenseMatrix F(dim);
+         // ComputeAvgF(e, F);
+         // shear_closure_model->ComputeShearEnergy(F);
+         break;
+      }
       default:
          MFEM_ABORT("Invalid value for shear_eos.");
       }
@@ -323,6 +359,11 @@ public:
          val += 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
          return val;
       }
+      case TRANSVERSELY_ISOTROPIC:
+      {
+         MFEM_ABORT("NEED OVERRIDE");
+         break;
+      }
       default:
          MFEM_ABORT("Invalid value for shear_eos.");
       }
@@ -349,16 +390,21 @@ public:
          return 0.;
       case MOONEY_RIVLIN:
          return mu / 16. / rho0 * (-pow(trc,2) + trc2);
-         case AORTIC:
-         {
-            /* compute i4 and i5 */
-            double i4, i5;
-            compute_i4_i5(c, i4, i5);
-   
-            double val = (2. * w1 - 1.) * (B1 / 4.);
-            val -= w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
-            return val;
-         }
+      case AORTIC:
+      {
+         /* compute i4 and i5 */
+         double i4, i5;
+         compute_i4_i5(c, i4, i5);
+
+         double val = (2. * w1 - 1.) * (B1 / 4.);
+         val -= w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
+         return val;
+      }
+      case TRANSVERSELY_ISOTROPIC:
+      {
+         MFEM_ABORT("NEED OVERRIDE");
+         break;
+      }
       default:
          MFEM_ABORT("Invalid value for shear_eos.");
       }

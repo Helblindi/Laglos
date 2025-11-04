@@ -4,6 +4,7 @@ list(APPEND SRCS
    laglos_assembly.cpp
    sedov_exact.cpp
    laglos_tools.cpp
+   shear_closure.cpp
    # lagrange_multiplier.cpp
    geometry.cpp)
 

@@ -106,7 +106,7 @@ public:
             mi_vec(2) = 0.;
             tensor(mi_vec, mi_vec, Gi);
             shear_eos = ShearEOS::AORTIC;
-            shear_closure_model = new ShearClosureAortic(mi_vec, w1, D1, A1, B1);
+            shear_closure_model = new ShearClosureAortic(mu, mi_vec, w1, D1, A1, B1);
             break;
          }
          case 4: // Transversely Isotropic
@@ -118,7 +118,7 @@ public:
             mi_vec(0) = cos(theta);
             mi_vec(1) = sin(theta);
             mi_vec(2) = 0.;
-            shear_closure_model = new ShearClosureTransverselyIsotropic(mi_vec, E, EA, GA, nu);
+            shear_closure_model = new ShearClosureTransverselyIsotropic(mu, mi_vec, E, EA, GA, nu);
             
             break;
          }
@@ -190,7 +190,10 @@ public:
          }
       }
    }
-   void set_shear_modulus(const double &_mu) { this->mu = _mu; }
+   void set_shear_modulus(const double &_mu) { 
+      this->mu = _mu; 
+      shear_closure_model->UpdateShearModulus(_mu);
+   }
 
    void setShearEnergyMethod(ShearEnergyMethod method) { 
       shear_method = method; 
@@ -209,89 +212,7 @@ public:
       ComputeAvgF(e, F);
       double _e_shear = shear_closure_model->ComputeShearEnergy(F, rho0);
       return _e_shear;
-   }
- 
-   double des_dtrc(const DenseMatrix &c, const double &rho0) const
-   {
-      /* Compute trace values */
-      const double trc = c.Trace();
-      DenseMatrix c2(3);
-      mfem::Mult(c,c,c2);
-      const double trc2 = c2.Trace();
-
-      if (mu == -1.)
-      {
-         MFEM_ABORT("Must set shear modulus.\n");
-      }
-
-      switch (shear_eos)
-      {
-      case NEO_HOOKEAN:
-         return mu / 2.;
-      case MOONEY_RIVLIN:
-         return mu / 8. * (pow(trc,3) - trc*trc2 - 2.);
-      case AORTIC:
-      {
-         /* compute i4 and i5 */
-         double i4, i5;
-         compute_i4_i5(c, i4, i5);
-
-         double val = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * trc);
-         val += 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) * (-i4 + trc);
-         return val;
-      }
-      case TRANSVERSELY_ISOTROPIC:
-      {
-         MFEM_ABORT("NEED OVERRIDE");
-         break;
-      }
-      default:
-         MFEM_ABORT("Invalid value for shear_eos.");
-      }
-
-      return -1.;
-   }
- 
-   double des_dtrc2(const DenseMatrix &c, const double &rho0) const
-   {
-      /* Compute trace values */
-      const double trc = c.Trace();
-      DenseMatrix c2(3);
-      mfem::Mult(c,c,c2);
-      const double trc2 = c2.Trace();
-
-      if (mu == -1.)
-      {
-         MFEM_ABORT("Must set shear modulus.\n");
-      }
-
-      switch (shear_eos)
-      {
-      case NEO_HOOKEAN:
-         return 0.;
-      case MOONEY_RIVLIN:
-         return mu / 16. * (-pow(trc,2) + trc2);
-      case AORTIC:
-      {
-         /* compute i4 and i5 */
-         double i4, i5;
-         compute_i4_i5(c, i4, i5);
-
-         double val = (2. * w1 - 1.) * (B1 / 4.);
-         val -= w1 * D1 * B2 / B1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
-         return val;
-      }
-      case TRANSVERSELY_ISOTROPIC:
-      {
-         MFEM_ABORT("NEED OVERRIDE");
-         break;
-      }
-      default:
-         MFEM_ABORT("Invalid value for shear_eos.");
-      }
-
-      return -1.;
-   }
+   }   
 
    void compute_i4_i5(const DenseMatrix &c, double &i4, double &i5) const
    {
@@ -494,8 +415,10 @@ public:
       mfem::Add(b, I, -1./3. * b.Trace(), b_tf);
       mfem::Add(b2, I, -1./3. * b2.Trace(), b2_tf);
 
-      double c_coeff = des_dtrc(c, rho0);
-      double c2_coeff = 2.*des_dtrc2(c, rho0);
+      double des_dj1, des_dj2;
+      shear_closure_model->ComputeShearEnergyIsotropicDerivatives(C, des_dj1, des_dj2);
+      double c_coeff = des_dj1;
+      double c2_coeff = 2.*des_dj2;
       mfem::Add(c_coeff, b_tf, c2_coeff, b2_tf, S);
 
       /* Handle anistropic contribution */

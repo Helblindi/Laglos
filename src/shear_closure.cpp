@@ -54,6 +54,12 @@ double ShearClosureNeoHookean::ComputeShearEnergy(const DenseMatrix &F, const do
    return mu / 2. / rho0 * (j1 - 3.);
 }
 
+void ShearClosureNeoHookean::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+{
+   des_dj1 = mu / 2.;
+   des_dj2 = 0.;
+}
+
 void ShearClosureNeoHookean::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
 {
    MFEM_ABORT("NEED OVERRIDE");
@@ -76,6 +82,14 @@ double ShearClosureMooneyRivlin::ComputeShearEnergy(const DenseMatrix &F, const 
    return mu / 32. / rho0 * (pow(j1,4) - 2*j2*j1*j1 + j2*j2 - 8.*j1 - 12.);
 }
 
+void ShearClosureMooneyRivlin::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+{
+   double j1, j2;
+   ComputeIsotropicInvariantsReduced(C, j1, j2);
+   des_dj1 = mu / 8. * (pow(j1,3) - j1*j2 - 2.);
+   des_dj2 = mu / 16. * (-j1*j1 + j2);
+}
+
 void ShearClosureMooneyRivlin::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
 {
    MFEM_ABORT("NEED OVERRIDE");
@@ -84,9 +98,9 @@ void ShearClosureMooneyRivlin::ComputeCauchyStress(const DenseMatrix &F, DenseMa
 /**************************************************************************
 * Aortic Shear Closure Class
 ***************************************************************************/
-ShearClosureAortic::ShearClosureAortic(const Vector &_mi, const double &_w1, const double &_D1,
+ShearClosureAortic::ShearClosureAortic(const double &_mu, const Vector &_mi, const double &_w1, const double &_D1,
                      const double &_A1, const double &_B1)
-      : ShearClosureAnisotropic(_mi), Gi(3), w1(_w1), D1(_D1), A1(_A1), B1(_B1) 
+      : ShearClosureAnisotropic(_mu, _mi), Gi(3), w1(_w1), D1(_D1), A1(_A1), B1(_B1) 
 {
    /* Form Gi */
    for (int i = 0; i < 3; i++)
@@ -152,6 +166,42 @@ double ShearClosureAortic::ComputeShearEnergy(const DenseMatrix &F, const double
    return val;
 }
 
+void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+{
+   /* Compute trace values */
+   double j1, j2, j4, j5;
+   ComputeIsotropicInvariantsReduced(C, j1, j2);
+   ComputeAnisotropicInvariantsAortic(C, j4, j5);
+
+   des_dj1 = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * j1);
+   des_dj1 += 2. * w1 * D1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)) * (-j4 + j1);
+   
+   des_dj2 = (2. * w1 - 1.) * (B1 / 4.);
+   des_dj2 -= w1 * D1 * B2 / B1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)) * (-j4 + j1);
+}
+
+void ShearClosureAortic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const
+{
+   /* Compute trace values */
+   // const double trc = C.Trace();
+   // DenseMatrix c2(3);
+   // mfem::Mult(C,C,c2);
+   // const double trc2 = c2.Trace();
+
+   // if (mu == -1.)
+   // {
+   //    MFEM_ABORT("Must set shear modulus.\n");
+   // }
+
+   // /* compute j4 and j5 */
+   // double j4, j5;
+   // ComputeAnisotropicInvariantsAortic(C, j4, j5);
+
+   // des_dj4 = 2. * w1 * D1 * (exp(A2 * (j4 - 1.)) - trc * exp(B2 * (j5 - trc * j4 + (trc*trc - trc2) / 2. - 1.)));
+   // des_dj5 = 2. * w1 * D1 * B2 * exp(B2 * (j5 - trc * j4 + (trc*trc - trc2) / 2. - 1.)));
+   MFEM_ABORT("NEED OVERRIDE");
+}
+
 void ShearClosureAortic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
 {
    MFEM_ABORT("NEED OVERRIDE");
@@ -191,6 +241,20 @@ double ShearClosureTransverselyIsotropic::ComputeShearEnergy(const DenseMatrix &
    e_shear += (alpha + beta * log(J) + gamma * (I4 - 1.) ) * (I4 - 1.) - 0.5 * alpha * (I5 - 1.);
 
    return e_shear;
+}
+
+void ShearClosureTransverselyIsotropic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+{
+   // Implement isotropic derivative computations
+   /* NH part (isotropic) */
+   MFEM_ABORT("NEED OVERRIDE");
+}
+
+void ShearClosureTransverselyIsotropic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const
+{
+   // Implement anisotropic derivative computations
+   /* NH part (isotropic) */
+   MFEM_ABORT("NEED OVERRIDE");
 }
 
 void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const

@@ -105,20 +105,20 @@ num_faces: 544
 num_vertices: 289
 smesh_num_faces: 544
 Entering time loop
-step 5    ,	t = 0.000002,	dt = 0.00000035,	|e| = 1.8214925282e+08
-step 10   ,	t = 0.000004,	dt = 0.00000035,	|e| = 1.8213750862e+08
-step 15   ,	t = 0.000005,	dt = 0.00000035,	|e| = 1.8213148584e+08
-step 20   ,	t = 0.000007,	dt = 0.00000036,	|e| = 1.8212745264e+08
-step 25   ,	t = 0.000009,	dt = 0.00000036,	|e| = 1.8212456386e+08
-step 29   ,	t = 0.000010,	dt = 0.00000005,	|e| = 1.8212315722e+08
-Program took 3.1543883333e-01s.
-This amounts to 4.1072764757e-05 s per timestep per gridpoint.
+step 5    ,	t = 0.000002,	dt = 0.00000035,	|e| = 1.8214925100e+08
+step 10   ,	t = 0.000004,	dt = 0.00000035,	|e| = 1.8213751161e+08
+step 15   ,	t = 0.000005,	dt = 0.00000036,	|e| = 1.8213150412e+08
+step 20   ,	t = 0.000007,	dt = 0.00000036,	|e| = 1.8212749953e+08
+step 25   ,	t = 0.000009,	dt = 0.00000036,	|e| = 1.8212464622e+08
+step 28   ,	t = 0.000010,	dt = 0.00000036,	|e| = 1.8212332285e+08
+Program took 3.1252141667e-01s.
+This amounts to 4.2096095995e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 3.154e-01                    | 4.107e-05
-  Dij calculation: 1.102e-01               | 1.435e-05
-  Mesh Motion calculation: 3.925e-02       | 5.111e-06
+                                 Total time: 3.125e-01                    | 4.210e-05
+  Dij calculation: 1.054e-01               | 1.420e-05
+  Mesh Motion calculation: 3.795e-02       | 5.112e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 3.162e-01      | 4.118e-05
+  State Update calculation: 3.133e-01      | 4.219e-05
 ===========================================================

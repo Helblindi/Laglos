@@ -89,14 +89,14 @@ public:
       {
          case 1: // Neo-Hookean
             shear_eos = ShearEOS::NEO_HOOKEAN;
+            shear_closure_model = new ShearClosureNeoHookean(mu);
             break;
          case 2: // Mooney-Rivlin
             shear_eos = ShearEOS::MOONEY_RIVLIN;
+            shear_closure_model = new ShearClosureMooneyRivlin(mu);
             break;
          case 3: // Aortic
          {
-            shear_eos = ShearEOS::AORTIC;
-
             /* Invariants */
             mi_vec.SetSize(3);
             Gi.SetSize(3);
@@ -105,6 +105,8 @@ public:
             mi_vec(1) = sin(theta);
             mi_vec(2) = 0.;
             tensor(mi_vec, mi_vec, Gi);
+            shear_eos = ShearEOS::AORTIC;
+            shear_closure_model = new ShearClosureAortic(mi_vec, w1, D1, A1, B1);
             break;
          }
          case 4: // Transversely Isotropic
@@ -198,116 +200,15 @@ public:
       }
    }
 
+   /* Wrapper function that needs to be moved to ElasticProblemBase class */
    double e_sheer(const int &e) const
    {
-      /* Transeversely isotropic case */
-      if (shear_eos == ShearEOS::TRANSVERSELY_ISOTROPIC)
-      {
-         DenseMatrix F(dim);
-         ComputeAvgF(e, F);
-         double _e_shear = shear_closure_model->ComputeShearEnergy(F);
-         return _e_shear;
-      }
-
-      DenseMatrix c(3), c2(3);
       const double rho0 = rho0_gf(e);
-      switch (shear_method) {
-         case ShearEnergyMethod::AVERAGE_F:
-         {
-            Compute_cFromAvgF(e, c);
-            break;
-         }
-         case ShearEnergyMethod::AVERAGE_C:
-         {
-            Compute_cAvg(e,c);
-            break;
-         }
-         case ShearEnergyMethod::AVERAGE_ENERGY:
-            MFEM_ABORT("Not implemented");
-         default:
-            MFEM_ABORT("Unknown shear energy method");
-      }
-      return e_sheer(c, rho0);
-   }
-    
-   double e_sheer(const DenseMatrix &c, const double &rho0) const
-   {
-      /* Compute trace values */
-      double trc = c.Trace();
-      DenseMatrix c2(3);
-      mfem::Mult(c,c,c2);
-      double trc2 = c2.Trace();
 
-      if (mu == -1.)
-      {
-         MFEM_ABORT("Must set shear modulus.\n");
-      }
-
-      switch (shear_eos)
-      {
-      case NEO_HOOKEAN:
-         return mu / 2. / rho0 * (trc - 3.);
-      case MOONEY_RIVLIN:
-         return mu / 32. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
-         // return 0.;
-      case AORTIC:
-      {
-         /* compute i4 and i5 */
-         double i4, i5;
-         compute_i4_i5(c, i4, i5);
-
-         /* Compute shear energy */
-         double val = (1. - 2 * w1) * ((A1 / 2.) * (trc - 3.) + (B1 / 4.) * (trc*trc - trc2 - 6.));
-         if (std::isnan(val))
-         {
-            cout << "c:\n";
-            c.Print(cout);
-            cout << "c2:\n";
-            c2.Print(cout);
-            cout << "trc: " << trc << ", trc2: " << trc2 << endl;
-            cout << "i4: " << i4 << ", i5: " << i5 << endl;
-            cout << "val: " << val << endl;
-         }
-         double _tt1 = (1. / A2) * (exp(A2 * (i4 - 1.)) - 1.);
-         double _tt2 = (1. / B2) * (exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)) - 1.);
-         double _anisotropic_val = 2. * w1 * D1 * (_tt1 + _tt2);
-         // if (val > 1.E-10 || _anisotropic_val > 1.E-10)
-         // {
-         //    cout << "isotropic: " << val << ", anisotropic: " << _anisotropic_val << endl;
-         // }
-
-         
-         if (!std::isnan(_anisotropic_val))
-         {
-            val += _anisotropic_val;
-         }
-         else
-         {
-            cout << "_anisotropic_val is nan\n";
-            cout << "w1: " << w1 << ", D1: " << D1 << ", A1: " << A1 << ", B1: " << B1 << endl;
-            cout << "trc: " << trc << ", trc2: " << trc2 << endl;
-            cout << "i4: " << i4 << ", i5: " << i5 << endl;
-            cout << "tt1: " << _tt1 << ", tt2: " << _tt2 << endl;
-            MFEM_WARNING("Aortic EOS anisotropic is NaN.\n");
-         }
-
-         // cout << "anisotropic ratio: " << _anisotropic_val / val << endl;
-
-         return val;
-      }
-      case TRANSVERSELY_ISOTROPIC:
-      {
-         MFEM_ABORT("Shouldn't ever be here.");
-         // DenseMatrix F(dim);
-         // ComputeAvgF(e, F);
-         // shear_closure_model->ComputeShearEnergy(F);
-         break;
-      }
-      default:
-         MFEM_ABORT("Invalid value for shear_eos.");
-      }
-
-      return -1.;
+      DenseMatrix F(dim);
+      ComputeAvgF(e, F);
+      double _e_shear = shear_closure_model->ComputeShearEnergy(F, rho0);
+      return _e_shear;
    }
  
    double des_dtrc(const DenseMatrix &c, const double &rho0) const

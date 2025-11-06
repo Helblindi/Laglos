@@ -22,7 +22,7 @@ refinements_serial=4
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
-options+="-mv ${mv_option} "
+options+="-mv ${mv_option} -ppd "
 options+="-rs ${refinements_serial} "
 options+="-ue 2 " # Mooney-Rivlin
 echo $options

@@ -335,7 +335,7 @@ LagrangianLOOperator::LagrangianLOOperator(const int &_dim,
    /* Initialize elasticity object */
    if (use_elasticity)
    {
-      elastic = new Elastic(dim, elastic_eos, qdata, H1, L2, rho0_gf, ir);
+      elastic = new Elastic(dim, elastic_eos, qdata, H1, rho0_gf, ir);
       SetShearModulus(pb->get_shear_modulus());
    }
    
@@ -456,8 +456,8 @@ void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, Dens
       idy[i] = i;
    }
    GetStateVector(S,e,U);
-   double rho = 1./U[0], es = 0.;
-   elastic->ComputeS(e, rho, sigmaD_e);
+   double es = 0.;
+   elastic->ComputeS(e, sigmaD_e);
    // es = elastic->e_sheer(e);
    // flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
    // flux.GetSubMatrix(idx, idy, sigma_e);
@@ -783,12 +783,11 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
 
       if (use_elasticity && attr_i == 50)
       {
-         const double _rho = 1./U_i[0];
          double _es = 0.;
          DenseMatrix _sigmaD(3);
 
          // _sigmaD is 3 x 3
-         elastic->ComputeS(el_i, _rho, _sigmaD);
+         elastic->ComputeS(el_i, _sigmaD);
          _es = elastic->e_sheer(el_i);
 
          F_i = pb->ElasticFlux(_sigmaD, _es, U_i, attr_i);
@@ -989,12 +988,11 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             int attr_j = pmesh->GetAttribute(el_j);
             if (use_elasticity && attr_j == 50)
             {
-               const double _rho = 1./U_j[0];
                double _es = 0.;
                DenseMatrix _sigmaD(3);
 
                // _sigmaD is 3 x 3
-               elastic->ComputeS(el_j, _rho, _sigmaD);
+               elastic->ComputeS(el_j, _sigmaD);
                _es = elastic->e_sheer(el_j);
 
                dm = pb->ElasticFlux(_sigmaD, _es, U_j, attr_j);

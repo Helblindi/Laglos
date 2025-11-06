@@ -116,7 +116,6 @@ Constructing BdrElementIndexingArray:
 @ 	m(2)        : 0                    @
 @ ShearEnergyMethod : AVERAGE_F            @
 @ nqp               : 4                    @
-@ NDofs_L2          : 24                   @
 @ NE                : 24                   @
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -154,14 +153,14 @@ step 80   ,	t = 0.000089,	dt = 0.00000114,	|e| = 2.4933119232e+07
 step 85   ,	t = 0.000095,	dt = 0.00000114,	|e| = 2.4933097733e+07
 step 90   ,	t = 0.000100,	dt = 0.00000113,	|e| = 2.4933077718e+07
 step 93   ,	t = 0.000103,	dt = 0.00000044,	|e| = 2.4933068748e+07
-Program took 1.0674166667e-01s.
-This amounts to 4.7314568558e-05 s per timestep per gridpoint.
+Program took 1.1281516667e-01s.
+This amounts to 5.0006722813e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 1.067e-01                    | 4.731e-05
-  Dij calculation: 3.516e-02               | 1.559e-05
-  Mesh Motion calculation: 1.419e-02       | 6.290e-06
+                                 Total time: 1.128e-01                    | 5.001e-05
+  Dij calculation: 3.707e-02               | 1.643e-05
+  Mesh Motion calculation: 1.472e-02       | 6.524e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 1.077e-01      | 4.773e-05
+  State Update calculation: 1.139e-01      | 5.048e-05
 ===========================================================

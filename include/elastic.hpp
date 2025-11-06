@@ -38,10 +38,10 @@ private:
    const int dim;
    ShearEnergyMethod shear_method;
    ShearEOS shear_eos;
-   ParFiniteElementSpace &H1, &L2;
+   ParFiniteElementSpace &H1;
    const ParGridFunction &rho0_gf;
    const IntegrationRule &ir;
-   const int NE, NDofs_L2, nqp;
+   const int NE, nqp;
 
    ShearClosure *shear_closure_model = nullptr;
 
@@ -72,26 +72,18 @@ public:
            const int &_elastic_eos,
            QuadratureData &_quad_data,
            ParFiniteElementSpace &h1_fes,
-           ParFiniteElementSpace &l2_fes,
            const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
       dim(_dim),
       quad_data(_quad_data),
       H1(h1_fes), 
-      L2(l2_fes),
       rho0_gf(rho0_gf),
       ir(ir),
       NE(H1.GetParMesh()->GetNE()),
-      NDofs_L2(L2.GetNDofs()), 
       nqp(ir.GetNPoints()),
       shear_method(method)
    {
-      if (NDofs_L2 != NE)
-      {
-         MFEM_ABORT("Error: Number of L2 dofs must be equal to the number of elements.\n");
-      }
-
       /* Set equation of state */
       switch(_elastic_eos)
       {
@@ -180,7 +172,6 @@ public:
       cout << " @\n";
       
       cout << "@ nqp               : " << std::setw(20) << std::left << nqp      << " @\n"
-           << "@ NDofs_L2          : " << std::setw(20) << std::left << NDofs_L2 << " @\n"
            << "@ NE                : " << std::setw(20) << std::left << NE       << " @\n"
            << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n";
       /***************** END CONFIGURATION *****************/
@@ -573,7 +564,7 @@ public:
       }
    }
  
-   void ComputeS(const int &e, const double &rho, DenseMatrix &S) const
+   void ComputeS(const int &e, DenseMatrix &S) const
    {
       /* Objects needed in function */
       DenseMatrix F(3), FT(3), B(3), b(3), b2(3), C(3), c(3), c2(3), I(3);

@@ -420,57 +420,6 @@ LagrangianLOOperator::~LagrangianLOOperator()
 
 
 /**
- * @brief Computes the sigma component for a given element.
- *
- * This function calculates the sigma component for a specific element in the mesh.
- * It retrieves the state vector for the given element, computes the density and 
- * specific internal energy, and evaluates the stress tensor and flux based on 
- * the elasticity model.
- *
- * @tparam dim The dimension of the problem (1D, 2D, or 3D).
- * @param S The input state vector containing the solution variables.
- * @param e The index of the element for which the sigma component is computed.
- * @return The computed sigma component for the specified element.
- *
- * @note This function assumes that the elasticity model is being used and that
- *       the necessary data structures (e.g., elastic object) are properly initialized.
- */
-void LagrangianLOOperator::ComputeSigmaDComp(const Vector &S, const int &e, DenseMatrix &sigmaD_e) const
-{
-   if (order_t > 0)
-   {
-      MFEM_ABORT("LagrangianLOOperator::ComputeSigmaDComp: order_t > 0 is not supported yet.");
-   }
-   assert(use_elasticity);
-   sigmaD_e.SetSize(3);
-   sigmaD_e = 0.;
-
-   if (pmesh->GetAttribute(e) != 50)
-   {
-      return;
-   }
-
-   Array<int> idx(dim), idy(dim);
-   DenseMatrix flux(dim+2,dim);
-   Vector U(dim+2);
-
-   /* Fill sigma_e arrays */
-   for (int i = 0; i < dim; i++)
-   {
-      idx[i] = i+1;
-      idy[i] = i;
-   }
-   GetStateVector(S,e,U);
-   double es = 0.;
-   pb->ComputeS(e, sigmaD_e);
-   // es = elastic->e_sheer(e);
-   // flux = pb->ElasticFlux(sigmaD, es, U, pmesh->GetAttribute(e));
-   // flux.GetSubMatrix(idx, idy, sigma_e);
-   // sigma_e *= -1.;
-}
-
-
-/**
  * @brief Computes the sigma grid function (sigma_gf) based on the input vector S.
  *
  * This function computes the stress tensor grid function (sigma_gf) using the provided vector S.
@@ -498,7 +447,7 @@ void LagrangianLOOperator::ComputeSigmaGF(const Vector &S, ParGridFunction &sigm
    {
       if (pmesh->GetAttribute(e) == 50)
       {
-         ComputeSigmaDComp(S,e,sigmaD_e);
+         pb->ComputeS(e, sigmaD_e);
          sigma_gf[e] = sigmaD_e.FNorm();
       }
    }
@@ -788,14 +737,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
 
       if (use_elasticity && attr_i == 50)
       {
-         double _es = 0.;
-         DenseMatrix _sigmaD(3);
-
-         // _sigmaD is 3 x 3
-         pb->ComputeS(el_i, _sigmaD);
-         _es = pb->e_sheer(el_i);
-
-         F_i = pb->ElasticFlux(_sigmaD, _es, U_i, attr_i);
+         F_i = pb->ElasticFlux(el_i, U_i, attr_i);
       }
       else
       {
@@ -993,14 +935,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
             int attr_j = pmesh->GetAttribute(el_j);
             if (use_elasticity && attr_j == 50)
             {
-               double _es = 0.;
-               DenseMatrix _sigmaD(3);
-
-               // _sigmaD is 3 x 3
-               pb->ComputeS(el_j, _sigmaD);
-               _es = pb->e_sheer(el_j);
-
-               dm = pb->ElasticFlux(_sigmaD, _es, U_j, attr_j);
+               dm = pb->ElasticFlux(el_j, U_j, attr_j);
             }
             else
             {
@@ -4502,7 +4437,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       if (use_elasticity)
       {
          DenseMatrix sigmaD(3);
-         ComputeSigmaDComp(S, i, sigmaD); // sigma
+         pb->ComputeS(i, sigmaD); // sigma
          // for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
          fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2)
                     << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2)

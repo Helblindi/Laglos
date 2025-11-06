@@ -464,16 +464,18 @@ public:
     * from `sig_dev` and then adding the pressure term to it. The pressure is computed based on the 
     * state vector `U` and an optional cell attribute `cell_attr`.
     *
-    * @param[in] sig_dev The deviatoric stress tensor as a DenseMatrix.
-    * @param[in] U The state vector.
+    * @param[in] e The element index.
+    * @param[in] pressure The pressure value.
     * @param[out] sigma The resulting stress tensor.
     * @param[in] cell_attr An optional cell attribute used in the pressure calculation (default is 0).
     *
     * NOTE: @param sig_dev is not assumed to be dim x dim.
     */
-   inline void ComputeSigma(const DenseMatrix &sig_dev, const double &pressure, DenseMatrix &sigma, const int&cell_attr=0)
+   inline void ComputeSigma(const int &e, const double &pressure, DenseMatrix &sigma, const int&cell_attr=0)
    {
       // cout << "ProblemBase::ComputeSigma\n";
+      DenseMatrix sig_dev(3);
+      ComputeS(e, sig_dev);
 
       DenseMatrix I(dim);
       I = 0.;
@@ -503,7 +505,7 @@ public:
     *
     * NOTE: @param sig_dev is not assumed to be dim x dim.
     */
-   inline DenseMatrix ElasticFlux(const DenseMatrix &sig_dev, const double &es, const Vector &U, const int &cell_attr=0)
+   inline DenseMatrix ElasticFlux(const int &e, const Vector &U, const int &cell_attr=0)
    {
       if (cell_attr != 50)
       {
@@ -522,9 +524,11 @@ public:
       /* Compute dim x dim stress tensor */
       DenseMatrix sigma(dim);
       const double rho = 1./ U[0];
+      const double es = e_sheer(e);
       const double sie = specific_internal_energy(U, es);
       const double _pressure = pressure(rho, sie, cell_attr);
-      ComputeSigma(sig_dev, _pressure, sigma, cell_attr);
+
+      ComputeSigma(e, _pressure, sigma, cell_attr);
 
       // * is not overridden for Vector class, but *= is
       Vector v; velocity(U, v);

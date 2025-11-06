@@ -273,13 +273,27 @@ add_test(NAME CompareOT1TG
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 add_test(
-    NAME TestElasticImpact
+    NAME TestElasticImpactNH
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh ${PROJECT_SOURCE_DIR} "elastic_impact_output.txt"
 )
-add_test(NAME CompareElasticImpact
+add_test(NAME CompareElasticImpactNH
   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
     ${CMAKE_CURRENT_BINARY_DIR}/elastic_impact_output.txt
-    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_impact.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_impact_NH.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
+## Elastic Rotation with MR model
+file(COPY test_elastic_rotation_MR.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_rotation_MR.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestElasticRotationMR
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_rotation_MR.sh ${PROJECT_SOURCE_DIR} "elastic_rotation_MR_output.txt"
+)
+add_test(NAME CompareElasticRotationMR
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/elastic_rotation_MR_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_rotation_MR.txt
     11 # Ignore timing data at the end of the file as this fluctuates
 )
 

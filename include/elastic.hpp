@@ -255,7 +255,7 @@ public:
       switch (shear_eos)
       {
       case NEO_HOOKEAN:
-         return mu / 2. * (trc - 3.) / rho0;
+         return mu / 2. / rho0 * (trc - 3.);
       case MOONEY_RIVLIN:
          return mu / 32. / rho0 * (pow(trc,4) - 2*trc2*pow(trc,2) + pow(trc2,2) - 8 * trc - 12.);
          // return 0.;
@@ -335,9 +335,9 @@ public:
       switch (shear_eos)
       {
       case NEO_HOOKEAN:
-         return mu / 2. / rho0;
+         return mu / 2.;
       case MOONEY_RIVLIN:
-         return mu / 8. / rho0 * (pow(trc,3) - trc*trc2 - 2.);
+         return mu / 8. * (pow(trc,3) - trc*trc2 - 2.);
       case AORTIC:
       {
          /* compute i4 and i5 */
@@ -378,7 +378,7 @@ public:
       case NEO_HOOKEAN:
          return 0.;
       case MOONEY_RIVLIN:
-         return mu / 16. / rho0 * (-pow(trc,2) + trc2);
+         return mu / 16. * (-pow(trc,2) + trc2);
       case AORTIC:
       {
          /* compute i4 and i5 */
@@ -633,7 +633,7 @@ public:
       }
 
       /* Finally, multiply by 2rho */
-      S *= 2. * rho;
+      S *= 2. / F.Det();
    }
 }; // End Elastic class
 } // end ns hydroLO

@@ -320,69 +320,14 @@ public:
    void ComputeS(const int &e, DenseMatrix &S) const
    {
       /* Objects needed in function */
-      DenseMatrix F(3), FT(3), B(3), b(3), b2(3), C(3), c(3), c2(3), I(3);
-      for (int i = 0; i < 3; i++) { I(i,i) = 1.; }
-      const double rho0 = rho0_gf(e);
+      DenseMatrix F(3);
 
-      S.SetSize(3);
-      S = 0.;
-
-      /* Compute F, B, b, C, and c */
+      /* Compute F */
       assert(shear_method == ShearEnergyMethod::AVERAGE_F);
       ComputeAvgF(e, F);
-      FT.Transpose(F);
-      mfem::Mult(FT, F, C);
-      c = C;
-      c *= std::pow(C.Det(), -1./3.);
-      mfem::Mult(c, c, c2);
-      mfem::Mult(F, FT, B);
-      b = B;
-      b *= std::pow(B.Det(), -1./3.);
-      mfem::Mult(b, b, b2);
-      
-      /* Compute deviatoric part of stess tensor */
-      DenseMatrix b_tf(3), b2_tf(3); // 'trace-free objects'
-      // remove multiple of trace from diagonal
-      mfem::Add(b, I, -1./3. * b.Trace(), b_tf);
-      mfem::Add(b2, I, -1./3. * b2.Trace(), b2_tf);
 
-      double des_dj1, des_dj2;
-      shear_closure_model->ComputeShearEnergyIsotropicDerivatives(C, des_dj1, des_dj2);
-      double c_coeff = des_dj1;
-      double c2_coeff = 2.*des_dj2;
-      mfem::Add(c_coeff, b_tf, c2_coeff, b2_tf, S);
-
-      /* Handle anistropic contribution */
-      if (shear_eos == ShearEOS::AORTIC)
-      {
-         // cout << "===== Anisotropic contribution =====\n";
-         double des_di4, des_di5;
-         shear_closure_model->ComputeShearEnergyAnisotropicDerivatives(C, des_di4, des_di5);
-         
-         /* des_di4 portion */
-         double c4_coeff = des_di4;
-         DenseMatrix c4_tf(3), c5_tf(3), _tmp(3), _tmp2(3);
-         mfem::Mult(F, Gi, _tmp);
-         mfem::Mult(_tmp, FT, c4_tf);
-         c4_tf *= std::pow(C.Det(), -1./3.);
-         mfem::Mult(c, Gi, _tmp);
-         mfem::Add(c4_tf, I, -1./3. * _tmp.Trace(), c4_tf);
-         mfem::Add(S, c4_tf, c4_coeff, S);
-
-         /* des_di5 portion */
-         double c5_coeff = 2. * des_di5;
-         mfem::Mult(F, C, _tmp);
-         mfem::Mult(_tmp, Gi, _tmp2);
-         mfem::Mult(_tmp2, F, c5_tf);
-         c5_tf *= std::pow(C.Det(), -2./3.);
-         mfem::Mult(c2, Gi, _tmp);
-         mfem::Add(c5_tf, I, -1./3. * _tmp.Trace(), c5_tf);
-         mfem::Add(S, c5_tf, c5_coeff, S);
-         // cout << "=====================================\n";
-      }
-
-      /* Finally, multiply by 2rho */
-      S *= 2. / F.Det();
+      shear_closure_model->ComputeCauchyStress(F, S);
+      return;
    }
 }; // End Elastic class
 } // end ns hydroLO

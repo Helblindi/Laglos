@@ -37,6 +37,44 @@ void ShearClosure::ComputeAnisotropicInvariants(const Vector &mi, const DenseMat
    j5 = mfem::InnerProduct(mi, C2mi);
 }
 
+void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const
+{
+   DenseMatrix FT(3), C(3), c(3), c2(3), B(3), b(3),b2(3), I(3);
+   for (int i = 0; i < 3; i++) { I(i,i) = 1.; }
+   sigmaD.SetSize(3);
+   sigmaD = 0.;
+
+   FT.Transpose(F);
+   mfem::Mult(FT, F, C);
+   c = C;
+   c *= std::pow(C.Det(), -1./3.);
+   mfem::Mult(c, c, c2);
+   mfem::Mult(F, FT, B);
+   b = B;
+   b *= std::pow(B.Det(), -1./3.);
+   mfem::Mult(b, b, b2);
+   
+   /* Compute deviatoric part of stess tensor */
+   DenseMatrix b_tf(3), b2_tf(3); // 'trace-free objects'
+   // remove multiple of trace from diagonal
+   mfem::Add(b, I, -1./3. * b.Trace(), b_tf);
+   mfem::Add(b2, I, -1./3. * b2.Trace(), b2_tf);
+
+   double des_dj1, des_dj2;
+   this->ComputeShearEnergyIsotropicDerivatives(C, des_dj1, des_dj2);
+   double c_coeff = des_dj1;
+   double c2_coeff = 2.*des_dj2;
+   mfem::Add(c_coeff, b_tf, c2_coeff, b2_tf, sigmaD);
+   if (this->is_anisotropic)
+   {
+      DenseMatrix sigmaD_an(3);
+      this->ComputeCauchyStressAnisotropicComponent(F, sigmaD_an);
+      sigmaD.Add(1., sigmaD_an);
+   }
+
+   sigmaD *= 2. / F.Det();
+}
+
 
 
 
@@ -58,11 +96,6 @@ void ShearClosureNeoHookean::ComputeShearEnergyIsotropicDerivatives(const DenseM
 {
    des_dj1 = mu / 2.;
    des_dj2 = 0.;
-}
-
-void ShearClosureNeoHookean::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
-{
-   MFEM_ABORT("NEED OVERRIDE");
 }
 
 
@@ -90,10 +123,6 @@ void ShearClosureMooneyRivlin::ComputeShearEnergyIsotropicDerivatives(const Dens
    des_dj2 = mu / 16. * (-j1*j1 + j2);
 }
 
-void ShearClosureMooneyRivlin::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
-{
-   MFEM_ABORT("NEED OVERRIDE");
-}
 
 /**************************************************************************
 * Aortic Shear Closure Class
@@ -191,10 +220,42 @@ void ShearClosureAortic::ComputeShearEnergyAnisotropicDerivatives(const DenseMat
    des_dj5 = 2. * w1 * D1 * B2 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.));
 }
 
-void ShearClosureAortic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
+void ShearClosureAortic::ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const
 {
-   MFEM_ABORT("NEED OVERRIDE");
+   DenseMatrix FT(3), C(3);
+   FT.Transpose(F);
+   mfem::Mult(FT, F, C);
+
+   double des_dj4, des_dj5;
+   ComputeAnisotropicInvariantsAortic(C, des_dj4, des_dj5);
+
+   DenseMatrix c(3), c2(3), I(3);
+   c = C;
+   c *= std::pow(C.Det(), -1./3.);
+   mfem::Mult(c, c, c2);
+
+   /* des_dj4 portion */
+   double c4_coeff = des_dj4;
+   DenseMatrix c4_tf(3), _tmp(3);
+   mfem::Mult(F, Gi, _tmp);
+   mfem::Mult(_tmp, FT, c4_tf);
+   c4_tf *= std::pow(C.Det(), -1./3.);
+   mfem::Mult(c, Gi, _tmp);
+   mfem::Add(c4_tf, I, -1./3. * _tmp.Trace(), c4_tf);
+   mfem::Add(sigmaD_an, c4_tf, c4_coeff, sigmaD_an);
+
+   /* des_dj5 portion */
+   double c5_coeff = 2. * des_dj5;
+   DenseMatrix c5_tf(3), _tmp2(3);
+   mfem::Mult(F, C, _tmp);
+   mfem::Mult(_tmp, Gi, _tmp2);
+   mfem::Mult(_tmp2, F, c5_tf);
+   c5_tf *= std::pow(C.Det(), -2./3.);
+   mfem::Mult(c2, Gi, _tmp);
+   mfem::Add(c5_tf, I, -1./3. * _tmp.Trace(), c5_tf);
+   mfem::Add(sigmaD_an, c5_tf, c5_coeff, sigmaD_an);
 }
+
 
 /**************************************************************************
 * Transversely Isotropic Shear Closure Class
@@ -246,14 +307,11 @@ void ShearClosureTransverselyIsotropic::ComputeShearEnergyAnisotropicDerivatives
    MFEM_ABORT("NEED OVERRIDE");
 }
 
-void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const
+void ShearClosureTransverselyIsotropic::ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const
 {
-   // Implement Cauchy stress computation for transversely isotropic material
-   /* NH part (isotropic) */
-
-   /* Transversely isotropic part */
-   MFEM_ABORT("NEED OVERRIDE");
+   MFEM_ABORT("NEED OVERRIDE FOR ANISOTROPIC");
 }
+
 
 } // namespace hydroLO
 } // namespace mfem

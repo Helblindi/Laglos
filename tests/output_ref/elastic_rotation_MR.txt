@@ -84,7 +84,6 @@ Constructing BdrElementIndexingArray:
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @         Elastic Class Configuration      @
 @------------------------------------------@
-@ shear_eos         : MOONEY_RIVLIN        @
 @ ShearEnergyMethod : AVERAGE_F            @
 @ nqp               : 4                    @
 @ NE                : 256                  @
@@ -104,6 +103,35 @@ NE: 256
 num_faces: 544
 num_vertices: 289
 smesh_num_faces: 544
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ ProblemBase Configuration                @
+@------------------------------------------@
+@ distort_mesh :          false            @
+@ known_exact_solution :  false            @
+@ th_bcs :                false            @
+@ mv_bcs :                false            @
+@ mv_bcs_need_updating :  false            @
+@ indicator :             ElasticRotation  @
+@------------------------------------------@
+@ change_cfl :            false            @
+@ cfl_first :             0.50             @
+@ cfl_second :            0.50             @
+@ cfl_time_change :       0.00             @
+@------------------------------------------@
+@ elastic :               set              @
+@------------------------------------------@
+@ shear_eos :             MOONEY_RIVLIN    @
+@ shear_closure_model :   set              @
+@------------------------------------------@
+@ mu :                    26000000000.0    @
+@ theta (rad) :           0.785398         @
+@ theta (deg) :           45.000000        @
+@ rho0_v size :           256              @
+@ mi_vec size :           0                @
+@ mi_vec head :                            @
+@ Gi shape :              3x3              @
+@------------------------------------------@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Entering time loop
 step 5    ,	t = 0.000002,	dt = 0.00000035,	|e| = 1.8214925100e+08
 step 10   ,	t = 0.000004,	dt = 0.00000035,	|e| = 1.8213751161e+08
@@ -111,14 +139,14 @@ step 15   ,	t = 0.000005,	dt = 0.00000036,	|e| = 1.8213150412e+08
 step 20   ,	t = 0.000007,	dt = 0.00000036,	|e| = 1.8212749953e+08
 step 25   ,	t = 0.000009,	dt = 0.00000036,	|e| = 1.8212464622e+08
 step 28   ,	t = 0.000010,	dt = 0.00000036,	|e| = 1.8212332285e+08
-Program took 3.1252141667e-01s.
-This amounts to 4.2096095995e-05 s per timestep per gridpoint.
+Program took 3.0940320833e-01s.
+This amounts to 4.1676078709e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 3.125e-01                    | 4.210e-05
-  Dij calculation: 1.054e-01               | 1.420e-05
-  Mesh Motion calculation: 3.795e-02       | 5.112e-06
+                                 Total time: 3.094e-01                    | 4.168e-05
+  Dij calculation: 1.087e-01               | 1.465e-05
+  Mesh Motion calculation: 3.812e-02       | 5.135e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 3.133e-01      | 4.219e-05
+  State Update calculation: 3.100e-01      | 4.175e-05
 ===========================================================

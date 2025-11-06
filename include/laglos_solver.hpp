@@ -275,7 +275,6 @@ public:
    void ComputeFGF(ParGridFunction &f_gf) const;
    void ComputeESheerGF(ParGridFunction &e_sheer_gf) const;
    void ComputePressGF(const Vector &S, ParGridFunction &press_gf) const;
-   void SetShearModulus(const double &_mu) { elastic->set_shear_modulus(_mu); }
 
    /* Mesh movement */
    void UpdateMeshVelocityBCs(const double &t, const double &dt);
@@ -320,7 +319,6 @@ public:
    void FillCenterVelocitiesWithAvg(Vector &dxdt) const;
 
    // Normal vector mesh motion
-   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const;
    void ComputeGeoVNormal(const Vector &S, ParGridFunction &dxdt_gf) const;
 
    // Normal vector mesh motion with distributed viscosity (discussed on 09/05/2024)

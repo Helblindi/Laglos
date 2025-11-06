@@ -7,8 +7,6 @@
 #define ELASTIC
 
 #include "mfem.hpp"
-#include "problem_base.h"
-#include "shear_closure.hpp"
 #include "laglos_assembly.hpp"
 
 using namespace std;
@@ -18,13 +16,6 @@ namespace mfem
 
 namespace hydroLO
 {
-
-enum ShearEOS {
-   NEO_HOOKEAN,
-   MOONEY_RIVLIN,
-   AORTIC,         // anisotropic model
-   TRANSVERSELY_ISOTROPIC
-};
 
 enum ShearEnergyMethod {
    AVERAGE_F,
@@ -37,129 +28,33 @@ class Elastic
 private:
    const int dim;
    ShearEnergyMethod shear_method;
-   ShearEOS shear_eos;
    ParFiniteElementSpace &H1;
-   const ParGridFunction &rho0_gf;
    const IntegrationRule &ir;
    const int NE, nqp;
 
-   ShearClosure *shear_closure_model = nullptr;
-
    // Reference to physical Jacobian for the initial mesh
    // These are computed only at time zero and stored here
-   const QuadratureData &quad_data;
-   double mu = -1.; // Shear modulus
-
-   /* 
-   If using the aortic eos, a fiber direction must be defined. 
-   This direction is used to compute the invariants:
-      m = (cos(theta), sin(theta), 0) 
-   */
-   double theta = M_PI/4.; // angle of fiber direction
-   Vector mi_vec;
-   DenseMatrix Gi;
-   
-   // double A1 = 21.5802, B1 = 9.9007, D1 = 0.8849, w1 = 0.4189; /* PP too squished */
-   // double A1 = 771.8033, B1 = 21.2093, D1 = 3.8068, w1 = 0.4971;
-   // double A2 = 1., B2 = 1.;
-
-   /* These params were closer to the Neo Hook results when w1 = 0 */
-   double stiffness = 9.63E5;
-   double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
+   const QuadratureData &quad_data;   
 
 public:
    Elastic(const int &_dim,
-           const int &_elastic_eos,
            QuadratureData &_quad_data,
            ParFiniteElementSpace &h1_fes,
-           const ParGridFunction &rho0_gf,
            const IntegrationRule &ir,
            ShearEnergyMethod method = ShearEnergyMethod::AVERAGE_F) : 
       dim(_dim),
       quad_data(_quad_data),
-      H1(h1_fes), 
-      rho0_gf(rho0_gf),
+      H1(h1_fes),
       ir(ir),
       NE(H1.GetParMesh()->GetNE()),
       nqp(ir.GetNPoints()),
       shear_method(method)
    {
-      /* Set equation of state */
-      switch(_elastic_eos)
-      {
-         case 1: // Neo-Hookean
-            shear_eos = ShearEOS::NEO_HOOKEAN;
-            shear_closure_model = new ShearClosureNeoHookean(mu);
-            break;
-         case 2: // Mooney-Rivlin
-            shear_eos = ShearEOS::MOONEY_RIVLIN;
-            shear_closure_model = new ShearClosureMooneyRivlin(mu);
-            break;
-         case 3: // Aortic
-         {
-            /* Invariants */
-            mi_vec.SetSize(3);
-            Gi.SetSize(3);
-            /* Set fiber direction */
-            mi_vec(0) = cos(theta);
-            mi_vec(1) = sin(theta);
-            mi_vec(2) = 0.;
-            tensor(mi_vec, mi_vec, Gi);
-            shear_eos = ShearEOS::AORTIC;
-            shear_closure_model = new ShearClosureAortic(mu, mi_vec, w1, D1, A1, B1);
-            break;
-         }
-         case 4: // Transversely Isotropic
-         {
-            shear_eos = ShearEOS::TRANSVERSELY_ISOTROPIC;
-            double E = 1.729E6, EA = 1.E6, GA = 4.59E5, nu = 0.4;
-            mi_vec.SetSize(3);
-            /* Set fiber direction */
-            mi_vec(0) = cos(theta);
-            mi_vec(1) = sin(theta);
-            mi_vec(2) = 0.;
-            shear_closure_model = new ShearClosureTransverselyIsotropic(mu, mi_vec, E, EA, GA, nu);
-            
-            break;
-         }
-         default:
-            MFEM_ABORT("Invalid value for shear_eos.");
-      }
-
       /*************** CONFIGURATION OUTPUT ***************/
       cout << "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
       << "@         Elastic Class Configuration      @\n"
       << "@------------------------------------------@\n"
-      << "@ shear_eos         : " << std::setw(20) << std::left;
-      switch (shear_eos)
-      {
-         case NEO_HOOKEAN:
-            cout << "NEO_HOOKEAN";
-            break;
-         case MOONEY_RIVLIN:
-            cout << "MOONEY_RIVLIN";
-            break;
-         case AORTIC:
-            cout << "AORTIC";
-            break;
-         case TRANSVERSELY_ISOTROPIC:
-            cout << "TRANSVERSELY_ISOTROPIC";
-            break;
-         default:
-            MFEM_ABORT("Invalid value for shear_eos.");
-      }
-      cout << " @\n";
-      if (shear_eos == ShearEOS::AORTIC)
-      {
-         cout << "@ -- Aortic parameters -- " << std::setw(18) << std::right << "@" << "\n"
-              << "@ \ttheta         : " << std::setw(21) << std::left << theta << "@" << "\n"
-              << "@ \tm(0)        : " << std::setw(21) << std::left << mi_vec(0) << "@" << "\n"
-              << "@ \tm(1)        : " << std::setw(21) << std::left << mi_vec(1) << "@" << "\n"
-              << "@ \tm(2)        : " << std::setw(21) << std::left << mi_vec(2) << "@" << "\n";
-      }
-
-      
-      cout << "@ ShearEnergyMethod : " << std::setw(20) << std::left;
+      << "@ ShearEnergyMethod : " << std::setw(20) << std::left;
       switch (shear_method)
       {
          case ShearEnergyMethod::AVERAGE_F:
@@ -178,42 +73,9 @@ public:
            << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n";
       /***************** END CONFIGURATION *****************/
    }
- 
-   void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm) const
-   {
-      const int v1_len = v1.Size(), v2_len = v2.Size();
-      for (int i = 0; i < v1_len; i++)
-      {
-         for (int j = 0; j < v2_len; j++)
-         {
-            dm.Elem(i,j) = v1[i] * v2[j];
-         }
-      }
-   }
-   void set_shear_modulus(const double &_mu) { 
-      this->mu = _mu; 
-      shear_closure_model->UpdateShearModulus(_mu);
-   }
 
-   void setShearEnergyMethod(ShearEnergyMethod method) { 
-      shear_method = method; 
-      if (shear_method != ShearEnergyMethod::AVERAGE_F && shear_eos == ShearEOS::AORTIC)
-      {
-         MFEM_ABORT("Aortic EOS only supports shear energy method AVERAGE_F.\n");
-      }
-   }
+   void setShearEnergyMethod(ShearEnergyMethod method) { shear_method = method; }
 
-   /* Wrapper function that needs to be moved to ElasticProblemBase class */
-   double e_sheer(const int &e) const
-   {
-      const double rho0 = rho0_gf(e);
-
-      DenseMatrix F(dim);
-      ComputeAvgF(e, F);
-      double _e_shear = shear_closure_model->ComputeShearEnergy(F, rho0);
-      return _e_shear;
-   }   
- 
    void ComputeAvgF(const int e, DenseMatrix &F) const
    {
       DenseMatrix F_dim(dim); F_dim = 0.;
@@ -315,19 +177,6 @@ public:
          /* Add in contribution from quadrature point */
          c.Add(ip.weight, cqp);
       }
-   }
- 
-   void ComputeS(const int &e, DenseMatrix &S) const
-   {
-      /* Objects needed in function */
-      DenseMatrix F(3);
-
-      /* Compute F */
-      assert(shear_method == ShearEnergyMethod::AVERAGE_F);
-      ComputeAvgF(e, F);
-
-      shear_closure_model->ComputeCauchyStress(F, S);
-      return;
    }
 }; // End Elastic class
 } // end ns hydroLO

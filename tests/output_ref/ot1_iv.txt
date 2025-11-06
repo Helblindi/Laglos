@@ -94,17 +94,34 @@ NE: 256
 num_faces: 544
 num_vertices: 289
 smesh_num_faces: 2112
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ ProblemBase Configuration                @
+@------------------------------------------@
+@ distort_mesh :          false            @
+@ known_exact_solution :  true             @
+@ th_bcs :                true             @
+@ mv_bcs :                true             @
+@ mv_bcs_need_updating :  false            @
+@ indicator :             IsentropicVortex @
+@------------------------------------------@
+@ change_cfl :            false            @
+@ cfl_first :             0.50             @
+@ cfl_second :            0.50             @
+@ cfl_time_change :       0.00             @
+@------------------------------------------@
+@ elastic :               null             @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Entering time loop
-step     5,	t = 0.155338,	dt = 0.03109345,	|e| = 8.0269177001e+01
-step     9,	t = 0.250000,	dt = 0.00121681,	|e| = 8.0269429496e+01
-Program took 6.6279216667e-01s.
-This amounts to 2.5890319010e-04 s per timestep per gridpoint.
+step 5    ,	t = 0.155338,	dt = 0.03109345,	|e| = 8.0269177001e+01
+step 9    ,	t = 0.250000,	dt = 0.00121681,	|e| = 8.0269429496e+01
+Program took 6.5446491667e-01s.
+This amounts to 2.5565035807e-04 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
-                                total time | t / (dof*ts) 
-  Total time:                    6.628e-01 | 2.589e-04
-  Dij calculation:               1.648e-01 | 6.439e-05
-  Mesh Motion calculation:       1.671e-01 | 6.529e-05
-    Hiop calculation (if used):  0.000e+00 | 0.000e+00
-  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      6.672e-01 | 2.606e-04
+ total time | t / (dof*ts) 
+                                 Total time: 6.545e-01                    | 2.557e-04
+  Dij calculation: 1.652e-01               | 6.453e-05
+  Mesh Motion calculation: 1.677e-01       | 6.551e-05
+    Hiop calculation (if used): 0.000e+00  | 0.000e+00
+  Mesh Motion Linearization: 0.000e+00     | 0.000e+00
+  State Update calculation: 6.597e-01      | 2.577e-04
 ===========================================================

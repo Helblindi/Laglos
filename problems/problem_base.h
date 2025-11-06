@@ -4,6 +4,9 @@
 #include "mfem.hpp"
 #include "geometry.hpp"
 #include "eos.h"
+#include "elastic.hpp"
+#include "shear_closure.hpp"
+#include "laglos_tools.hpp"
 #include <cmath>
 #include <string>
 
@@ -42,6 +45,13 @@ namespace mfem
 namespace hydroLO
 {
 
+enum ShearEOS {
+   NEO_HOOKEAN,
+   MOONEY_RIVLIN,
+   AORTIC,         // anisotropic model
+   TRANSVERSELY_ISOTROPIC
+};
+
 class ProblemBase
 {
 private:
@@ -59,12 +69,66 @@ private:
    double cfl_first = 0.5;
    double cfl_second = 0.5;
    double cfl_time_change = 0.;
+   int elastic_eos_type = -1; // Indicator for type of elastic eos model
+   ShearEOS shear_eos;
+   Elastic *elastic = nullptr;
+   Vector rho0_v;
+   /* 
+   If using the aortic eos, a fiber direction must be defined. 
+   This direction is used to compute the invariants:
+      m = (cos(theta), sin(theta), 0) 
+   */
+   double mu = -1.;
+   double theta = M_PI/4.; // angle of fiber direction
+   Vector mi_vec; // Fiber direction vector for anisotropic models
+   DenseMatrix Gi;
+   ShearClosure *shear_closure_model = nullptr;
+
+   // double A1 = 21.5802, B1 = 9.9007, D1 = 0.8849, w1 = 0.4189; /* PP too squished */
+   // double A1 = 771.8033, B1 = 21.2093, D1 = 3.8068, w1 = 0.4971;
+   // double A2 = 1., B2 = 1.;
+   /* These params were closer to the Neo Hook results when w1 = 0 */
+   double stiffness = 9.63E5;
+   double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
 
 protected:
    const int dim;
    double a = 0., b = 0., gamma = 0.;
-   double q = 0., p_inf = 0., mu = 0.;
+   double q = 0., p_inf = 0.;
    std::unique_ptr<EquationOfState> eos = NULL;  // Pointer to the EOS object
+
+   /* helpers */
+   static std::string toFixed(double x, int prec = 6) {
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(prec) << x;
+        return ss.str();
+    }
+
+    static std::string shearEOSToString(ShearEOS e) {
+        switch (e) {
+            case ShearEOS::NEO_HOOKEAN:            return "NEO_HOOKEAN";
+            case ShearEOS::MOONEY_RIVLIN:          return "MOONEY_RIVLIN";
+            case ShearEOS::AORTIC:                 return "AORTIC";
+            case ShearEOS::TRANSVERSELY_ISOTROPIC: return "TRANSVERSELY_ISOTROPIC";
+        }
+        return "Unknown";
+    }
+
+    static std::string vecSizeString(const Vector& v) {
+      return std::to_string(v.Size());
+    }
+    static std::string vecHead(const Vector& v, int k = 3) {
+      // implement: "[v0, v1, v2]" or "(empty)"1
+      if (k == 0) return "(empty)";
+      else {
+         for (int i = 0; i < std::min(k, v.Size()); i++) {
+            std::cout << v[i];
+            if (i < std::min(k, v.Size()) - 1) std::cout << ", ";
+         }
+         if (v.Size() > k) std::cout << ", ...";
+         return "";
+      }
+    }
 
 public:
    ProblemBase(const int &_dim) : dim(_dim) {}
@@ -111,6 +175,68 @@ public:
    virtual void update_additional_BCs(const double &t, const double timestep_first, Array<double> &add_bdr_vals, const Geometric *geom=NULL, const ParGridFunction *x_gf=NULL) { MFEM_ABORT("Function get_additional_BCs must be overridden.\n"); }
    virtual void GetBoundaryState(const Vector &x, const int &bdr_attr, Vector &state, const double &t=0.) { MFEM_ABORT("Function GetBoundaryState must be overridden.\n"); }
 
+   void PrintInfo() const
+   {
+      const int W = 24; // label width for alignment
+      auto line = [&] { std::cout << "@------------------------------------------@\n"; };
+      auto head = [&](const std::string& title) {
+         std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n";
+         std::cout << "@ " << std::setw(41) << std::left << title << "@\n";
+         line();
+      };
+      auto field = [&](const std::string& key, const std::string& val) {
+         std::cout << "@ " << std::setw(W) << std::left << (key + " : ") 
+                     << std::setw(17) << std::left << val << "@\n";
+      };
+      auto b2s = [](bool b){ return b ? "true" : "false"; };
+
+      head("ProblemBase Configuration");
+
+      // Booleans
+      field("distort_mesh",         b2s(distort_mesh));
+      field("known_exact_solution", b2s(known_exact_solution));
+      field("th_bcs",               b2s(th_bcs));
+      field("mv_bcs",               b2s(mv_bcs));
+      field("mv_bcs_need_updating", b2s(mv_bcs_need_updating));
+
+      // Indicator string
+      field("indicator", indicator.empty() ? "(none)" : indicator);
+
+      line();
+
+      // CFL
+      field("change_cfl",       b2s(change_cfl));
+      field("cfl_first",        toFixed(cfl_first,2));
+      field("cfl_second",       toFixed(cfl_second,2));
+      field("cfl_time_change",  toFixed(cfl_time_change,2));
+
+      line();
+
+      // Pointers (presence + optional nested printing)
+      field("elastic", elastic ? "set" : "null");
+      if (elastic) {
+         line();
+         // Nested elastic configuration output
+         field("shear_eos", shearEOSToString(shear_eos));
+         field("shear_closure_model", shear_closure_model ? "set" : "null");
+
+         line();
+
+         // Material / anisotropy
+         field("mu",          toFixed(mu,1));
+         field("theta (rad)", toFixed(theta));
+         field("theta (deg)", toFixed(theta * 180.0 / M_PI));
+
+         // Vectors / matrices: sizes + preview
+         field("rho0_v size", vecSizeString(rho0_v));
+         field("mi_vec size", vecSizeString(mi_vec));
+         field("mi_vec head", vecHead(mi_vec));
+         field("Gi shape",    "3x3");
+         line();
+      }
+
+      std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n";
+   }
    /* ProblemDescription */
    double internal_energy(const Vector &U, const double e_sheer)
    {
@@ -413,6 +539,86 @@ public:
       result.SetRow(dim+1, sigmav);
 
       return result;
+   }
+
+   void SetElastic(Elastic &_elastic) { elastic = &_elastic; }
+
+   bool HasElastic() const { return (elastic != nullptr); }
+
+   void SetElasticEOSType(const int &_elastic_eos_type) { 
+      elastic_eos_type = _elastic_eos_type; 
+      switch (elastic_eos_type)
+      {
+         case 1: // Neo-Hookean
+            shear_eos = ShearEOS::NEO_HOOKEAN;
+            shear_closure_model = new ShearClosureNeoHookean(mu);
+            break;
+         case 2: // Mooney-Rivlin
+            shear_eos = ShearEOS::MOONEY_RIVLIN;
+            shear_closure_model = new ShearClosureMooneyRivlin(mu);
+            break;
+         case 3: // Aortic
+         {
+            /* Invariants */
+            mi_vec.SetSize(3);
+            Gi.SetSize(3);
+            /* Set fiber direction */
+            mi_vec(0) = cos(theta);
+            mi_vec(1) = sin(theta);
+            mi_vec(2) = 0.;
+            tensor(mi_vec, mi_vec, Gi);
+            shear_eos = ShearEOS::AORTIC;
+            shear_closure_model = new ShearClosureAortic(mu, mi_vec, w1, D1, A1, B1);
+            break;
+         }
+         case 4: // Transversely Isotropic
+         {
+            shear_eos = ShearEOS::TRANSVERSELY_ISOTROPIC;
+            double E = 1.729E6, EA = 1.E6, GA = 4.59E5, nu = 0.4;
+            mi_vec.SetSize(3);
+            /* Set fiber direction */
+            mi_vec(0) = cos(theta);
+            mi_vec(1) = sin(theta);
+            mi_vec(2) = 0.;
+            shear_closure_model = new ShearClosureTransverselyIsotropic(mu, mi_vec, E, EA, GA, nu);
+            
+            break;
+         }
+         default:
+            MFEM_ABORT("Invalid value for shear_eos.");
+      }
+      
+   }
+
+   void set_rho0_vec(const Vector &_rho0_vec) { rho0_v = _rho0_vec; }
+
+   virtual double e_sheer(const int &e) const
+   {
+      const double rho0 = rho0_v(e);
+
+      DenseMatrix F(dim);
+      elastic->ComputeAvgF(e, F);
+      double _e_shear = shear_closure_model->ComputeShearEnergy(F, rho0);
+      return _e_shear;
+   }
+
+   void ComputeS(const int &e, DenseMatrix &S) const
+   {
+      /* Objects needed in function */
+      DenseMatrix F(3);
+
+      /* Compute F */
+      elastic->ComputeAvgF(e, F);
+
+      shear_closure_model->ComputeCauchyStress(F, S);
+      return;
+   }
+
+   void ComputeF(const int &e, DenseMatrix &F) const
+   {
+      /* Compute F */
+      elastic->ComputeAvgF(e, F);
+      return;
    }
 
    double sound_speed(const double &rho, const double &press, const double &gamma) const

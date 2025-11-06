@@ -94,19 +94,36 @@ NE: 64
 num_faces: 144
 num_vertices: 81
 smesh_num_faces: 544
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ ProblemBase Configuration                @
+@------------------------------------------@
+@ distort_mesh :          false            @
+@ known_exact_solution :  true             @
+@ th_bcs :                false            @
+@ mv_bcs :                true             @
+@ mv_bcs_need_updating :  false            @
+@ indicator :             TaylorGreen      @
+@------------------------------------------@
+@ change_cfl :            false            @
+@ cfl_first :             0.50             @
+@ cfl_second :            0.50             @
+@ cfl_time_change :       0.00             @
+@------------------------------------------@
+@ elastic :               null             @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Entering time loop
-step     5,	t = 0.026418,	dt = 0.00527195,	|e| = 2.8721745611e+01
-step    10,	t = 0.052639,	dt = 0.00522146,	|e| = 2.8769383130e+01
-step    15,	t = 0.078522,	dt = 0.00514366,	|e| = 2.8841809262e+01
-step    20,	t = 0.100000,	dt = 0.00109319,	|e| = 2.8917183874e+01
-Program took 3.7716179167e-01s.
-This amounts to 2.8062633309e-04 s per timestep per gridpoint.
+step 5    ,	t = 0.026418,	dt = 0.00527195,	|e| = 2.8721745611e+01
+step 10   ,	t = 0.052639,	dt = 0.00522146,	|e| = 2.8769383130e+01
+step 15   ,	t = 0.078522,	dt = 0.00514366,	|e| = 2.8841809262e+01
+step 20   ,	t = 0.100000,	dt = 0.00109319,	|e| = 2.8917183874e+01
+Program took 3.6936183333e-01s.
+This amounts to 2.7482279266e-04 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
-                                total time | t / (dof*ts) 
-  Total time:                    3.772e-01 | 2.806e-04
-  Dij calculation:               8.771e-02 | 6.526e-05
-  Mesh Motion calculation:       9.417e-02 | 7.007e-05
-    Hiop calculation (if used):  0.000e+00 | 0.000e+00
-  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      3.790e-01 | 2.820e-04
+ total time | t / (dof*ts) 
+                                 Total time: 3.694e-01                    | 2.748e-04
+  Dij calculation: 8.700e-02               | 6.473e-05
+  Mesh Motion calculation: 9.444e-02       | 7.027e-05
+    Hiop calculation (if used): 0.000e+00  | 0.000e+00
+  Mesh Motion Linearization: 0.000e+00     | 0.000e+00
+  State Update calculation: 3.710e-01      | 2.760e-04
 ===========================================================

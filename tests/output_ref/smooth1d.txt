@@ -94,31 +94,48 @@ NE: 60
 num_faces: 61
 num_vertices: 61
 smesh_num_faces: 61
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ ProblemBase Configuration                @
+@------------------------------------------@
+@ distort_mesh :          false            @
+@ known_exact_solution :  true             @
+@ th_bcs :                false            @
+@ mv_bcs :                true             @
+@ mv_bcs_need_updating :  false            @
+@ indicator :             SmoothWave       @
+@------------------------------------------@
+@ change_cfl :            false            @
+@ cfl_first :             0.50             @
+@ cfl_second :            0.50             @
+@ cfl_time_change :       0.00             @
+@------------------------------------------@
+@ elastic :               null             @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Entering time loop
-step     5,	t = 0.049946,	dt = 0.00989605,	|e| = 2.2862866529e+01
-step    10,	t = 0.098816,	dt = 0.00972056,	|e| = 2.2760924656e+01
-step    15,	t = 0.145521,	dt = 0.00875511,	|e| = 2.2674520152e+01
-step    20,	t = 0.186175,	dt = 0.00783517,	|e| = 2.2630726853e+01
-step    25,	t = 0.224249,	dt = 0.00751772,	|e| = 2.2615503192e+01
-step    30,	t = 0.261603,	dt = 0.00746266,	|e| = 2.2616866483e+01
-step    35,	t = 0.299081,	dt = 0.00752740,	|e| = 2.2626866466e+01
-step    40,	t = 0.337034,	dt = 0.00763488,	|e| = 2.2640730444e+01
-step    45,	t = 0.375526,	dt = 0.00773822,	|e| = 2.2655927572e+01
-step    50,	t = 0.414487,	dt = 0.00782567,	|e| = 2.2671320639e+01
-step    55,	t = 0.453828,	dt = 0.00789403,	|e| = 2.2686527057e+01
-step    60,	t = 0.493458,	dt = 0.00794536,	|e| = 2.2701487846e+01
-step    65,	t = 0.533306,	dt = 0.00798429,	|e| = 2.2716247728e+01
-step    70,	t = 0.573322,	dt = 0.00801496,	|e| = 2.2730861513e+01
-step    74,	t = 0.600000,	dt = 0.00260174,	|e| = 2.2740505641e+01
+step 5    ,	t = 0.049946,	dt = 0.00989605,	|e| = 2.2862866529e+01
+step 10   ,	t = 0.098816,	dt = 0.00972056,	|e| = 2.2760924656e+01
+step 15   ,	t = 0.145521,	dt = 0.00875511,	|e| = 2.2674520152e+01
+step 20   ,	t = 0.186175,	dt = 0.00783517,	|e| = 2.2630726853e+01
+step 25   ,	t = 0.224249,	dt = 0.00751772,	|e| = 2.2615503192e+01
+step 30   ,	t = 0.261603,	dt = 0.00746266,	|e| = 2.2616866483e+01
+step 35   ,	t = 0.299081,	dt = 0.00752740,	|e| = 2.2626866466e+01
+step 40   ,	t = 0.337034,	dt = 0.00763488,	|e| = 2.2640730444e+01
+step 45   ,	t = 0.375526,	dt = 0.00773822,	|e| = 2.2655927572e+01
+step 50   ,	t = 0.414487,	dt = 0.00782567,	|e| = 2.2671320639e+01
+step 55   ,	t = 0.453828,	dt = 0.00789403,	|e| = 2.2686527057e+01
+step 60   ,	t = 0.493458,	dt = 0.00794536,	|e| = 2.2701487846e+01
+step 65   ,	t = 0.533306,	dt = 0.00798429,	|e| = 2.2716247728e+01
+step 70   ,	t = 0.573322,	dt = 0.00801496,	|e| = 2.2730861513e+01
+step 74   ,	t = 0.600000,	dt = 0.00260174,	|e| = 2.2740505641e+01
 projecting zero on cells with attr 99
-Program took 3.7286666667e-02s.
-This amounts to 8.2859259259e-06 s per timestep per gridpoint.
+Program took 3.5391125000e-02s.
+This amounts to 7.8646944444e-06 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
-                                total time | t / (dof*ts) 
-  Total time:                    3.729e-02 | 8.286e-06
-  Dij calculation:               1.201e-02 | 2.670e-06
-  Mesh Motion calculation:       3.486e-03 | 7.747e-07
-    Hiop calculation (if used):  0.000e+00 | 0.000e+00
-  Mesh Motion Linearization:     0.000e+00 | 0.000e+00
-  State Update calculation:      3.914e-02 | 8.698e-06
+ total time | t / (dof*ts) 
+                                 Total time: 3.539e-02                    | 7.865e-06
+  Dij calculation: 1.208e-02               | 2.684e-06
+  Mesh Motion calculation: 3.532e-03       | 7.849e-07
+    Hiop calculation (if used): 0.000e+00  | 0.000e+00
+  Mesh Motion Linearization: 0.000e+00     | 0.000e+00
+  State Update calculation: 3.705e-02      | 8.233e-06
 ===========================================================

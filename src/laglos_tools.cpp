@@ -282,5 +282,26 @@ const real_t RK6IDPSolver::a[] = {.25, 1./8., 1./8., 0., -.5, 1., 3./16., 0., 0.
 const real_t RK6IDPSolver::b[] = {7./90., 0., 32./90., 12./90., 32./90., 7./90.};
 const real_t RK6IDPSolver::c[] = {.25, .25, .5, .75, 1.};
 
+/****************************************************************************************************
+* Function: tensor
+* Parameters:
+*  v1     - Vector object
+*  v2     - Vector object
+*  dm     - Resultant DenseMatrix
+*
+* Purpose:
+*  Compute the tensor product of two vectors.
+****************************************************************************************************/
+void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm)
+{
+   const int v1_len = v1.Size(), v2_len = v2.Size();
+   for (int i = 0; i < v1_len; i++)
+   {
+      for (int j = 0; j < v2_len; j++)
+      {
+         dm.Elem(i,j) = v1[i] * v2[j];
+      }
+   }
+}
 } // namespace hydroLO
 } // namespace mfem

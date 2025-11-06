@@ -153,7 +153,9 @@ public:
    RK6IDPSolver() : RKIDPSolver(6, a, b, c) { }
 };
 
+void tensor(const Vector & v1, const Vector & v2, DenseMatrix & dm);
+
 } // namespace hydroLO
 } // namespace mfem
 
-#endif // MFEM_REMHOS_SOLVERS
+#endif // LAGLOS_TOOLS

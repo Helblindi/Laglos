@@ -11,8 +11,10 @@ class ShearClosure
 {
 protected:
    double mu; // shear modulus
+   Vector mi; // fiber direction for anisotropic models
 public:
    ShearClosure(const double &_mu) : mu(_mu) {}
+   ShearClosure(const double &_mu, const Vector &_mi) : mu(_mu), mi(_mi) {}
    virtual ~ShearClosure() {}
    virtual double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const {
       MFEM_ABORT("Must override.\n");
@@ -31,21 +33,14 @@ public:
       this->mu = new_mu;
    }
 
-}; // end of ShearClosure class
-
-class ShearClosureAnisotropic : public ShearClosure
-{
-protected:
-   Vector mi; // fiber direction
-public:
-   ShearClosureAnisotropic(const double &_mu, const Vector &_mi) : ShearClosure(_mu), mi(_mi) {}
-   virtual ~ShearClosureAnisotropic() {}
+   /* Anisotropic functions */
    virtual void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const {
-      MFEM_ABORT("Must override.\n");
+      des_dj4 = 0.;
+      des_dj5 = 0.;
    }
    void ComputeAnisotropicInvariants(const Vector &mi, const DenseMatrix &C, double &j4, double &j5) const;
 
-}; // end of ShearClosureAnisotropic class
+}; // end of ShearClosure class
 
 class ShearClosureNeoHookean : public ShearClosure
 {
@@ -67,7 +62,7 @@ public:
    void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const override;
 }; // end of ShearClosureMooneyRivlin class
 
-class ShearClosureAortic : public ShearClosureAnisotropic
+class ShearClosureAortic : public ShearClosure
 {
 private:
    double w1, D1, A1, B1;
@@ -84,7 +79,7 @@ public:
    void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const override;
 }; // end of ShearClosureAortic class
 
-class ShearClosureTransverselyIsotropic : public ShearClosureAnisotropic
+class ShearClosureTransverselyIsotropic : public ShearClosure
 {
 private:
    double E, EA, GA, nu;
@@ -93,7 +88,7 @@ private:
 public:
    ShearClosureTransverselyIsotropic(const double &_mu, const Vector &_mi, const double &_E, const double &_EA,
                                     const double &_GA, const double &_nu)
-      : ShearClosureAnisotropic(_mu, _mi), E(_E), EA(_EA), GA(_GA), nu(_nu) {}
+      : ShearClosure(_mu, _mi), E(_E), EA(_EA), GA(_GA), nu(_nu) {}
    virtual ~ShearClosureTransverselyIsotropic() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
    void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;

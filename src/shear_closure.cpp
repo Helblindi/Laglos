@@ -24,7 +24,7 @@ void ShearClosure::ComputeIsotropicInvariantsReduced(const DenseMatrix &C, doubl
    j2 = c2.Trace();
 }
 
-void ShearClosureAnisotropic::ComputeAnisotropicInvariants(const Vector &mi, const DenseMatrix &C, double &j4, double &j5) const
+void ShearClosure::ComputeAnisotropicInvariants(const Vector &mi, const DenseMatrix &C, double &j4, double &j5) const
 {
    // MFEM_WARNING("SHEAR ENERGY CHECK");
    Vector Cmi(3), C2mi(3);
@@ -100,7 +100,7 @@ void ShearClosureMooneyRivlin::ComputeCauchyStress(const DenseMatrix &F, DenseMa
 ***************************************************************************/
 ShearClosureAortic::ShearClosureAortic(const double &_mu, const Vector &_mi, const double &_w1, const double &_D1,
                      const double &_A1, const double &_B1)
-      : ShearClosureAnisotropic(_mu, _mi), Gi(3), w1(_w1), D1(_D1), A1(_A1), B1(_B1) 
+      : ShearClosure(_mu, _mi), Gi(3), w1(_w1), D1(_D1), A1(_A1), B1(_B1) 
 {
    /* Form Gi */
    for (int i = 0; i < 3; i++)
@@ -183,23 +183,12 @@ void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatri
 void ShearClosureAortic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const
 {
    /* Compute trace values */
-   // const double trc = C.Trace();
-   // DenseMatrix c2(3);
-   // mfem::Mult(C,C,c2);
-   // const double trc2 = c2.Trace();
+   double j1, j2, j4, j5;
+   ComputeIsotropicInvariantsReduced(C, j1, j2);
+   ComputeAnisotropicInvariantsAortic(C, j4, j5);
 
-   // if (mu == -1.)
-   // {
-   //    MFEM_ABORT("Must set shear modulus.\n");
-   // }
-
-   // /* compute j4 and j5 */
-   // double j4, j5;
-   // ComputeAnisotropicInvariantsAortic(C, j4, j5);
-
-   // des_dj4 = 2. * w1 * D1 * (exp(A2 * (j4 - 1.)) - trc * exp(B2 * (j5 - trc * j4 + (trc*trc - trc2) / 2. - 1.)));
-   // des_dj5 = 2. * w1 * D1 * B2 * exp(B2 * (j5 - trc * j4 + (trc*trc - trc2) / 2. - 1.)));
-   MFEM_ABORT("NEED OVERRIDE");
+   des_dj4 = 2. * w1 * D1 * (exp(A2 * (j4 - 1.)) - j1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)));
+   des_dj5 = 2. * w1 * D1 * B2 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.));
 }
 
 void ShearClosureAortic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigma) const

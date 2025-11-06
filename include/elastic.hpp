@@ -213,75 +213,6 @@ public:
       double _e_shear = shear_closure_model->ComputeShearEnergy(F, rho0);
       return _e_shear;
    }   
-
-   void compute_i4_i5(const DenseMatrix &c, double &i4, double &i5) const
-   {
-      assert(shear_eos == ShearEOS::AORTIC);
-
-      /* compute i4 and i5 */
-      DenseMatrix _res(3), _res2(3);
-      Mult(c, Gi, _res);
-      i4 = _res.Trace();
-      Mult(c, c, _res);
-      Mult(_res, Gi, _res2);
-      i5 = _res2.Trace();
-   }
- 
-   double des_di4(const DenseMatrix &c) const
-   {
-      /* Compute trace values */
-      const double trc = c.Trace();
-      DenseMatrix c2(3);
-      mfem::Mult(c,c,c2);
-      const double trc2 = c2.Trace();
-
-      assert(shear_eos == ShearEOS::AORTIC);
-
-      if (mu == -1.)
-      {
-         MFEM_ABORT("Must set shear modulus.\n");
-      }
-
-      /* compute i4 and i5 */
-      double i4, i5;
-      compute_i4_i5(c, i4, i5);
-
-      double val = 2. * w1 * D1 * (exp(A2 * (i4 - 1.)) - trc * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.)));
-      if (std::isnan(val))
-      {
-         val = 0.;
-         MFEM_WARNING("Aortic EOS shear energy derivative computation failed in des_di4.\n");
-      }
-      return val;
-   }
- 
-   double des_di5(const DenseMatrix &c) const
-   {
-      /* Compute trace values */
-      const double trc = c.Trace();
-      DenseMatrix c2(3);
-      mfem::Mult(c,c,c2);
-      const double trc2 = c2.Trace();
-
-      assert(shear_eos == ShearEOS::AORTIC);
-
-      if (mu == -1.)
-      {
-         MFEM_ABORT("Must set shear modulus.\n");
-      }
-
-      /* compute i4 and i5 */
-      double i4, i5;
-      compute_i4_i5(c, i4, i5);
-
-      double val = 2. * w1 * D1 * exp(B2 * (i5 - trc * i4 + (trc*trc - trc2) / 2. - 1.));
-      if (std::isnan(val))
-      {
-         val = 0.;
-         MFEM_WARNING("Aortic EOS shear energy derivative computation failed in des_di5.\n");
-      }
-      return val;
-   }
  
    void ComputeAvgF(const int e, DenseMatrix &F) const
    {
@@ -425,8 +356,11 @@ public:
       if (shear_eos == ShearEOS::AORTIC)
       {
          // cout << "===== Anisotropic contribution =====\n";
+         double des_di4, des_di5;
+         shear_closure_model->ComputeShearEnergyAnisotropicDerivatives(C, des_di4, des_di5);
+         
          /* des_di4 portion */
-         double c4_coeff = des_di4(c);
+         double c4_coeff = des_di4;
          DenseMatrix c4_tf(3), c5_tf(3), _tmp(3), _tmp2(3);
          mfem::Mult(F, Gi, _tmp);
          mfem::Mult(_tmp, FT, c4_tf);
@@ -436,7 +370,7 @@ public:
          mfem::Add(S, c4_tf, c4_coeff, S);
 
          /* des_di5 portion */
-         double c5_coeff = 2. * des_di5(c);
+         double c5_coeff = 2. * des_di5;
          mfem::Mult(F, C, _tmp);
          mfem::Mult(_tmp, Gi, _tmp2);
          mfem::Mult(_tmp2, F, c5_tf);

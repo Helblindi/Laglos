@@ -238,34 +238,34 @@ public:
       std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n";
    }
    /* ProblemDescription */
-   double internal_energy(const Vector &U, const double e_sheer)
+   double internal_energy(const Vector &U, const double e_shear)
    {
       const double &rho = 1./U[0];
-      const double &e = specific_internal_energy(U, e_sheer);
+      const double &e = specific_internal_energy(U, e_shear);
       return rho * e;
    }
 
-   double specific_internal_energy(const Vector &U, const double e_sheer)
+   double specific_internal_energy(const Vector &U, const double e_shear)
    {
-      // Verify e_sheer > 0.
-      // TODO: This is a temporary fix. The correct fix is to ensure that e_sheer is always positive.
-      // assert(e_sheer >=  -std::numeric_limits<double>::epsilon());
-      /* Subtract out kinetic and sheer energy */
+      // Verify e_shear > 0.
+      // TODO: This is a temporary fix. The correct fix is to ensure that e_shear is always positive.
+      // assert(e_shear >=  -std::numeric_limits<double>::epsilon());
+      /* Subtract out kinetic and shear energy */
       Vector v;
       velocity(U, v);
       double E = U[dim + 1]; // specific total energy
       double _ske = 0.5 * pow(v.Norml2(), 2); // specific kinetic energy
-      if (std::isnan(e_sheer) || std::isnan(E) || std::isnan(_ske))
+      if (std::isnan(e_shear) || std::isnan(E) || std::isnan(_ske))
       {
-         cout << "E: " << E << ", v: " << v.Norml2() << ", e_sheer: " << e_sheer << ", _ske: " << _ske << endl;
+         cout << "E: " << E << ", v: " << v.Norml2() << ", e_shear: " << e_shear << ", _ske: " << _ske << endl;
          MFEM_ABORT("NaN values in specific internal energy computation.\n");
       }
-      double val = E - _ske - e_sheer;
+      double val = E - _ske - e_shear;
 
       // Verify sie > 0.
       if (val <  -std::numeric_limits<double>::epsilon())
       {
-         cout << "sie computation. E: " << E << ", ke: " << 0.5 * pow(v.Norml2(), 2) << ", esheer: " << e_sheer << ", sie: " << val << endl;
+         cout << "sie computation. E: " << E << ", ke: " << 0.5 * pow(v.Norml2(), 2) << ", esheer: " << e_shear << ", sie: " << val << endl;
          MFEM_ABORT("Specific internal energy is negative or zero.\n");
       }
 
@@ -524,7 +524,7 @@ public:
       /* Compute dim x dim stress tensor */
       DenseMatrix sigma(dim);
       const double rho = 1./ U[0];
-      const double es = e_sheer(e);
+      const double es = e_shear(e);
       const double sie = specific_internal_energy(U, es);
       const double _pressure = pressure(rho, sie, cell_attr);
 
@@ -596,7 +596,7 @@ public:
 
    void set_rho0_vec(const Vector &_rho0_vec) { rho0_v = _rho0_vec; }
 
-   virtual double e_sheer(const int &e) const
+   virtual double e_shear(const int &e) const
    {
       const double rho0 = rho0_v(e);
 
@@ -655,7 +655,7 @@ public:
     * @param t The time as a double.
     * @return The total specific energy as a double.
     *
-    * NOTE: There is no sheer energy at initial time.
+    * NOTE: There is no shear energy at initial time.
     */
    double ste0(const Vector &x, const double & t)
    {

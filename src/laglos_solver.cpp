@@ -486,7 +486,7 @@ void LagrangianLOOperator::ComputeESheerGF(ParGridFunction &e_sheer_gf) const
 
    for (int e = 0; e < NDofs_L2; e++)
    {
-      e_sheer_gf[e] = pb->e_sheer(e);
+      e_sheer_gf[e] = pb->e_shear(e);
    }
 }
 
@@ -500,7 +500,7 @@ void LagrangianLOOperator::ComputePressGF(const Vector &S, ParGridFunction &pres
       double _esheer = 0.;
       if (use_elasticity)
       {
-         _esheer = pb->e_sheer(i);
+         _esheer = pb->e_shear(i);
       }
       double sie = pb->specific_internal_energy(U, _esheer);
       int el_i = L2.GetElementForDof(i);
@@ -1806,12 +1806,12 @@ void LagrangianLOOperator::BuildDijMatrix(const Vector &S)
             // double b_covolume = .1 / (max(1./Uc[0], 1./Ucp[0]));
             // pb->lm_update(b_covolume);
 
-            // Compute sheer energy, if applicable
+            // Compute shear energy, if applicable
             double esl = 0., esr = 0.;
             if (use_elasticity)
             {
-               esl = pb->e_sheer(dof_it);
-               esr = pb->e_sheer(cj);
+               esl = pb->e_shear(dof_it);
+               esr = pb->e_shear(cj);
             }
 
             // Compute pressure with given EOS
@@ -2168,9 +2168,9 @@ void LagrangianLOOperator::ComputeKidderAvgDensityAndEntropy(const Vector &S, do
    {
       GetStateVector(S, cell_it, U);
       double density = 1. / U[0]; 
-      double e_sheer = 0.;
-      if (use_elasticity) { e_sheer = pb->e_sheer(cell_it); }
-      double sie = pb->specific_internal_energy(U, e_sheer);
+      double e_shear = 0.;
+      if (use_elasticity) { e_shear = pb->e_shear(cell_it); }
+      double sie = pb->specific_internal_energy(U, e_shear);
       double pressure = pb->pressure(density, sie, pmesh->GetAttribute(cell_it));
       double entropy = pressure / pow(density, pb->get_gamma());
 
@@ -4394,9 +4394,9 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       GetStateVector(S, i, U);
       pb->velocity(U, vel);
       double rho = 1. / U[0];
-      double e_sheer = 0.;
-      if (use_elasticity) { e_sheer = pb->e_sheer(i); }
-      double sie = pb->specific_internal_energy(U, e_sheer);
+      double e_shear = 0.;
+      if (use_elasticity) { e_shear = pb->e_shear(i); }
+      double sie = pb->specific_internal_energy(U, e_shear);
       int el_i = L2.GetElementForDof(i);
       int attr = pmesh->GetAttribute(el_i);
       pressure = pb->pressure(rho, sie, attr);
@@ -4445,7 +4445,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
                     << "," << sigmaD(0,0) - pressure
                     << "," << sigmaD(1,1) - pressure
                     << "," << sigmaD(2,2) - pressure
-                    << "," << e_sheer;
+                    << "," << e_shear;
       }
       fstream_sv << "\n";
    }

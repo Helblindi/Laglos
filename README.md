@@ -247,7 +247,7 @@ representative value
 Laglos has the capability to handle multimaterial test problems, and this is implemented through the 
 cell attribute values defined in the mesh. For each element that should be treated as a solid,
 the cell attribute in the mesh should be set to 50. When the use-elasticity ['-ue'] is used in 
-a Laglos execution, the elastic flux and elastic sheer with be computed only if the cell
+a Laglos execution, the elastic flux and elastic shear with be computed only if the cell
 attribute value is set to 50. Otherwise, a non-elastic flux will be used.
 
 ## Examples

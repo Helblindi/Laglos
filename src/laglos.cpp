@@ -103,7 +103,7 @@
 *     p = 43 --> riemann
 *     p = 50 --> elastic shocktube
 *     p = 51 --> elastic impact
-*     p = 52 --> elastic sheer
+*     p = 52 --> elastic shear
 *     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"
@@ -1049,7 +1049,7 @@ int main(int argc, char *argv[]) {
                         "F/rho", Wx, Wy, Ww, Wh);
          Wx += offx;
          VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
-                        "e sheer", Wx, Wy, Ww, Wh);
+                        "e shear", Wx, Wy, Ww, Wh);
       }
       
       Wx = 0;
@@ -1263,7 +1263,7 @@ int main(int argc, char *argv[]) {
       paraview_dc->RegisterField("Pressure", &press_gf);
       paraview_dc->RegisterField("Gamma", &gamma_gf);
       paraview_dc->RegisterField("Deviatoric Stress Frobenius Norm", &sigma_gf);
-      paraview_dc->RegisterField("e sheer", &e_sheer_gf);
+      paraview_dc->RegisterField("e shear", &e_sheer_gf);
       paraview_dc->SetCycle(0);
       paraview_dc->SetTime(0.0);
       paraview_dc->Save();
@@ -1521,7 +1521,7 @@ int main(int argc, char *argv[]) {
                               "F/rho", Wx, Wy, Ww, Wh);
                Wx += offx;
                VisualizeField(vis_esheer, vishost, visport, e_sheer_gf,
-                              "e sheer", Wx, Wy, Ww, Wh);
+                              "e shear", Wx, Wy, Ww, Wh);
             }
 
             if (problem_class->has_exact_solution())

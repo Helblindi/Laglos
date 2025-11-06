@@ -193,10 +193,10 @@ int tester()
 
    /* If F is the identity, then es = 0 */
    DenseMatrix sigma(3);
-   double e_sheer = -1.;
+   double e_shear = -1.;
    problem_class->ComputeS(0, sigma);
-   e_sheer = problem_class->e_sheer(0);
-   if (e_sheer > tol)
+   e_shear = problem_class->e_shear(0);
+   if (e_shear > tol)
    {
       cout << "Sheer energy is not zero.\n";
       return 1;

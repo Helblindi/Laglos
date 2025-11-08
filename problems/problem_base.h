@@ -48,13 +48,16 @@ namespace hydroLO
 enum ShearEOS {
    NEO_HOOKEAN,
    MOONEY_RIVLIN,
-   AORTIC,         // anisotropic model
-   TRANSVERSELY_ISOTROPIC
+   /* anisotropic models */
+   AORTIC,
+   TRANSVERSELY_ISOTROPIC,
+   /* multi material */
+   MULTIPLE_SHEAR_EOS
 };
 
 class ProblemBase
 {
-private:
+protected:
    bool distort_mesh = false;
    bool known_exact_solution = false;
    bool th_bcs = false; // Indicator for thermo boundary conditions to be imposed on the thermo solution
@@ -91,7 +94,6 @@ private:
    double stiffness = 9.63E5;
    double A1 = 0.5 * stiffness, B1 = 0.5 * stiffness, A2 = 1., B2 = 1., D1 = 0.5 * (1.5*stiffness), w1 = 0.49;
 
-protected:
    const int dim;
    double a = 0., b = 0., gamma = 0.;
    double q = 0., p_inf = 0.;
@@ -110,6 +112,7 @@ protected:
             case ShearEOS::MOONEY_RIVLIN:          return "MOONEY_RIVLIN";
             case ShearEOS::AORTIC:                 return "AORTIC";
             case ShearEOS::TRANSVERSELY_ISOTROPIC: return "TRANSVERSELY_ISOTROPIC";
+            case ShearEOS::MULTIPLE_SHEAR_EOS:     return "MULTIPLE_SHEAR_EOS";
         }
         return "Unknown";
     }
@@ -471,11 +474,11 @@ public:
     *
     * NOTE: @param sig_dev is not assumed to be dim x dim.
     */
-   inline void ComputeSigma(const int &e, const double &pressure, DenseMatrix &sigma, const int&cell_attr=0)
+   inline void ComputeSigma(const int &e, const double &pressure, DenseMatrix &sigma, const int&cell_attr)
    {
       // cout << "ProblemBase::ComputeSigma\n";
       DenseMatrix sig_dev(3);
-      ComputeS(e, sig_dev);
+      ComputeS(e, sig_dev, cell_attr);
 
       DenseMatrix I(dim);
       I = 0.;
@@ -507,7 +510,7 @@ public:
     */
    inline DenseMatrix ElasticFlux(const int &e, const Vector &U, const int &cell_attr=0)
    {
-      if (cell_attr != 50)
+      if (cell_attr < 50)
       {
          MFEM_WARNING("Elastic cell must have attribute 50.\n");
          return flux(U, cell_attr);
@@ -524,7 +527,7 @@ public:
       /* Compute dim x dim stress tensor */
       DenseMatrix sigma(dim);
       const double rho = 1./ U[0];
-      const double es = e_shear(e);
+      const double es = e_shear(e, cell_attr);
       const double sie = specific_internal_energy(U, es);
       const double _pressure = pressure(rho, sie, cell_attr);
 
@@ -588,6 +591,10 @@ public:
             
             break;
          }
+         case 5: // Multiple Shear EOS
+            shear_eos = ShearEOS::MULTIPLE_SHEAR_EOS;
+            // shear_closure_model = new ShearClosureMultipleShearEOS(mu);
+            break;
          default:
             MFEM_ABORT("Invalid value for shear_eos.");
       }
@@ -596,7 +603,7 @@ public:
 
    void set_rho0_vec(const Vector &_rho0_vec) { rho0_v = _rho0_vec; }
 
-   virtual double e_shear(const int &e) const
+   virtual double e_shear(const int &e, const int &cell_attr) const
    {
       const double rho0 = rho0_v(e);
 
@@ -606,7 +613,7 @@ public:
       return _e_shear;
    }
 
-   void ComputeS(const int &e, DenseMatrix &S) const
+   virtual void ComputeS(const int &e, DenseMatrix &S, const int &cell_attr) const
    {
       /* Objects needed in function */
       DenseMatrix F(3);

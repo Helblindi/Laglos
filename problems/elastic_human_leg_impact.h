@@ -32,6 +32,7 @@
 #include "mfem.hpp"
 #include "problem_base.h"
 #include "riemann1D.hpp"
+#include "shear_closure.hpp"
 #include <cmath>
 
 using namespace mfem;
@@ -48,19 +49,29 @@ private:
    /*********************************************************
     * Problem Specific constants
     *********************************************************/
-   double _gamma = 4.22;
+   double _gamma = 4.2;
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
-   bool _mvbcs = false; // Indicator for mv boundary conditions
+   bool _mvbcs = true; // Indicator for mv boundary conditions
    string _indicator = "ElasticHumanLegImpact";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
    // 5.2 elastic projectile plate section 7.1
    double rho_bone = 1986., rho_flesh = 1000., rho_bar = 2400.; // kg/m^3
    double v_proj = -13.4112; // m/s, equivalent to 30 mph impact speed
-   const double p_inf = 3.42E8; // Pa
+   const double p_inf = 2.39E10; // Pa
+   // const double p_inf = 3.42E8; // Pa
    /* Different shear moduli for projectile plate */
-   const double _mu = 9.2E8; // Pa
+   const double _mu = 1.3E10; // Pa
+   // const double _mu = 9.2E8; // Pa
+   double E_bone = 1.89E10, EA_bone = 1.029E10;
+   double GA_bone = 5.63E9, nu_bone = 0.312;
+   double E_flesh = 1.729E6, EA_flesh = 1.E6;
+   double GA_flesh = 4.59E5, nu_flesh = 0.4;
+   double _theta = M_PI/2.;
+   ShearClosure *shear_closure_bone = nullptr;
+   ShearClosure *shear_closure_flesh = nullptr;
+   ShearClosure *shear_closure_bar = nullptr;
 
 
    /* helper function to determine the region based on x,y coords */
@@ -103,6 +114,17 @@ public:
 
       // Set Equation of state
       this->eos = std::unique_ptr<EquationOfState>(new NobleAbelStiffenedGasEOS(this->b,this->q,this->p_inf));
+
+      // Overwrite mi vector for anisotropic models
+      theta = _theta;
+      mi_vec.SetSize(3);
+      mi_vec(0) = cos(theta);
+      mi_vec(1) = sin(theta);
+      mi_vec(2) = 0.;
+      // Set elastic models
+      shear_closure_bone = new ShearClosureTransverselyIsotropic(mu, mi_vec, E_bone, EA_bone, GA_bone, nu_bone);
+      shear_closure_flesh = new ShearClosureTransverselyIsotropic(mu, mi_vec, E_flesh, EA_flesh, GA_flesh, nu_flesh);
+      shear_closure_bar = new ShearClosureNeoHookean(mu);
    }
    
    /* Override specific update functions */
@@ -128,8 +150,8 @@ public:
    }
 
    /*********************************************************
-    * Initial State functions
-    *********************************************************/
+   * Initial State functions
+   *********************************************************/
    double rho0(const Vector &x, const double & t) const override
    {
       assert(t < 1e-12); // No exact solution
@@ -159,6 +181,56 @@ public:
       double _p = p0(x,t);
       return this->eos->energy(_p, _rho, _gamma);
    }
+
+   /*********************************************************
+   * Elastic functions
+   *********************************************************/
+   double e_shear(const int &e, const int &cell_attr) const override
+   {
+      const double rho0 = rho0_v(e);
+      DenseMatrix F(dim);
+      elastic->ComputeAvgF(e,F);
+      switch (cell_attr)
+      {
+         case 51: // bone
+            return shear_closure_bone->ComputeShearEnergy(F, rho0);
+         case 52: // flesh
+            return shear_closure_flesh->ComputeShearEnergy(F, rho0);
+         case 53: // bar
+            return shear_closure_bar->ComputeShearEnergy(F, rho0);
+         default:
+         {
+            cout << "cell_attr = " << cell_attr << "\n";
+            MFEM_ABORT("Invalid cell attribute in ElasticHumanLegImpact::e_shear");
+         }
+      }
+      return 0.;
+   }
+
+   void ComputeS(const int &e, DenseMatrix &S, const int &cell_attr) const override
+   {
+      DenseMatrix F(3);
+      elastic->ComputeAvgF(e, F);
+      switch (cell_attr)
+      {
+         case 51: // bone
+            shear_closure_bone->ComputeCauchyStress(F, S);
+            return;
+         case 52: // flesh
+            shear_closure_flesh->ComputeCauchyStress(F, S);
+            return;
+         case 53: // bar
+            shear_closure_bar->ComputeCauchyStress(F, S);
+            return;
+         default:
+         {
+            cout << "cell_attr = " << cell_attr << "\n";
+            MFEM_ABORT("Invalid cell attribute in ElasticHumanLegImpact::ComputeS");
+         }
+      }
+      return;
+   }
+
 }; // End class
 
 } // ns hydroLO

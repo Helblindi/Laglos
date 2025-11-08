@@ -24,19 +24,6 @@ void ShearClosure::ComputeIsotropicInvariantsReduced(const DenseMatrix &C, doubl
    j2 = c2.Trace();
 }
 
-void ShearClosure::ComputeAnisotropicInvariants(const Vector &mi, const DenseMatrix &C, double &j4, double &j5) const
-{
-   // MFEM_WARNING("SHEAR ENERGY CHECK");
-   Vector Cmi(3), C2mi(3);
-   C.Mult(mi, Cmi);
-   j4 = mfem::InnerProduct(mi, Cmi);
-
-   DenseMatrix C2(3);
-   mfem::Mult(C, C, C2);
-   C2.Mult(mi, C2mi);
-   j5 = mfem::InnerProduct(mi, C2mi);
-}
-
 void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const
 {
    DenseMatrix FT(3), C(3), c(3), c2(3), B(3), b(3),b2(3), I(3);
@@ -140,7 +127,7 @@ ShearClosureAortic::ShearClosureAortic(const double &_mu, const Vector &_mi, con
       }
    }
 }
-void ShearClosureAortic::ComputeAnisotropicInvariantsAortic(const DenseMatrix &C, double &j4, double &j5) const
+void ShearClosureAortic::ComputeAnisotropicInvariants(const DenseMatrix &C, double &j4, double &j5) const
 {
    /* compute j4 and j5 */
    DenseMatrix c(3);
@@ -162,7 +149,7 @@ double ShearClosureAortic::ComputeShearEnergy(const DenseMatrix &F, const double
    FT.Transpose(F);
    mfem::Mult(FT, F, C);
    ComputeIsotropicInvariantsReduced(C, j1, j2);
-   ComputeAnisotropicInvariantsAortic(C, j4, j5);
+   ComputeAnisotropicInvariants(C, j4, j5);
    
    /* Compute shear energy */
    double val = (1. - 2 * w1) * ((A1 / 2.) * (j1 - 3.) + (B1 / 4.) * (j1*j1 - j2 - 6.));
@@ -200,7 +187,7 @@ void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatri
    /* Compute trace values */
    double j1, j2, j4, j5;
    ComputeIsotropicInvariantsReduced(C, j1, j2);
-   ComputeAnisotropicInvariantsAortic(C, j4, j5);
+   ComputeAnisotropicInvariants(C, j4, j5);
 
    des_dj1 = (1. - 2. * w1) * (A1 / 2. + (B1 / 2.) * j1);
    des_dj1 += 2. * w1 * D1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)) * (-j4 + j1);
@@ -209,12 +196,15 @@ void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatri
    des_dj2 -= w1 * D1 * B2 / B1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)) * (-j4 + j1);
 }
 
-void ShearClosureAortic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const
+void ShearClosureAortic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const
 {
    /* Compute trace values */
    double j1, j2, j4, j5;
+   DenseMatrix FT(3), C(3);
+   FT.Transpose(F);
+   mfem::Mult(FT, F, C);
    ComputeIsotropicInvariantsReduced(C, j1, j2);
-   ComputeAnisotropicInvariantsAortic(C, j4, j5);
+   ComputeAnisotropicInvariants(C, j4, j5);
 
    des_dj4 = 2. * w1 * D1 * (exp(A2 * (j4 - 1.)) - j1 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.)));
    des_dj5 = 2. * w1 * D1 * B2 * exp(B2 * (j5 - j1 * j4 + (j1*j1 - j2) / 2. - 1.));
@@ -227,7 +217,7 @@ void ShearClosureAortic::ComputeCauchyStressAnisotropicComponent(const DenseMatr
    mfem::Mult(FT, F, C);
 
    double des_dj4, des_dj5;
-   ComputeAnisotropicInvariantsAortic(C, des_dj4, des_dj5);
+   ComputeAnisotropicInvariants(C, des_dj4, des_dj5);
 
    DenseMatrix c(3), c2(3), I(3);
    c = C;
@@ -262,54 +252,114 @@ void ShearClosureAortic::ComputeCauchyStressAnisotropicComponent(const DenseMatr
 ***************************************************************************/
 void ShearClosureTransverselyIsotropic::ComputeMaterialParameters()
 {
+   cout << "Computing material parameters for Transversely Isotropic Shear Closure\n";
    assert(1 + nu != 0.);
+   n = EA / E;
    m = 1. - nu - 2. * n * nu * nu;
    assert(m != 0.);
-   n = EA / E;
    lambda = E * nu * (1. + n * nu) / (m * (1. + nu));
    mu = 0.5 * E / (1. + nu);
    alpha = mu - GA;
    beta = E * nu * nu * (1 - n) / (4 * m * (1 + nu));
    gamma = EA * (1. - nu) / (8 * m) - (lambda + 2. * mu) / 8. + 0.5 * alpha - beta;
+   cout << "m: " << m << ", n: " << n << ", lambda: " << lambda << ", mu: " << mu << endl;
+   cout << "alpha: " << alpha << ", beta: " << beta << ", gamma: " << gamma << endl;
+}
+
+void ShearClosureTransverselyIsotropic::ComputeAnisotropicInvariants(const DenseMatrix &C, double &j4, double &j5) const
+{
+   // MFEM_WARNING("SHEAR ENERGY CHECK");
+   Vector Cmi(3), C2mi(3);
+   C.Mult(mi, Cmi);
+   j4 = mfem::InnerProduct(mi, Cmi);
+
+   DenseMatrix C2(3);
+   mfem::Mult(C, C, C2);
+   C2.Mult(mi, C2mi);
+   j5 = mfem::InnerProduct(mi, C2mi);
 }
 
 double ShearClosureTransverselyIsotropic::ComputeShearEnergy(const DenseMatrix &F, const double &rho0) const
 {
    double e_shear = 0.0;
    /* NH part (isotropic) */
-   double I1, I2, I3, J;
+   double J1, J2, J3, J;
    DenseMatrix FT(3), C(3);
    FT.Transpose(F);
    mfem::Mult(FT, F, C);
-   ComputeIsotropicInvariants(C, I1, I2, I3);
+   ComputeIsotropicInvariants(C, J1, J2, J3);
    J = F.Det();
-   e_shear = 0.5 * mu * (I1 - 3.) - mu * log(J) + 0.5 * lambda * pow(J - 1., 2);
+   e_shear = 0.5 * mu * (J1 - 3.) - mu * log(J) + 0.5 * lambda * pow(J - 1., 2);
 
    /* Transversely isotropic part */
-   double I4, I5;
-   ComputeAnisotropicInvariants(mi, C, I4, I5);
-   e_shear += (alpha + beta * log(J) + gamma * (I4 - 1.) ) * (I4 - 1.) - 0.5 * alpha * (I5 - 1.);
+   double J4, J5;
+   ComputeAnisotropicInvariants(C, J4, J5);
+   e_shear += (alpha + beta * log(J) + gamma * (J4 - 1.) ) * (J4 - 1.) - 0.5 * alpha * (J5 - 1.);
 
-   return e_shear;
+   return e_shear / rho0;
+}
+
+void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const
+{
+   // cout << "\n\nShearClosureTransverselyIsotropic::ComputeCauchyStress\n\n";
+   DenseMatrix FT(3), C(3), b(3), I(3);
+   Vector a(3); // a = F * mi
+   F.Mult(mi, a);
+   double J = F.Det();
+   I = 0.;
+   for (int i = 0; i < 3; i++) { I(i,i) = 1.; }
+   sigmaD.SetSize(3);
+   sigmaD = 0.;
+
+   FT.Transpose(F);
+   mfem::Mult(FT, F, C);
+   mfem::Mult(F, FT, b);
+
+   /* Isotropic part */
+   mfem::Add(b, I, -1., sigmaD);
+   sigmaD *= mu / J;
+   mfem::Add(sigmaD, I, lambda*(J-1.), sigmaD);
+
+   /* Anisotropic part */
+   double J4, J5;
+   ComputeAnisotropicInvariants(C, J4, J5);
+   DenseMatrix sigmaD_an(3);
+   sigmaD_an = I;
+   sigmaD_an *= 2.*beta*(J4-1.);
+   DenseMatrix _tmp_mat(3);
+   Vector _tmp_vec(3);
+   tensor(a, a, _tmp_mat);
+   double coeff = 2. * (alpha + 2. * beta * log(J) + 2. * gamma * (J4 - 1.));
+   sigmaD_an.Add(coeff, _tmp_mat);
+   coeff = -alpha;
+   b.Mult(a, _tmp_vec);
+   tensor(_tmp_vec, a, _tmp_mat);
+   sigmaD_an.Add(coeff, _tmp_mat);
+   tensor(a, _tmp_vec, _tmp_mat);
+   sigmaD_an.Add(coeff, _tmp_mat);
+   sigmaD_an *= 1. / J;
+   sigmaD.Add(1., sigmaD_an);
+   return;
 }
 
 void ShearClosureTransverselyIsotropic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
 {
-   // Implement isotropic derivative computations
    /* NH part (isotropic) */
-   MFEM_ABORT("NEED OVERRIDE");
+   des_dj1 = 0.5 * mu;
+   des_dj2 = 0.0;
 }
 
-void ShearClosureTransverselyIsotropic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const
+void ShearClosureTransverselyIsotropic::ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const
 {
    // Implement anisotropic derivative computations
-   /* NH part (isotropic) */
-   MFEM_ABORT("NEED OVERRIDE");
-}
-
-void ShearClosureTransverselyIsotropic::ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const
-{
-   MFEM_ABORT("NEED OVERRIDE FOR ANISOTROPIC");
+   double J4, J5, J;
+   DenseMatrix FT(3), C(3);
+   FT.Transpose(F);
+   mfem::Mult(FT, F, C);
+   ComputeAnisotropicInvariants(C, J4, J5);
+   J = F.Det();
+   des_dj4 = 2. * alpha * J4 - alpha + beta * log(J);
+   des_dj5 = -0.5 * alpha;
 }
 
 

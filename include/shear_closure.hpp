@@ -2,6 +2,7 @@
 #define SHEAR_CLOSURE
 
 #include "mfem.hpp"
+#include "laglos_tools.hpp"
 
 namespace mfem {
 namespace hydroLO {
@@ -23,7 +24,7 @@ public:
    virtual void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const {
       MFEM_ABORT("Must override.\n");
    }
-   void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const;
+   virtual void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const;
    void ComputeIsotropicInvariants(const DenseMatrix &C, double &J1, double &J2, double &J3) const;
    void ComputeIsotropicInvariantsReduced(const DenseMatrix &C, double &j1, double &j2) const;
 
@@ -33,14 +34,13 @@ public:
    }
 
    /* Anisotropic functions */
-   virtual void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const {
+   virtual void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const {
       des_dj4 = 0.;
       des_dj5 = 0.;
    }
    virtual void ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const {
       MFEM_ABORT("NEED OVERRIDE FOR ANISOTROPIC");
    }
-   void ComputeAnisotropicInvariants(const Vector &mi, const DenseMatrix &C, double &j4, double &j5) const;
 
 }; // end of ShearClosure class
 
@@ -68,14 +68,14 @@ private:
    double w1, D1, A1, B1;
    double A2 = 1., B2 = 1.;
    DenseMatrix Gi;
-   void ComputeAnisotropicInvariantsAortic(const DenseMatrix &C, double &i4, double &i5) const;
+   void ComputeAnisotropicInvariants(const DenseMatrix &C, double &i4, double &i5) const;
 public:
    ShearClosureAortic(const double &_mu, const Vector &_mi, const double &_w1, const double &_D1,
                       const double &_A1, const double &_B1);
    virtual ~ShearClosureAortic() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
    void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
-   void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const override;
+   void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const override;
    void ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const override;
 }; // end of ShearClosureAortic class
 
@@ -85,15 +85,18 @@ private:
    double E, EA, GA, nu;
    double lambda, mu, alpha, beta, gamma, m, n;
    void ComputeMaterialParameters();
+   void ComputeAnisotropicInvariants(const DenseMatrix &C, double &j4, double &j5) const;
 public:
    ShearClosureTransverselyIsotropic(const double &_mu, const Vector &_mi, const double &_E, const double &_EA,
                                     const double &_GA, const double &_nu)
-      : ShearClosure(_mu, _mi), E(_E), EA(_EA), GA(_GA), nu(_nu) {}
+      : ShearClosure(_mu, _mi), E(_E), EA(_EA), GA(_GA), nu(_nu) {
+         ComputeMaterialParameters();
+      }
    virtual ~ShearClosureTransverselyIsotropic() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
+   void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const override;
    void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
-   void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &C, double &des_dj4, double &des_dj5) const override;
-   void ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const override;
+   void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const override;
 }; // end of ShearClosureTransverselyIsotropic class
 
 } // namespace hydroLO

@@ -83,7 +83,7 @@ class ShearClosureTransverselyIsotropic : public ShearClosure
 {
 private:
    double E, EA, GA, nu;
-   double lambda, mu, alpha, beta, gamma, m, n;
+   double lambda, alpha, beta, gamma, m, n;
    void ComputeMaterialParameters();
    void ComputeAnisotropicInvariants(const DenseMatrix &C, double &j4, double &j5) const;
 public:

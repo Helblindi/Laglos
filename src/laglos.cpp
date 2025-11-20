@@ -252,7 +252,9 @@ int main(int argc, char *argv[]) {
                   "\n\t 00 - No shear energy,"
                   "\n\t 01 - Neo Hookean EOS,"
                   "\n\t 02 - Mooney Rivlin EOS,"
-                  "\n\t 03 - Aortic EOS"); //NF//MS
+                  "\n\t 03 - Aortic EOS,"
+                  "\n\t 04 - Transversely Isotropic EOS"
+                  "\n\t 05 - Multiple shear EOS");
    args.AddOption(&mv_option, "-mv", "--mesh-velocity-option",
                   "Choose how to compute mesh velocities:"
                   "\n\t 00 - Arithmetic avg of adj cells,"

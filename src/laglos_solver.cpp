@@ -865,7 +865,12 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                      Vector face_x(dim), cell_v(dim), cell_vp(dim);
                      H1.GetFaceDofs(fid, face_dofs);
                      int face_dof = face_dofs[2];
-                     geom.GetNodePositionFromBV(S,face_dof, face_x);
+                     /* Compute face_x using average from end nodes of the face */
+                     geom.GetNodePositionFromBV(S,face_dofs[0], face_x);
+                     Vector face_x2(dim);
+                     geom.GetNodePositionFromBV(S,face_dofs[1], face_x2);
+                     face_x += face_x2;
+                     face_x /= 2.;
                      /* 
                      Need boundary state for Kidder
                      Note that t should have been set using update_additional_BCs

@@ -220,6 +220,7 @@ void Geometric::GetNodePositionFromBV(const Vector &S, const int & node, Vector 
 void Geometric::GetNodePosition(const ParGridFunction &x_gf, const int & node, Vector &x) const
 {
    assert(x_gf.Size() == dim*NDofs_H1);
+   assert(node < NDofs_H1);
    for (int i = 0; i < dim; i++)
    {
       int index = node + i * NDofs_H1;

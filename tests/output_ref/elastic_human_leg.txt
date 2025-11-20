@@ -44,26 +44,8 @@ Options used:
    --no-suppress-output
    --distort-mesh 0
    --no-debug-mesh-velocity
-
-
-MFEM Warning: Non-positive attributes on the boundary!
- ... in function: virtual void mfem::Mesh::SetAttributes()
- ... in file: /Users/madisonsheridan/Workspace/mfem-git/mesh/mesh.cpp:1619
-
-
-
-MFEM Warning: Non-positive attributes on the boundary!
- ... in function: virtual void mfem::Mesh::SetAttributes()
- ... in file: /Users/madisonsheridan/Workspace/mfem-git/mesh/mesh.cpp:1619
-
 Meshing done
 done with serial refinement
-
-
-MFEM Warning: Non-positive attributes on the boundary!
- ... in function: virtual void mfem::Mesh::SetAttributes()
- ... in file: /Users/madisonsheridan/Workspace/mfem-git/mesh/mesh.cpp:1619
-
 done with parallel refinement
 dim: 2, spacedim: 2
 Zones min/max: 316 316
@@ -156,14 +138,14 @@ step 85   ,	t = 0.000009,	dt = 0.00000011,	|e| = 3.7631141283e+08
 step 90   ,	t = 0.000010,	dt = 0.00000011,	|e| = 3.7528191172e+08
 step 95   ,	t = 0.000011,	dt = 0.00000011,	|e| = 3.7431082789e+08
 step 100  ,	t = 0.000011,	dt = 0.00000011,	|e| = 3.7339353789e+08
-Program took 6.8248908333e-01s.
-This amounts to 2.1383916635e-05 s per timestep per gridpoint.
+Program took 6.7079512500e-01s.
+This amounts to 2.1017518643e-05 s per timestep per gridpoint.
 ==================== Runtime breakdown ====================
  total time | t / (dof*ts) 
-                                 Total time: 6.825e-01                    | 2.138e-05
-  Dij calculation: 2.913e-01               | 9.126e-06
-  Mesh Motion calculation: 1.683e-01       | 5.273e-06
+                                 Total time: 6.708e-01                    | 2.102e-05
+  Dij calculation: 2.868e-01               | 8.985e-06
+  Mesh Motion calculation: 1.673e-01       | 5.242e-06
     Hiop calculation (if used): 0.000e+00  | 0.000e+00
   Mesh Motion Linearization: 0.000e+00     | 0.000e+00
-  State Update calculation: 6.834e-01      | 2.141e-05
+  State Update calculation: 6.713e-01      | 2.103e-05
 ===========================================================

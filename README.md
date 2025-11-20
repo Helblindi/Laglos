@@ -212,12 +212,12 @@ and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
 Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
 that can be used are
 
-> - 0  - Free boundary condition
 > - 1  - Used to enforce $v_x = 0$.
 > - 2  - Used to enforce $v_y = 0$.
 > - 3  - Used to enforce $v_z = 0$.
 > - 4  - Used to enforce $v_r = 0$, or in other words 0 radial movement.
-> - 5  - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5+]
+> - 5  - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5-9]
+> - 9  - Free boundary condition
 > - 99 - Off limits as this is used in BdrVertexIndexingArray to indicate corner vertices that should not move at all.
 
 If one chooses to implement BC that are not some version of $v\cdot n = 0$, then

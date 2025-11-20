@@ -52,7 +52,7 @@ private:
    double _gamma = 4.2;
    bool _known_exact_solution = false;
    bool _thbcs = false; // Indicator for thermal boundary conditions
-   bool _mvbcs = true; // Indicator for mv boundary conditions
+   bool _mvbcs = false; // Indicator for mv boundary conditions
    string _indicator = "ElasticHumanLegImpact";
 
    //https://www.sciencedirect.com/science/article/pii/S0021999109002654?fr=RR-2&ref=pdf_download&rr=928faaf93aca69c5
@@ -60,10 +60,11 @@ private:
    double rho_bone = 1986., rho_flesh = 1000., rho_bar = 2400.; // kg/m^3
    double v_proj = -13.4112; // m/s, equivalent to 30 mph impact speed
    const double p_inf = 2.39E10; // Pa
-   // const double p_inf = 3.42E8; // Pa
-   /* Different shear moduli for projectile plate */
    const double _mu = 1.3E10; // Pa
+   /* Different shear moduli */
+   // const double p_inf = 3.42E8; // Pa
    // const double _mu = 9.2E8; // Pa
+   /* Bone and flesh params */
    double E_bone = 1.89E10, EA_bone = 1.029E10;
    double GA_bone = 5.63E9, nu_bone = 0.312;
    double E_flesh = 1.729E6, EA_flesh = 1.E6;
@@ -124,6 +125,8 @@ public:
       // Set elastic models
       shear_closure_bone = new ShearClosureTransverselyIsotropic(mu, mi_vec, E_bone, EA_bone, GA_bone, nu_bone);
       shear_closure_flesh = new ShearClosureTransverselyIsotropic(mu, mi_vec, E_flesh, EA_flesh, GA_flesh, nu_flesh);
+      // shear_closure_bone = new ShearClosureNeoHookean(mu);
+      // shear_closure_flesh = new ShearClosureNeoHookean(mu);
       shear_closure_bar = new ShearClosureNeoHookean(mu);
    }
    

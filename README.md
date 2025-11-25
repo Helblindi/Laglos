@@ -63,9 +63,47 @@ where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the me
 
 The percentage of cells in which mass loss is broken is simply the number of cells in which $\frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho} > 10^{-12}$ divided by the total number of cells in the mesh.
 
-# Select script insructions [located in ${source}/scripts directory]
-## Creating convergence tables
-> To show proper convergence of the utilized numerical method, one can construct a table of multiple error rates from a given test problem.  To valide the numerical method, a convergence order can then be computed from two different refinements.
+## Convergence Analysis
+
+To validate the numerical method and demonstrate proper convergence rates, Laglos includes scripts for generating convergence tables from test problems with known exact solutions.
+
+### Creating Convergence Tables
+
+**Step 1: Configure the test script**
+
+Edit `scripts/convergence_test_script.sh` to specify:
+- Test problem parameters (`-p`, `-m`, `-tf`, `-cfl`)
+- Refinement levels to run (modify the `rs_levels` array)
+- Output directory
+
+**Step 2: Run the convergence test**
+
+```sh
+~/Laglos/scripts> ./convergence_test_script.sh
+```
+This will execute Laglos at each specified refinement level and save the results.
+
+**Step 3: Generate convergence table**
+```sh
+~/Laglos/scripts> python3 compute_convergence.py --results-dir ../build/convergence_results/
+```
+
+**Expected Output**
+
+**TODO:** Add an example convergence table here for the Sod case perhaps. Edit default convergence analysis script to correspond to this output.
+
+When the exact solution of a specific test case is known, we measure the composite relative $L^1$ error by computing:
+$$
+\delta^1(t) :=
+\frac{\|\tau_h(t)-\tau(t)\|_{L^1(D)}}{\|\tau(t)\|_{L^1(D)}}
++\frac{\|\mathbf{v}_h(t)-\mathbf{v}(t)\|_{L^1(D)}}{\|\mathbf{v}(t)\|_{L^1(D)}}
++\frac{\|E_h(t)-E(t)\|_{L^1(D)}}{\|E(t)\|_{L^1(D)}}.
+$$
+
+The convergence order between two refinement levels is computed by comparing the error norms. For a method expected to have $p$-th order convergence, the error should satisfy:
+$$
+\text{rate} = \frac{log(e_1/e_2)}{log(h_1/h_2)} \approx p
+$$
 
 
 # Select HiOp Notes

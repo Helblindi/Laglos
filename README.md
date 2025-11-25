@@ -6,10 +6,22 @@ Laglos (LAGrangian Low-Order Solver) is a high-performance computational fluid d
 - [Key Features](#key-features)
 - [Applications](#applications)
 - [Building Laglos](#building-laglos)
+  - [Dependencies](#dependencies)
+  - [Build Instructions](#build-instructions)
+  - [Building Laghos Extension](#building-laghos-extension)
 - [Quick Start](#quick-start)
-- [Runtime Parameters](#optional-runtime-parameters)
-- [Examples](#examples)
-- [Handling Boundary Conditions](#handling-boundary-conditions)
+  - [Hydrodynamics Examples](#hydrodynamics-examples)
+  - [Elasticity Examples](#elasticity-examples)
+- [Runtime Parameters](#runtime-parameters)
+- [Verification and Validation](#verification-and-validation)
+  - [Mass Conservation](#mass-conservation)
+  - [Convergence Analysis](#convergence-analysis)
+- [Advanced Topics](#advanced-topics)
+  - [Boundary Conditions](#boundary-conditions)
+  - [Multi-Material Meshes](#multi-material-meshes)
+  - [Elastic Problems](#elastic-problems)
+- [Contributing](#contributing)
+- [References](#references)
 
 ## Key Features
 
@@ -17,248 +29,147 @@ Laglos (LAGrangian Low-Order Solver) is a high-performance computational fluid d
 - **Low-Order Finite Elements**: Uses robust DG0/Q1 discretizations for improved stability
 - **Flexible Problem Suite**: Includes classic test problems (Sod shock tube, Sedov blast wave, Noh implosion, etc.)
 - **Advanced Physics**: Supports various equations of state including Van der Waals gas models
+- **Multi-Material Support**: Handle elastic-plastic materials and multi-phase flows
 - **Viscosity Options**: Multiple artificial viscosity formulations for shock capturing
 - **Mesh Velocity Algorithms**: Configurable mesh motion schemes for optimal Lagrangian evolution
+- **HiOp Integration**: Advanced optimization capabilities for mesh movement
 
 ## Applications
 
 Laglos is designed for:
 - Compressible hydrodynamics research
 - Shock physics simulations
+- Elastic-plastic material modeling
 - Inertial confinement fusion modeling
 - Algorithm development for Lagrangian methods
-> ## Optional runtime parameters
-> - -mv - mesh velocity option
-> - -fv - face velocity option 
-> - -mv-iter-n - number of iterations that should be used for mesh velocity calculations
-> - -m - mesh file to use 
-> - -p - problem to run
-> - -rs - number of serial refinements
-> - -rp - number of parallel refinements (parallel not implemented)
-> - -of - designate the output folder where results should be saved to
-> - -print
-> - -mm
-> - -visc - type of viscosity to use
-> - -greedy - Use greedy viscosity described in GMPST2024.
-> - -ggn - Number of GMV steps to take before using Greedy lambda
-> - -ms - maximum steps that the solver should take 
-> - -vs - the number of steps that should pass between visualizing the solution
-> - -vis - enable visualization
-> - -visit - Enable outputting visit files
-> - -gfprint
-> - -tf - designate final time 
-> - -ti - initial time (does not work for all test cases)
-> - -cfl - Courant-Friedrichs-Lewy condition
-> - -cm - check mesh
-> - -do-mv-lin - enable mv linearization
-> - -tvc - Target velocity optimization viscosity coefficient parameter
-> - -ppd - Post process the density to give mass conservative update
 
-
-## Mass Error Calculation
-All calculations related to the local mass error are calculated in the function LagrangianLOOperator::ValidateMassConservation.
-The mass error is a relative quantity and is defined as 
-$$ \text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho}}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}} $$
-where $m_c^{\rho}$ is the initial mass of a cell, $\left|K_c^n\right|$ is the measure of the cell at time $t^n$, and $T_c^n$ is the specific volume of a cell at time $t^n$.
-
-The percentage of cells in which mass loss is broken is simply the number of cells in which $\frac{\left|K_c^n\right|}{T_c^n} - m_c^{\rho} > 10^{-12}$ divided by the total number of cells in the mesh.
-
-## Convergence Analysis
-
-To validate the numerical method and demonstrate proper convergence rates, Laglos includes scripts for generating convergence tables from test problems with known exact solutions.
-
-### Creating Convergence Tables
-
-**Step 1: Configure the test script**
-
-Edit `scripts/convergence_test_script.sh` to specify:
-- Test problem parameters (`-p`, `-m`, `-tf`, `-cfl`)
-- Refinement levels to run (modify the `rs_levels` array)
-- Output directory
-
-**Step 2: Run the convergence test**
-
-```sh
-~/Laglos/scripts> ./convergence_test_script.sh
-```
-This will execute Laglos at each specified refinement level and save the results.
-
-**Step 3: Generate convergence table**
-```sh
-~/Laglos/scripts> python3 compute_convergence.py --results-dir ../build/convergence_results/
-```
-
-**Expected Output**
-
-**TODO:** Add an example convergence table here for the Sod case perhaps. Edit default convergence analysis script to correspond to this output.
-
-When the exact solution of a specific test case is known, we measure the composite relative $L^1$ error by computing:
-$$
-\delta^1(t) :=
-\frac{\|\tau_h(t)-\tau(t)\|_{L^1(D)}}{\|\tau(t)\|_{L^1(D)}}
-+\frac{\|\mathbf{v}_h(t)-\mathbf{v}(t)\|_{L^1(D)}}{\|\mathbf{v}(t)\|_{L^1(D)}}
-+\frac{\|E_h(t)-E(t)\|_{L^1(D)}}{\|E(t)\|_{L^1(D)}}.
-$$
-
-The convergence order between two refinement levels is computed by comparing the error norms. For a method expected to have $p$-th order convergence, the error should satisfy:
-$$
-\text{rate} = \frac{log(e_1/e_2)}{log(h_1/h_2)} \approx p
-$$
-
-
-# Select HiOp Notes
-> ## SolveStatus
-> - 0 - Solve successful,
-> - 1 - Solve successful due to RelTol
-> - 2 - Solve acceptable level
-> - 5 - Infeasible problem
-> - 10 - Max iteration exceeded 
-> - -16 - Error in feasiblity restoration
->
-> A more complete list of hiopSolveStatus values is available in the file src/Interface/hiopInterface.hpp where the enum hiopSolveStatus is defined.
-
+---
 
 ## Building Laglos
 
-Laglos has the following external dependencies:
+### Dependencies
 
-<!-- - *hypre*, used for parallel linear algebra, we recommend version 2.11.2<br>
-  https://github.com/hypre-space/hypre/releases/tag/v2.11.2 
+Laglos requires the following external libraries:
 
-- METIS, used for parallel domain decomposition (optional), we recommend [version 4.0.3](https://github.com/mfem/tpls/blob/gh-pages/metis-4.0.3.tar.gz) <br>
-  https://github.com/mfem/tpls -->
+| Library | Version | Purpose | Required |
+|---------|---------|---------|----------|
+| [MFEM](https://github.com/mfem/mfem) | master branch | Finite element discretization | Yes |
+| [HiOp](https://github.com/LLNL/hiop) | master branch | Nonlinear optimization solver | Optional* |
+| [CoinHSL](http://hsl.rl.ac.uk/ipopt) | latest | Linear algebra for optimization | Optional* |
 
-- COINHSL, collection of linear algebra libraries bundled for use with IPOPT and other applications <br>
-  http://hsl.rl.ac.uk/ipopt
+**Optional:**
+- [GLVis](https://github.com/GLVis/glvis) - Real-time visualization
 
-- HIOP, HPC solver for nonlinear optimization problems, its GitHub master branch <br>
-  https://github.com/LLNL/hiop
+> **Note on Optional Dependencies**: CoinHSL and HiOp are only required for certain advanced mesh velocity calculations involving optimization. These are research-specific dependencies and are **not necessary for out-of-the-box use cases** of Laglos. If you're not using optimization-based mesh velocity algorithms (e.g., `-mv` options that require HiOp), you can skip building these libraries and only build MFEM.
+>
+> **MFEM branch for optimization builds**: If you choose to use HiOp/CoinHSL, you must build MFEM from the `hiop-sparse` branch:
+> `git checkout hiop-sparse`. Other branches may not include the required sparse/HiOp interfaces.
 
-- MFEM, used for (high-order) finite element discretization, its GitHub master branch <br>
-  https://github.com/mfem/mfem
+### Build Instructions
 
-To build the miniapp, first download *CoinHSL*, *HIOP*, and *MFEM* from the links above
-and put everything on the same level as the `Laglos` directory:
+#### 1. Download and Setup Dependencies
+
+Create a workspace directory and organize libraries:
+
 ```sh
-~> ls
-Laglos/  coinhsl-x.y.z.tar.gz  hiop/ mfem/
+~> mkdir Workspace && cd Workspace
+~/Workspace> ls
+Laglos/  coinhsl-x.y.z.tar.gz  hiop/  mfem/
 ```
 
-<!-- Build *hypre*:
+#### 2. Build CoinHSL (Optional - for optimization)
+
+1. Register at http://hsl.rl.ac.uk/ipopt to obtain download link
+2. Download and extract:
+
 ```sh
-~> tar -zxvf v2.11.2.tar.gz
-~> cd hypre-2.11.2/src/
-~/hypre-2.11.2/src> ./configure --disable-fortran
-~/hypre-2.11.2/src> make -j
-~/hypre-2.11.2/src> cd ../..
-~> ln -s hypre-2.11.2 hypre
-```
-For large runs (problem size above 2 billion unknowns), add the
-`--enable-bigint` option to the above `configure` line.
-
-Build METIS:
-```sh
-~> tar -zxvf metis-4.0.3.tar.gz
-~> cd metis-4.0.3
-~/metis-4.0.3> make
-~/metis-4.0.3> cd ..
-~> ln -s metis-4.0.3 metis-4.0
-```
-This build is optional, as MFEM can be build without METIS by specifying
-`MFEM_USE_METIS = NO` below. -->
-
-Build COINHSL:
-
-1. Go to http://hsl.rl.ac.uk/ipopt
-2. Submit a registration form (Should respond within one working business day). Reponse email should contain a link to download CoinHSL
-3. Download the tarball and unpack into workspace directory, then establish symlink
-
-```
 ~/Workspace> gunzip coinhsl-x.y.z.tar.gz
 ~/Workspace> tar xf coinhsl-x.y.z.tar
-~/Workspace> ln- -s coinhsl-x.y.z coinhsl
-~/Workspace/coinhsl> cd coinhsl
-
-~/Workspace/coinhsl> meson setup build -Dcpp_args="-fPIC" -Dc_args="-fPIC" -Dfortran_args="-fPIC" --buildtype=release --prefix={absolute dir to install in coinhsl}
+~/Workspace> ln -s coinhsl-x.y.z coinhsl
+~/Workspace> cd coinhsl
+~/Workspace/coinhsl> meson setup build \
+    -Dcpp_args="-fPIC" \
+    -Dc_args="-fPIC" \
+    -Dfortran_args="-fPIC" \
+    --buildtype=release \
+    --prefix=$(pwd)/install
 ~/Workspace/coinhsl> meson compile -C build
 ~/Workspace/coinhsl> meson install -C build
 ```
 
-Build HIOP:
-```
-hiop/build> cmake -DCMAKE_INSTALL_PREFIX=../install
--DHIOP_COINHSL_DIR=../../coinhsl/install 
--DCMAKE_POSITION_INDEPENDENT_CODE=ON 
--S ../
-hiop/build> make -j 8
-hiop/build> make test -j 8
-hiop/build> make install
-```
+#### 3. Build HiOp (Optional - for optimization)
 
-Clone and build the parallel version of MFEM:
 ```sh
-~> git clone https://github.com/mfem/mfem.git ./mfem
-~> cd mfem/
-~/mfem> git checkout master
-~/mfem> mkdir build
-~/mfem> cd build
-~/mfem/build> cmake -DCMAKE_INSTALL_PREFIX=./install -DCMAKE_POSITION_INDEPENDENT_CODE=ON -S ../
-~/mfem/build> make parallel -j
+~/Workspace> cd hiop
+~/Workspace/hiop> mkdir build && cd build
+~/Workspace/hiop/build> cmake \
+    -DCMAKE_INSTALL_PREFIX=../install \
+    -DHIOP_COINHSL_DIR=../../coinhsl/install \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -S ../
+~/Workspace/hiop/build> make -j8
+~/Workspace/hiop/build> make test
+~/Workspace/hiop/build> make install
 ```
-The above uses the `master` branch of MFEM.
-See the [MFEM building page](http://mfem.org/building/) for additional details.
 
-(Optional) Clone and build GLVis:
+#### 4. Build MFEM
+
 ```sh
-~> git clone https://github.com/GLVis/glvis.git ./glvis
-~> cd glvis/
-~/glvis> make
-~/glvis> cd ..
+~/Workspace> git clone https://github.com/mfem/mfem.git ./mfem
+~/Workspace> cd mfem/
+~/Workspace/mfem> git checkout master
+~/Workspace/mfem> mkdir build && cd build
+~/Workspace/mfem/build> cmake \
+    -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -S ../
+~/Workspace/mfem/build> make -j8
+~/Workspace/mfem/build> make install
 ```
-The easiest way to visualize Laglos results is to have GLVis running in a
-separate terminal. Then the `-vis` option in Laglos will stream results directly
-to the GLVis socket.
 
-Build Laglos
+**Note on `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`:**  
+This flag is critical on Linux systems for proper shared library linking. It ensures static libraries are compiled with position-independent code (PIC), allowing them to be linked into shared objects. On Linux, static libraries (.a) do not include PIC unless explicitly compiled with it.
+
+#### 5. Build Laglos
+
 ```sh
-~> cd Laglos/
-~/Laglos> mkdir build
-~/Laglos> cd build
-~/Laglos/build> cmake -DCMAKE_INSTALL_PREFIX=./install -DCMAKE_POSITION_INDEPENDENT_CODE=ON ../
-~/Laglos/build> make
-~/Laglos/build> make install
+~/Workspace> cd Laglos
+~/Workspace/Laglos> mkdir build && cd build
+~/Workspace/Laglos/build> cmake \
+    -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    ../
+~/Workspace/Laglos/build> make -j8
+~/Workspace/Laglos/build> make test
+~/Workspace/Laglos/build> make install
 ```
-This can be followed by `make test` and `make install` to check and install the
-build respectively. See `make help` for additional options.
 
-See also the `make setup` target that can be used to automated the
-download and building of hypre, METIS and MFEM.
+#### 6. Build GLVis (Optional)
 
+For visualization:
 
-### Notes on build
 ```sh
-mfem/build$ cmake -DCMAKE_INSTALL_PREFIX=./install -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
+~/Workspace> git clone https://github.com/GLVis/glvis.git ./glvis
+~/Workspace> cd glvis
+~/Workspace/glvis> make
 ```
 
-The flag `-DCMAKE_POSITION_INDEPENDENT_CODE=ON` is important on Linux systems as it handles shared library linking and position-independent code (PIC) different from mac.
+Run GLVis in a separate terminal, then use `-vis` flag in Laglos to stream results.
 
-On Linux, static libraries (.a) do not include position-independent code (-fPIC) unless explicitly compiled with it. When you try to link a static library (libmfem.a) that was not built with -fPIC into a shared library (libLaglos.so), the linker (ld) throws an error because it cannot use relocatable code in a shared object.
+### Building Laghos Extension
 
-TODO: Add section of optional build if optimization is to be utilized.
-
-## Build Laghos to limit
+The Laghos miniapp can be built against Laglos:
 
 ```sh
 ~/Workspace> cd Laghos
-~/Workspace/Laghos> mkdir build
-~/Workspace/Laghos> cd build
-~/Workspace/Laghos/build> cmake -DLaglos_DIR=../../Laglos -S .. 
-~/Workspace/Laghos/build> make -j 8
+~/Workspace/Laghos> mkdir build && cd build
+~/Workspace/Laghos/build> cmake -DLaglos_DIR=../../Laglos/build -S ..
+~/Workspace/Laghos/build> make -j8
 ```
 
-## Quick Start
+---
 
-After building Laglos, try running some of the classic test problems below.
+## Quick Start
 
 ### Hydrodynamics Examples
 
@@ -272,11 +183,16 @@ After building Laglos, try running some of the classic test problems below.
 ~/Laglos/build> ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf 0.9 -cfl 1 -rs 5 -vis
 ```
 
+#### Triple Point Problem
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 3 -tf 5.0 -cfl 0.5 -rs 6 -vis
+```
+
 ### Elasticity Examples
 
-When running elasticity problems, use the `-ue` flag to enable elastic flux calculations.
+Enable elastic flux with `-ue <flag>` option.
 
-#### Elastic Shocktube
+#### Elastic Shock Tube
 ```sh
 ~/Laglos/build> ./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
 ```
@@ -353,50 +269,249 @@ Test case from Vilar-Main-Shu 2D. Note: Currently yields mixed results on distor
 ~/Laglos/build> ./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
 ```
 
-# Handling boundary conditions
-## Boundary attributes
-The user has the option in the problem file to impose boundary conditions on
-the thermodynamics and/or on the mesh velocity.
-Both of these types of boundary conditions have corresponding flags ```_thbcs```
-and ```_mvbcs``` which can be set to ```true``` in the problem.h file.
+---
 
-Boundary conditions are implemented via a flag in the mesh file.  Common boundaries 
-that can be used are
+## Runtime Parameters
 
-> - 1  - Used to enforce $v_x = 0$.
-> - 2  - Used to enforce $v_y = 0$.
-> - 3  - Used to enforce $v_z = 0$.
-> - 4  - Used to enforce $v_r = 0$, or in other words 0 radial movement.
-> - 5  - Used to enforce arbitrary bcs, to be handled in the problem.h file. [5-9]
-> - 9  - Free boundary condition
-> - 99 - Off limits as this is used in BdrVertexIndexingArray to indicate corner vertices that should not move at all.
+| Parameter | Description |
+|-----------|-------------|
+| `-m <mesh>` | Mesh file to use |
+| `-p <int>` | Problem number to run |
+| `-rs <int>` | Number of serial mesh refinements |
+| `-rp <int>` | Number of parallel refinements (not implemented) |
+| `-tf <double>` | Final simulation time |
+| `-ti <double>` | Initial time (not available for all problems) |
+| `-cfl <double>` | Courant-Friedrichs-Lewy condition for time step |
+| `-visc <int>` | Artificial viscosity type (0=none, 1-4=various formulations) |
+| `-greedy` | Enable greedy viscosity (see GMPST2024) |
+| `-ggn <int>` | Number of GMV steps before using greedy lambda |
+| `-ue <int>` | Use elasticity (1=full elastic, 2=elastic shear only) |
+| `-ppd` | Post-process density for mass-conservative update |
+| `-vis` | Enable GLVis visualization |
+| `-visit` | Enable VisIt output files |
+| `-vs <int>` | Visualization snapshot frequency (every N steps) |
+| `-of <path>` | Output folder for results |
+| `-print` | Print state vectors to disk |
+| `-gfprint` | Print grid functions |
+| `-mv <int>` | Mesh velocity algorithm option |
+| `-fv <int>` | Face velocity computation option |
+| `-mv-iter-n <int>` | Number of mesh velocity solver iterations |
+| `-do-mv-lin` | Enable mesh velocity linearization |
+| `-tvc <double>` | Target velocity optimization viscosity coefficient |
+| `-ms <int>` | Maximum number of time steps |
+| `-cm` | Check mesh quality |
+| `-mm` | Mesh motion flag |
 
-If one chooses to implement BC that are not some version of $v\cdot n = 0$, then
-the functions ProblemBase::get_additional_BCs and ProblemBase::update_additions_BCs
-must be overridden. See for example Dirichlet conditions enforced on the left wall 
-of the Saltzman problem.
-
-
-# Select Elastic notes
-Since our exact solution here is given in terms of approximation data from Dr. Favrie,
-we cannot compute errors the conventional way.  To this end, I have created the file
-compute_errors to handle both the computation of the approximation errors as well 
-as convergence tables. To execute this, run the following
+For complete parameter list, run:
+```sh
+~/Laglos/build> ./Laglos --help
 ```
-$ python3 ../scripts/compute_error.py results/testing/st1/state_vectors/ ../exact_sol/elastic/shocktube/all_results.txt 7 16
+
+---
+
+## Verification and Validation
+
+### Mass Conservation
+
+Laglos monitors local and global mass conservation at each time step. All calculations related to mass error are performed in `LagrangianLOOperator::ValidateMassConservation()`. The relative mass error is computed as:
+
+$$
+\text{error}_{\text{mass}} = \frac{\sum_{c \in \eta^{\text{Cel}}} \left|\frac{|K_c^n|}{T_c^n} - m_c^{\rho}\right|}{\sum_{c \in \eta^{\text{Cel}}}m_c^{\rho}}
+$$
+
+where:
+- $m_c^{\rho}$ = initial cell mass
+- $|K_c^n|$ = cell volume at time $t^n$
+- $T_c^n$ = specific volume at time $t^n$
+
+A cell is flagged as violating mass conservation if:
+$$
+\left|\frac{|K_c^n|}{T_c^n} - m_c^{\rho}\right| > 10^{-12}
+$$
+
+The percentage of cells violating mass conservation is reported as the number of flagged cells divided by the total number of cells in the mesh.
+
+### Convergence Analysis
+
+For problems with known exact solutions, Laglos can compute convergence rates.
+
+**Step 1:** Configure test parameters in `scripts/convergence_test_script.sh`
+
+```bash
+PROBLEM=40                           # Problem number
+MESH="../data/ref-segment.mesh"      # Base mesh
+FINAL_TIME=0.6                       # Simulation end time
+CFL=0.5                              # CFL number
+rs_levels=(4 5 6 7)                  # Refinement levels to test
+OUTPUT_DIR="convergence_results"     # Output directory
 ```
-The third and fourth arguments correspond to matching columns of the respective files that are being compared. We list here the following pairs and their corresponding 
-representative value
 
-| parameter | arg 3 | arg 4 |
-|:----------|:-----:|:-----:|
-| $\rho$    |   1   |   13  |
-| $E$       | 3     | 15    |
-| $\sigma$  | 7     | 16    |
+**Step 2:** Run convergence suite
 
-## Meshes
-Laglos has the capability to handle multimaterial test problems, and this is implemented through the 
-cell attribute values defined in the mesh. For each element that should be treated as a solid,
-the cell attribute in the mesh should be set to 50. When the use-elasticity ['-ue'] is used in 
-a Laglos execution, the elastic flux and elastic shear with be computed only if the cell
-attribute value is set to 50. Otherwise, a non-elastic flux will be used.
+```sh
+~/Laglos/scripts> ./convergence_test_script.sh
+```
+
+This will execute Laglos at each specified refinement level and save results.
+
+**Step 3:** Generate convergence table
+
+```sh
+~/Laglos/scripts> python3 compute_convergence.py --results-dir ../build/convergence_results/
+```
+
+**Expected Output:**
+
+**TODO:** Add an example convergence table here for the Sod case. Edit default convergence analysis script to correspond to this output.
+
+The composite relative $L^1$ error is computed as:
+
+$$
+\delta^1(t) := \frac{\|\tau_h(t)-\tau(t)\|_{L^1(D)}}{\|\tau(t)\|_{L^1(D)}} + \frac{\|\mathbf{v}_h(t)-\mathbf{v}(t)\|_{L^1(D)}}{\|\mathbf{v}(t)\|_{L^1(D)}} + \frac{\|E_h(t)-E(t)\|_{L^1(D)}}{\|E(t)\|_{L^1(D)}}
+$$
+
+The convergence order between two refinement levels is computed by comparing error norms:
+$$
+\text{rate} = \frac{\log(e_1/e_2)}{\log(h_1/h_2)} \approx p
+$$
+
+where $e_i$ is the error at refinement level $i$, $h_i$ is the corresponding mesh size, and $p$ is the expected order of convergence.
+
+**Expected convergence rates:**
+- **DG0 (piecewise constant)**: Rate ≈ 1.0
+- **Q1 (bilinear elements)**: Rate ≈ 2.0
+
+For detailed instructions on other utility scripts, see [scripts/README.md](scripts/README.md).
+
+---
+
+## Advanced Topics
+
+### Boundary Conditions
+
+Laglos supports thermodynamic and mesh velocity boundary conditions via mesh attributes. Both types can be enabled in the problem file using flags:
+
+```cpp
+_thbcs = true;  // Enable thermodynamic BCs
+_mvbcs = true;  // Enable mesh velocity BCs
+```
+
+#### Standard Boundary Attributes
+
+| Attribute | Meaning |
+|-----------|---------|
+| 1 | Enforce $v_x = 0$ |
+| 2 | Enforce $v_y = 0$ |
+| 3 | Enforce $v_z = 0$ |
+| 4 | Enforce $v_r = 0$ (no radial movement) |
+| 5-8 | User-defined BCs (implement in problem file) |
+| 9 | Free boundary (outflow) |
+| 99 | Corner vertices (no movement) |
+
+#### Custom Boundary Conditions
+
+To implement non-standard BCs beyond $v \cdot n = 0$, override these functions in your problem class:
+
+```cpp
+void get_additional_BCs(const FiniteElementSpace &fes, 
+                        Array<int> ess_bdr,
+                        Array<int> &add_ess_tdofs,
+                        Array<double> &add_bdr_vals);
+
+void update_additional_BCs(const Vector &S,
+                           Array<int> &add_ess_tdofs,
+                           Array<double> &add_bdr_vals);
+```
+
+See `SaltzmannProblem` for an example with Dirichlet conditions on the left wall.
+
+### Multi-Material Meshes
+
+Laglos handles multi-material problems through element attributes in the mesh file:
+
+- **Attribute < 50**: Fluid/gas elements (standard hydrodynamics)
+- **Attribute ≥ 50**: Solid/elastic elements (uses elastic constitutive model)
+
+When using `-ue` flag, only elements with attribute ≥ 50 will use elastic flux and stress calculations.
+
+**Example multi-material mesh:**
+```
+# MFEM mesh file
+...
+elements
+100
+1 3 0 1 4 3     # Fluid region (attribute 1)
+1 3 1 2 5 4     # Fluid region (attribute 1)
+50 3 6 7 10 9   # Solid region (attribute 50)
+50 3 7 8 11 10  # Solid region (attribute 50)
+...
+```
+
+### Elastic Problems
+
+#### Computing Errors with Tabulated Data
+
+Since exact solutions for elastic problems are often given as tabulated approximation data, use the `compute_error.py` script:
+
+```sh
+~/Laglos/scripts> python3 compute_error.py \
+    results/elastic/st1/state_vectors/ \
+    ../exact_sol/elastic/shocktube/all_results.txt \
+    7 16
+```
+
+The third and fourth arguments correspond to matching columns of the respective files being compared.
+
+**Column mappings:**
+
+| Variable | Laglos Column | Exact Solution Column |
+|:---------|:-------------:|:---------------------:|
+| ρ (density) | 1 | 13 |
+| E (energy) | 3 | 15 |
+| σ (stress) | 7 | 16 |
+
+#### HiOp Solve Status
+
+When using optimization for mesh movement, HiOp returns:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Solve successful |
+| 1 | Solve successful (RelTol) |
+| 2 | Acceptable solution |
+| 5 | Infeasible problem |
+| 10 | Max iterations exceeded |
+| -16 | Error in feasibility restoration |
+
+For a complete list of `hiopSolveStatus` values, see `hiop/src/Interface/hiopInterface.hpp`.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request with clear description of changes
+
+---
+
+## References
+
+For the underlying algorithms and theory, see:
+
+- **Lagrangian Methods**: 
+   - Dobrev et al., "High-Order Curvilinear Finite Element Methods for Lagrangian Hydrodynamics," SIAM J. Sci. Comput., 2012
+   - Guermond et al., "Invariant-Domain Preserving and Locally Mass Conservative Approximation of the Lagrangian Hydrodynamics Equations," CMAME, 2025
+- **Graph Viscosity**: 
+   - Guermond et al., "Invariant Domains and First-Order Continuous Finite Element Approximation for Hyperbolic Systems, SIAM J. Numer. Anal. 54, 2016
+- **Elastic-Plastic Models**: 
+   - Favrie et al., "A Thermodynamically Compatible Splitting Procedure in Hyperelasticity," JCP, 2014.
+   - Chaimoon et al., "An Anisotropic Hyperelastic Model with an Application to Soft Tissues," European Journal of Mechanics-A/Solids, 2019
+
+---
+
+## Contact
+
+Madison Sheridan \
+madison.sheridan94@gmail.com

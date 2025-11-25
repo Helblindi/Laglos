@@ -11,9 +11,6 @@ Release/
 Debug/
 compile_commands.json
 
-# Meshes
-mesh-test-*
-results/mesh-*
 # mesh needed just for convergence testing
 data/vortex-square-131044.mesh
 

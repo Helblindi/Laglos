@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
    // Set output_flag string
    if (strncmp(output_flag, "default", 7) != 0)
    {
-      output_path = results_dir + std::string(output_flag) + "/";
+      output_path = std::string(output_flag) + "/";
    }
    else
    {

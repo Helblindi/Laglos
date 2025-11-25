@@ -273,6 +273,8 @@ Test case from Vilar-Main-Shu 2D. Note: Currently yields mixed results on distor
 
 ## Runtime Parameters
 
+> ⚠️ **Experimental Features**: Some options (marked with **[Experimental]**) are under active development. Results should be carefully validated.
+
 | Parameter | Description |
 |-----------|-------------|
 | `-m <mesh>` | Mesh file to use |
@@ -306,6 +308,44 @@ For complete parameter list, run:
 ```sh
 ~/Laglos/build> ./Laglos --help
 ```
+
+### Details
+
+- ODE solvers (`-s`):
+  - 1: Forward Euler **(DEFAULT)**
+  - 2: RK2 SSP
+  - 3: RK3 SSP
+  - 4: RK4
+  - 6: RK6
+  - 7: RK2Avg
+  - Note: IDP variants are also available internally (11,12,13,14,16), but these are only needed in the limiting Laghos case.
+
+- Viscosity (`-visc`):
+  - 0: None
+  - 1: GMS-GV (Guaranteed Maximum Speed Graph Viscosity) **(DEFAULT)**
+  - 2: Greedy viscosity **[Experimental]**
+  - 3: Artificial graph viscosity (HO, Binder) **[Experimental]**
+  - 4: Artificial graph viscosity (HO, Non-binder) **[Experimental]**
+
+- Elasticity (`-ue`):
+  - 0: No shear energy (fluid) **(DEFAULT)**
+  - 1: Neo-Hookean
+  - 2: Mooney-Rivlin
+  - 3: Aortic
+  - 4: Transversely isotropic
+  - 5: Multiple shear EOS
+
+- Mesh velocity (`-mv`):
+  - 0: Arithmetic average of adjacent cells
+  - 1: Arithmetic average with distributed viscosity
+  - 2: Cell-face-normal with viscosity **(DEFAULT)**
+  - 1*: Sparse HiOp LM with “*” target (requires HiOp/CoinHSL and MFEM branch hiop-sparse) **[Experimental]**
+
+- Face velocity (`-fv`):
+  - 0: Do nothing **(DEFAULT)**
+  - 1: Mass-conservative bubble (Q2)
+  - 2: Average (Q1-type)
+  - 3: Butterfly (Q2) **[Experimental]**
 
 ---
 

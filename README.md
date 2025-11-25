@@ -2,6 +2,15 @@
 
 Laglos (LAGrangian Low-Order Solver) is a high-performance computational fluid dynamics miniapp for solving the time-dependent Euler equations of compressible gas dynamics in a moving Lagrangian frame. Built on the MFEM finite element library, Laglos employs unstructured low-order finite element spatial discretization with forward Euler time-stepping to simulate complex hydrodynamic phenomena.
 
+## Table of Contents
+- [Key Features](#key-features)
+- [Applications](#applications)
+- [Building Laglos](#building-laglos)
+- [Quick Start](#quick-start)
+- [Runtime Parameters](#optional-runtime-parameters)
+- [Examples](#examples)
+- [Handling Boundary Conditions](#handling-boundary-conditions)
+
 ## Key Features
 
 - **Lagrangian Framework**: Solves hydrodynamic equations on a moving mesh that follows material flow
@@ -221,6 +230,103 @@ TODO: Add section of optional build if optimization is to be utilized.
 ~/Workspace/Laghos/build> make -j 8
 ```
 
+## Quick Start
+
+After building Laglos, try running some of the classic test problems below.
+
+### Hydrodynamics Examples
+
+#### Sod Shock Tube (1D)
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 8 -vis
+```
+
+#### Sedov Blast Wave (2D)
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf 0.9 -cfl 1 -rs 5 -vis
+```
+
+### Elasticity Examples
+
+When running elasticity problems, use the `-ue` flag to enable elastic flux calculations.
+
+#### Elastic Shocktube
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
+```
+
+#### Elastic Impact
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
+```
+
+#### Elastic Shear
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+~/Laglos/build> ./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+~/Laglos/build> ./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+```
+
+#### Elastic Shear (Y Direction)
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+```
+
+#### Elastic Impact + Shear
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
+```
+
+#### Elastic 2D Rotation
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/ref-square-c0-p15.mesh -p 57 -tf 0.00001 -cfl 0.5 -vis -vs 1 -ue 1 -rs 6 -ppd
+```
+
+#### Elastic Projectile Plate
+
+The final time depends on the shear modulus used (modified in the problem file). Final times from the referenced paper:
+
+**For μ = 9.2×10¹⁰ Pa:**
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000036 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 3.6×10⁻⁵
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000106 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 1.06×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.00032 -cfl 0.5 -ue 1 -ppd -rs 1   # t = 3.2×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000609 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 6.09×10⁻⁴
+```
+
+**For μ = 1×10⁹ Pa:**
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000035 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 3.5×10⁻⁵
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.00014 -cfl 0.5 -ue 1 -ppd -rs 1   # t = 1.4×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.00042 -cfl 0.5 -ue 1 -ppd -rs 1   # t = 4.2×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.00071 -cfl 0.5 -ue 1 -ppd -rs 1   # t = 7.1×10⁻⁴
+```
+
+**For μ = 0 Pa:**
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000075 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 7.5×10⁻⁵
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000187 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 1.87×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.0006 -cfl 0.5 -ue 1 -ppd -rs 1    # t = 6×10⁻⁴
+~/Laglos/build> ./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf 0.000103 -cfl 0.5 -ue 1 -ppd -rs 1  # t = 1.03×10⁻⁴
+```
+
+#### Elastic Noh
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 6
+~/Laglos/build> ./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 1
+```
+
+#### Elastic Twist
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue 1 -ppd -rs 6
+```
+
+#### Elastic Projectile Impact
+Test case from Vilar-Main-Shu 2D. Note: Currently yields mixed results on distorted meshes.
+```sh
+~/Laglos/build> ./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
+```
+
 # Handling boundary conditions
 ## Boundary attributes
 The user has the option in the problem file to impose boundary conditions on
@@ -268,78 +374,3 @@ cell attribute values defined in the mesh. For each element that should be treat
 the cell attribute in the mesh should be set to 50. When the use-elasticity ['-ue'] is used in 
 a Laglos execution, the elastic flux and elastic shear with be computed only if the cell
 attribute value is set to 50. Otherwise, a non-elastic flux will be used.
-
-## Examples
-
-### Elastic shocktube
-```
-./Laglos -m ../data/elastic/ref-segment.mesh -p 50 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
-```
-### Elastic impact
-```
-./Laglos -m ../data/elastic/ref-segment.mesh -p 51 -tf 0.00005 -cfl 0.5 -ue 1 -rs 8
-```
-### Elastic shear
-```
-./Laglos -m ../data/elastic/tube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
-./Laglos -m ../data/elastic/distube-100x1y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
-./Laglos -m ../data/elastic/tube-2x100y.mesh -p 52 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
-```
-### Elastic shear y direction (rotated x)
-```
-./Laglos -m ../data/elastic/tube-1x100y.mesh -p 55 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
-```
-### Elastic impact + shear
-```
-./Laglos -m ../data/elastic/tube-100x1y.mesh -p 56 -tf 0.00005 -cfl 0.5 -ue 2 -ppd -rs 0
-```
-### Elastic 2D Rotation
-```
-./Laglos -m ../data/elastic/ref-square-c0-p15.mesh -p 57 -tf 0.00001 -cfl 0.5 -vis -vs 1 -ue 1 -rs 6 -ppd
-```
-
-### Elastic Projectile Plate
-The final time depends on the shear modulus used, which is modified in the problem file.
-The final times reported in the referenced paper corresponding to their shear moduli are as follows
-#### $\mu = 9.2\times 10^{10}$ Pa
-1. $t = 3.6\times 10^{-5}$
-2. $t = 1.06\times 10^{-4}$
-3. $t = 3.2\times 10^{-4}$
-4. $t = 6.09\times 10^{-4}$
-
-#### $\mu = 1\times 10^{9}$ Pa
-1. $t = 3.5\times 10^{-5}$
-2. $t = 1.4\times 10^{-4}$
-3. $t = 4.2\times 10^{-4}$
-4. $t = 7.1\times 10^{-4}$
-
-#### $\mu = 0$ Pa
-1. $t = 7.5\times 10^{-5}$
-2. $t = 1.87\times 10^{-4}$
-3. $t = 6\times 10^{-4}$
-4. $t = 1.03\times 10^{-4}$
-```
-./Laglos -m ../data/elastic/projectile-plate.mesh -p 54 -tf .000103 -cfl 0.5 -ue 1 -ppd -rs 1
-```
-
-### Elastic Noh
-```
-./Laglos -m ../data/elastic/ref-square-c0.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 6
-./Laglos -m ../data/elastic/noh-nonuniform.mesh -p 58 -tf 0.000002 -cfl 0.5 -ue 1 -ppd -rs 1
-```
-
-### Elastic twist
-```
-./Laglos -m ../data/elastic/ref-square-c0.mesh -p 57 -tf 0.00005 -cfl 0.5 -ue 1 -ppd -rs 6
-```
-
-### Elastic projectile impact
-This is a test case outlined in vilar-main-shu-2d. Currently
-not yielding great results, perhaps due to the mesh velocity 
-computation we employ.  Have tried it on a cartesian and
-distorted mesh. 
-```
-./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
-
-./Laglos -m ../data/elastic/test-distorted-nonsymmetric.mesh -p 59 -tf 0.005 -cfl 0.5 -ue 1 -rs 2 -vis -vs 1
-```

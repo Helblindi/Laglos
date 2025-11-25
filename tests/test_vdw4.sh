@@ -22,7 +22,7 @@ refinements_serial=5
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
-options+="-mv ${mv_option} "
+options+="-mv ${mv_option} -no-ppd "
 options+="-rs ${refinements_serial} "
 echo $options
 

@@ -22,7 +22,7 @@ refinements_serial=8
 
 options="-m ${mesh_file} -p ${problem} "
 options+="-tf ${final_time} -cfl ${cfl} "
-options+="-mv ${mv_option} "
+options+="-mv ${mv_option} -no-ppd "
 options+="-rs ${refinements_serial} "
 options+="-ue 1 " # NeoHookean
 echo $options

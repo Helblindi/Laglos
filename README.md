@@ -173,19 +173,82 @@ The Laghos miniapp can be built against Laglos:
 
 ### Hydrodynamics Examples
 
+#### Smooth wave (1D)
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-segment.mesh -p 40 -tf 0.6 -cfl 0.5 -rs 6 -vis
+```
+
 #### Sod Shock Tube (1D)
 ```sh
 ~/Laglos/build> ./Laglos -m ../data/ref-segment.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 8 -vis
 ```
 
-#### Sedov Blast Wave (2D)
+#### van der Waals (1D) - Various Test Cases
 ```sh
-~/Laglos/build> ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf 0.9 -cfl 1 -rs 5 -vis
+~/Laglos/build> ./Laglos -m ../data/ref-segment-c0.mesh -p 12 -cfl 0.5 -tf 0.5 -rs 8 -vis            ## Vdw1
+~/Laglos/build> ./Laglos -m ../data/segment-nhalf-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 5 -vis          ## Vdw2 
+~/Laglos/build> ./Laglos -m ../data/segment-nhalf-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 8 -vis           ## Vdw3 
+~/Laglos/build> ./Laglos -m ../data/segment-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 4 -vis          ## Vdw4
 ```
 
-#### Triple Point Problem
+#### Misc (1D)
 ```sh
-~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 3 -tf 5.0 -cfl 0.5 -rs 6 -vis
+~/Laglos/build> ./Laglos -m ../data/ref-segment.mesh -p 41 -tf 0.15 -cfl 0.5 -rs 8                   ## Lax
+~/Laglos/build> ./Laglos -m ../data/ref-segment-extrapolated.mesh -p 42 -tf 0.667 -cfl 0.2 -rs  5    ## Leblanc
+```
+
+#### Sod Radial
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 8 -tf 0.225 -cfl 0.5 -rs 5 -vis
+```
+
+#### Isentropic Vortex
+```sh
+~/Laglos/build> ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 1 -cfl 0.5 -rs 3 -vis
+~/Laglos/build> ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 3 -visc 0 -cfl 0.5 -rs 3 -vis # long time integration, no viscosity
+```
+
+#### Noh (Nonuniform Mesh)
+```sh
+~/Laglos/build> ./Laglos -m ../data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 0 -vis
+```
+
+#### Sedov Blast Wave
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf 0.9 -cfl 1 -rs 2 -vis
+```
+
+#### Saltzman
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 1 -vis
+```
+
+#### Kidder
+```sh
+~/Laglos/build> ./Laglos -m ../data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0
+```
+
+#### Taylor-Green Vortex
+```sh
+~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 5
+```
+
+#### Triple Point Problem [Experimental]
+```sh
+~/Laglos/build> ./Laglos -m ../data/triple-point.mesh -p 3 -tf 5. -cfl 0.5 -rs 2 -vis
+```
+
+#### Misc (2D) 
+```sh
+./Laglos -m ../data/shocktube.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0                     ## Sod
+./Laglos -m ../data/distorted-tube-2.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0              ## Sod on a distorted mesh
+./Laglos -m ../data/ref-square-c0.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 6                  ## Noh
+./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4                     ## ICF [Untested]
+./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0               ## Kidder ball [Untested]
+./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis               ## Vdw2 
+./Laglos -m ../data/tube-np5-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 2 -vis                ## Vdw3 
+./Laglos -m ../data/tube-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis             ## Vdw4
+./Laglos -m ../data/ref-segment-c0.mesh -p 43 -cfl 0.5 -tf 1 -rs 8 -vis              ## General Riemann Problem
 ```
 
 ### Elasticity Examples

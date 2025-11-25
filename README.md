@@ -68,18 +68,6 @@ The percentage of cells in which mass loss is broken is simply the number of cel
 > To show proper convergence of the utilized numerical method, one can construct a table of multiple error rates from a given test problem.  To valide the numerical method, a convergence order can then be computed from two different refinements.
 
 
-## Organize output pvtu files
-> When running a test problem with the flags `-pview -print -vs #`, pvtu and vtu files
-will be generated and placed in individual directories according to their timesteps.
-In an effort to make importing all these files faster in a visualization software 
-such as ParaView, it is helpful for all pvtu files to be in the same directory.  
-The following command (executed from the ${source}/scripts directory) will handle 
-renaming all pvtu files and replacing references to their corresponding vtu files
-for each processor.  
-```
-$ python3 reorganize_paraview.py <input_dir> <output_dir>
-````
-
 # Select HiOp Notes
 > ## SolveStatus
 > - 0 - Solve successful,

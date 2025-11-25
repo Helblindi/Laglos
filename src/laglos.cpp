@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
    int gmv_to_greedy_steps = 0;
    bool mm = true;
    bool check_mesh = true;
-   bool post_process_density = false;
+   bool post_process_density = true;
    int elastic_eos = 0;
    int mv_option = 2;
    double mv_target_visc_coeff = 0.;

@@ -26,7 +26,8 @@ echo "Laglos binary dir: ${LAGLOS_BINARY_DIR}"
 
 cd $LAGLOS_BINARY_DIR
 
-# # EDIT THESE PARAMS
+
+# EDIT THESE PARAMS
 # results_dir="/home/sheridanm/scratch/Laglos-results"
 results_dir="${LAGLOS_BINARY_DIR}/results"
 mesh_file="../data/ref-segment.mesh"
@@ -41,9 +42,9 @@ fv_option=0
 output_location="testing/sod"
 output_file_prefix="${results_dir}/${output_location}/out-sod-r"
 elastic_op=0
-MIN_RS=8
-MAX_RS=3
-# ########
+MIN_RS=3
+MAX_RS=8
+########
 
 # Create output directory
 mkdir -p "${results_dir}/${output_location}"
@@ -73,4 +74,4 @@ done
 
 # Lastly, copy this script to the output_file location
 # for documentation on run parameters
-cp "${scripts_dir}/convergence_test_script.sh" "${results_dir}/${output_location}/." 
+cp "${scripts_dir}/run_convergence_test.sh" "${results_dir}/${output_location}/." 

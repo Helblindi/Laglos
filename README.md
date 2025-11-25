@@ -140,6 +140,7 @@ This flag is critical on Linux systems for proper shared library linking. It ens
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     ../
 ~/Workspace/Laglos/build> make -j8
+~/Workspace/Laglos/build> make build_tests
 ~/Workspace/Laglos/build> make test
 ~/Workspace/Laglos/build> make install
 ```

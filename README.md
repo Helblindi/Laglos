@@ -202,37 +202,69 @@ The Laghos miniapp can be built against Laglos:
 ```sh
 ~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 8 -tf 0.225 -cfl 0.5 -rs 5 -vis
 ```
+This produces the following density plots.
+
+<table border="0">
+<td> <img src="results/2d-sod-rad.png">
+<td> <img src="results/2d-sod-rad-perspective.png">
+</table>
 
 #### Isentropic Vortex
 ```sh
 ~/Laglos/build> ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 1 -cfl 0.5 -rs 3 -vis
 ~/Laglos/build> ./Laglos -m ../data/square-vortex.mesh -p 9 -tf 3 -visc 0 -cfl 0.5 -rs 3 -vis # long time integration, no viscosity
 ```
+The latter produces the following density plot and zoom on the mesh at the center of the vortex.
 
-#### Noh (Nonuniform Mesh)
+<table border="0">
+<td> <img src="results/2d-iv.png">
+<td> <img src="results/2d-iv-zoom.png">
+</table>
+
+#### Noh
 ```sh
-~/Laglos/build> ./Laglos -m ../data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 0 -vis
+~/Laglos/build> ./Laglos -m ../data/noh.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 1 -vis
+~/Laglos/build> ./Laglos -m ../data/noh-nonuniform.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 0 -vis # nonuniform mesh
 ```
+The noh problem run on a uniform and nonuniform mesh can be seen in the following images of the density.
+<table border="0">
+<td> <img src="results/2d-noh.png">
+<td> <img src="results/2d-noh-nonuniform.png">
+</table>
 
 #### Sedov Blast Wave
 ```sh
 ~/Laglos/build> ./Laglos -m ../data/ref-square-N15.mesh -p 1 -tf 0.9 -cfl 1 -rs 2 -vis
 ```
+The density from the above command is plotted as follows:
+<table border="0">
+<td> <img src="results/2d-sedov.png">
+<td> <img src="results/2d-sedov-perspective.png">
+</table>
 
 #### Saltzman
 ```sh
-~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 1 -vis
+~/Laglos/build> ./Laglos -m ../data/rectangle_saltzmann.mesh -p 11 -tf 0.6 -cfl 0.01 -rs 1 -vis
 ```
+The density for the Saltzman problem is plotted as follows:
+<table border="0">
+<td> <img src="results/2d-saltzman.png">
+</table>
 
 #### Kidder
 ```sh
-~/Laglos/build> ./Laglos -m ../data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0
+~/Laglos/build> ./Laglos -m ../data/full_ring_r0.mesh -p 16 -tf 0.1887 -cfl 0.5 -rs 0 -vis
 ```
 
 #### Taylor-Green Vortex
 ```sh
-~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 5
+~/Laglos/build> ./Laglos -m ../data/ref-square.mesh -p 0 -tf 0.5 -cfl 0.5 -rs 5 -vis
 ```
+The magnitude of the velocity field at the initial and final configurations are plotted below.
+<table border="0">
+<td> <img src="results/2d-tg-init.png">
+<td> <img src="results/2d-tg.png">
+</table>
 
 #### Triple Point Problem [Experimental]
 ```sh
@@ -241,11 +273,10 @@ The Laghos miniapp can be built against Laglos:
 
 #### Misc (2D) 
 ```sh
-./Laglos -m ../data/shocktube.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0                     ## Sod
-./Laglos -m ../data/distorted-tube-2.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0              ## Sod on a distorted mesh
-./Laglos -m ../data/ref-square-c0.mesh -p 10 -tf 0.6 -cfl 0.5 -rs 6                  ## Noh
-./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4                     ## ICF [Untested]
-./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0               ## Kidder ball [Untested]
+./Laglos -m ../data/shocktube.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0 -vis                ## Sod
+./Laglos -m ../data/distorted-tube-2.mesh -p 2 -tf 0.225 -cfl 0.5 -rs 0 -vis         ## Sod on a distorted  mesh
+./Laglos -m ../data/ref-square.mesh -p 18 -tf 0.6 -cfl 0.5 -rs 4 -vis                ## ICF [Untested]
+./Laglos -m ../data/ref-rectangle-q1q2.mesh -p 17 -tf 2 -cfl 0.5 -rs 0 -vis          ## Kidder ball [Untested]
 ./Laglos -m ../data/tube-np5-1.mesh -p 13 -cfl 0.5 -tf 1.25 -rs 2 -vis               ## Vdw2 
 ./Laglos -m ../data/tube-np5-1.mesh -p 14 -cfl 0.5 -tf 0.4 -rs 2 -vis                ## Vdw3 
 ./Laglos -m ../data/tube-n1p7-1.mesh -p 15 -cfl 1.3 -tf 0.005 -rs 8 -vis             ## Vdw4

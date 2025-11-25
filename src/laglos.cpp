@@ -62,6 +62,14 @@
 *     p = 50 --> elastic shocktube
 *     p = 51 --> elastic impact
 *     p = 52 --> elastic shear
+*     p = 53 --> elastic human leg impact (Bonet-Burton 1997)
+*     p = 54 --> elastic projectile plate
+*     p = 55 --> elastic shear in y direction
+*     p = 56 --> elastic impact with shear
+*     p = 57 --> elastic rotation (Favrie 2014 Sec. 5.4)
+*     p = 58 --> elast Noh (Experimental)
+*     p = 59 --> elastic projectile impact (Vilar-Maire-Shu 2D)
+*     p = 60 --> elastic test
 *     p = 100 --> TestBCs 
 ***/
 #include "mfem.hpp"

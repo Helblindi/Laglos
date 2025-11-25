@@ -100,6 +100,7 @@ Laglos/  coinhsl-x.y.z.tar.gz  hiop/  mfem/
 #### 3. Build HiOp (Optional - for optimization)
 
 ```sh
+~/Workspace> git clone https://github.com/LLNL/hiop.git
 ~/Workspace> cd hiop
 ~/Workspace/hiop> mkdir build && cd build
 ~/Workspace/hiop/build> cmake \
@@ -470,21 +471,30 @@ The percentage of cells violating mass conservation is reported as the number of
 
 For problems with known exact solutions, Laglos can compute convergence rates.
 
-**Step 1:** Configure test parameters in `scripts/convergence_test_script.sh`
+**Step 1:** Configure test parameters in `scripts/run_convergence_test.sh`
 
 ```bash
-PROBLEM=40                           # Problem number
-MESH="../data/ref-segment.mesh"      # Base mesh
-FINAL_TIME=0.6                       # Simulation end time
-CFL=0.5                              # CFL number
-rs_levels=(4 5 6 7)                  # Refinement levels to test
-OUTPUT_DIR="convergence_results"     # Output directory
+# results_dir="/home/sheridanm/scratch/Laglos-results"
+results_dir="${LAGLOS_BINARY_DIR}/results" 
+mesh_file="../data/ref-segment.mesh"     
+problem=2                     # problem indicator
+final_time=.225               # final time
+cfl=0.5                       # CFL number
+mv_option=2                   # mesh velocity option
+fv_option=0                   # face velocity option
+# mv_it_op=2                  # mesh velocity iteration option
+# mv_iter_n=2                 # number of iterations
+elastic_op=0                  # type of elasticity closure
+MIN_RS=3                      # min refinement number
+MAX_RS=8                      # max refinement number
+output_location="testing/sod" 
+output_file_prefix="${results_dir}/${output_location}/out-sod-r"
 ```
 
-**Step 2:** Run convergence suite
+**Step 2:** Run convergence script
 
 ```sh
-~/Laglos/scripts> ./convergence_test_script.sh
+~/Laglos/scripts> bash ./run_convergence_test.sh
 ```
 
 This will execute Laglos at each specified refinement level and save results.
@@ -492,12 +502,20 @@ This will execute Laglos at each specified refinement level and save results.
 **Step 3:** Generate convergence table
 
 ```sh
-~/Laglos/scripts> python3 compute_convergence.py --results-dir ../build/convergence_results/
+~/Laglos/scripts> python3 compute_convergence.py ../build/results/testing/sod/convergence/temp_output
 ```
 
 **Expected Output:**
+The results from the unmodified 'scripts/run_convergence_test.sh' file give the following convergence table for the Sod 1D problem.
 
-**TODO:** Add an example convergence table here for the Sod case. Edit default convergence analysis script to correspond to this output.
+| # dof | L1 Error  | Rate     | Mass Loss    | Rate  |
+|-------|-----------|----------|--------------|-------|
+| 8     | 0.236658  | ---      | 0            | ---   |
+| 16    | 0.179517  | 0.398685 | 0            | ---   |
+| 32    | 0.126514  | 0.504826 | 1.54198e-17  | ---   |
+| 64    | 0.0781721 | 0.69457  | 1.19503e-17  | ---   |
+| 128   | 0.0488305 | 0.678872 | 7.90263e-18  | ---   |
+| 256   | 0.0306059 | 0.673972 | 1.11793e-17  | ---   |
 
 The composite relative $L^1$ error is computed as:
 

@@ -1,4 +1,23 @@
-# Lagrangian
+# Laglos - Lagrangian Low-Order Solver
+
+Laglos (LAGrangian Low-Order Solver) is a high-performance computational fluid dynamics miniapp for solving the time-dependent Euler equations of compressible gas dynamics in a moving Lagrangian frame. Built on the MFEM finite element library, Laglos employs unstructured low-order finite element spatial discretization with forward Euler time-stepping to simulate complex hydrodynamic phenomena.
+
+## Key Features
+
+- **Lagrangian Framework**: Solves hydrodynamic equations on a moving mesh that follows material flow
+- **Low-Order Finite Elements**: Uses robust DG0/Q1 discretizations for improved stability
+- **Flexible Problem Suite**: Includes classic test problems (Sod shock tube, Sedov blast wave, Noh implosion, etc.)
+- **Advanced Physics**: Supports various equations of state including Van der Waals gas models
+- **Viscosity Options**: Multiple artificial viscosity formulations for shock capturing
+- **Mesh Velocity Algorithms**: Configurable mesh motion schemes for optimal Lagrangian evolution
+
+## Applications
+
+Laglos is designed for:
+- Compressible hydrodynamics research
+- Shock physics simulations
+- Inertial confinement fusion modeling
+- Algorithm development for Lagrangian methods
 > ## Optional runtime parameters
 > - -mv - mesh velocity option
 > - -fv - face velocity option 

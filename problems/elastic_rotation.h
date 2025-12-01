@@ -60,9 +60,14 @@ private:
    const double _mu = 2.6E10;
 
    /* Problem specific parameters, can be tweaked */
-   const double omega = 40000; // revolutions per second
+   const double omega = 40000.; // revolutions per second
    const double R = 0.05;      // Internal radius
    const double R2 = R*R;
+
+   /* Aortic parameters */
+   double _stiffness = 9.63E5;
+   double _A1 = 0.5 * _stiffness, _B1 = 0.5 * _stiffness, _D1 = 0.5 * (1.5*_stiffness), _w1 = 0.49;
+   double _theta = M_PI/4.; // angle of fiber direction
 
 public:
    ElasticRotation(const int &_dim) : ProblemBase(_dim)
@@ -85,6 +90,13 @@ public:
 
       // Set Equation of state
       this->eos = std::unique_ptr<EquationOfState>(new NobleAbelStiffenedGasEOS(this->b,this->q,this->p_inf));
+
+      /* Overwrite aortic params from ProblemBase class */
+      this->A1 = _A1;
+      this->B1 = _B1;
+      this->D1 = _D1;
+      this->w1 = _w1;
+      this->theta = _theta;
    }
    
    /* Override specific update functions */

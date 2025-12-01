@@ -269,6 +269,19 @@ add_test(NAME CompareOT1TG
 )
 
 #### Test elastic functions ####
+file(COPY test_elastic_shocktube.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_shocktube.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+add_test(
+    NAME TestElasticShocktube
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_shocktube.sh ${PROJECT_SOURCE_DIR} "elastic_shocktube_output.txt"
+)
+add_test(NAME CompareElasticShocktube
+  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/compare_ignore_last_lines.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/elastic_shocktube_output.txt
+    ${PROJECT_SOURCE_DIR}/tests/output_ref/elastic_shocktube_NH.txt
+    11 # Ignore timing data at the end of the file as this fluctuates
+)
+
 ## Elastic Impact
 file(COPY test_elastic_impact.sh DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/test_elastic_impact.sh PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

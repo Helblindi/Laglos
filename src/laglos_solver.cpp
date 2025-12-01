@@ -917,7 +917,7 @@ void LagrangianLOOperator::ComputeHydroLocRHS(const Vector &S, const int &el, Ve
                } // End face iterator
             }
             /* Vacuum conditions enforced by default */
-            else if (use_elasticity)
+            else if (use_elasticity && pb->get_indicator() != "ElasticShocktube")
             {
                DenseMatrix F_i_bdry = F_i;
                Vector y_bdry(dim+2);

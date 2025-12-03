@@ -473,11 +473,11 @@ public:
     *
     * NOTE: @param sig_dev is not assumed to be dim x dim.
     */
-   inline void ComputeSigma(const int &e, const double &pressure, DenseMatrix &sigma, const int&cell_attr)
+   inline void ComputeSigma(const int &e, const double &rho, const double &pressure, DenseMatrix &sigma, const int&cell_attr)
    {
       // cout << "ProblemBase::ComputeSigma\n";
       DenseMatrix sig_dev(3);
-      ComputeS(e, sig_dev, cell_attr);
+      ComputeS(e, rho, sig_dev, cell_attr);
 
       DenseMatrix I(dim);
       I = 0.;
@@ -530,7 +530,7 @@ public:
       const double sie = specific_internal_energy(U, es);
       const double _pressure = pressure(rho, sie, cell_attr);
 
-      ComputeSigma(e, _pressure, sigma, cell_attr);
+      ComputeSigma(e, rho, _pressure, sigma, cell_attr);
 
       // * is not overridden for Vector class, but *= is
       Vector v; velocity(U, v);
@@ -612,7 +612,7 @@ public:
       return _e_shear;
    }
 
-   virtual void ComputeS(const int &e, DenseMatrix &S, const int &cell_attr) const
+   virtual void ComputeS(const int &e, const double &rho, DenseMatrix &S, const int &cell_attr) const
    {
       /* Objects needed in function */
       DenseMatrix F(3);
@@ -620,7 +620,8 @@ public:
       /* Compute F */
       elastic->ComputeAvgF(e, F);
 
-      shear_closure_model->ComputeCauchyStress(F, S);
+      const double rho0 = rho0_v(e);
+      shear_closure_model->ComputeCauchyStress(F, rho, rho0, S);
       return;
    }
 

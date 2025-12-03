@@ -442,6 +442,7 @@ void LagrangianLOOperator::ComputeSigmaGF(const Vector &S, ParGridFunction &sigm
    assert(sigma_gf.Size() == NDofs_L2);
    sigma_gf = 0.;
    DenseMatrix sigmaD_e(3);
+   Vector U(dim+2);
 
    for (int e = 0; e < NDofs_L2; e++)
    {
@@ -449,7 +450,9 @@ void LagrangianLOOperator::ComputeSigmaGF(const Vector &S, ParGridFunction &sigm
       int el_attr = pmesh->GetAttribute(el);
       if (el_attr >= 50)
       {
-         pb->ComputeS(e, sigmaD_e, el_attr);
+         GetStateVector(S,e,U);
+         double rho = 1./U[0];
+         pb->ComputeS(e, rho, sigmaD_e, el_attr);
          sigma_gf[e] = sigmaD_e.FNorm();
       }
    }
@@ -4451,7 +4454,7 @@ void LagrangianLOOperator::SaveStateVecsToFile(const Vector &S,
       if (use_elasticity)
       {
          DenseMatrix sigmaD(3);
-         pb->ComputeS(i, sigmaD, attr); // sigma
+         pb->ComputeS(i, rho, sigmaD, attr); // sigma
          // for (int i = 0; i < dim; i++) { fstream_sv << "," << sigma(0,i); }
          fstream_sv << "," << sigmaD(0,0) << "," << sigmaD(0,1) << "," << sigmaD(0,2)
                     << "," << sigmaD(1,0) << "," << sigmaD(1,1) << "," << sigmaD(1,2)

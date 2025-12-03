@@ -21,10 +21,10 @@ public:
    virtual double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const {
       MFEM_ABORT("Must override.\n");
    } // virtual function, must be overridden;
-   virtual void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const {
+   virtual void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const {
       MFEM_ABORT("Must override.\n");
    }
-   virtual void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const;
+   virtual void ComputeCauchyStress(const DenseMatrix &F, const double &rho, const double &rho0, DenseMatrix &sigmaD) const;
    void ComputeIsotropicInvariants(const DenseMatrix &C, double &J1, double &J2, double &J3) const;
    void ComputeIsotropicInvariantsReduced(const DenseMatrix &C, double &j1, double &j2) const;
 
@@ -50,7 +50,7 @@ public:
    ShearClosureNeoHookean(const double &_mu) : ShearClosure(_mu) {}
    virtual ~ShearClosureNeoHookean() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
-   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
+   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const override;
 }; // end of ShearClosureNeoHookean class
 
 class ShearClosureMooneyRivlin : public ShearClosure
@@ -59,7 +59,7 @@ public:
    ShearClosureMooneyRivlin(const double &_mu) : ShearClosure(_mu) {}
    virtual ~ShearClosureMooneyRivlin() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
-   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
+   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const override;
 }; // end of ShearClosureMooneyRivlin class
 
 class ShearClosureAortic : public ShearClosure
@@ -74,7 +74,7 @@ public:
                       const double &_A1, const double &_B1);
    virtual ~ShearClosureAortic() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
-   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
+   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const override;
    void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const override;
    void ComputeCauchyStressAnisotropicComponent(const DenseMatrix &F, DenseMatrix &sigmaD_an) const override;
 }; // end of ShearClosureAortic class
@@ -94,8 +94,8 @@ public:
       }
    virtual ~ShearClosureTransverselyIsotropic() {}
    double ComputeShearEnergy(const DenseMatrix &F, const double &rho0=1.) const override;
-   void ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const override;
-   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const override;
+   void ComputeCauchyStress(const DenseMatrix &F, const double &rho, const double &rho0, DenseMatrix &sigmaD) const override;
+   void ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const override;
    void ComputeShearEnergyAnisotropicDerivatives(const DenseMatrix &F, double &des_dj4, double &des_dj5) const override;
 }; // end of ShearClosureTransverselyIsotropic class
 

@@ -210,20 +210,21 @@ public:
       return 0.;
    }
 
-   void ComputeS(const int &e, DenseMatrix &S, const int &cell_attr) const override
+   void ComputeS(const int &e, const double &rho, DenseMatrix &S, const int &cell_attr) const override
    {
       DenseMatrix F(3);
       elastic->ComputeAvgF(e, F);
+      const double rho0 = rho0_v(e);
       switch (cell_attr)
       {
          case 51: // bone
-            shear_closure_bone->ComputeCauchyStress(F, S);
+            shear_closure_bone->ComputeCauchyStress(F, rho, rho0, S);
             return;
          case 52: // flesh
-            shear_closure_flesh->ComputeCauchyStress(F, S);
+            shear_closure_flesh->ComputeCauchyStress(F, rho, rho0, S);
             return;
          case 53: // bar
-            shear_closure_bar->ComputeCauchyStress(F, S);
+            shear_closure_bar->ComputeCauchyStress(F, rho, rho0, S);
             return;
          default:
          {

@@ -193,8 +193,9 @@ int tester()
 
    /* If F is the identity, then es = 0 */
    DenseMatrix sigma(3);
+
    double e_shear = -1.;
-   problem_class->ComputeS(0, sigma);
+   problem_class->ComputeS(0, 1, sigma);
    e_shear = problem_class->e_shear(0);
    if (e_shear > tol)
    {

@@ -24,7 +24,7 @@ void ShearClosure::ComputeIsotropicInvariantsReduced(const DenseMatrix &C, doubl
    j2 = c2.Trace();
 }
 
-void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const
+void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, const double &rho, const double &rho0, DenseMatrix &sigmaD) const
 {
    DenseMatrix FT(3), C(3), c(3), c2(3), B(3), b(3),b2(3), I(3);
    for (int i = 0; i < 3; i++) { I(i,i) = 1.; }
@@ -48,7 +48,7 @@ void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD
    mfem::Add(b2, I, -1./3. * b2.Trace(), b2_tf);
 
    double des_dj1, des_dj2;
-   this->ComputeShearEnergyIsotropicDerivatives(C, des_dj1, des_dj2);
+   this->ComputeShearEnergyIsotropicDerivatives(C, rho0, des_dj1, des_dj2);
    double c_coeff = des_dj1;
    double c2_coeff = 2.*des_dj2;
    mfem::Add(c_coeff, b_tf, c2_coeff, b2_tf, sigmaD);
@@ -59,7 +59,7 @@ void ShearClosure::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD
       sigmaD.Add(1., sigmaD_an);
    }
 
-   sigmaD *= 2. / F.Det();
+   sigmaD *= 2. * rho;
 }
 
 
@@ -79,9 +79,9 @@ double ShearClosureNeoHookean::ComputeShearEnergy(const DenseMatrix &F, const do
    return mu / 2. / rho0 * (j1 - 3.);
 }
 
-void ShearClosureNeoHookean::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+void ShearClosureNeoHookean::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0,double &des_dj1, double &des_dj2) const
 {
-   des_dj1 = mu / 2.;
+   des_dj1 = mu / 2. / rho0;
    des_dj2 = 0.;
 }
 
@@ -102,12 +102,12 @@ double ShearClosureMooneyRivlin::ComputeShearEnergy(const DenseMatrix &F, const 
    return mu / 32. / rho0 * (pow(j1,4) - 2*j2*j1*j1 + j2*j2 - 8.*j1 - 12.);
 }
 
-void ShearClosureMooneyRivlin::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+void ShearClosureMooneyRivlin::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const
 {
    double j1, j2;
    ComputeIsotropicInvariantsReduced(C, j1, j2);
-   des_dj1 = mu / 8. * (pow(j1,3) - j1*j2 - 2.);
-   des_dj2 = mu / 16. * (-j1*j1 + j2);
+   des_dj1 = mu / 8. / rho0 * (pow(j1,3) - j1*j2 - 2.);
+   des_dj2 = mu / 16. / rho0 * (-j1*j1 + j2);
 }
 
 
@@ -182,7 +182,7 @@ double ShearClosureAortic::ComputeShearEnergy(const DenseMatrix &F, const double
    return val;
 }
 
-void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+void ShearClosureAortic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const
 {
    /* Compute trace values */
    double j1, j2, j4, j5;
@@ -299,7 +299,7 @@ double ShearClosureTransverselyIsotropic::ComputeShearEnergy(const DenseMatrix &
    return e_shear / rho0;
 }
 
-void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F, DenseMatrix &sigmaD) const
+void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F, const double &rho, const double &rho0, DenseMatrix &sigmaD) const
 {
    // cout << "\n\nShearClosureTransverselyIsotropic::ComputeCauchyStress\n\n";
    DenseMatrix FT(3), C(3), b(3), I(3);
@@ -342,10 +342,10 @@ void ShearClosureTransverselyIsotropic::ComputeCauchyStress(const DenseMatrix &F
    return;
 }
 
-void ShearClosureTransverselyIsotropic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, double &des_dj1, double &des_dj2) const
+void ShearClosureTransverselyIsotropic::ComputeShearEnergyIsotropicDerivatives(const DenseMatrix &C, const double &rho0, double &des_dj1, double &des_dj2) const
 {
    /* NH part (isotropic) */
-   des_dj1 = 0.5 * mu;
+   des_dj1 = 0.5 * mu / rho0;
    des_dj2 = 0.0;
 }
 
